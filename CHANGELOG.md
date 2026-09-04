@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/nubisco/acta/compare/v1.0.0...v1.1.0) (2026-09-04)
+
+
+### Features
+
+* Cloudflare Workers deployment target (D1, R2, assets binding) ([4454b30](https://github.com/nubisco/acta/commit/4454b307e64ce611df340cfd54df3d67902edaab))
+
 # 1.0.0 (2026-09-04)
 
 
