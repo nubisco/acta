@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in Acta is broken
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create an item via item_write with ...
+        2. Open the board view ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Acta version
+      placeholder: e.g. 0.3.1 (Settings, or the image tag)
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - Web UI
+        - REST API
+        - MCP
+        - Importers
+        - Webhooks / rules / ingest
+        - Self-host / Docker
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      placeholder: OS, browser, deployment (Docker on NAS, local bun, ...)

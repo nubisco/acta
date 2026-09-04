@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [master]
+    types: [completed]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+          persist-credentials: true
+          path: acta
+
+      - uses: actions/checkout@v6
+        with:
+          repository: nubisco/ui
+          path: ui
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: acta/package.json
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build @nubisco/ui
+        working-directory: ui
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Install dependencies
+        working-directory: acta
+        run: pnpm install --frozen-lockfile
+
+      - name: Disable git hooks in CI
+        working-directory: acta
+        run: git config core.hooksPath /dev/null
+
+      - name: Release
+        working-directory: acta
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npx semantic-release

@@ -1,0 +1,18 @@
+node_modules/
+dist/
+data/
+*.sqlite
+*.sqlite-*
+.DS_Store
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+coverage/
+.env
+.env.*
+
+# Internal design documents: contain Nubisco-internal infrastructure and
+# migration data. Kept local, never published.
+discovery-findings.md
+design-spec.md
+mvp-spec.md
+import-report.json

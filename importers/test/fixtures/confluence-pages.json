@@ -1,0 +1,56 @@
+[
+  {
+    "id": "100",
+    "title": "Nubisco Home",
+    "space": { "key": "NUB" },
+    "body": {
+      "storage": {
+        "value": "<p>Welcome to <strong>Nubisco</strong>.</p><ac:structured-macro ac:name=\"info\"><ac:parameter ac:name=\"title\">Read me</ac:parameter><ac:rich-text-body><p>Start with the manual.</p></ac:rich-text-body></ac:structured-macro><p><ac:link><ri:page ri:content-title=\"The Nubisco Manual\" /></ac:link></p>"
+      }
+    },
+    "version": {
+      "number": 3,
+      "when": "2026-07-29T10:00:00.000Z",
+      "by": { "displayName": "José Silva" }
+    },
+    "history": {
+      "createdBy": { "displayName": "José Silva" },
+      "createdDate": "2026-07-25T08:00:00.000Z"
+    }
+  },
+  {
+    "id": "101",
+    "title": "The Nubisco Manual",
+    "ancestors": [{ "id": "100" }],
+    "space": { "key": "NUB" },
+    "body": {
+      "storage": {
+        "value": "<h2>Chapters</h2><ul><li>One<ul><li>Nested</li></ul></li><li>Two</li></ul><ac:structured-macro ac:name=\"note\"><ac:rich-text-body><p>Careful with permissions.</p><ac:structured-macro ac:name=\"expand\"><ac:parameter ac:name=\"title\">Details inside</ac:parameter><ac:rich-text-body><p>Hidden text.</p></ac:rich-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro><table><tbody><tr><th>Role</th><th>Owner</th></tr><tr><td>CEO</td><td>Jos&#233;</td></tr></tbody></table>"
+      }
+    },
+    "version": { "number": 1 }
+  },
+  {
+    "id": "102",
+    "title": "Stagewright",
+    "ancestors": [{ "id": "100" }, { "id": "101" }],
+    "space": { "key": "NUB" },
+    "metadata": {
+      "properties": {
+        "content-appearance-published": { "value": "full-width" }
+      }
+    },
+    "body": {
+      "storage": {
+        "value": "<p>Board: <a href=\"https://trello.com/b/PZWcHkir/stagewright\">https://trello.com/b/PZWcHkir/stagewright</a></p><ac:structured-macro ac:name=\"code\"><ac:parameter ac:name=\"language\">ts</ac:parameter><ac:plain-text-body><![CDATA[const x = 1]]></ac:plain-text-body></ac:structured-macro><ac:structured-macro ac:name=\"toc\" />"
+      }
+    },
+    "version": { "number": 2 }
+  },
+  {
+    "id": "900",
+    "title": "Personal scratch",
+    "space": { "key": "~jose" },
+    "body": { "storage": { "value": "<p>mine</p>" } }
+  }
+]

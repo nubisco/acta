@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discussions
+    url: https://github.com/nubisco/acta/discussions
+    about: Ask questions and share tips with the community.
+  - name: Security policy
+    url: https://github.com/nubisco/acta/blob/master/SECURITY.md
+    about: Report vulnerabilities privately using the project's responsible disclosure process.

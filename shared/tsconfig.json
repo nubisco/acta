@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // Type-only: crypto and TextEncoder are runtime globals in Bun, browsers,
+    // and Node 20+, but only the DOM lib declares them.
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

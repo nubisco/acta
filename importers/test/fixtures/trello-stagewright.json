@@ -1,0 +1,190 @@
+{
+  "id": "687f2a8000000000000000b1",
+  "name": "Stagewright",
+  "desc": "Main engineering board",
+  "shortLink": "PZWcHkir",
+  "lists": [
+    { "id": "687f2a800000000000000l01", "name": "Backlog", "pos": 1024 },
+    { "id": "687f2a800000000000000l02", "name": "In Progress", "pos": 2048 },
+    {
+      "id": "687f2a800000000000000l03",
+      "name": "Blocked / Waiting",
+      "pos": 3072
+    },
+    {
+      "id": "687f2a800000000000000l04",
+      "name": "Review / Testing",
+      "pos": 4096
+    },
+    { "id": "687f2a800000000000000l05", "name": "Done", "pos": 5120 },
+    {
+      "id": "687f2a800000000000000l06",
+      "name": "Old stuff",
+      "pos": 6144,
+      "closed": true
+    }
+  ],
+  "labels": [
+    { "id": "687f2a800000000000000b01", "name": "Bug", "color": "red" },
+    { "id": "687f2a800000000000000b02", "name": "Infra", "color": "blue" },
+    { "id": "687f2a800000000000000b03", "name": "", "color": "green_dark" },
+    { "id": "687f2a800000000000000b04", "name": "", "color": null }
+  ],
+  "members": [
+    {
+      "id": "687f2a800000000000000m01",
+      "username": "josesilva",
+      "fullName": "José Silva"
+    },
+    {
+      "id": "687f2a800000000000000m02",
+      "username": "ghostuser",
+      "fullName": "Ghost User"
+    }
+  ],
+  "cards": [
+    {
+      "id": "68851e80000000000000c004",
+      "name": "Ship v1.0",
+      "desc": "Released.",
+      "idList": "687f2a800000000000000l05",
+      "pos": 1024,
+      "shortLink": "sl004"
+    },
+    {
+      "id": "68851e80000000000000c001",
+      "name": "Doodloop App Store submission",
+      "desc": "Waiting on Apple review.\n\nUPDATE: resubmitted with new screenshots.",
+      "idList": "687f2a800000000000000l03",
+      "pos": 1024,
+      "idLabels": ["687f2a800000000000000b01"],
+      "idMembers": ["687f2a800000000000000m01", "687f2a800000000000000m02"],
+      "shortLink": "sl001"
+    },
+    {
+      "id": "68851e80000000000000c002",
+      "name": "[SW] Fix crash on load",
+      "desc": "Crashes when the config file is empty.",
+      "idList": "687f2a800000000000000l01",
+      "pos": 1024,
+      "idLabels": ["687f2a800000000000000b03", "687f2a800000000000000b04"],
+      "due": "2026-09-10T09:00:00.000Z",
+      "dueComplete": true,
+      "shortLink": "sl002"
+    },
+    {
+      "id": "68851e80000000000000c005",
+      "name": "Old idea",
+      "desc": "",
+      "closed": true,
+      "idList": "687f2a800000000000000l01",
+      "pos": 2048,
+      "shortLink": "sl005"
+    },
+    {
+      "id": "68851e80000000000000c003",
+      "name": "CMS MCP epic",
+      "desc": "Connect Claude to cms.nubisco.io with the user's own credentials.",
+      "idList": "687f2a800000000000000l02",
+      "pos": 1024,
+      "badges": { "comments": 3 },
+      "shortLink": "sl003"
+    },
+    {
+      "id": "68851e80000000000000c006",
+      "name": "[Support] Vasco - upload fails",
+      "desc": "**From**: Vasco\n**Email**: vasco@example.test\n\nUpload fails on large files.",
+      "idList": "687f2a800000000000000l04",
+      "pos": 1024,
+      "attachments": [
+        {
+          "id": "687f2a800000000000000a01",
+          "name": "design doc",
+          "url": "https://docs.google.com/document/d/abc123",
+          "isUpload": false
+        },
+        {
+          "id": "687f2a800000000000000a02",
+          "name": "inquiry.txt",
+          "url": "https://trello.com/1/cards/c006/attachments/a02/download/inquiry.txt",
+          "isUpload": true,
+          "bytes": 2048,
+          "mimeType": "text/plain"
+        }
+      ],
+      "shortLink": "sl006"
+    },
+    {
+      "id": "68851e80000000000000c007",
+      "name": "Card in archived list",
+      "desc": "",
+      "idList": "687f2a800000000000000l06",
+      "pos": 1024,
+      "shortLink": "sl007"
+    }
+  ],
+  "checklists": [
+    {
+      "id": "687f2a800000000000000h01",
+      "idCard": "68851e80000000000000c003",
+      "name": "Phase 1",
+      "pos": 2048,
+      "checkItems": [
+        {
+          "id": "687f2a800000000000000i02",
+          "name": "Build",
+          "state": "incomplete",
+          "pos": 2048
+        },
+        {
+          "id": "687f2a800000000000000i01",
+          "name": "Design",
+          "state": "complete",
+          "pos": 1024
+        }
+      ]
+    },
+    {
+      "id": "687f2a800000000000000h02",
+      "idCard": "68851e80000000000000c003",
+      "name": "Phase 0",
+      "pos": 1024,
+      "checkItems": [
+        {
+          "id": "687f2a800000000000000i03",
+          "name": "Scope",
+          "state": "complete",
+          "pos": 1024
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "687f2a800000000000000t02",
+      "type": "commentCard",
+      "date": "2026-08-29T10:00:00.000Z",
+      "data": {
+        "card": { "id": "68851e80000000000000c003" },
+        "text": "Second comment: shipping the MCP server first."
+      },
+      "memberCreator": { "username": "josesilva", "fullName": "José Silva" }
+    },
+    {
+      "id": "687f2a800000000000000t01",
+      "type": "commentCard",
+      "date": "2026-08-28T09:00:00.000Z",
+      "data": {
+        "card": { "id": "68851e80000000000000c003" },
+        "text": "First comment with a design question."
+      },
+      "memberCreator": { "username": "ivanm", "fullName": "Ivan Marjanovic" }
+    },
+    {
+      "id": "687f2a800000000000000t03",
+      "type": "updateCard",
+      "date": "2026-08-30T10:00:00.000Z",
+      "data": { "card": { "id": "68851e80000000000000c003" } }
+    }
+  ]
+}

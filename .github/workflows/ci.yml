@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+
+    steps:
+      # Dev consumes @nubisco/ui via a pnpm link to the sibling checkout, so
+      # CI reproduces the same layout: build ui first, then the link resolves
+      # exactly as it does locally.
+      - uses: actions/checkout@v6
+        with:
+          path: acta
+
+      - uses: actions/checkout@v6
+        with:
+          repository: nubisco/ui
+          path: ui
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: acta/package.json
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build @nubisco/ui
+        working-directory: ui
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Install dependencies
+        working-directory: acta
+        run: pnpm install --frozen-lockfile
+
+      - name: Quality gates (test, lint, format, types)
+        working-directory: acta
+        run: pnpm quality:check
+
+      - name: Build
+        working-directory: acta
+        run: pnpm build

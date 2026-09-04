@@ -1,0 +1,22 @@
+{
+  "name": "@nubisco/acta-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "true",
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "types:check": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@nubisco/acta-shared": "workspace:*",
+    "hono": "^4.7.0",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.4",
+    "typescript": "^5.9.3"
+  }
+}

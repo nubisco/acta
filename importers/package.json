@@ -1,0 +1,23 @@
+{
+  "name": "@nubisco/acta-importers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "true",
+    "build": "true",
+    "test": "bun test",
+    "types:check": "tsc -p tsconfig.json",
+    "trello-import": "bun src/trello-import.ts",
+    "confluence-import": "bun src/confluence-import.ts"
+  },
+  "dependencies": {
+    "@nubisco/acta-shared": "workspace:*",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@nubisco/acta-server": "workspace:*",
+    "@types/bun": "^1.3.4",
+    "typescript": "^5.9.3"
+  }
+}

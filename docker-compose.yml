@@ -1,0 +1,27 @@
+services:
+  acta:
+    image: ghcr.io/nubisco/acta:latest
+    pull_policy: always
+    container_name: acta
+    restart: unless-stopped
+    ports:
+      - '4460:4460'
+    environment:
+      TZ: Europe/Lisbon
+      ACTA_WORKSPACE: Nubisco
+      ACTA_ADMIN_EMAIL: ${ACTA_ADMIN_EMAIL:?set in .env}
+      ACTA_ADMIN_HANDLE: ${ACTA_ADMIN_HANDLE:-jose}
+      ACTA_ADMIN_NAME: ${ACTA_ADMIN_NAME:-José Silva}
+    volumes:
+      - acta-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - bun
+        - -e
+        - "fetch('http://localhost:4460/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+
+volumes:
+  acta-data:

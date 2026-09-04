@@ -1,0 +1,90 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [Release]
+    branches: [master]
+    types: [completed]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  image:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: master
+          path: acta
+
+      - uses: actions/checkout@v6
+        with:
+          repository: nubisco/ui
+          path: ui
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: acta/package.json
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build @nubisco/ui
+        working-directory: ui
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Install dependencies
+        working-directory: acta
+        run: pnpm install --frozen-lockfile
+
+      # The image ships prebuilt artifacts (see Dockerfile): the SPA and a
+      # single-file server bundle. Both are pure JS, so one build serves
+      # every platform.
+      - name: Build artifacts
+        working-directory: acta
+        run: |
+          pnpm -C web build
+          (cd server && bun build src/index.ts --target=bun --outdir=dist)
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get version from package.json
+        id: version
+        working-directory: acta
+        run: echo "VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push (multi-arch)
+        uses: docker/build-push-action@v6
+        with:
+          context: acta
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
