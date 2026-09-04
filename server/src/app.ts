@@ -4,8 +4,9 @@ import type { IActorCtx } from './core/ctx'
 import { bootstrapWorkspace, type IBootstrapOptions } from './core/bootstrap'
 import { mcpRoutes } from './mcp'
 import { apiRoutes } from './routes/api'
-import { authRoutes, requireAuth } from './routes/auth'
+import { authRoutes, requireAuth, type ISsoRuntime } from './routes/auth'
 import { ingestRoutes } from './routes/ingest'
+import { JwksVerifier, type ISsoConfig } from './core/sso'
 import { AttachmentStore, type IBlobStore } from './services/attachments'
 import { startRulesEngine } from './services/rules'
 import { startWebhookDispatcher } from './services/webhooks'
@@ -29,6 +30,8 @@ export interface IAppOptions {
    * entrypoint passes the assets binding.
    */
   serveAsset?: (path: string) => Promise<Response | null>
+  /** External SSO configuration; local OTP stays available regardless. */
+  sso?: ISsoConfig
   /** Overridable for tests. */
   fetchImpl?: typeof fetch
   webhookBackoffMs?: number
@@ -61,7 +64,15 @@ export async function createApp(
     c.json({ ok: true, service: 'acta', ts: Date.now() }),
   )
 
-  app.route('/api/v1/auth', authRoutes())
+  const ssoRuntime: ISsoRuntime | undefined = opts.sso
+    ? {
+        config: opts.sso,
+        verifier: new JwksVerifier(opts.sso.issuer, {
+          fetchImpl: opts.fetchImpl,
+        }),
+      }
+    : undefined
+  app.route('/api/v1/auth', authRoutes(ssoRuntime))
   app.route('/api/v1/ingest', ingestRoutes())
   app.use('/api/v1/*', requireAuth())
   app.route('/api/v1', apiRoutes(store))

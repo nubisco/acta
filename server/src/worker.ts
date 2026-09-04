@@ -7,6 +7,7 @@
 import type { Hono } from 'hono'
 import { createApp, type IAppEnv } from './app'
 import { setDeferrer } from './core/defer'
+import { ssoConfigFromEnv } from './core/sso'
 import { D1Driver, type ID1Database } from './db'
 import type { IBlobStore } from './services/attachments'
 
@@ -31,6 +32,10 @@ interface IWorkerEnv {
   ACTA_ADMIN_EMAIL?: string
   ACTA_ADMIN_HANDLE?: string
   ACTA_ADMIN_NAME?: string
+  ACTA_SSO_ISSUER?: string
+  ACTA_SSO_APP_ID?: string
+  ACTA_SSO_AUTHORIZE_URL?: string
+  ACTA_SSO_AUTO_PROVISION?: string
 }
 
 interface IExecutionContext {
@@ -64,6 +69,10 @@ function getApp(env: IWorkerEnv): Promise<Hono<IAppEnv>> {
         )
         return res.status === 404 ? null : res
       },
+      sso:
+        ssoConfigFromEnv(
+          env as unknown as Record<string, string | undefined>,
+        ) ?? undefined,
       bootstrap: {
         workspaceName: env.ACTA_WORKSPACE ?? 'Workspace',
         adminEmail: env.ACTA_ADMIN_EMAIL,

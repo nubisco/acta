@@ -10,7 +10,9 @@ import {
   sha256Hex,
   type TOtpSender,
 } from '../core/auth'
-import { now, type IActorCtx } from '../core/ctx'
+import { now, type IActorCtx, type ICtx } from '../core/ctx'
+import { emitEvent, flushPendingEvents } from '../core/events'
+import { JwksVerifier, type ISsoConfig } from '../core/sso'
 import type { ISqlDriver } from '../db'
 
 const SESSION_COOKIE = 'acta_session'
@@ -30,8 +32,140 @@ export function setOtpSender(sender: TOtpSender): void {
   otpSender = sender
 }
 
-export function authRoutes(): Hono<IAuthEnv> {
+export interface ISsoRuntime {
+  config: ISsoConfig
+  verifier: JwksVerifier
+}
+
+const SSO_STATE_COOKIE = 'acta_sso_state'
+
+export function authRoutes(sso?: ISsoRuntime): Hono<IAuthEnv> {
   const app = new Hono<IAuthEnv>()
+
+  app.get('/config', (c) => c.json({ sso: sso !== undefined, otp: true }))
+
+  app.get('/sso/start', (c) => {
+    if (!sso) return c.json({ error: 'sso not configured' }, 404)
+    const state = randomToken(16)
+    setCookie(c, SSO_STATE_COOKIE, state, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: 600,
+    })
+    const url = new URL(sso.config.authorizeUrl)
+    url.searchParams.set('app_id', sso.config.appId)
+    url.searchParams.set(
+      'redirect_uri',
+      new URL('/api/v1/auth/sso/callback', c.req.url).toString(),
+    )
+    url.searchParams.set('state', state)
+    return c.redirect(url.toString(), 302)
+  })
+
+  app.get('/sso/callback', async (c) => {
+    if (!sso) return c.json({ error: 'sso not configured' }, 404)
+    const error = c.req.query('error')
+    if (error) return c.redirect(`/login?error=${encodeURIComponent(error)}`)
+    const token = c.req.query('token')
+    const state = c.req.query('state')
+    const expectedState = getCookie(c, SSO_STATE_COOKIE)
+    deleteCookie(c, SSO_STATE_COOKIE, { path: '/' })
+    if (!token || !state || !expectedState || state !== expectedState) {
+      return c.redirect('/login?error=sso_state')
+    }
+    let claims
+    try {
+      claims = await sso.verifier.verify(token)
+    } catch {
+      return c.redirect('/login?error=sso_token')
+    }
+    const db = c.get('db')
+    const workspaceId = c.get('workspaceId')
+    let member = (
+      await db.query<{ id: string; disabled: number }>(
+        "SELECT id, disabled FROM actor WHERE workspace_id = ? AND email = ? AND kind = 'human'",
+        [workspaceId, claims.email],
+      )
+    )[0]
+    if (member?.disabled === 1) return c.redirect('/login?error=disabled')
+    if (!member) {
+      if (!sso.config.autoProvision)
+        return c.redirect('/login?error=not_a_member')
+      const id = newId('act')
+      const base = claims.email
+        .split('@')[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, '-')
+        .replace(/^-|-$/g, '')
+      const clash = await db.query(
+        'SELECT id FROM actor WHERE workspace_id = ? AND handle = ?',
+        [workspaceId, base],
+      )
+      const handle = clash.length > 0 ? `${base}-${id.slice(-4)}` : base
+      await db.run(
+        `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
+         VALUES (?, ?, 'human', ?, ?, ?, ?, ?)`,
+        [
+          id,
+          workspaceId,
+          handle,
+          claims.name ?? claims.email,
+          claims.email,
+          claims.role === 'admin' ? 'admin' : 'member',
+          now(),
+        ],
+      )
+      const system = (
+        await db.query<{ id: string; handle: string }>(
+          "SELECT id, handle FROM actor WHERE workspace_id = ? AND kind = 'system' LIMIT 1",
+          [workspaceId],
+        )
+      )[0]
+      const ctx: ICtx = {
+        db,
+        workspaceId,
+        actor: {
+          id: system.id,
+          kind: 'system',
+          handle: system.handle,
+          role: 'member',
+          scopes: ['write'],
+        },
+      }
+      await emitEvent(
+        ctx,
+        'member.provisioned',
+        'actor',
+        id,
+        `provisioned member @${handle} via SSO`,
+      )
+      flushPendingEvents()
+      member = { id, disabled: 0 }
+    }
+    const memberRole = (
+      await db.query<{ role: string }>('SELECT role FROM actor WHERE id = ?', [
+        member.id,
+      ])
+    )[0].role
+    const session = await createToken(
+      db,
+      workspaceId,
+      member.id,
+      'session',
+      memberRole === 'admin' ? ['read', 'write', 'admin'] : ['read', 'write'],
+      SESSION_TTL,
+    )
+    setCookie(c, SESSION_COOKIE, session, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: SESSION_TTL / 1000,
+    })
+    return c.redirect('/', 302)
+  })
 
   app.post('/otp', async (c) => {
     const body = z.object({ email: z.email() }).parse(await c.req.json())
@@ -85,8 +219,8 @@ export function authRoutes(): Hono<IAuthEnv> {
       [workspaceId, body.email],
     )
     const actor = (
-      await db.query<{ id: string }>(
-        'SELECT id FROM actor WHERE workspace_id = ? AND email = ? AND disabled = 0',
+      await db.query<{ id: string; role: string }>(
+        'SELECT id, role FROM actor WHERE workspace_id = ? AND email = ? AND disabled = 0',
         [workspaceId, body.email],
       )
     )[0]
@@ -95,7 +229,7 @@ export function authRoutes(): Hono<IAuthEnv> {
       workspaceId,
       actor.id,
       'session',
-      ['read', 'write', 'admin'],
+      actor.role === 'admin' ? ['read', 'write', 'admin'] : ['read', 'write'],
       SESSION_TTL,
     )
     setCookie(c, SESSION_COOKIE, token, {

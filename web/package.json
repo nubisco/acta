@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@nubisco/acta-shared": "workspace:*",
-    "@nubisco/ui": "^3.2.0",
+    "@nubisco/ui": "^3.3.0",
     "markdown-it": "^15.0.1",
     "vue": "^3.5.30",
     "vue-i18n": "^11.3.2",

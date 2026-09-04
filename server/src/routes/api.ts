@@ -13,7 +13,7 @@ import {
 } from '@nubisco/acta-shared'
 import { ApiError, type ICtx } from '../core/ctx'
 import { createToken } from '../core/auth'
-import { onEvent } from '../core/events'
+import { emitEvent, flushPendingEvents, onEvent } from '../core/events'
 import { boardWrite } from '../services/boards'
 import { docWrite } from '../services/docs'
 import { itemWrite } from '../services/items'
@@ -234,6 +234,94 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
         'content-disposition': `attachment; filename="${meta.filename.replace(/"/g, '')}"`,
       },
     })
+  })
+
+  // Members (admin) ---------------------------------------------------------
+  app.post('/members', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    const body = z
+      .object({
+        email: z.email(),
+        handle: z
+          .string()
+          .min(2)
+          .max(40)
+          .regex(/^[a-z0-9-]+$/),
+        name: z.string().min(1).max(120),
+        role: z.enum(['admin', 'member']).default('member'),
+      })
+      .parse(await c.req.json())
+    const clash = await ctx.db.query(
+      'SELECT id FROM actor WHERE workspace_id = ? AND (handle = ? OR email = ?)',
+      [ctx.workspaceId, body.handle, body.email],
+    )
+    if (clash.length > 0)
+      throw new ApiError(409, 'a member with that handle or email exists')
+    const id = newId('act')
+    await ctx.db.run(
+      `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
+       VALUES (?, ?, 'human', ?, ?, ?, ?, ?)`,
+      [
+        id,
+        ctx.workspaceId,
+        body.handle,
+        body.name,
+        body.email,
+        body.role,
+        now(),
+      ],
+    )
+    await emitEvent(
+      ctx,
+      'member.added',
+      'actor',
+      id,
+      `added member @${body.handle}`,
+    )
+    flushPendingEvents()
+    return c.json({ id, handle: body.handle })
+  })
+
+  app.patch('/members/:id', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    const body = z
+      .object({
+        role: z.enum(['admin', 'member']).optional(),
+        disabled: z.boolean().optional(),
+        name: z.string().min(1).max(120).optional(),
+      })
+      .parse(await c.req.json())
+    if (c.req.param('id') === ctx.actor.id && body.disabled)
+      throw new ApiError(400, 'you cannot disable yourself')
+    await ctx.db.run(
+      `UPDATE actor SET role = COALESCE(?, role), name = COALESCE(?, name),
+              disabled = COALESCE(?, disabled)
+        WHERE workspace_id = ? AND id = ? AND kind = 'human'`,
+      [
+        body.role ?? null,
+        body.name ?? null,
+        body.disabled === undefined ? null : body.disabled ? 1 : 0,
+        ctx.workspaceId,
+        c.req.param('id'),
+      ],
+    )
+    if (body.disabled) {
+      await ctx.db.run(
+        'UPDATE auth_token SET revoked_at = ? WHERE workspace_id = ? AND actor_id = ?',
+        [now(), ctx.workspaceId, c.req.param('id')],
+      )
+    }
+    await emitEvent(
+      ctx,
+      'member.updated',
+      'actor',
+      c.req.param('id'),
+      'updated member',
+    )
+    flushPendingEvents()
+    return c.json({ ok: true })
   })
 
   // Agent tokens (admin, human sessions only: design-spec §4) ---------------

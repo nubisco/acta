@@ -6,6 +6,13 @@
       <p v-if="stage === 'email'">Sign in with your workspace email.</p>
       <p v-else>Enter the six-digit code sent to {{ email }}.</p>
 
+      <template v-if="ssoAvailable && stage === 'email'">
+        <NbButton variant="primary" @click="startSso">
+          Continue with single sign-on
+        </NbButton>
+        <p class="login__divider">or use a one-time code</p>
+      </template>
+
       <NbForm v-if="stage === 'email'" @submit.prevent="requestCode">
         <NbField label="Email">
           <NbTextInput
@@ -42,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   NbButton,
@@ -60,10 +67,34 @@ const email = ref('')
 const code = ref('')
 const stage = ref<'email' | 'code'>('email')
 const busy = ref(false)
+const ssoAvailable = ref(false)
 const toast = useToast()
 const router = useRouter()
 const route = useRoute()
 const ws = useWorkspace()
+
+onMounted(async () => {
+  try {
+    const res = await fetch('/api/v1/auth/config')
+    ssoAvailable.value = ((await res.json()) as { sso: boolean }).sso
+  } catch {
+    ssoAvailable.value = false
+  }
+  const error = route.query.error
+  if (typeof error === 'string') {
+    const messages: Record<string, string> = {
+      not_a_member: 'Your account is not a member of this workspace',
+      disabled: 'This account is disabled',
+      sso_state: 'The sign-in attempt expired; try again',
+      sso_token: 'Single sign-on failed; try again',
+    }
+    toast.error(messages[error] ?? 'Sign-in failed', { retain: true })
+  }
+})
+
+function startSso(): void {
+  window.location.href = '/api/v1/auth/sso/start'
+}
 
 async function requestCode(): Promise<void> {
   busy.value = true
@@ -110,6 +141,12 @@ async function verify(): Promise<void> {
   &__mark {
     width: 48px;
     margin-inline: auto;
+  }
+
+  &__divider {
+    font-size: 0.85rem;
+    opacity: 0.6;
+    margin: 0;
   }
 }
 </style>

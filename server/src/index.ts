@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs'
 import { bunAssetReader, createApp } from './app'
+import { ssoConfigFromEnv } from './core/sso'
 import { openDb } from './db'
 
 const DATA_DIR = process.env.ACTA_DATA_DIR ?? './data'
@@ -12,6 +13,7 @@ const db = await openDb(`${DATA_DIR}/acta.sqlite`)
 const app = await createApp(db, {
   dataDir: DATA_DIR,
   serveAsset: WEB_DIST ? bunAssetReader(WEB_DIST) : undefined,
+  sso: ssoConfigFromEnv(process.env) ?? undefined,
   bootstrap: {
     workspaceName: process.env.ACTA_WORKSPACE ?? 'Nubisco',
     adminEmail: process.env.ACTA_ADMIN_EMAIL,
