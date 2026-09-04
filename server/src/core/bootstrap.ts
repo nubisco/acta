@@ -14,11 +14,11 @@ export interface IBootstrapOptions {
  * Ensure a workspace and its first admin exist (single-workspace self-host).
  * Returns the workspace id. Idempotent.
  */
-export function bootstrapWorkspace(
+export async function bootstrapWorkspace(
   db: ISqlDriver,
   opts: IBootstrapOptions = {},
-): string {
-  const existing = db.query<{ id: string }>(
+): Promise<string> {
+  const existing = await db.query<{ id: string }>(
     'SELECT id FROM workspace ORDER BY created_at LIMIT 1',
   )
   if (existing.length > 0) return existing[0].id
@@ -26,13 +26,12 @@ export function bootstrapWorkspace(
   const ts = now()
   const workspaceId = newId('ws')
   const adminId = newId('act')
-  db.transaction(() => {
-    db.run('INSERT INTO workspace (id, name, created_at) VALUES (?, ?, ?)', [
-      workspaceId,
-      opts.workspaceName ?? 'Nubisco',
-      ts,
-    ])
-    db.run(
+  await db.transaction(async () => {
+    await db.run(
+      'INSERT INTO workspace (id, name, created_at) VALUES (?, ?, ?)',
+      [workspaceId, opts.workspaceName ?? 'Nubisco', ts],
+    )
+    await db.run(
       `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
        VALUES (?, ?, 'human', ?, ?, ?, 'admin', ?)`,
       [
@@ -44,7 +43,7 @@ export function bootstrapWorkspace(
         ts,
       ],
     )
-    db.run(
+    await db.run(
       `INSERT INTO actor (id, workspace_id, kind, handle, name, role, created_at)
        VALUES (?, ?, 'system', 'acta', 'Acta', 'member', ?)`,
       [newId('act'), workspaceId, ts],
@@ -60,7 +59,7 @@ export function bootstrapWorkspace(
         scopes: ['read', 'write', 'admin'],
       },
     }
-    seedDefaultLabels(seedCtx)
+    await seedDefaultLabels(seedCtx)
   })
   return workspaceId
 }

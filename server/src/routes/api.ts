@@ -73,9 +73,9 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
   })
 
   // Reads -------------------------------------------------------------------
-  app.get('/overview', (c) => c.json(workspaceOverview(ctxOf(c))))
+  app.get('/overview', async (c) => c.json(await workspaceOverview(ctxOf(c))))
 
-  app.get('/boards/:key', (c) => {
+  app.get('/boards/:key', async (c) => {
     const params = zBoardGet.parse({
       board: c.req.param('key'),
       ...c.req.query(),
@@ -84,16 +84,16 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
         : undefined,
       limit: c.req.query('limit') ? Number(c.req.query('limit')) : undefined,
     })
-    return c.json(boardGet(ctxOf(c), params))
+    return c.json(await boardGet(ctxOf(c), params))
   })
 
   app.post('/items/get', async (c) =>
-    c.json(itemGet(ctxOf(c), zItemGet.parse(await c.req.json()))),
+    c.json(await itemGet(ctxOf(c), zItemGet.parse(await c.req.json()))),
   )
 
-  app.get('/docs', (c) =>
+  app.get('/docs', async (c) =>
     c.json(
-      docTree(
+      await docTree(
         ctxOf(c),
         c.req.query('root'),
         c.req.query('depth') ? Number(c.req.query('depth')) : undefined,
@@ -101,21 +101,21 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     ),
   )
 
-  app.get('/docs/:slug{.+}', (c) => {
+  app.get('/docs/:slug{.+}', async (c) => {
     const slug = zDocSlug.parse(c.req.param('slug'))
     const include = c.req.query('include')?.split(',')
     const atVersion = c.req.query('at_version')
     return c.json(
-      docGet(ctxOf(c), slug, {
+      await docGet(ctxOf(c), slug, {
         include,
         at_version: atVersion ? Number(atVersion) : undefined,
       }),
     )
   })
 
-  app.get('/search', (c) =>
+  app.get('/search', async (c) =>
     c.json(
-      search(
+      await search(
         ctxOf(c),
         zSearch.parse({
           query: c.req.query('q'),
@@ -129,9 +129,9 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     ),
   )
 
-  app.get('/activity', (c) =>
+  app.get('/activity', async (c) =>
     c.json(
-      activityQuery(
+      await activityQuery(
         ctxOf(c),
         zActivityQuery.parse({
           ...c.req.query(),
@@ -148,42 +148,47 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
     const body = zItemWrite.parse(await c.req.json())
-    return c.json({ results: itemWrite(ctx, body.ops, body.default_board) })
+    return c.json({
+      results: await itemWrite(ctx, body.ops, body.default_board),
+    })
   })
 
   app.post('/boards/write', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
     const body = zBoardWrite.parse(await c.req.json())
-    return c.json({ results: boardWrite(ctx, body.ops) })
+    return c.json({ results: await boardWrite(ctx, body.ops) })
   })
 
   app.post('/docs/write', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
     const body = zDocWrite.parse(await c.req.json())
-    return c.json({ results: docWrite(ctx, body.ops) })
+    return c.json({ results: await docWrite(ctx, body.ops) })
   })
 
   app.post('/labels/write', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
     const body = zLabelWrite.parse(await c.req.json())
-    return c.json({ results: labelWrite(ctx, body.ops) })
+    return c.json({ results: await labelWrite(ctx, body.ops) })
   })
 
   app.post('/webhooks/write', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
     const body = zWebhookWrite.parse(await c.req.json())
-    return c.json({ results: webhookWrite(ctx, body.ops), ...webhookList(ctx) })
+    return c.json({
+      results: await webhookWrite(ctx, body.ops),
+      ...(await webhookList(ctx)),
+    })
   })
-  app.get('/webhooks', (c) => c.json(webhookList(ctxOf(c))))
+  app.get('/webhooks', async (c) => c.json(await webhookList(ctxOf(c))))
 
-  app.get('/webhooks/:id/deliveries', (c) => {
+  app.get('/webhooks/:id/deliveries', async (c) => {
     const ctx = ctxOf(c)
     return c.json({
-      deliveries: ctx.db.query(
+      deliveries: await ctx.db.query(
         `SELECT d.event, d.status, d.attempts, d.last_error, d.created_at
            FROM webhook_delivery d JOIN webhook w ON w.id = d.webhook_id
           WHERE w.workspace_id = ? AND d.webhook_id = ?
@@ -197,9 +202,12 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
     const body = zRuleWrite.parse(await c.req.json())
-    return c.json({ results: ruleWrite(ctx, body.ops), ...ruleList(ctx) })
+    return c.json({
+      results: await ruleWrite(ctx, body.ops),
+      ...(await ruleList(ctx)),
+    })
   })
-  app.get('/rules', (c) => c.json(ruleList(ctxOf(c))))
+  app.get('/rules', async (c) => c.json(await ruleList(ctxOf(c))))
 
   app.post('/ingest_tokens', async (c) => {
     const ctx = ctxOf(c)
@@ -212,12 +220,12 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
     const body = zAttachmentAdd.parse(await c.req.json())
-    return c.json(attachmentAdd(ctx, store, body))
+    return c.json(await attachmentAdd(ctx, store, body))
   })
 
-  app.get('/attachments/:id', (c) => {
+  app.get('/attachments/:id', async (c) => {
     const ctx = ctxOf(c)
-    const { meta, bytes } = attachmentGet(ctx, store, c.req.param('id'))
+    const { meta, bytes } = await attachmentGet(ctx, store, c.req.param('id'))
     if (!bytes)
       return c.json({ kind: 'url', url: meta.url, filename: meta.filename })
     return new Response(new Uint8Array(bytes), {
@@ -248,7 +256,7 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
     const actorId = newId('act')
-    ctx.db.run(
+    await ctx.db.run(
       `INSERT INTO actor (id, workspace_id, kind, handle, name, role, on_behalf_of, created_at)
        VALUES (?, ?, 'agent', ?, ?, 'member', ?, ?)`,
       [
@@ -273,11 +281,11 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
   app.delete('/tokens/:actorId', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'admin')
-    ctx.db.run(
+    await ctx.db.run(
       'UPDATE auth_token SET revoked_at = ? WHERE workspace_id = ? AND actor_id = ?',
       [now(), ctx.workspaceId, c.req.param('actorId')],
     )
-    ctx.db.run(
+    await ctx.db.run(
       'UPDATE actor SET disabled = 1 WHERE workspace_id = ? AND id = ? AND kind = ?',
       [ctx.workspaceId, c.req.param('actorId'), 'agent'],
     )

@@ -86,9 +86,9 @@ export const MCP_TOOLS: IMcpTool[] = [
       'Batch item mutations, transactional per op, idempotent via op_id (safe to retry). Ops: create (with labels/assignees/checklists inline), update (optional if_rev optimistic lock), move (cross-board moves re-key and alias), comment, checklist_set, label, assign, archive, restore, complete, reopen. Up to 100 ops per call; returns {op_id, ok, key, rev} per op.',
     schema: zItemWrite,
     write: true,
-    handler: (ctx, args) => {
+    handler: async (ctx, args) => {
       const body = args as z.infer<typeof zItemWrite>
-      return { results: itemWrite(ctx, body.ops, body.default_board) }
+      return { results: await itemWrite(ctx, body.ops, body.default_board) }
     },
   },
   {
@@ -97,9 +97,9 @@ export const MCP_TOOLS: IMcpTool[] = [
       'Batch board/list mutations, idempotent via op_id. Ops: create (template kanban6 seeds the standard six lists), update, archive, list_create, list_update (rename/role/pos), list_archive (refuses if open items remain).',
     schema: zBoardWrite,
     write: true,
-    handler: (ctx, args) => {
+    handler: async (ctx, args) => {
       const body = args as z.infer<typeof zBoardWrite>
-      return { results: boardWrite(ctx, body.ops) }
+      return { results: await boardWrite(ctx, body.ops) }
     },
   },
   {
@@ -131,9 +131,9 @@ export const MCP_TOOLS: IMcpTool[] = [
       'Batch document mutations, idempotent via op_id. Ops: create, replace (needs if_rev), patch_section (needs section slug + if_hash from doc_get sections; conflicts only when the same section changed), append (no read needed, ideal for logs), move, rename, archive. Section edits transfer only the changed section, not the whole document.',
     schema: zDocWrite,
     write: true,
-    handler: (ctx, args) => {
+    handler: async (ctx, args) => {
       const body = args as z.infer<typeof zDocWrite>
-      return { results: docWrite(ctx, body.ops) }
+      return { results: await docWrite(ctx, body.ops) }
     },
   },
   {
@@ -157,9 +157,9 @@ export const MCP_TOOLS: IMcpTool[] = [
       'Batch label management, idempotent via op_id. Ops: group_create (workspace-wide or board-scoped), label_create, label_update, label_merge (folds one label into another and reassigns all items), label_delete.',
     schema: zLabelWrite,
     write: true,
-    handler: (ctx, args) => {
+    handler: async (ctx, args) => {
       const body = args as z.infer<typeof zLabelWrite>
-      return { results: labelWrite(ctx, body.ops) }
+      return { results: await labelWrite(ctx, body.ops) }
     },
   },
   {
@@ -168,9 +168,12 @@ export const MCP_TOOLS: IMcpTool[] = [
       'Manage outbound webhooks, idempotent via op_id. Ops: create (url + event patterns like item.moved, item.*, *; optional HMAC secret for x-acta-signature), update (url/events/enabled; re-enabling resets the failure counter), delete. Every response includes the full current webhook list with failure counts.',
     schema: zWebhookWrite,
     write: true,
-    handler: (ctx, args) => {
+    handler: async (ctx, args) => {
       const body = args as z.infer<typeof zWebhookWrite>
-      return { results: webhookWrite(ctx, body.ops), ...webhookList(ctx) }
+      return {
+        results: await webhookWrite(ctx, body.ops),
+        ...(await webhookList(ctx)),
+      }
     },
   },
   {
@@ -179,9 +182,12 @@ export const MCP_TOOLS: IMcpTool[] = [
       'Manage automation rules (fixed catalog), idempotent via op_id. Ops: create {trigger: event pattern, condition?: embed-query grammar (board=X list=Y label=Z assignee=H state=open|done|archived), action: move_item|apply_label|assign|comment|complete|call_webhook}, update (name/enabled), delete. Rule actions are attributed to the system actor with caused_by chaining and never re-trigger rules. Every op response includes the current rule list.',
     schema: zRuleWrite,
     write: true,
-    handler: (ctx, args) => {
+    handler: async (ctx, args) => {
       const body = args as z.infer<typeof zRuleWrite>
-      return { results: ruleWrite(ctx, body.ops), ...ruleList(ctx) }
+      return {
+        results: await ruleWrite(ctx, body.ops),
+        ...(await ruleList(ctx)),
+      }
     },
   },
 ]

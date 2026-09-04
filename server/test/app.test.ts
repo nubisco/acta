@@ -4,8 +4,8 @@ import { openDb } from '../src/db'
 
 describe('server skeleton', () => {
   it('boots, migrates, and serves /healthz', async () => {
-    const db = openDb(':memory:')
-    const app = createApp(db, { dataDir: '/tmp/acta-test-app' })
+    const db = await openDb(':memory:')
+    const app = await createApp(db, { dataDir: '/tmp/acta-test-app' })
     const res = await app.request('/healthz')
     expect(res.status).toBe(200)
     const body = (await res.json()) as { ok: boolean; service: string }
@@ -13,13 +13,13 @@ describe('server skeleton', () => {
     expect(body.service).toBe('acta')
   })
 
-  it('has the core tables after migration', () => {
-    const db = openDb(':memory:')
-    const tables = db
-      .query<{ name: string }>(
+  it('has the core tables after migration', async () => {
+    const db = await openDb(':memory:')
+    const tables = (
+      await db.query<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type IN ('table') ORDER BY name",
       )
-      .map((r) => r.name)
+    ).map((r) => r.name)
     for (const t of [
       'workspace',
       'actor',

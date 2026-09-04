@@ -31,7 +31,7 @@ export async function resolveToken(
   token: string,
 ): Promise<IAuthedActor | null> {
   const hash = await sha256Hex(token)
-  const rows = db.query<{
+  const rows = await db.query<{
     kind: 'session' | 'agent'
     scopes: string
     expires_at: number | null
@@ -73,7 +73,7 @@ export async function createToken(
   ttlMs?: number,
 ): Promise<string> {
   const token = randomToken()
-  db.run(
+  await db.run(
     `INSERT INTO auth_token (id, workspace_id, actor_id, kind, token_hash, scopes, expires_at, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [

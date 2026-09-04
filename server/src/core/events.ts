@@ -1,4 +1,5 @@
 import { newId } from '@nubisco/acta-shared'
+import { defer } from './defer'
 import type { ICtx } from './ctx'
 import { now } from './ctx'
 
@@ -17,7 +18,7 @@ export interface IEvent {
   caused_by?: string
 }
 
-type TListener = (event: IEvent) => void
+type TListener = (event: IEvent) => void | Promise<void>
 
 /** In-process pub/sub feeding SSE, webhooks, and the rules kernel. */
 const listeners = new Set<TListener>()
@@ -27,14 +28,14 @@ export function onEvent(listener: TListener): () => void {
   return () => listeners.delete(listener)
 }
 
-export function emitEvent(
+export async function emitEvent(
   ctx: ICtx,
   verb: string,
   entity: string,
   entityId: string,
   summary: string,
   payload?: unknown,
-): IEvent {
+): Promise<IEvent> {
   const event: IEvent = {
     id: newId('evt'),
     workspace_id: ctx.workspaceId,
@@ -49,7 +50,7 @@ export function emitEvent(
     payload,
     caused_by: ctx.causedBy,
   }
-  ctx.db.run(
+  await ctx.db.run(
     `INSERT INTO event (id, workspace_id, ts, actor_id, actor_kind, on_behalf_of, verb, entity, entity_id, summary, payload, caused_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -67,12 +68,31 @@ export function emitEvent(
       event.caused_by ?? null,
     ],
   )
-  for (const listener of listeners) {
-    try {
-      listener(event)
-    } catch {
-      // Listeners must never break the write path.
+  pending.push(event)
+  return event
+}
+
+/**
+ * Listener dispatch is deferred until after the surrounding transaction
+ * commits (withOp flushes), so webhook/rule side effects never interleave
+ * with an open transaction and rolled-back ops emit nothing.
+ */
+const pending: IEvent[] = []
+
+export function flushPendingEvents(): void {
+  while (pending.length > 0) {
+    const event = pending.shift()!
+    for (const listener of listeners) {
+      try {
+        const out = listener(event)
+        if (out instanceof Promise) defer(out.catch(() => {}))
+      } catch {
+        // Listeners must never break the write path.
+      }
     }
   }
-  return event
+}
+
+export function discardPendingEvents(): void {
+  pending.length = 0
 }

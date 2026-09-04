@@ -36,17 +36,17 @@ async function call(name: string, args: unknown, token = agentToken) {
 }
 
 beforeEach(async () => {
-  db = openDb(':memory:')
-  app = createApp(db, {
+  db = await openDb(':memory:')
+  app = (await createApp(db, {
     bootstrap: { adminEmail: 'jose@nubisco.io', adminHandle: 'jose' },
     dataDir: `/tmp/acta-test-${Math.random().toString(36).slice(2)}`,
-  }) as never
-  const ws = db.query<{ id: string }>('SELECT id FROM workspace')[0].id
-  const jose = db.query<{ id: string }>(
-    "SELECT id FROM actor WHERE handle = 'jose'",
+  })) as never
+  const ws = (await db.query<{ id: string }>('SELECT id FROM workspace'))[0].id
+  const jose = (
+    await db.query<{ id: string }>("SELECT id FROM actor WHERE handle = 'jose'")
   )[0].id
   const agentId = newId('act')
-  db.run(
+  await db.run(
     `INSERT INTO actor (id, workspace_id, kind, handle, name, role, on_behalf_of, created_at)
      VALUES (?, ?, 'agent', 'claude', 'Claude', 'member', ?, ?)`,
     [agentId, ws, jose, Date.now()],
@@ -195,9 +195,10 @@ describe('mcp endpoint', () => {
   })
 
   it('enforces write scope', async () => {
-    const ws = db.query<{ id: string }>('SELECT id FROM workspace')[0].id
+    const ws = (await db.query<{ id: string }>('SELECT id FROM workspace'))[0]
+      .id
     const readerId = newId('act')
-    db.run(
+    await db.run(
       `INSERT INTO actor (id, workspace_id, kind, handle, name, role, created_at)
        VALUES (?, ?, 'agent', 'reader', 'Reader', 'member', ?)`,
       [readerId, ws, Date.now()],

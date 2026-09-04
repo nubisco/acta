@@ -25,7 +25,7 @@ export function ingestRoutes(): Hono<IIngestEnv> {
   app.post('/:token', async (c) => {
     const db = c.get('db')
     const tokenHash = await sha256Hex(c.req.param('token'))
-    const rows = db.query<{
+    const rows = await db.query<{
       id: string
       workspace_id: string
       actor_id: string
@@ -48,18 +48,23 @@ export function ingestRoutes(): Hono<IIngestEnv> {
       return c.json({ error: 'validation', detail: String(err) }, 400)
     }
 
-    const board = db.query<{ key: string }>(
-      'SELECT key FROM board WHERE id = ?',
-      [token.board_id],
+    const board = (
+      await db.query<{ key: string }>('SELECT key FROM board WHERE id = ?', [
+        token.board_id,
+      ])
     )[0]
     const list =
       body.list ??
-      db.query<{ name: string }>(`SELECT name FROM list WHERE id = ?`, [
-        token.list_id ?? '',
-      ])[0]?.name ??
-      db.query<{ name: string }>(
-        `SELECT name FROM list WHERE board_id = ? AND archived = 0 ORDER BY CASE role WHEN 'inbox' THEN 0 WHEN 'backlog' THEN 1 ELSE 2 END, pos LIMIT 1`,
-        [token.board_id],
+      (
+        await db.query<{ name: string }>(`SELECT name FROM list WHERE id = ?`, [
+          token.list_id ?? '',
+        ])
+      )[0]?.name ??
+      (
+        await db.query<{ name: string }>(
+          `SELECT name FROM list WHERE board_id = ? AND archived = 0 ORDER BY CASE role WHEN 'inbox' THEN 0 WHEN 'backlog' THEN 1 ELSE 2 END, pos LIMIT 1`,
+          [token.board_id],
+        )
       )[0]?.name
 
     const ctx: ICtx = {
@@ -85,7 +90,7 @@ export function ingestRoutes(): Hono<IIngestEnv> {
       .join('')
       .trim()
 
-    const results = itemWrite(
+    const results = await itemWrite(
       ctx,
       [
         {
@@ -119,7 +124,7 @@ export async function createIngestToken(
   ctx: ICtx,
   input: z.infer<typeof zIngestTokenCreate>,
 ): Promise<{ token: string; actor_id: string }> {
-  const board = ctx.db.query<{ id: string }>(
+  const board = await ctx.db.query<{ id: string }>(
     'SELECT id FROM board WHERE workspace_id = ? AND key = ?',
     [ctx.workspaceId, input.board],
   )
@@ -127,7 +132,7 @@ export async function createIngestToken(
     throw new ApiError(404, `board ${input.board} not found`)
   let listId: string | null = null
   if (input.list) {
-    const list = ctx.db.query<{ id: string }>(
+    const list = await ctx.db.query<{ id: string }>(
       'SELECT id FROM list WHERE board_id = ? AND lower(name) = lower(?)',
       [board[0].id, input.list],
     )
@@ -140,7 +145,7 @@ export async function createIngestToken(
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')}-${actorId.slice(-4)}`
-  ctx.db.run(
+  await ctx.db.run(
     `INSERT INTO actor (id, workspace_id, kind, handle, name, role, created_at) VALUES (?, ?, 'agent', ?, ?, 'member', ?)`,
     [actorId, ctx.workspaceId, handle, input.name, now()],
   )
@@ -159,7 +164,7 @@ async function createIngestSecret(
   const raw = crypto
     .getRandomValues(new Uint8Array(24))
     .reduce((s, b) => s + b.toString(16).padStart(2, '0'), '')
-  ctx.db.run(
+  await ctx.db.run(
     'INSERT INTO ingest_token (id, workspace_id, token_hash, actor_id, board_id, list_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [
       newId('act'),

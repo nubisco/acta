@@ -60,6 +60,20 @@ export default defineConfig(
     },
   },
   {
+    // The whole server is async over a driver abstraction; a missed await is
+    // a silent bug (a Promise serialized as {}). Enforce mechanically.
+    files: ['server/**/*.ts', 'importers/**/*.ts', 'shared/**/*.ts'],
+    ignores: ['**/*.d.ts'],
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: false },
+      ],
+    },
+  },
+  {
     ignores: [
       '**/dist/',
       '**/node_modules/',

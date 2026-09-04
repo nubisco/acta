@@ -26,18 +26,20 @@ function fakeFetch(ok = true): typeof fetch {
   }) as typeof fetch
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   delivered = []
-  db = openDb(':memory:')
-  app = createApp(db, {
+  db = await openDb(':memory:')
+  app = (await createApp(db, {
     bootstrap: { adminEmail: 'jose@nubisco.io', adminHandle: 'jose' },
     dataDir: `/tmp/acta-test-${Math.random().toString(36).slice(2)}`,
     fetchImpl: fakeFetch(),
     webhookBackoffMs: 1,
-  }) as never
-  const workspaceId = db.query<{ id: string }>('SELECT id FROM workspace')[0].id
-  const admin = db.query<{ id: string }>(
-    "SELECT id FROM actor WHERE handle = 'jose'",
+  })) as never
+  const workspaceId = (
+    await db.query<{ id: string }>('SELECT id FROM workspace')
+  )[0].id
+  const admin = (
+    await db.query<{ id: string }>("SELECT id FROM actor WHERE handle = 'jose'")
   )[0]
   ctx = {
     db,
@@ -50,7 +52,7 @@ beforeEach(() => {
       scopes: ['read', 'write', 'admin'],
     },
   }
-  boardWrite(ctx, [
+  await boardWrite(ctx, [
     {
       op: 'create',
       op_id: 'b1',
@@ -68,7 +70,7 @@ async function settle(): Promise<void> {
 
 describe('webhooks', () => {
   it('delivers signed payloads for matching events', async () => {
-    webhookWrite(ctx, [
+    await webhookWrite(ctx, [
       {
         op: 'create',
         op_id: 'w1',
@@ -77,7 +79,7 @@ describe('webhooks', () => {
         secret: 's3cret',
       },
     ])
-    itemWrite(
+    await itemWrite(
       ctx,
       [{ op: 'create', op_id: 'i1', list: 'Backlog', title: 'T' }],
       'SUP',
@@ -85,7 +87,7 @@ describe('webhooks', () => {
     await settle()
     expect(delivered).toHaveLength(0) // created != moved
 
-    itemWrite(ctx, [
+    await itemWrite(ctx, [
       { op: 'move', op_id: 'i2', key: 'SUP-1', list: 'In Progress' },
     ])
     await settle()
@@ -101,17 +103,20 @@ describe('webhooks', () => {
 
   it('logs deliveries and counts failures', async () => {
     // Recreate the app with a failing fetch.
-    db = openDb(':memory:')
-    createApp(db, {
+    db = await openDb(':memory:')
+    await createApp(db, {
       bootstrap: { adminHandle: 'jose' },
       dataDir: `/tmp/acta-test-${Math.random().toString(36).slice(2)}`,
       fetchImpl: fakeFetch(false),
       webhookBackoffMs: 1,
     })
-    const workspaceId = db.query<{ id: string }>('SELECT id FROM workspace')[0]
-      .id
-    const admin = db.query<{ id: string }>(
-      "SELECT id FROM actor WHERE kind = 'human'",
+    const workspaceId = (
+      await db.query<{ id: string }>('SELECT id FROM workspace')
+    )[0].id
+    const admin = (
+      await db.query<{ id: string }>(
+        "SELECT id FROM actor WHERE kind = 'human'",
+      )
     )[0]
     const failCtx: ICtx = {
       db,
@@ -124,10 +129,10 @@ describe('webhooks', () => {
         scopes: ['read', 'write', 'admin'],
       },
     }
-    boardWrite(failCtx, [
+    await boardWrite(failCtx, [
       { op: 'create', op_id: 'b1', key: 'SW', name: 'S', template: 'kanban6' },
     ])
-    webhookWrite(failCtx, [
+    await webhookWrite(failCtx, [
       {
         op: 'create',
         op_id: 'w1',
@@ -135,13 +140,13 @@ describe('webhooks', () => {
         events: ['*'],
       },
     ])
-    itemWrite(
+    await itemWrite(
       failCtx,
       [{ op: 'create', op_id: 'i1', list: 'Backlog', title: 'T' }],
       'SW',
     )
     await settle()
-    const log = db.query<{
+    const log = await db.query<{
       status: number
       attempts: number
       last_error: string
@@ -149,8 +154,10 @@ describe('webhooks', () => {
     expect(log.length).toBeGreaterThan(0)
     expect(log[0].attempts).toBe(3)
     expect(log[0].last_error).toContain('http 500')
-    const hook = db.query<{ failure_count: number }>(
-      'SELECT failure_count FROM webhook',
+    const hook = (
+      await db.query<{ failure_count: number }>(
+        'SELECT failure_count FROM webhook',
+      )
     )[0]
     expect(hook.failure_count).toBeGreaterThan(0)
   })
@@ -158,7 +165,7 @@ describe('webhooks', () => {
 
 describe('rules', () => {
   it('moves labeled ingest items and chains causation without looping', async () => {
-    ruleWrite(ctx, [
+    await ruleWrite(ctx, [
       {
         op: 'create',
         op_id: 'r1',
@@ -169,7 +176,7 @@ describe('rules', () => {
         enabled: true,
       },
     ])
-    itemWrite(
+    await itemWrite(
       ctx,
       [
         {
@@ -184,16 +191,19 @@ describe('rules', () => {
       'SUP',
     )
     await settle()
-    const labeled = itemGet(ctx, { keys: ['SUP-1'] }).items[0] as {
+    const labeled = (await itemGet(ctx, { keys: ['SUP-1'] })).items[0] as {
       list: string
     }
-    const unlabeled = itemGet(ctx, { keys: ['SUP-2'] }).items[0] as {
+    const unlabeled = (await itemGet(ctx, { keys: ['SUP-2'] })).items[0] as {
       list: string
     }
     expect(labeled.list).toBe('In Progress')
     expect(unlabeled.list).toBe('Backlog')
 
-    const activity = activityQuery(ctx, { actor_kind: 'system', limit: 10 })
+    const activity = await activityQuery(ctx, {
+      actor_kind: 'system',
+      limit: 10,
+    })
     const ruleMove = activity.events.find((e) => e.verb === 'item.moved')
     expect(ruleMove).toBeDefined()
     expect(ruleMove!.caused_by).toBeTruthy()
@@ -241,14 +251,17 @@ describe('ingest', () => {
     const created = (await res.json()) as { ok: boolean; key: string }
     expect(created.ok).toBe(true)
 
-    const item = itemGet(ctx, { keys: [created.key] }).items[0] as {
+    const item = (await itemGet(ctx, { keys: [created.key] })).items[0] as {
       description: string
       list: string
     }
     expect(item.list).toBe('Backlog')
     expect(item.description).toContain('**From**: John Buser')
 
-    const activity = activityQuery(ctx, { actor_kind: 'agent', limit: 10 })
+    const activity = await activityQuery(ctx, {
+      actor_kind: 'agent',
+      limit: 10,
+    })
     expect(activity.events.some((e) => e.verb === 'item.created')).toBe(true)
 
     // Bad token is rejected.

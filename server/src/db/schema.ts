@@ -1,7 +1,8 @@
+// Canonical schema. Kept as a TS constant so both bundlers (bun, wrangler)
+// and both drivers (bun:sqlite, D1) consume one source.
+export const SCHEMA_SQL = `
 -- Acta schema (design-spec §1). SQLite dialect, D1-portable.
 -- Every entity row carries workspace_id (multi-tenant readiness).
-
-PRAGMA journal_mode = WAL;
 
 CREATE TABLE IF NOT EXISTS workspace (
   id TEXT PRIMARY KEY,
@@ -282,3 +283,4 @@ CREATE TABLE IF NOT EXISTS op_log (
 CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
   kind, ref, title, body, board_key, tokenize = 'unicode61'
 );
+`

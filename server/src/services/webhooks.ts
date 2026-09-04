@@ -2,6 +2,7 @@ import { newId } from '@nubisco/acta-shared'
 import { z } from 'zod'
 import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
+import { defer } from '../core/defer'
 import { emitEvent, onEvent, type IEvent } from '../core/events'
 import { withOp } from '../core/ops'
 import type { ISqlDriver } from '../db'
@@ -40,71 +41,87 @@ export function matchesPattern(pattern: string, verb: string): boolean {
   return pattern === verb
 }
 
-export function webhookWrite(ctx: ICtx, ops: TWebhookOp[]) {
-  return ops.map((op) =>
-    withOp(ctx, op.op_id, () => {
-      switch (op.op) {
-        case 'create': {
-          const id = newId('whk')
-          ctx.db.run(
-            'INSERT INTO webhook (id, workspace_id, url, events, secret, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [
+export async function webhookWrite(ctx: ICtx, ops: TWebhookOp[]) {
+  const results = []
+  for (const op of ops) {
+    results.push(
+      await withOp(ctx, op.op_id, async () => {
+        switch (op.op) {
+          case 'create': {
+            const id = newId('whk')
+            await ctx.db.run(
+              'INSERT INTO webhook (id, workspace_id, url, events, secret, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+              [
+                id,
+                ctx.workspaceId,
+                op.url,
+                JSON.stringify(op.events),
+                op.secret ?? null,
+                now(),
+              ],
+            )
+            await emitEvent(
+              ctx,
+              'webhook.created',
+              'webhook',
               id,
-              ctx.workspaceId,
-              op.url,
-              JSON.stringify(op.events),
-              op.secret ?? null,
-              now(),
-            ],
-          )
-          emitEvent(
-            ctx,
-            'webhook.created',
-            'webhook',
-            id,
-            `created webhook ${op.url}`,
-          )
-          return { id }
-        }
-        case 'update': {
-          const rows = ctx.db.query<{ id: string }>(
-            'SELECT id FROM webhook WHERE workspace_id = ? AND id = ?',
-            [ctx.workspaceId, op.id],
-          )
-          if (rows.length === 0)
-            throw new ApiError(404, `webhook ${op.id} not found`)
-          ctx.db.run(
-            `UPDATE webhook SET url = COALESCE(?, url), events = COALESCE(?, events),
+              `created webhook ${op.url}`,
+            )
+            return { id }
+          }
+          case 'update': {
+            const rows = await ctx.db.query<{ id: string }>(
+              'SELECT id FROM webhook WHERE workspace_id = ? AND id = ?',
+              [ctx.workspaceId, op.id],
+            )
+            if (rows.length === 0)
+              throw new ApiError(404, `webhook ${op.id} not found`)
+            await ctx.db.run(
+              `UPDATE webhook SET url = COALESCE(?, url), events = COALESCE(?, events),
                     enabled = COALESCE(?, enabled), failure_count = CASE WHEN ? THEN 0 ELSE failure_count END
               WHERE id = ?`,
-            [
-              op.url ?? null,
-              op.events ? JSON.stringify(op.events) : null,
-              op.enabled === undefined ? null : op.enabled ? 1 : 0,
-              op.enabled === true ? 1 : 0,
+              [
+                op.url ?? null,
+                op.events ? JSON.stringify(op.events) : null,
+                op.enabled === undefined ? null : op.enabled ? 1 : 0,
+                op.enabled === true ? 1 : 0,
+                op.id,
+              ],
+            )
+            await emitEvent(
+              ctx,
+              'webhook.updated',
+              'webhook',
               op.id,
-            ],
-          )
-          emitEvent(ctx, 'webhook.updated', 'webhook', op.id, `updated webhook`)
-          return { id: op.id }
+              `updated webhook`,
+            )
+            return { id: op.id }
+          }
+          case 'delete': {
+            await ctx.db.run(
+              'DELETE FROM webhook WHERE workspace_id = ? AND id = ?',
+              [ctx.workspaceId, op.id],
+            )
+            await emitEvent(
+              ctx,
+              'webhook.deleted',
+              'webhook',
+              op.id,
+              `deleted webhook`,
+            )
+            return { id: op.id }
+          }
         }
-        case 'delete': {
-          ctx.db.run('DELETE FROM webhook WHERE workspace_id = ? AND id = ?', [
-            ctx.workspaceId,
-            op.id,
-          ])
-          emitEvent(ctx, 'webhook.deleted', 'webhook', op.id, `deleted webhook`)
-          return { id: op.id }
-        }
-      }
-    }),
-  )
+      }),
+    )
+  }
+  return results
 }
 
-export function webhookList(ctx: ICtx) {
+export async function webhookList(ctx: ICtx) {
   return {
-    webhooks: ctx.db
-      .query<{
+    webhooks: (
+      await ctx.db.query<{
         id: string
         url: string
         events: string
@@ -114,13 +131,13 @@ export function webhookList(ctx: ICtx) {
         'SELECT id, url, events, enabled, failure_count FROM webhook WHERE workspace_id = ?',
         [ctx.workspaceId],
       )
-      .map((w) => ({
-        id: w.id,
-        url: w.url,
-        events: JSON.parse(w.events) as string[],
-        enabled: w.enabled === 1,
-        failures: w.failure_count,
-      })),
+    ).map((w) => ({
+      id: w.id,
+      url: w.url,
+      events: JSON.parse(w.events) as string[],
+      enabled: w.enabled === 1,
+      failures: w.failure_count,
+    })),
   }
 }
 
@@ -167,10 +184,10 @@ export function startWebhookDispatcher(
   const fetchImpl = opts.fetchImpl ?? fetch
   const backoffMs = opts.backoffMs ?? 2000
 
-  return onEvent((event) => {
+  return onEvent(async (event) => {
     // Never deliver webhook admin events to webhooks (noise + loop risk).
     if (event.verb.startsWith('webhook.')) return
-    const hooks = db.query<{
+    const hooks = await db.query<{
       id: string
       url: string
       events: string
@@ -183,7 +200,7 @@ export function startWebhookDispatcher(
     for (const hook of hooks) {
       const patterns = JSON.parse(hook.events) as string[]
       if (!patterns.some((p) => matchesPattern(p, event.verb))) continue
-      void deliver(db, hook, event, fetchImpl, backoffMs)
+      defer(deliver(db, hook, event, fetchImpl, backoffMs))
     }
   })
 }
@@ -230,7 +247,7 @@ async function deliver(
       await new Promise((r) => setTimeout(r, backoffMs * attempts))
   }
   const ok = status !== null && status >= 200 && status < 300
-  db.run(
+  await db.run(
     'INSERT INTO webhook_delivery (id, webhook_id, event, status, attempts, last_error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [
       deliveryId,
@@ -243,9 +260,9 @@ async function deliver(
     ],
   )
   if (ok) {
-    db.run('UPDATE webhook SET failure_count = 0 WHERE id = ?', [hook.id])
+    await db.run('UPDATE webhook SET failure_count = 0 WHERE id = ?', [hook.id])
   } else {
-    db.run(
+    await db.run(
       `UPDATE webhook SET failure_count = failure_count + 1,
               enabled = CASE WHEN failure_count + 1 >= ? THEN 0 ELSE enabled END
         WHERE id = ?`,

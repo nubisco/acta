@@ -18,11 +18,11 @@ function arg(flag: string, fallback: string): string {
 const dataDir = arg('--data', './data')
 const outDir = arg('--out', './export')
 
-const db = openDb(`${dataDir}/acta.sqlite`)
+const db = await openDb(`${dataDir}/acta.sqlite`)
 mkdirSync(outDir, { recursive: true })
 
 // Docs → markdown tree ------------------------------------------------------
-const docs = db.query<{
+const docs = await db.query<{
   id: string
   slug: string
   title: string
@@ -47,7 +47,7 @@ for (const doc of docs) {
 }
 
 // Boards → JSONL ------------------------------------------------------------
-const boards = db.query<{
+const boards = await db.query<{
   id: string
   key: string
   name: string
@@ -57,7 +57,7 @@ const boards = db.query<{
 mkdirSync(join(outDir, 'boards'), { recursive: true })
 let itemTotal = 0
 for (const board of boards) {
-  const lists = db.query<{
+  const lists = await db.query<{
     id: string
     name: string
     role: string
@@ -67,7 +67,7 @@ for (const board of boards) {
     'SELECT id, name, role, pos, archived FROM list WHERE board_id = ? ORDER BY pos',
     [board.id],
   )
-  const items = db.query<{
+  const items = await db.query<{
     id: string
     key: string
     title: string
@@ -97,19 +97,19 @@ for (const board of boards) {
   for (const item of items) {
     itemTotal++
     const listName = lists.find((l) => l.id === item.list_id)?.name
-    const labels = db
-      .query<{ name: string }>(
+    const labels = (
+      await db.query<{ name: string }>(
         'SELECT lb.name FROM item_label il JOIN label lb ON lb.id = il.label_id WHERE il.item_id = ?',
         [item.id],
       )
-      .map((r) => r.name)
-    const assignees = db
-      .query<{ handle: string }>(
+    ).map((r) => r.name)
+    const assignees = (
+      await db.query<{ handle: string }>(
         'SELECT a.handle FROM item_assignee ia JOIN actor a ON a.id = ia.actor_id WHERE ia.item_id = ?',
         [item.id],
       )
-      .map((r) => r.handle)
-    const comments = db.query<{
+    ).map((r) => r.handle)
+    const comments = await db.query<{
       body: string
       created_at: number
       handle: string
@@ -117,20 +117,22 @@ for (const board of boards) {
       'SELECT c.body, c.created_at, a.handle FROM comment c JOIN actor a ON a.id = c.actor_id WHERE c.item_id = ? ORDER BY c.created_at',
       [item.id],
     )
-    const checklists = db
-      .query<{ id: string; name: string }>(
-        'SELECT id, name FROM checklist WHERE item_id = ? ORDER BY pos',
-        [item.id],
-      )
-      .map((cl) => ({
+    const checklistRows = await db.query<{ id: string; name: string }>(
+      'SELECT id, name FROM checklist WHERE item_id = ? ORDER BY pos',
+      [item.id],
+    )
+    const checklists = []
+    for (const cl of checklistRows) {
+      checklists.push({
         name: cl.name,
-        items: db
-          .query<{ text: string; done: number }>(
+        items: (
+          await db.query<{ text: string; done: number }>(
             'SELECT text, done FROM checklist_item WHERE checklist_id = ? ORDER BY pos',
             [cl.id],
           )
-          .map((ci) => ({ text: ci.text, done: ci.done === 1 })),
-      }))
+        ).map((ci) => ({ text: ci.text, done: ci.done === 1 })),
+      })
+    }
     lines.push(
       JSON.stringify({
         kind: 'item',

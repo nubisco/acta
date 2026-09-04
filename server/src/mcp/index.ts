@@ -40,11 +40,11 @@ function rpcError(
   return { jsonrpc: '2.0' as const, id, error: { code, message, data } }
 }
 
-function handleRequest(
+async function handleRequest(
   ctx: ICtx,
   tools: IMcpTool[],
   req: IJsonRpcRequest,
-): unknown {
+): Promise<unknown> {
   const id = req.id ?? null
   switch (req.method) {
     case 'initialize':
@@ -85,7 +85,7 @@ function handleRequest(
         )
       }
       try {
-        const result = tool.handler(ctx, parsed.data)
+        const result = await tool.handler(ctx, parsed.data)
         return rpcResult(id, {
           content: [{ type: 'text', text: JSON.stringify(result) }],
         })
@@ -131,9 +131,11 @@ export function mcpRoutes(store: AttachmentStore): Hono<IMcpEnv> {
       return c.json(rpcError(null, -32700, 'parse error'), 400)
     }
     const requests = Array.isArray(body) ? body : [body]
-    const responses = requests
-      .map((r) => handleRequest(ctx, tools, r as IJsonRpcRequest))
-      .filter((r) => r !== undefined)
+    const responses: unknown[] = []
+    for (const r of requests) {
+      const response = await handleRequest(ctx, tools, r as IJsonRpcRequest)
+      if (response !== undefined) responses.push(response)
+    }
     if (responses.length === 0) return c.body(null, 202)
     const payload = Array.isArray(body) ? responses : responses[0]
     return c.json(payload as Record<string, unknown>)

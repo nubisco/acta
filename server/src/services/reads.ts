@@ -23,12 +23,14 @@ type TActivityQuery = z.infer<typeof zActivityQuery>
 // workspace_overview
 // --------------------------------------------------------------------------
 
-export function workspaceOverview(ctx: ICtx) {
-  const ws = ctx.db.query<{ id: string; name: string }>(
-    'SELECT id, name FROM workspace WHERE id = ?',
-    [ctx.workspaceId],
+export async function workspaceOverview(ctx: ICtx) {
+  const ws = (
+    await ctx.db.query<{ id: string; name: string }>(
+      'SELECT id, name FROM workspace WHERE id = ?',
+      [ctx.workspaceId],
+    )
   )[0]
-  const boards = ctx.db.query<{
+  const boards = await ctx.db.query<{
     key: string
     name: string
     archived: number
@@ -37,7 +39,7 @@ export function workspaceOverview(ctx: ICtx) {
     'SELECT id, key, name, archived FROM board WHERE workspace_id = ? ORDER BY key',
     [ctx.workspaceId],
   )
-  const lists = ctx.db.query<{
+  const lists = await ctx.db.query<{
     board_id: string
     id: string
     name: string
@@ -49,7 +51,7 @@ export function workspaceOverview(ctx: ICtx) {
        FROM list l WHERE l.workspace_id = ? AND l.archived = 0 ORDER BY l.board_id, l.pos`,
     [ctx.workspaceId],
   )
-  const labels = ctx.db.query<{
+  const labels = await ctx.db.query<{
     group_name: string
     board_key: string | null
     id: string
@@ -62,7 +64,7 @@ export function workspaceOverview(ctx: ICtx) {
       WHERE l.workspace_id = ? ORDER BY g.name, l.name`,
     [ctx.workspaceId],
   )
-  const actors = ctx.db.query<{
+  const actors = await ctx.db.query<{
     id: string
     handle: string
     kind: string
@@ -71,7 +73,7 @@ export function workspaceOverview(ctx: ICtx) {
     'SELECT id, handle, kind, name FROM actor WHERE workspace_id = ? AND disabled = 0 ORDER BY handle',
     [ctx.workspaceId],
   )
-  const docRoots = ctx.db.query<{
+  const docRoots = await ctx.db.query<{
     slug: string
     title: string
     children: number
@@ -107,8 +109,8 @@ export function workspaceOverview(ctx: ICtx) {
 // board_get
 // --------------------------------------------------------------------------
 
-export function boardGet(ctx: ICtx, params: TBoardGet) {
-  const board = boardByKey(ctx, params.board)
+export async function boardGet(ctx: ICtx, params: TBoardGet) {
+  const board = await boardByKey(ctx, params.board)
   const where: string[] = ['i.board_id = ?']
   const args: unknown[] = [board.id]
 
@@ -148,7 +150,7 @@ export function boardGet(ctx: ICtx, params: TBoardGet) {
     args.push(params.cursor)
   }
 
-  const rows = ctx.db.query<
+  const rows = await ctx.db.query<
     IItemRow & {
       list_name: string
       labels: string | null
@@ -199,131 +201,138 @@ export function boardGet(ctx: ICtx, params: TBoardGet) {
 // item_get (batch)
 // --------------------------------------------------------------------------
 
-export function itemGet(ctx: ICtx, params: TItemGet) {
+export async function itemGet(ctx: ICtx, params: TItemGet) {
   const include = new Set(
     params.include ?? ['comments', 'checklists', 'links', 'attachments'],
   )
-  return {
-    items: params.keys.map((key) => {
-      const item = itemByKey(ctx, key)
-      const boardKey = ctx.db.query<{ key: string }>(
+  const items = []
+  for (const key of params.keys) {
+    const item = await itemByKey(ctx, key)
+    const boardKey = (
+      await ctx.db.query<{ key: string }>(
         'SELECT key FROM board WHERE id = ?',
         [item.board_id],
-      )[0].key
-      const listName = ctx.db.query<{ name: string }>(
+      )
+    )[0].key
+    const listName = (
+      await ctx.db.query<{ name: string }>(
         'SELECT name FROM list WHERE id = ?',
         [item.list_id],
-      )[0].name
-      const labels = ctx.db
-        .query<{ name: string }>(
-          'SELECT lb.name FROM item_label il JOIN label lb ON lb.id = il.label_id WHERE il.item_id = ?',
-          [item.id],
-        )
-        .map((r) => r.name)
-      const assignees = ctx.db
-        .query<{ handle: string }>(
-          'SELECT a.handle FROM item_assignee ia JOIN actor a ON a.id = ia.actor_id WHERE ia.item_id = ?',
-          [item.id],
-        )
-        .map((r) => r.handle)
+      )
+    )[0].name
+    const labels = (
+      await ctx.db.query<{ name: string }>(
+        'SELECT lb.name FROM item_label il JOIN label lb ON lb.id = il.label_id WHERE il.item_id = ?',
+        [item.id],
+      )
+    ).map((r) => r.name)
+    const assignees = (
+      await ctx.db.query<{ handle: string }>(
+        'SELECT a.handle FROM item_assignee ia JOIN actor a ON a.id = ia.actor_id WHERE ia.item_id = ?',
+        [item.id],
+      )
+    ).map((r) => r.handle)
 
-      const out: Record<string, unknown> = {
-        key: item.key,
-        board: boardKey,
-        list: listName,
-        title: item.title,
-        description: item.description,
-        labels: labels.length > 0 ? labels : undefined,
-        assignees: assignees.length > 0 ? assignees : undefined,
-        due: item.due ?? undefined,
-        done: item.completed === 1 || undefined,
-        archived: item.archived === 1 || undefined,
-        rev: item.rev,
-        created: item.created_at,
-        updated: item.updated_at,
-      }
-      if (include.has('comments')) {
-        out.comments = ctx.db
-          .query<{
-            id: string
-            body: string
-            created_at: number
-            handle: string
-            kind: string
-          }>(
-            `SELECT c.id, c.body, c.created_at, a.handle, a.kind FROM comment c
-             JOIN actor a ON a.id = c.actor_id WHERE c.item_id = ? ORDER BY c.created_at`,
-            [item.id],
-          )
-          .map((c) => ({
-            id: c.id,
-            by: c.handle,
-            agent: c.kind === 'agent' || undefined,
-            ts: c.created_at,
-            body: c.body,
-          }))
-      }
-      if (include.has('checklists')) {
-        out.checklists = ctx.db
-          .query<{ id: string; name: string }>(
-            'SELECT id, name FROM checklist WHERE item_id = ? ORDER BY pos',
-            [item.id],
-          )
-          .map((cl) => ({
-            name: cl.name,
-            items: ctx.db
-              .query<{ text: string; done: number }>(
-                'SELECT text, done FROM checklist_item WHERE checklist_id = ? ORDER BY pos',
-                [cl.id],
-              )
-              .map((ci) => ({ text: ci.text, done: ci.done === 1 })),
-          }))
-      }
-      if (include.has('links')) {
-        out.links = {
-          out: ctx.db.query<{ ref_type: string; target: string }>(
-            "SELECT ref_type, target FROM link WHERE src_kind = 'item' AND src_id = ?",
-            [item.id],
-          ),
-          in: ctx.db.query<{ src_kind: string; src_id: string }>(
-            "SELECT src_kind, src_id FROM link WHERE workspace_id = ? AND ref_type = 'item' AND target = ?",
-            [ctx.workspaceId, item.key],
-          ),
-        }
-      }
-      if (include.has('attachments')) {
-        out.attachments = ctx.db.query<{
+    const out: Record<string, unknown> = {
+      key: item.key,
+      board: boardKey,
+      list: listName,
+      title: item.title,
+      description: item.description,
+      labels: labels.length > 0 ? labels : undefined,
+      assignees: assignees.length > 0 ? assignees : undefined,
+      due: item.due ?? undefined,
+      done: item.completed === 1 || undefined,
+      archived: item.archived === 1 || undefined,
+      rev: item.rev,
+      created: item.created_at,
+      updated: item.updated_at,
+    }
+    if (include.has('comments')) {
+      out.comments = (
+        await ctx.db.query<{
           id: string
+          body: string
+          created_at: number
+          handle: string
           kind: string
-          filename: string
-          url: string | null
-          size: number | null
         }>(
-          "SELECT id, kind, filename, url, size FROM attachment WHERE owner_kind = 'item' AND owner_id = ?",
+          `SELECT c.id, c.body, c.created_at, a.handle, a.kind FROM comment c
+             JOIN actor a ON a.id = c.actor_id WHERE c.item_id = ? ORDER BY c.created_at`,
           [item.id],
         )
+      ).map((c) => ({
+        id: c.id,
+        by: c.handle,
+        agent: c.kind === 'agent' || undefined,
+        ts: c.created_at,
+        body: c.body,
+      }))
+    }
+    if (include.has('checklists')) {
+      const checklists = await ctx.db.query<{ id: string; name: string }>(
+        'SELECT id, name FROM checklist WHERE item_id = ? ORDER BY pos',
+        [item.id],
+      )
+      const withItems = []
+      for (const cl of checklists) {
+        withItems.push({
+          name: cl.name,
+          items: (
+            await ctx.db.query<{ text: string; done: number }>(
+              'SELECT text, done FROM checklist_item WHERE checklist_id = ? ORDER BY pos',
+              [cl.id],
+            )
+          ).map((ci) => ({ text: ci.text, done: ci.done === 1 })),
+        })
       }
-      if (include.has('activity')) {
-        out.activity = ctx.db.query<{
-          ts: number
-          verb: string
-          summary: string
-          actor_kind: string
-        }>(
-          "SELECT ts, verb, summary, actor_kind FROM event WHERE entity = 'item' AND entity_id = ? ORDER BY id DESC LIMIT 20",
+      out.checklists = withItems
+    }
+    if (include.has('links')) {
+      out.links = {
+        out: await ctx.db.query<{ ref_type: string; target: string }>(
+          "SELECT ref_type, target FROM link WHERE src_kind = 'item' AND src_id = ?",
           [item.id],
-        )
+        ),
+        in: await ctx.db.query<{ src_kind: string; src_id: string }>(
+          "SELECT src_kind, src_id FROM link WHERE workspace_id = ? AND ref_type = 'item' AND target = ?",
+          [ctx.workspaceId, item.key],
+        ),
       }
-      return out
-    }),
+    }
+    if (include.has('attachments')) {
+      out.attachments = await ctx.db.query<{
+        id: string
+        kind: string
+        filename: string
+        url: string | null
+        size: number | null
+      }>(
+        "SELECT id, kind, filename, url, size FROM attachment WHERE owner_kind = 'item' AND owner_id = ?",
+        [item.id],
+      )
+    }
+    if (include.has('activity')) {
+      out.activity = await ctx.db.query<{
+        ts: number
+        verb: string
+        summary: string
+        actor_kind: string
+      }>(
+        "SELECT ts, verb, summary, actor_kind FROM event WHERE entity = 'item' AND entity_id = ? ORDER BY id DESC LIMIT 20",
+        [item.id],
+      )
+    }
+    items.push(out)
   }
+  return { items }
 }
 
 // --------------------------------------------------------------------------
 // doc_tree / doc_get
 // --------------------------------------------------------------------------
 
-export function docTree(ctx: ICtx, root?: string, depth = 10) {
+export async function docTree(ctx: ICtx, root?: string, depth = 10) {
   interface INode {
     id: string
     slug: string
@@ -332,7 +341,7 @@ export function docTree(ctx: ICtx, root?: string, depth = 10) {
     rev: number
     updated_at: number
   }
-  const all = ctx.db.query<INode>(
+  const all = await ctx.db.query<INode>(
     'SELECT id, slug, title, parent_id, rev, updated_at FROM document WHERE workspace_id = ? AND archived = 0 ORDER BY pos',
     [ctx.workspaceId],
   )
@@ -361,17 +370,17 @@ export function docTree(ctx: ICtx, root?: string, depth = 10) {
   return { docs: out }
 }
 
-export function docGet(
+export async function docGet(
   ctx: ICtx,
   ref: string,
   opts: { at_version?: number; include?: string[] } = {},
 ) {
-  const doc = docBySlug(ctx, ref)
+  const doc = await docBySlug(ctx, ref)
   const include = new Set(opts.include ?? [])
   let body = doc.body
   let rev = doc.rev
   if (opts.at_version !== undefined) {
-    const v = ctx.db.query<{ body: string; rev: number }>(
+    const v = await ctx.db.query<{ body: string; rev: number }>(
       'SELECT body, rev FROM doc_version WHERE document_id = ? AND rev = ?',
       [doc.id, opts.at_version],
     )
@@ -397,13 +406,13 @@ export function docGet(
     }))
   }
   if (include.has('backlinks')) {
-    out.backlinks = ctx.db.query<{ src_kind: string; src_id: string }>(
+    out.backlinks = await ctx.db.query<{ src_kind: string; src_id: string }>(
       "SELECT src_kind, src_id FROM link WHERE workspace_id = ? AND ref_type = 'doc' AND target = ?",
       [ctx.workspaceId, doc.slug],
     )
   }
   if (include.has('versions')) {
-    out.versions = ctx.db.query<{
+    out.versions = await ctx.db.query<{
       rev: number
       created_at: number
       handle: string
@@ -420,7 +429,7 @@ export function docGet(
 // search / activity
 // --------------------------------------------------------------------------
 
-export function search(ctx: ICtx, params: TSearch) {
+export async function search(ctx: ICtx, params: TSearch) {
   const types = params.types ?? ['item', 'doc', 'comment']
   const args: unknown[] = [params.query]
   let filter = `kind IN (${types.map(() => '?').join(',')})`
@@ -429,7 +438,7 @@ export function search(ctx: ICtx, params: TSearch) {
     filter += ' AND board_key = ?'
     args.push(params.board)
   }
-  const rows = ctx.db.query<{
+  const rows = await ctx.db.query<{
     kind: string
     ref: string
     title: string
@@ -451,7 +460,7 @@ export function search(ctx: ICtx, params: TSearch) {
   }
 }
 
-export function activityQuery(ctx: ICtx, params: TActivityQuery) {
+export async function activityQuery(ctx: ICtx, params: TActivityQuery) {
   const where: string[] = ['workspace_id = ?']
   const args: unknown[] = [ctx.workspaceId]
   if (params.entity) {
@@ -478,7 +487,7 @@ export function activityQuery(ctx: ICtx, params: TActivityQuery) {
     where.push('id < ?')
     args.push(params.cursor)
   }
-  const rows = ctx.db.query<{
+  const rows = await ctx.db.query<{
     id: string
     ts: number
     actor_id: string

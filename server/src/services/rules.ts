@@ -53,65 +53,75 @@ export const zRuleOp = z.discriminatedUnion('op', [
 export type TRuleOp = z.infer<typeof zRuleOp>
 export const zRuleWrite = z.object({ ops: z.array(zRuleOp).min(1).max(20) })
 
-export function ruleWrite(ctx: ICtx, ops: TRuleOp[]) {
-  return ops.map((op) =>
-    withOp(ctx, op.op_id, () => {
-      switch (op.op) {
-        case 'create': {
-          if (op.condition && parseEmbedQuery(op.condition) === null)
-            throw new ApiError(400, `invalid condition: ${op.condition}`)
-          const id = newId('rul')
-          ctx.db.run(
-            'INSERT INTO rule (id, workspace_id, name, trigger, condition, action, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [
+export async function ruleWrite(ctx: ICtx, ops: TRuleOp[]) {
+  const results = []
+  for (const op of ops) {
+    results.push(
+      await withOp(ctx, op.op_id, async () => {
+        switch (op.op) {
+          case 'create': {
+            if (op.condition && parseEmbedQuery(op.condition) === null)
+              throw new ApiError(400, `invalid condition: ${op.condition}`)
+            const id = newId('rul')
+            await ctx.db.run(
+              'INSERT INTO rule (id, workspace_id, name, trigger, condition, action, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              [
+                id,
+                ctx.workspaceId,
+                op.name,
+                op.trigger,
+                op.condition ?? null,
+                JSON.stringify(op.action),
+                op.enabled ? 1 : 0,
+                now(),
+              ],
+            )
+            await emitEvent(
+              ctx,
+              'rule.created',
+              'rule',
               id,
-              ctx.workspaceId,
-              op.name,
-              op.trigger,
-              op.condition ?? null,
-              JSON.stringify(op.action),
-              op.enabled ? 1 : 0,
-              now(),
-            ],
-          )
-          emitEvent(ctx, 'rule.created', 'rule', id, `created rule ${op.name}`)
-          return { id }
+              `created rule ${op.name}`,
+            )
+            return { id }
+          }
+          case 'update': {
+            const rows = await ctx.db.query<{ id: string }>(
+              'SELECT id FROM rule WHERE workspace_id = ? AND id = ?',
+              [ctx.workspaceId, op.id],
+            )
+            if (rows.length === 0)
+              throw new ApiError(404, `rule ${op.id} not found`)
+            await ctx.db.run(
+              'UPDATE rule SET name = COALESCE(?, name), enabled = COALESCE(?, enabled) WHERE id = ?',
+              [
+                op.name ?? null,
+                op.enabled === undefined ? null : op.enabled ? 1 : 0,
+                op.id,
+              ],
+            )
+            await emitEvent(ctx, 'rule.updated', 'rule', op.id, `updated rule`)
+            return { id: op.id }
+          }
+          case 'delete': {
+            await ctx.db.run(
+              'DELETE FROM rule WHERE workspace_id = ? AND id = ?',
+              [ctx.workspaceId, op.id],
+            )
+            await emitEvent(ctx, 'rule.deleted', 'rule', op.id, `deleted rule`)
+            return { id: op.id }
+          }
         }
-        case 'update': {
-          const rows = ctx.db.query<{ id: string }>(
-            'SELECT id FROM rule WHERE workspace_id = ? AND id = ?',
-            [ctx.workspaceId, op.id],
-          )
-          if (rows.length === 0)
-            throw new ApiError(404, `rule ${op.id} not found`)
-          ctx.db.run(
-            'UPDATE rule SET name = COALESCE(?, name), enabled = COALESCE(?, enabled) WHERE id = ?',
-            [
-              op.name ?? null,
-              op.enabled === undefined ? null : op.enabled ? 1 : 0,
-              op.id,
-            ],
-          )
-          emitEvent(ctx, 'rule.updated', 'rule', op.id, `updated rule`)
-          return { id: op.id }
-        }
-        case 'delete': {
-          ctx.db.run('DELETE FROM rule WHERE workspace_id = ? AND id = ?', [
-            ctx.workspaceId,
-            op.id,
-          ])
-          emitEvent(ctx, 'rule.deleted', 'rule', op.id, `deleted rule`)
-          return { id: op.id }
-        }
-      }
-    }),
-  )
+      }),
+    )
+  }
+  return results
 }
 
-export function ruleList(ctx: ICtx) {
+export async function ruleList(ctx: ICtx) {
   return {
-    rules: ctx.db
-      .query<{
+    rules: (
+      await ctx.db.query<{
         id: string
         name: string
         trigger: string
@@ -122,14 +132,14 @@ export function ruleList(ctx: ICtx) {
         'SELECT id, name, trigger, condition, action, enabled FROM rule WHERE workspace_id = ?',
         [ctx.workspaceId],
       )
-      .map((r) => ({
-        id: r.id,
-        name: r.name,
-        trigger: r.trigger,
-        condition: r.condition ?? undefined,
-        action: JSON.parse(r.action),
-        enabled: r.enabled === 1,
-      })),
+    ).map((r) => ({
+      id: r.id,
+      name: r.name,
+      trigger: r.trigger,
+      condition: r.condition ?? undefined,
+      action: JSON.parse(r.action),
+      enabled: r.enabled === 1,
+    })),
   }
 }
 
@@ -137,13 +147,13 @@ export function ruleList(ctx: ICtx) {
 // Evaluation
 // ---------------------------------------------------------------------------
 
-function itemMatches(
+async function itemMatches(
   db: ISqlDriver,
   workspaceId: string,
   itemId: string,
   condition: IEmbedQuery,
-): boolean {
-  const rows = db.query<{
+): Promise<boolean> {
+  const rows = await db.query<{
     board_key: string
     list_name: string
     completed: number
@@ -170,7 +180,7 @@ function itemMatches(
   if (condition.state === 'done' && item.completed !== 1) return false
   if (condition.state === 'archived' && item.archived !== 1) return false
   if (condition.label) {
-    const has = db.query(
+    const has = await db.query(
       `SELECT 1 FROM item_label il JOIN label lb ON lb.id = il.label_id
         WHERE il.item_id = ? AND lower(lb.name) = lower(?)`,
       [itemId, condition.label],
@@ -178,7 +188,7 @@ function itemMatches(
     if (has.length === 0) return false
   }
   if (condition.assignee) {
-    const has = db.query(
+    const has = await db.query(
       `SELECT 1 FROM item_assignee ia JOIN actor a ON a.id = ia.actor_id
         WHERE ia.item_id = ? AND a.handle = ?`,
       [itemId, condition.assignee],
@@ -199,12 +209,12 @@ export function startRulesEngine(
 ): () => void {
   const fetchImpl = opts.fetchImpl ?? fetch
 
-  return onEvent((event) => {
+  return onEvent(async (event) => {
     // Loop guard (design-spec §6): actions caused by a rule never re-trigger.
     if (event.caused_by) return
     if (event.entity !== 'item') return
 
-    const rules = db.query<{
+    const rules = await db.query<{
       id: string
       name: string
       trigger: string
@@ -220,24 +230,31 @@ export function startRulesEngine(
         const condition = parseEmbedQuery(rule.condition)
         if (
           !condition ||
-          !itemMatches(db, event.workspace_id, event.entity_id, condition)
+          !(await itemMatches(
+            db,
+            event.workspace_id,
+            event.entity_id,
+            condition,
+          ))
         )
           continue
       }
-      executeRule(db, rule, event, fetchImpl)
+      await executeRule(db, rule, event, fetchImpl)
     }
   })
 }
 
-function executeRule(
+async function executeRule(
   db: ISqlDriver,
   rule: { id: string; name: string; action: string },
   event: IEvent,
   fetchImpl: typeof fetch,
-): void {
-  const system = db.query<{ id: string; handle: string }>(
-    "SELECT id, handle FROM actor WHERE workspace_id = ? AND kind = 'system' LIMIT 1",
-    [event.workspace_id],
+): Promise<void> {
+  const system = (
+    await db.query<{ id: string; handle: string }>(
+      "SELECT id, handle FROM actor WHERE workspace_id = ? AND kind = 'system' LIMIT 1",
+      [event.workspace_id],
+    )
   )[0]
   const ctx: ICtx = {
     db,
@@ -251,9 +268,10 @@ function executeRule(
     },
     causedBy: event.id,
   }
-  const item = db.query<{ key: string }>('SELECT key FROM item WHERE id = ?', [
-    event.entity_id,
-  ])
+  const item = await db.query<{ key: string }>(
+    'SELECT key FROM item WHERE id = ?',
+    [event.entity_id],
+  )
   if (item.length === 0) return
   const key = item[0].key
   const action = JSON.parse(rule.action) as z.infer<typeof zRuleAction>
@@ -261,7 +279,7 @@ function executeRule(
 
   switch (action.kind) {
     case 'move_item':
-      itemWrite(ctx, [
+      await itemWrite(ctx, [
         {
           op: 'move',
           op_id: opId,
@@ -272,16 +290,22 @@ function executeRule(
       ])
       break
     case 'apply_label':
-      itemWrite(ctx, [{ op: 'label', op_id: opId, key, add: [action.label] }])
+      await itemWrite(ctx, [
+        { op: 'label', op_id: opId, key, add: [action.label] },
+      ])
       break
     case 'assign':
-      itemWrite(ctx, [{ op: 'assign', op_id: opId, key, add: [action.actor] }])
+      await itemWrite(ctx, [
+        { op: 'assign', op_id: opId, key, add: [action.actor] },
+      ])
       break
     case 'comment':
-      itemWrite(ctx, [{ op: 'comment', op_id: opId, key, body: action.body }])
+      await itemWrite(ctx, [
+        { op: 'comment', op_id: opId, key, body: action.body },
+      ])
       break
     case 'complete':
-      itemWrite(ctx, [{ op: 'complete', op_id: opId, key }])
+      await itemWrite(ctx, [{ op: 'complete', op_id: opId, key }])
       break
     case 'call_webhook':
       void fetchImpl(action.url, {

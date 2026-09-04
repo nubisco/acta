@@ -22,7 +22,7 @@ import { planTrelloImport, type ITrelloPlanOptions } from '../src/trello/plan'
 import { runTrelloImport } from '../src/trello/run'
 
 let db: BunSqliteDriver
-let app: ReturnType<typeof createApp>
+let app: Awaited<ReturnType<typeof createApp>>
 let ctx: ICtx
 let client: ActaClient
 
@@ -44,14 +44,16 @@ function fixturePages() {
 }
 
 beforeEach(async () => {
-  db = openDb(':memory:')
-  app = createApp(db, {
+  db = await openDb(':memory:')
+  app = await createApp(db, {
     bootstrap: { adminEmail: 'jose@nubisco.io', adminHandle: 'jose' },
     dataDir: `/tmp/acta-importer-test-${Math.random().toString(36).slice(2)}`,
   })
-  const workspaceId = db.query<{ id: string }>('SELECT id FROM workspace')[0].id
-  const admin = db.query<{ id: string }>(
-    "SELECT id FROM actor WHERE handle = 'jose'",
+  const workspaceId = (
+    await db.query<{ id: string }>('SELECT id FROM workspace')
+  )[0].id
+  const admin = (
+    await db.query<{ id: string }>("SELECT id FROM actor WHERE handle = 'jose'")
   )[0]
   ctx = {
     db,
@@ -134,7 +136,8 @@ describe('trello import end to end', () => {
     // Key mapping recorded from op results, source ids in the report.
     const mapping = report.mappings as Record<string, { key: string }>
     const submissionKey = mapping['trello:68851e80000000000000c001'].key
-    const submission = itemGet(ctx, { keys: [submissionKey] }).items[0] as {
+    const submission = (await itemGet(ctx, { keys: [submissionKey] }))
+      .items[0] as {
       list: string
       description: string
       labels?: string[]
@@ -146,7 +149,7 @@ describe('trello import end to end', () => {
     expect(submission.assignees).toEqual(['jose'])
 
     const epicKey = mapping['trello:68851e80000000000000c003'].key
-    const epic = itemGet(ctx, { keys: [epicKey] }).items[0] as {
+    const epic = (await itemGet(ctx, { keys: [epicKey] })).items[0] as {
       checklists?: { name: string; items: { text: string; done: boolean }[] }[]
       comments?: { body: string }[]
     }
@@ -161,7 +164,7 @@ describe('trello import end to end', () => {
     )
 
     const crashKey = mapping['trello:68851e80000000000000c002'].key
-    const crash = itemGet(ctx, { keys: [crashKey] }).items[0] as {
+    const crash = (await itemGet(ctx, { keys: [crashKey] })).items[0] as {
       due?: number
       done?: boolean
       labels?: string[]
@@ -173,23 +176,32 @@ describe('trello import end to end', () => {
     // closed card archived; done-as-archived applied on SW but not LABS.
     const oldKey = mapping['trello:68851e80000000000000c005'].key
     expect(
-      (itemGet(ctx, { keys: [oldKey] }).items[0] as { archived?: boolean })
-        .archived,
+      (
+        (await itemGet(ctx, { keys: [oldKey] })).items[0] as {
+          archived?: boolean
+        }
+      ).archived,
     ).toBe(true)
     const shipKey = mapping['trello:68851e80000000000000c004'].key
     expect(
-      (itemGet(ctx, { keys: [shipKey] }).items[0] as { archived?: boolean })
-        .archived,
+      (
+        (await itemGet(ctx, { keys: [shipKey] })).items[0] as {
+          archived?: boolean
+        }
+      ).archived,
     ).toBe(true)
     const gradKey = mapping['trello:68851e80000000000000c102'].key
     expect(
-      (itemGet(ctx, { keys: [gradKey] }).items[0] as { archived?: boolean })
-        .archived,
+      (
+        (await itemGet(ctx, { keys: [gradKey] })).items[0] as {
+          archived?: boolean
+        }
+      ).archived,
     ).toBeUndefined()
 
     // url attachment added; file upload skipped (no Trello credentials).
     const supportKey = mapping['trello:68851e80000000000000c006'].key
-    const support = itemGet(ctx, { keys: [supportKey] }).items[0] as {
+    const support = (await itemGet(ctx, { keys: [supportKey] })).items[0] as {
       attachments?: { filename: string; url: string | null }[]
     }
     expect(support.attachments).toHaveLength(1)
@@ -211,29 +223,23 @@ describe('trello import end to end', () => {
   it('is idempotent when re-run (same op ids, no duplicates)', async () => {
     const first = await importTrello()
     expect(first.ok()).toBe(true)
-    const countItems = () =>
-      db.query<{ n: number }>('SELECT COUNT(*) AS n FROM item')[0].n
-    const countComments = () =>
-      db.query<{ n: number }>('SELECT COUNT(*) AS n FROM comment')[0].n
-    const countAttachments = () =>
-      db.query<{ n: number }>('SELECT COUNT(*) AS n FROM attachment')[0].n
-    const countLabels = () =>
-      db.query<{ n: number }>('SELECT COUNT(*) AS n FROM label')[0].n
+    const count = async (table: string) =>
+      (await db.query<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table}`))[0].n
     const before = {
-      items: countItems(),
-      comments: countComments(),
-      attachments: countAttachments(),
-      labels: countLabels(),
+      items: await count('item'),
+      comments: await count('comment'),
+      attachments: await count('attachment'),
+      labels: await count('label'),
     }
     expect(before.items).toBe(9)
 
     const second = await importTrello()
     if (!second.ok()) second.print()
     expect(second.ok()).toBe(true)
-    expect(countItems()).toBe(before.items)
-    expect(countComments()).toBe(before.comments)
-    expect(countAttachments()).toBe(before.attachments)
-    expect(countLabels()).toBe(before.labels)
+    expect(await count('item')).toBe(before.items)
+    expect(await count('comment')).toBe(before.comments)
+    expect(await count('attachment')).toBe(before.attachments)
+    expect(await count('label')).toBe(before.labels)
   })
 
   it('dry-run performs no writes', async () => {
@@ -256,9 +262,9 @@ describe('trello import end to end', () => {
     const report = new ImportReport('trello-import', true)
     await runTrelloImport(plan, throwingClient, report, { dryRun: true })
     expect(report.ok()).toBe(true)
-    expect(db.query<{ n: number }>('SELECT COUNT(*) AS n FROM item')[0].n).toBe(
-      0,
-    )
+    expect(
+      (await db.query<{ n: number }>('SELECT COUNT(*) AS n FROM item'))[0].n,
+    ).toBe(0)
   })
 })
 
@@ -270,17 +276,25 @@ describe('confluence import end to end', () => {
     if (!report.ok()) report.print()
     expect(report.ok()).toBe(true)
 
-    const home = docGet(ctx, 'manual') as { title: string; body: string }
+    const home = (await docGet(ctx, 'manual')) as {
+      title: string
+      body: string
+    }
     expect(home.title).toBe('Nubisco Home')
     expect(home.body).toContain('> [!INFO] Read me')
     expect(home.body).toContain('[[doc:manual/the-nubisco-manual]]')
 
-    const manual = docGet(ctx, 'manual/the-nubisco-manual') as { body: string }
+    const manual = (await docGet(ctx, 'manual/the-nubisco-manual')) as {
+      body: string
+    }
     expect(manual.body).toContain(':::details Details inside')
     expect(manual.body).toContain('| Role | Owner |')
     expect(manual.body).toContain('- One\n  - Nested')
 
-    const product = docGet(ctx, 'manual/the-nubisco-manual/stagewright') as {
+    const product = (await docGet(
+      ctx,
+      'manual/the-nubisco-manual/stagewright',
+    )) as {
       layout?: string
       body: string
     }
@@ -315,9 +329,10 @@ describe('confluence import end to end', () => {
     if (!second.ok()) second.print()
     expect(second.ok()).toBe(true)
     expect(
-      db.query<{ n: number }>('SELECT COUNT(*) AS n FROM document')[0].n,
+      (await db.query<{ n: number }>('SELECT COUNT(*) AS n FROM document'))[0]
+        .n,
     ).toBe(3)
-    const revs = db.query<{ rev: number }>('SELECT rev FROM document')
+    const revs = await db.query<{ rev: number }>('SELECT rev FROM document')
     expect(revs.every((r) => r.rev === 1)).toBe(true)
   })
 })

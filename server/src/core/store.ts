@@ -57,8 +57,8 @@ export interface IDocRow {
   updated_at: number
 }
 
-export function boardByKey(ctx: ICtx, key: string): IBoardRow {
-  const rows = ctx.db.query<IBoardRow>(
+export async function boardByKey(ctx: ICtx, key: string): Promise<IBoardRow> {
+  const rows = await ctx.db.query<IBoardRow>(
     'SELECT * FROM board WHERE workspace_id = ? AND key = ?',
     [ctx.workspaceId, key],
   )
@@ -67,8 +67,12 @@ export function boardByKey(ctx: ICtx, key: string): IBoardRow {
 }
 
 /** Lists are addressed by name (case-insensitive) or id within a board. */
-export function listByRef(ctx: ICtx, boardId: string, ref: string): IListRow {
-  const rows = ctx.db.query<IListRow>(
+export async function listByRef(
+  ctx: ICtx,
+  boardId: string,
+  ref: string,
+): Promise<IListRow> {
+  const rows = await ctx.db.query<IListRow>(
     `SELECT * FROM list WHERE workspace_id = ? AND board_id = ? AND archived = 0
        AND (id = ? OR lower(name) = lower(?)) LIMIT 1`,
     [ctx.workspaceId, boardId, ref, ref],
@@ -78,27 +82,28 @@ export function listByRef(ctx: ICtx, boardId: string, ref: string): IListRow {
 }
 
 /** Items resolve by key, following key aliases from cross-board moves. */
-export function itemByKey(ctx: ICtx, key: string): IItemRow {
-  const rows = ctx.db.query<IItemRow>(
+export async function itemByKey(ctx: ICtx, key: string): Promise<IItemRow> {
+  const rows = await ctx.db.query<IItemRow>(
     'SELECT * FROM item WHERE workspace_id = ? AND key = ?',
     [ctx.workspaceId, key],
   )
   if (rows.length > 0) return rows[0]
-  const alias = ctx.db.query<{ item_id: string }>(
+  const alias = await ctx.db.query<{ item_id: string }>(
     'SELECT item_id FROM item_key_alias WHERE workspace_id = ? AND key = ?',
     [ctx.workspaceId, key],
   )
   if (alias.length > 0) {
-    const byId = ctx.db.query<IItemRow>('SELECT * FROM item WHERE id = ?', [
-      alias[0].item_id,
-    ])
+    const byId = await ctx.db.query<IItemRow>(
+      'SELECT * FROM item WHERE id = ?',
+      [alias[0].item_id],
+    )
     if (byId.length > 0) return byId[0]
   }
   throw new ApiError(404, `item ${key} not found`)
 }
 
-export function docBySlug(ctx: ICtx, slug: string): IDocRow {
-  const rows = ctx.db.query<IDocRow>(
+export async function docBySlug(ctx: ICtx, slug: string): Promise<IDocRow> {
+  const rows = await ctx.db.query<IDocRow>(
     'SELECT * FROM document WHERE workspace_id = ? AND slug = ?',
     [ctx.workspaceId, slug],
   )
@@ -106,11 +111,11 @@ export function docBySlug(ctx: ICtx, slug: string): IDocRow {
   return rows[0]
 }
 
-export function actorByRef(
+export async function actorByRef(
   ctx: ICtx,
   ref: string,
-): { id: string; handle: string } {
-  const rows = ctx.db.query<{ id: string; handle: string }>(
+): Promise<{ id: string; handle: string }> {
+  const rows = await ctx.db.query<{ id: string; handle: string }>(
     'SELECT id, handle FROM actor WHERE workspace_id = ? AND (id = ? OR handle = ?)',
     [ctx.workspaceId, ref, ref],
   )
@@ -118,21 +123,25 @@ export function actorByRef(
   return rows[0]
 }
 
-export function labelByRef(
+export async function labelByRef(
   ctx: ICtx,
   ref: string,
   boardId?: string,
-): { id: string; name: string; group_id: string } {
+): Promise<{ id: string; name: string; group_id: string }> {
   // Accept a label id or a name; names resolve board-local first, then
   // workspace groups.
-  const byId = ctx.db.query<{ id: string; name: string; group_id: string }>(
-    'SELECT id, name, group_id FROM label WHERE workspace_id = ? AND id = ?',
-    [ctx.workspaceId, ref],
-  )
+  const byId = await ctx.db.query<{
+    id: string
+    name: string
+    group_id: string
+  }>('SELECT id, name, group_id FROM label WHERE workspace_id = ? AND id = ?', [
+    ctx.workspaceId,
+    ref,
+  ])
   if (byId.length > 0) return byId[0]
   // With a board context, prefer that board's labels over workspace ones and
   // hide other boards' labels; without one, any unique name resolves.
-  const byName = boardId
+  const byName = await (boardId
     ? ctx.db.query<{ id: string; name: string; group_id: string }>(
         `SELECT l.id, l.name, l.group_id FROM label l
            JOIN label_group g ON g.id = l.group_id
@@ -145,7 +154,7 @@ export function labelByRef(
         `SELECT l.id, l.name, l.group_id FROM label l
           WHERE l.workspace_id = ? AND lower(l.name) = lower(?)`,
         [ctx.workspaceId, ref],
-      )
+      ))
   if (byName.length === 0) throw new ApiError(404, `label ${ref} not found`)
   return byName[0]
 }
@@ -153,13 +162,13 @@ export function labelByRef(
 const POS_STEP = 1024
 
 /** Position at the end of a sequence. */
-export function tailPos(
+export async function tailPos(
   ctx: ICtx,
   table: 'list' | 'item',
   parentCol: string,
   parentId: string,
-): number {
-  const rows = ctx.db.query<{ m: number | null }>(
+): Promise<number> {
+  const rows = await ctx.db.query<{ m: number | null }>(
     `SELECT MAX(pos) AS m FROM ${table} WHERE ${parentCol} = ?`,
     [parentId],
   )

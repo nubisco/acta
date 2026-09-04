@@ -20,14 +20,14 @@ import {
 let db: BunSqliteDriver
 let ctx: ICtx
 
-beforeEach(() => {
-  db = openDb(':memory:')
-  const workspaceId = bootstrapWorkspace(db, {
+beforeEach(async () => {
+  db = await openDb(':memory:')
+  const workspaceId = await bootstrapWorkspace(db, {
     adminEmail: 'a@b.c',
     adminHandle: 'jose',
   })
-  const admin = db.query<{ id: string }>(
-    "SELECT id FROM actor WHERE handle = 'jose'",
+  const admin = (
+    await db.query<{ id: string }>("SELECT id FROM actor WHERE handle = 'jose'")
   )[0]
   ctx = {
     db,
@@ -42,8 +42,8 @@ beforeEach(() => {
   }
 })
 
-function seedBoard(): void {
-  const results = boardWrite(ctx, [
+async function seedBoard(): Promise<void> {
+  const results = await boardWrite(ctx, [
     {
       op: 'create',
       op_id: 'b1',
@@ -56,9 +56,9 @@ function seedBoard(): void {
 }
 
 describe('boards', () => {
-  it('creates a kanban6 board', () => {
-    seedBoard()
-    const overview = workspaceOverview(ctx)
+  it('creates a kanban6 board', async () => {
+    await seedBoard()
+    const overview = await workspaceOverview(ctx)
     const board = overview.boards.find((b) => b.key === 'SW')
     expect(board?.lists.map((l) => l.name)).toEqual([
       'Backlog',
@@ -70,9 +70,9 @@ describe('boards', () => {
     ])
   })
 
-  it('is idempotent per op_id', () => {
-    seedBoard()
-    const replay = boardWrite(ctx, [
+  it('is idempotent per op_id', async () => {
+    await seedBoard()
+    const replay = await boardWrite(ctx, [
       {
         op: 'create',
         op_id: 'b1',
@@ -82,7 +82,7 @@ describe('boards', () => {
       },
     ])
     expect(replay[0].ok).toBe(true)
-    const dup = boardWrite(ctx, [
+    const dup = await boardWrite(ctx, [
       {
         op: 'create',
         op_id: 'b2',
@@ -98,8 +98,8 @@ describe('boards', () => {
 describe('items', () => {
   beforeEach(seedBoard)
 
-  it('creates, moves, labels, comments, checks off in one batch', () => {
-    const results = itemWrite(
+  it('creates, moves, labels, comments, checks off in one batch', async () => {
+    const results = await itemWrite(
       ctx,
       [
         {
@@ -134,7 +134,7 @@ describe('items', () => {
     )
     expect(results.every((r) => r.ok)).toBe(true)
 
-    const got = itemGet(ctx, { keys: ['SW-1'] })
+    const got = await itemGet(ctx, { keys: ['SW-1'] })
     const item = got.items[0] as Record<string, any>
     expect(item.list).toBe('In Progress')
     expect(item.labels).toEqual(['Bug'])
@@ -149,42 +149,44 @@ describe('items', () => {
     ])
   })
 
-  it('enforces if_rev and reports current rev on conflict', () => {
-    itemWrite(
+  it('enforces if_rev and reports current rev on conflict', async () => {
+    await itemWrite(
       ctx,
       [{ op: 'create', op_id: 'i1', list: 'To Do', title: 'X' }],
       'SW',
     )
-    const first = itemWrite(ctx, [
+    const first = await itemWrite(ctx, [
       { op: 'update', op_id: 'i2', key: 'SW-1', if_rev: 1, title: 'Y' },
     ])
     expect(first[0].ok).toBe(true)
-    const stale = itemWrite(ctx, [
+    const stale = await itemWrite(ctx, [
       { op: 'update', op_id: 'i3', key: 'SW-1', if_rev: 1, title: 'Z' },
     ])
     expect(stale[0].ok).toBe(false)
     expect((stale[0] as { current?: { rev: number } }).current?.rev).toBe(2)
   })
 
-  it('replays ops idempotently', () => {
+  it('replays ops idempotently', async () => {
     const ops = [
       { op: 'create' as const, op_id: 'same', list: 'To Do', title: 'Once' },
     ]
-    const a = itemWrite(ctx, ops, 'SW')
-    const b = itemWrite(ctx, ops, 'SW')
+    const a = await itemWrite(ctx, ops, 'SW')
+    const b = await itemWrite(ctx, ops, 'SW')
     expect(a[0]).toEqual(b[0])
     expect(
-      boardGet(ctx, {
-        board: 'SW',
-        state: 'open',
-        detail: 'compact',
-        limit: 100,
-      }).items,
+      (
+        await boardGet(ctx, {
+          board: 'SW',
+          state: 'open',
+          detail: 'compact',
+          limit: 100,
+        })
+      ).items,
     ).toHaveLength(1)
   })
 
-  it('keeps the old key as an alias across board moves', () => {
-    boardWrite(ctx, [
+  it('keeps the old key as an alias across board moves', async () => {
+    await boardWrite(ctx, [
       {
         op: 'create',
         op_id: 'b2',
@@ -193,22 +195,22 @@ describe('items', () => {
         template: 'kanban6',
       },
     ])
-    itemWrite(
+    await itemWrite(
       ctx,
       [{ op: 'create', op_id: 'i1', list: 'To Do', title: 'Graduate me' }],
       'SW',
     )
-    const moved = itemWrite(ctx, [
+    const moved = await itemWrite(ctx, [
       { op: 'move', op_id: 'i2', key: 'SW-1', board: 'SUP', list: 'Backlog' },
     ])
     expect(moved[0].ok).toBe(true)
     expect((moved[0] as { key: string }).key).toBe('SUP-1')
-    const viaAlias = itemGet(ctx, { keys: ['SW-1'] })
+    const viaAlias = await itemGet(ctx, { keys: ['SW-1'] })
     expect((viaAlias.items[0] as { key: string }).key).toBe('SUP-1')
   })
 
-  it('filters board_get by list, label, and state', () => {
-    labelWrite(ctx, [
+  it('filters board_get by list, label, and state', async () => {
+    await labelWrite(ctx, [
       { op: 'group_create', op_id: 'l1', name: 'Components', board: 'SW' },
       {
         op: 'label_create',
@@ -218,7 +220,7 @@ describe('items', () => {
         color: 'blue',
       },
     ])
-    itemWrite(
+    await itemWrite(
       ctx,
       [
         {
@@ -235,29 +237,35 @@ describe('items', () => {
       'SW',
     )
     expect(
-      boardGet(ctx, {
-        board: 'SW',
-        state: 'open',
-        detail: 'compact',
-        limit: 100,
-      }).items,
+      (
+        await boardGet(ctx, {
+          board: 'SW',
+          state: 'open',
+          detail: 'compact',
+          limit: 100,
+        })
+      ).items,
     ).toHaveLength(2)
     expect(
-      boardGet(ctx, {
-        board: 'SW',
-        state: 'open',
-        label: 'engine',
-        detail: 'compact',
-        limit: 100,
-      }).items,
+      (
+        await boardGet(ctx, {
+          board: 'SW',
+          state: 'open',
+          label: 'engine',
+          detail: 'compact',
+          limit: 100,
+        })
+      ).items,
     ).toHaveLength(1)
     expect(
-      boardGet(ctx, {
-        board: 'SW',
-        state: 'archived',
-        detail: 'compact',
-        limit: 100,
-      }).items,
+      (
+        await boardGet(ctx, {
+          board: 'SW',
+          state: 'archived',
+          detail: 'compact',
+          limit: 100,
+        })
+      ).items,
     ).toHaveLength(1)
   })
 })
@@ -265,8 +273,8 @@ describe('items', () => {
 describe('labels', () => {
   beforeEach(seedBoard)
 
-  it('merges labels and reassigns items', () => {
-    labelWrite(ctx, [
+  it('merges labels and reassigns items', async () => {
+    await labelWrite(ctx, [
       { op: 'group_create', op_id: 'g1', name: 'Extra', board: 'SW' },
       {
         op: 'label_create',
@@ -276,7 +284,7 @@ describe('labels', () => {
         color: 'red',
       },
     ])
-    itemWrite(
+    await itemWrite(
       ctx,
       [
         {
@@ -289,11 +297,11 @@ describe('labels', () => {
       ],
       'SW',
     )
-    const merged = labelWrite(ctx, [
+    const merged = await labelWrite(ctx, [
       { op: 'label_merge', op_id: 'm1', from: 'bugz', into: 'Bug' },
     ])
     expect(merged[0].ok).toBe(true)
-    const item = itemGet(ctx, { keys: ['SW-1'] }).items[0] as {
+    const item = (await itemGet(ctx, { keys: ['SW-1'] })).items[0] as {
       labels: string[]
     }
     expect(item.labels).toEqual(['Bug'])
@@ -301,8 +309,8 @@ describe('labels', () => {
 })
 
 describe('docs', () => {
-  it('creates a tree, patches sections, guards conflicts', () => {
-    const created = docWrite(ctx, [
+  it('creates a tree, patches sections, guards conflicts', async () => {
+    const created = await docWrite(ctx, [
       {
         op: 'create',
         op_id: 'd1',
@@ -325,20 +333,20 @@ describe('docs', () => {
     ])
     expect(created.every((r) => r.ok)).toBe(true)
 
-    const tree = docTree(ctx)
+    const tree = await docTree(ctx)
     expect(tree.docs).toEqual([
       expect.objectContaining({ slug: 'manual', depth: 0 }),
       expect.objectContaining({ slug: 'manual/vision', depth: 1 }),
     ])
 
-    const doc = docGet(ctx, 'manual', { include: ['sections'] }) as {
+    const doc = (await docGet(ctx, 'manual', { include: ['sections'] })) as {
       sections: { slug: string; hash: string }[]
       rev: number
     }
     const vision = doc.sections.find((s) => s.slug === 'vision')
     expect(vision).toBeDefined()
 
-    const patched = docWrite(ctx, [
+    const patched = await docWrite(ctx, [
       {
         op: 'patch_section',
         op_id: 'd3',
@@ -352,7 +360,7 @@ describe('docs', () => {
     expect(patched[0].ok).toBe(true)
 
     // Same-section edit with the stale hash conflicts.
-    const conflict = docWrite(ctx, [
+    const conflict = await docWrite(ctx, [
       {
         op: 'patch_section',
         op_id: 'd4',
@@ -365,20 +373,22 @@ describe('docs', () => {
     ])
     expect(conflict[0].ok).toBe(false)
 
-    const after = docGet(ctx, 'manual') as { body: string; rev: number }
+    const after = (await docGet(ctx, 'manual')) as { body: string; rev: number }
     expect(after.body).toContain('New vision.')
     expect(after.body).toContain('Hello.')
     expect(after.rev).toBe(2)
 
     // Version history intact.
-    const versions = docGet(ctx, 'manual', { include: ['versions'] }) as {
+    const versions = (await docGet(ctx, 'manual', {
+      include: ['versions'],
+    })) as {
       versions: { rev: number }[]
     }
     expect(versions.versions.map((v) => v.rev)).toEqual([2, 1])
   })
 
-  it('appends without needing a read', () => {
-    docWrite(ctx, [
+  it('appends without needing a read', async () => {
+    await docWrite(ctx, [
       {
         op: 'create',
         op_id: 'd1',
@@ -395,7 +405,7 @@ describe('docs', () => {
         body: '## 2026-09-04\n\nChose Acta.',
       },
     ])
-    const doc = docGet(ctx, 'log') as { body: string }
+    const doc = (await docGet(ctx, 'log')) as { body: string }
     expect(doc.body).toBe('# Log\n\n## 2026-09-04\n\nChose Acta.')
     const sections = sectionMap(doc.body)
     expect(contentHash(doc.body)).toBe(contentHash(doc.body))
@@ -406,8 +416,8 @@ describe('docs', () => {
 describe('search and activity', () => {
   beforeEach(seedBoard)
 
-  it('finds items, docs, and comments', () => {
-    itemWrite(
+  it('finds items, docs, and comments', async () => {
+    await itemWrite(
       ctx,
       [
         {
@@ -426,7 +436,7 @@ describe('search and activity', () => {
       ],
       'SW',
     )
-    docWrite(ctx, [
+    await docWrite(ctx, [
       {
         op: 'create',
         op_id: 'd1',
@@ -437,27 +447,27 @@ describe('search and activity', () => {
         tags: [],
       },
     ])
-    const items = search(ctx, { query: 'glitch', limit: 20 })
+    const items = await search(ctx, { query: 'glitch', limit: 20 })
     expect(items.results[0]).toMatchObject({ type: 'item', ref: 'SW-1' })
-    const both = search(ctx, { query: 'xruns', limit: 20 })
+    const both = await search(ctx, { query: 'xruns', limit: 20 })
     expect(both.results.map((r) => r.type).sort()).toEqual(['comment', 'doc'])
   })
 
-  it('records attribution and supports delta reads', () => {
-    itemWrite(
+  it('records attribution and supports delta reads', async () => {
+    await itemWrite(
       ctx,
       [{ op: 'create', op_id: 'i1', list: 'To Do', title: 'A' }],
       'SW',
     )
-    const all = activityQuery(ctx, { limit: 50 })
+    const all = await activityQuery(ctx, { limit: 50 })
     expect(all.events.some((e) => e.verb === 'item.created')).toBe(true)
     const cursorPoint = all.events[0].id
-    itemWrite(
+    await itemWrite(
       ctx,
       [{ op: 'create', op_id: 'i2', list: 'To Do', title: 'B' }],
       'SW',
     )
-    const delta = activityQuery(ctx, { since: cursorPoint, limit: 50 })
+    const delta = await activityQuery(ctx, { since: cursorPoint, limit: 50 })
     expect(delta.events.every((e) => e.id > cursorPoint)).toBe(true)
     expect(delta.events.some((e) => e.summary.includes('SW-2'))).toBe(true)
     expect(delta.events[0].actor_kind).toBe('human')

@@ -38,13 +38,13 @@ export function authRoutes(): Hono<IAuthEnv> {
     const db = c.get('db')
     const workspaceId = c.get('workspaceId')
     // Only known member emails get a code; respond identically either way.
-    const member = db.query<{ id: string }>(
+    const member = await db.query<{ id: string }>(
       'SELECT id FROM actor WHERE workspace_id = ? AND email = ? AND disabled = 0',
       [workspaceId, body.email],
     )
     if (member.length > 0) {
       const code = String(Math.floor(100000 + Math.random() * 900000))
-      db.run(
+      await db.run(
         'INSERT INTO otp_challenge (id, workspace_id, email, code_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)',
         [
           newId('act'),
@@ -67,26 +67,28 @@ export function authRoutes(): Hono<IAuthEnv> {
     const db = c.get('db')
     const workspaceId = c.get('workspaceId')
     const codeHash = await sha256Hex(body.code)
-    const challenge = db.query<{ id: string; attempts: number }>(
+    const challenge = await db.query<{ id: string; attempts: number }>(
       `SELECT id, attempts FROM otp_challenge
         WHERE workspace_id = ? AND email = ? AND code_hash = ? AND expires_at > ? AND attempts < 5
         ORDER BY created_at DESC LIMIT 1`,
       [workspaceId, body.email, codeHash, now()],
     )
     if (challenge.length === 0) {
-      db.run(
+      await db.run(
         'UPDATE otp_challenge SET attempts = attempts + 1 WHERE workspace_id = ? AND email = ?',
         [workspaceId, body.email],
       )
       return c.json({ ok: false, error: 'invalid code' }, 401)
     }
-    db.run('DELETE FROM otp_challenge WHERE workspace_id = ? AND email = ?', [
-      workspaceId,
-      body.email,
-    ])
-    const actor = db.query<{ id: string }>(
-      'SELECT id FROM actor WHERE workspace_id = ? AND email = ? AND disabled = 0',
+    await db.run(
+      'DELETE FROM otp_challenge WHERE workspace_id = ? AND email = ?',
       [workspaceId, body.email],
+    )
+    const actor = (
+      await db.query<{ id: string }>(
+        'SELECT id FROM actor WHERE workspace_id = ? AND email = ? AND disabled = 0',
+        [workspaceId, body.email],
+      )
     )[0]
     const token = await createToken(
       db,
@@ -110,10 +112,10 @@ export function authRoutes(): Hono<IAuthEnv> {
     const token = getCookie(c, SESSION_COOKIE)
     if (token) {
       const db = c.get('db')
-      db.run('UPDATE auth_token SET revoked_at = ? WHERE token_hash = ?', [
-        now(),
-        await sha256Hex(token),
-      ])
+      await db.run(
+        'UPDATE auth_token SET revoked_at = ? WHERE token_hash = ?',
+        [now(), await sha256Hex(token)],
+      )
     }
     deleteCookie(c, SESSION_COOKIE, { path: '/' })
     return c.json({ ok: true })
@@ -153,7 +155,7 @@ export async function mintBootstrapToken(
   db: ISqlDriver,
   workspaceId: string,
 ): Promise<string> {
-  const admin = db.query<{ id: string }>(
+  const admin = await db.query<{ id: string }>(
     "SELECT id FROM actor WHERE workspace_id = ? AND role = 'admin' AND kind = 'human' ORDER BY created_at LIMIT 1",
     [workspaceId],
   )

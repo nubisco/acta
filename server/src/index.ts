@@ -1,16 +1,17 @@
 import { mkdirSync } from 'node:fs'
-import { createApp } from './app'
+import { bunAssetReader, createApp } from './app'
 import { openDb } from './db'
 
 const DATA_DIR = process.env.ACTA_DATA_DIR ?? './data'
 const PORT = Number(process.env.ACTA_PORT ?? 4460)
+const WEB_DIST = process.env.ACTA_WEB_DIST
 
 mkdirSync(DATA_DIR, { recursive: true })
 
-const db = openDb(`${DATA_DIR}/acta.sqlite`)
-const app = createApp(db, {
+const db = await openDb(`${DATA_DIR}/acta.sqlite`)
+const app = await createApp(db, {
   dataDir: DATA_DIR,
-  webDist: process.env.ACTA_WEB_DIST,
+  serveAsset: WEB_DIST ? bunAssetReader(WEB_DIST) : undefined,
   bootstrap: {
     workspaceName: process.env.ACTA_WORKSPACE ?? 'Nubisco',
     adminEmail: process.env.ACTA_ADMIN_EMAIL,

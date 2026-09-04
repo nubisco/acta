@@ -1,10 +1,8 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
 import { newId } from '@nubisco/acta-shared'
 import { z } from 'zod'
 import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
-import { emitEvent } from '../core/events'
+import { emitEvent, flushPendingEvents } from '../core/events'
 import { docBySlug, itemByKey } from '../core/store'
 
 export const zAttachmentAdd = z
@@ -24,30 +22,32 @@ export const zAttachmentAdd = z
   })
 export type TAttachmentAdd = z.infer<typeof zAttachmentAdd>
 
+/** Runtime-agnostic content store: filesystem on Bun, R2 on Workers. */
+export interface IBlobStore {
+  put(id: string, bytes: Uint8Array): Promise<void>
+  get(id: string): Promise<Uint8Array | null>
+}
+
 export class AttachmentStore {
-  constructor(private dir: string) {
-    mkdirSync(dir, { recursive: true })
+  constructor(private blobs: IBlobStore) {}
+
+  write(id: string, bytes: Uint8Array): Promise<void> {
+    return this.blobs.put(id, bytes)
   }
 
-  write(id: string, bytes: Uint8Array): void {
-    writeFileSync(join(this.dir, id), bytes)
-  }
-
-  read(id: string): Uint8Array | null {
-    const path = join(this.dir, id)
-    if (!existsSync(path)) return null
-    return readFileSync(path)
+  read(id: string): Promise<Uint8Array | null> {
+    return this.blobs.get(id)
   }
 }
 
-export function attachmentAdd(
+export async function attachmentAdd(
   ctx: ICtx,
   store: AttachmentStore,
   input: TAttachmentAdd,
 ) {
   const owner = input.item
-    ? { kind: 'item' as const, row: itemByKey(ctx, input.item) }
-    : { kind: 'doc' as const, row: docBySlug(ctx, input.doc!) }
+    ? { kind: 'item' as const, row: await itemByKey(ctx, input.item) }
+    : { kind: 'doc' as const, row: await docBySlug(ctx, input.doc!) }
   const id = newId('att')
   let size: number | null = null
   if (input.content_base64) {
@@ -64,10 +64,10 @@ export function attachmentAdd(
         413,
         'inline attachments are capped at 1 MB; use the REST upload endpoint',
       )
-    store.write(id, bytes)
+    await store.write(id, bytes)
     size = bytes.byteLength
   }
-  ctx.db.run(
+  await ctx.db.run(
     `INSERT INTO attachment (id, workspace_id, owner_kind, owner_id, kind, filename, mime, size, url, actor_id, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -85,13 +85,14 @@ export function attachmentAdd(
     ],
   )
   const ownerRef = input.item ?? input.doc
-  emitEvent(
+  await emitEvent(
     ctx,
     'attachment.added',
     owner.kind,
     owner.row.id,
     `attached ${input.filename} to ${ownerRef}`,
   )
+  flushPendingEvents()
   return {
     id,
     filename: input.filename,
@@ -100,8 +101,12 @@ export function attachmentAdd(
   }
 }
 
-export function attachmentGet(ctx: ICtx, store: AttachmentStore, id: string) {
-  const rows = ctx.db.query<{
+export async function attachmentGet(
+  ctx: ICtx,
+  store: AttachmentStore,
+  id: string,
+) {
+  const rows = await ctx.db.query<{
     id: string
     kind: string
     filename: string
@@ -114,7 +119,7 @@ export function attachmentGet(ctx: ICtx, store: AttachmentStore, id: string) {
   if (rows.length === 0) throw new ApiError(404, `attachment ${id} not found`)
   const meta = rows[0]
   if (meta.kind === 'url') return { meta, bytes: null }
-  const bytes = store.read(id)
+  const bytes = await store.read(id)
   if (!bytes) throw new ApiError(404, `attachment ${id} content missing`)
   return { meta, bytes }
 }
