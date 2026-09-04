@@ -6,16 +6,9 @@
   box-sizing: border-box;
 }
 
-html {
-  font-size: 16px;
-  -webkit-text-size-adjust: 100%;
-}
-
 body {
   margin: 0;
-  font-family: var(--nb-font-family-sans, sans-serif);
-  font-size: 0.9375rem;
-  line-height: 1.6;
+  font-family: var(--nb-font-family-sans);
   color: var(--nb-c-text);
   background: var(--nb-c-bg);
 }

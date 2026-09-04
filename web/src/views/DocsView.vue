@@ -1,72 +1,84 @@
 <template>
   <div class="docs">
-    <aside class="docs__tree">
-      <header>
-        <h2>Docs</h2>
+    <component :is="topbarActions.Outlet">
+      <template v-if="doc && !editing">
         <NbButton
-          variant="ghost"
           size="sm"
-          icon="plus"
-          aria-label="New doc"
-          @click="creating = true"
-        />
-      </header>
-      <ul>
-        <li
-          v-for="node in tree"
-          :key="node.slug"
-          :style="{ paddingLeft: `${node.depth * 14}px` }"
-          :class="{ 'docs__node--active': node.slug === slug }"
+          variant="secondary"
+          :aria-expanded="showHistory"
+          @click="showHistory = !showHistory"
         >
-          <router-link :to="`/docs/${node.slug}`">{{ node.title }}</router-link>
-        </li>
-      </ul>
-      <NbEmptyState
-        v-if="tree.length === 0"
-        title="No docs yet"
-        description="Create the first page."
-      />
-    </aside>
+          Version history (v{{ doc.rev }})
+        </NbButton>
+        <NbButton size="sm" variant="primary" @click="startEdit">Edit</NbButton>
+      </template>
+      <template v-else-if="doc && editing">
+        <NbButton size="sm" variant="secondary" @click="cancelEdit">
+          Cancel
+        </NbButton>
+        <NbButton size="sm" variant="primary" :loading="saving" @click="save">
+          Save changes
+        </NbButton>
+      </template>
+    </component>
 
-    <article v-if="doc" class="docs__doc">
-      <header class="docs__doc-header">
-        <h1>{{ doc.title }}</h1>
-        <div class="docs__doc-actions">
-          <NbButton
-            v-if="!editing"
-            variant="ghost"
-            size="sm"
-            @click="showHistory = !showHistory"
-          >
-            v{{ doc.rev }}
+    <div v-if="!slug" class="docs__placeholder">
+      <NbEmptyState
+        title="Select a document"
+        description="Pick a page from the Documents panel, or create a new one."
+      />
+    </div>
+
+    <div v-else-if="load.state.value === 'loading'" class="docs__loading">
+      <NbSkeleton variant="heading" label="Loading document" />
+      <NbSkeleton variant="text" :lines="8" />
+    </div>
+
+    <NbEmptyState
+      v-else-if="load.state.value === 'forbidden'"
+      kind="forbidden"
+      title="You do not have access to this page"
+      description="Ask a workspace admin if you think you should."
+    />
+
+    <NbEmptyState
+      v-else-if="load.state.value === 'error' || !doc"
+      kind="error"
+      title="Could not load this page"
+      :description="load.message.value"
+    >
+      <template #actions>
+        <NbButton variant="secondary" @click="loadDoc">Retry</NbButton>
+      </template>
+    </NbEmptyState>
+
+    <article v-else class="docs__doc">
+      <h1>{{ doc.title }}</h1>
+
+      <NbBanner
+        v-if="conflict"
+        status="error"
+        variant="inline"
+        title="This page changed while you were editing"
+      >
+        Your draft is kept below. Reload to see the newer version, then merge by
+        hand.
+        <template #action>
+          <NbButton size="sm" variant="secondary" @click="reloadKeepDraft">
+            Reload page
           </NbButton>
-          <NbButton
-            v-if="!editing"
-            variant="primary"
-            size="sm"
-            @click="startEdit"
-            >Edit</NbButton
-          >
-          <template v-else>
-            <NbButton variant="ghost" size="sm" @click="editing = false"
-              >Cancel</NbButton
-            >
-            <NbButton variant="primary" size="sm" @click="save">Save</NbButton>
-          </template>
-        </div>
-      </header>
+        </template>
+      </NbBanner>
 
       <div v-if="showHistory && doc.versions" class="docs__history">
-        <button
-          v-for="version in doc.versions"
-          :key="version.rev"
-          type="button"
-          :class="{ 'docs__version--current': version.rev === viewedVersion }"
-          @click="viewVersion(version.rev)"
-        >
-          v{{ version.rev }} · @{{ version.handle }} ·
-          {{ new Date(version.created_at).toLocaleString() }}
-        </button>
+        <NbDataTable
+          :columns="versionColumns"
+          :rows="versionRows"
+          row-key="rev"
+          size="sm"
+          aria-label="Version history"
+          @row-click="viewVersion"
+        />
         <NbButton
           v-if="viewedVersion !== doc.rev"
           size="sm"
@@ -78,7 +90,17 @@
       </div>
 
       <div v-if="editing" class="docs__editor">
-        <textarea v-model="draft" rows="24" />
+        <NbForm id="doc-editor" aria-label="Edit document">
+          <NbField orientation="stack" label="Markdown" v-slot="{ id }">
+            <NbTextInput
+              :id="id"
+              v-model="draft"
+              multiline
+              :rows="24"
+              size="sm"
+            />
+          </NbField>
+        </NbForm>
         <MarkdownView
           class="docs__preview"
           :source="draft"
@@ -91,70 +113,77 @@
         v-if="doc.backlinks && doc.backlinks.length > 0"
         class="docs__backlinks"
       >
-        <h3>Referenced by</h3>
-        <ul>
-          <li
-            v-for="link in doc.backlinks"
-            :key="`${link.src_kind}-${link.src_id}`"
-          >
-            {{ link.src_kind }} {{ link.src_id }}
-          </li>
-        </ul>
+        <h2>Referenced by</h2>
+        <NbDefinitionList :items="backlinkFacts" layout="columns" />
       </footer>
     </article>
-
-    <NbEmptyState
-      v-else
-      class="docs__empty"
-      title="Select a document"
-      description="Pick a page from the tree, or create a new one."
-    />
-
-    <TextPromptModal
-      :open="creating"
-      title="New document"
-      :fields="[
-        { name: 'title', label: 'Title', placeholder: 'Decision log' },
-        {
-          name: 'parent',
-          label: 'Parent slug (optional)',
-          optional: true,
-          initial: slug ?? '',
-        },
-      ]"
-      @close="creating = false"
-      @submit="createDoc"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { NbButton, NbEmptyState, useToast } from '@nubisco/ui'
-import { api, newOpId, type IDocDetail, type IDocNode } from '@/api/client'
-import { slugify } from '@nubisco/acta-shared'
+import { onBeforeRouteLeave } from 'vue-router'
+import {
+  NbBanner,
+  NbButton,
+  NbDataTable,
+  NbDefinitionList,
+  NbEmptyState,
+  NbField,
+  NbForm,
+  NbSkeleton,
+  NbTextInput,
+  useConfirm,
+  useShellSlot,
+  useToast,
+} from '@nubisco/ui'
+import { api, newOpId, ApiHttpError } from '@/api/client'
+import type { IDocDetail } from '@/types/api'
+import { humanise, relativeTime, useLoadState } from '@/lib/state'
 import MarkdownView from '@/components/MarkdownView.vue'
-import TextPromptModal from '@/components/TextPromptModal.vue'
 
 const props = defineProps<{ slug?: string }>()
 
-const router = useRouter()
 const toast = useToast()
-const tree = ref<IDocNode[]>([])
+const confirm = useConfirm()
+const load = useLoadState()
+const topbarActions = useShellSlot('topbar-right')
+
 const doc = ref<IDocDetail | null>(null)
 const editing = ref(false)
-const creating = ref(false)
 const showHistory = ref(false)
+const saving = ref(false)
+const conflict = ref(false)
 const draft = ref('')
 const viewedVersion = ref(0)
 const viewedBody = ref('')
 
 const slug = computed(() => props.slug || undefined)
+const isDirty = computed(
+  () => editing.value && doc.value !== null && draft.value !== doc.value.body,
+)
 
-async function loadTree(): Promise<void> {
-  tree.value = (await api.docTree()).docs
-}
+const versionColumns = [
+  { key: 'version', header: 'Version' },
+  { key: 'by', header: 'By' },
+  { key: 'when', header: 'When' },
+]
+
+const versionRows = computed(() =>
+  (doc.value?.versions ?? []).map((v) => ({
+    rev: v.rev,
+    version: `v${v.rev}`,
+    by: `@${v.handle}`,
+    when: relativeTime(v.created_at),
+  })),
+)
+
+const backlinkFacts = computed(() =>
+  (doc.value?.backlinks ?? []).map((link) => ({
+    term: link.src_kind,
+    value: link.src_id,
+  })),
+)
 
 async function loadDoc(): Promise<void> {
   if (!slug.value) {
@@ -162,89 +191,117 @@ async function loadDoc(): Promise<void> {
     return
   }
   try {
+    load.state.value = 'loading'
     doc.value = await api.docGet(slug.value, ['backlinks', 'versions'])
     viewedVersion.value = doc.value.rev
     viewedBody.value = doc.value.body
     editing.value = false
     showHistory.value = false
-  } catch {
+    conflict.value = false
+    load.state.value = 'ready'
+  } catch (err) {
     doc.value = null
+    load.state.value =
+      err instanceof ApiHttpError && err.status === 403 ? 'forbidden' : 'error'
+    load.message.value = humanise(err)
   }
 }
 
 watch(slug, loadDoc, { immediate: true })
-void loadTree()
 
 function startEdit(): void {
   draft.value = doc.value?.body ?? ''
   editing.value = true
+  conflict.value = false
 }
+
+function cancelEdit(): void {
+  if (!isDirty.value) {
+    editing.value = false
+    return
+  }
+  void confirm({
+    title: 'Discard changes',
+    message: 'Your edits to this page will be lost.',
+    confirmLabel: 'Discard changes',
+    cancelLabel: 'Keep editing',
+    onConfirm: () => {
+      editing.value = false
+    },
+  })
+}
+
+onBeforeRouteLeave(async () => {
+  if (!isDirty.value) return true
+  let leave = false
+  await confirm({
+    title: 'Discard changes',
+    message: 'Your edits to this page will be lost.',
+    confirmLabel: 'Discard changes',
+    cancelLabel: 'Keep editing',
+    onConfirm: () => {
+      leave = true
+    },
+  })
+  return leave
+})
 
 async function save(): Promise<void> {
   if (!doc.value) return
-  const { results } = await api.docWrite([
-    {
-      op: 'replace',
-      op_id: newOpId(),
-      ref: doc.value.slug,
-      if_rev: doc.value.rev,
-      body: draft.value,
-    },
-  ])
-  if (!results[0].ok) {
-    toast.error(
-      'The document changed while you edited; showing the latest version',
-      { title: 'Conflict' },
-    )
+  saving.value = true
+  try {
+    const { results } = await api.docWrite([
+      {
+        op: 'replace',
+        op_id: newOpId(),
+        ref: doc.value.slug,
+        if_rev: doc.value.rev,
+        body: draft.value,
+      },
+    ])
+    if (!results[0].ok) {
+      conflict.value = true
+      return
+    }
+    await loadDoc()
+  } catch {
+    conflict.value = true
+  } finally {
+    saving.value = false
   }
-  await loadDoc()
 }
 
-async function viewVersion(rev: number): Promise<void> {
+async function reloadKeepDraft(): Promise<void> {
+  const kept = draft.value
+  await loadDoc()
+  draft.value = kept
+  editing.value = true
+}
+
+async function viewVersion(row: { rev: number }): Promise<void> {
   if (!doc.value) return
-  const old = await api.docGet(doc.value.slug, undefined, rev)
-  viewedVersion.value = rev
+  const old = await api.docGet(doc.value.slug, undefined, row.rev)
+  viewedVersion.value = row.rev
   viewedBody.value = old.body
 }
 
 async function restoreVersion(): Promise<void> {
   if (!doc.value) return
-  const { results } = await api.docWrite([
-    {
-      op: 'replace',
-      op_id: newOpId(),
-      ref: doc.value.slug,
-      if_rev: doc.value.rev,
-      body: viewedBody.value,
-    },
-  ])
-  if (results[0].ok)
+  try {
+    const { results } = await api.docWrite([
+      {
+        op: 'replace',
+        op_id: newOpId(),
+        ref: doc.value.slug,
+        if_rev: doc.value.rev,
+        body: viewedBody.value,
+      },
+    ])
+    if (!results[0].ok) throw new Error('conflict')
     toast.success(`Restored v${viewedVersion.value} as v${doc.value.rev + 1}`)
-  await loadDoc()
-}
-
-async function createDoc(values: Record<string, string>): Promise<void> {
-  creating.value = false
-  const base = slugify(values.title)
-  const parent = values.parent?.trim() || undefined
-  const docSlug = parent ? `${parent}/${base}` : base
-  const { results } = await api.docWrite([
-    {
-      op: 'create',
-      op_id: newOpId(),
-      slug: docSlug,
-      title: values.title,
-      parent,
-      body: '',
-      layout: 'default',
-      tags: [],
-    },
-  ])
-  if (results[0].ok) {
-    await loadTree()
-    void router.push(`/docs/${docSlug}`)
-  } else {
-    toast.error(String((results[0] as { error: string }).error))
+    await loadDoc()
+  } catch (err) {
+    toast.error(humanise(err), { title: 'Restore failed' })
   }
 }
 </script>
@@ -252,124 +309,49 @@ async function createDoc(values: Record<string, string>): Promise<void> {
 <style scoped lang="scss">
 .docs {
   display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: calc(var(--nb-base-unit) * 3);
-  align-items: start;
-  min-height: 100%;
+  gap: var(--nb-spacing-16);
+  align-content: start;
 
-  &__tree {
-    position: sticky;
-    top: 0;
-
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-
-      h2 {
-        margin: 0;
-        font-size: 1rem;
-      }
-    }
-
-    ul {
-      list-style: none;
-      margin: var(--nb-base-unit) 0 0;
-      padding: 0;
-      display: grid;
-      gap: 2px;
-    }
-
-    a {
-      display: block;
-      padding: 4px 8px;
-      border-radius: 6px;
-      color: inherit;
-      text-decoration: none;
-      font-size: 0.9rem;
-
-      &:hover {
-        background: color-mix(in srgb, currentColor 8%, transparent);
-      }
-    }
+  &__placeholder {
+    min-height: 24rem;
+    padding-block: var(--nb-spacing-24);
   }
 
-  &__node--active a {
-    background: color-mix(in srgb, var(--nb-c-primary) 12%, transparent);
-    color: var(--nb-c-primary);
+  &__loading {
+    display: grid;
+    gap: var(--nb-spacing-12);
   }
 
-  &__doc-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--nb-base-unit);
+  &__doc {
+    display: grid;
+    gap: var(--nb-spacing-16);
 
     h1 {
       margin: 0;
     }
   }
 
-  &__doc-actions {
-    display: flex;
-    gap: calc(var(--nb-base-unit) / 2);
-  }
-
   &__history {
     display: grid;
-    gap: 4px;
-    margin: var(--nb-base-unit) 0;
+    gap: var(--nb-spacing-8);
     justify-items: start;
-
-    button {
-      all: unset;
-      cursor: pointer;
-      font-size: 0.85rem;
-      opacity: 0.8;
-
-      &:hover {
-        opacity: 1;
-      }
-    }
-  }
-
-  &__version--current {
-    font-weight: 600;
   }
 
   &__editor {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: calc(var(--nb-base-unit) * 2);
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: var(--nb-spacing-16);
     align-items: start;
-
-    textarea {
-      width: 100%;
-      font-family: var(--nb-font-mono, monospace);
-      font-size: 0.9rem;
-      padding: var(--nb-base-unit);
-      border-radius: 8px;
-      border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-      background: transparent;
-      color: inherit;
-      resize: vertical;
-      box-sizing: border-box;
-    }
   }
 
   &__backlinks {
-    margin-top: calc(var(--nb-base-unit) * 4);
-    font-size: 0.85rem;
-    opacity: 0.8;
+    border-block-start: 1px solid var(--nb-c-border);
+    padding-block-start: var(--nb-spacing-16);
 
-    ul {
-      list-style: none;
-      padding: 0;
+    h2 {
+      margin: 0 0 var(--nb-spacing-8);
+      font-size: var(--nb-type-heading-01-size);
     }
-  }
-
-  &__empty {
-    align-self: center;
   }
 }
 </style>

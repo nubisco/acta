@@ -53,7 +53,7 @@ function renderRefs(html: string): string {
       const [target, alias] = inner.split('|').map((s) => s.trim())
       if (bang === '!') {
         if (target.startsWith('query:'))
-          return `<span class="md__embed" data-query="${esc(target.slice(6).trim())}">${esc(target)}</span>`
+          return `<span class="md__embed" data-query="${esc(target.slice(6).trim())}">Live item list (${esc(target.slice(6).trim())}) renders here soon</span>`
         return esc(raw)
       }
       if (target.startsWith('@'))
@@ -63,7 +63,7 @@ function renderRefs(html: string): string {
       if (target.startsWith('doc:'))
         return `<a class="md__ref" data-ref-type="doc" data-ref="${esc(target.slice(4))}" href="/docs/${esc(target.slice(4))}">${esc(alias ?? target.slice(4))}</a>`
       if (/^[A-Z][A-Z0-9]{1,4}-\d+$/.test(target))
-        return `<a class="md__ref md__ref--item" data-ref-type="item" data-ref="${esc(target)}" href="#">${esc(alias ?? target)}</a>`
+        return `<button type="button" class="md__ref md__ref--item" data-ref-type="item" data-ref="${esc(target)}">${esc(alias ?? target)}</button>`
       return esc(raw)
     },
   )
@@ -125,116 +125,145 @@ const html = computed(() => {
   return out
 })
 
-/** Intercept internal links so refs stay in-app. */
+/**
+ * Item refs are buttons that open the inspector. Board/doc refs are real
+ * links: plain left-clicks route in-app, modified clicks keep native
+ * behavior (new tab, etc.).
+ */
 function onClick(event: MouseEvent): void {
-  const target = (event.target as HTMLElement).closest('a.md__ref')
-  if (!target) return
+  const el = (event.target as HTMLElement).closest('.md__ref')
+  if (!el) return
+  const refType = el.getAttribute('data-ref-type')
+  const ref = el.getAttribute('data-ref') ?? ''
+  if (refType === 'item') {
+    inspector.open(ref)
+    return
+  }
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0)
+    return
   event.preventDefault()
-  const refType = target.getAttribute('data-ref-type')
-  const ref = target.getAttribute('data-ref') ?? ''
-  if (refType === 'item') inspector.open(ref)
-  else if (refType === 'board') void router.push(`/b/${ref}`)
+  if (refType === 'board') void router.push(`/b/${ref}`)
   else if (refType === 'doc') void router.push(`/docs/${ref}`)
 }
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
 .md {
-  max-width: 72ch;
-  line-height: 1.6;
+  line-height: var(--nb-type-body-md-line-height);
 
-  &--wide {
-    max-width: 100%;
+  :deep(p),
+  :deep(li),
+  :deep(blockquote) {
+    max-width: 68ch;
   }
 
-  h1,
-  h2,
-  h3 {
-    margin-top: calc(var(--nb-base-unit) * 3);
-    margin-bottom: var(--nb-base-unit);
+  :deep(h1),
+  :deep(h2),
+  :deep(h3) {
+    margin-block: var(--nb-spacing-24) var(--nb-spacing-8);
   }
 
-  pre {
+  :deep(pre) {
     overflow-x: auto;
-    padding: var(--nb-base-unit);
-    border-radius: 8px;
-    background: color-mix(in srgb, currentColor 6%, transparent);
+    padding: var(--nb-spacing-12);
+    border-radius: var(--nb-radius-sm, 8px);
+    background: var(--nb-c-surface);
+    border: 1px solid var(--nb-c-border);
+    font-family: var(--nb-font-family-mono);
+    font-size: var(--nb-type-code-sm-size);
   }
 
-  table {
+  :deep(code) {
+    font-family: var(--nb-font-family-mono);
+  }
+
+  :deep(table) {
     border-collapse: collapse;
 
     th,
     td {
-      border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-      padding: calc(var(--nb-base-unit) / 2) var(--nb-base-unit);
+      border: 1px solid var(--nb-c-border);
+      padding: var(--nb-spacing-4) var(--nb-spacing-8);
     }
   }
 
-  &__callout {
-    margin: var(--nb-base-unit) 0;
-    padding: var(--nb-base-unit) calc(var(--nb-base-unit) * 1.5);
-    border-left: 3px solid var(--nb-c-primary, currentColor);
-    border-radius: 6px;
-    background: color-mix(
-      in srgb,
-      var(--nb-c-primary, currentColor) 7%,
-      transparent
-    );
-
-    &--warning,
-    &--danger {
-      border-left-color: var(--nb-c-danger, #c33);
-      background: color-mix(in srgb, var(--nb-c-danger, #c33) 7%, transparent);
-    }
-
-    &--tip {
-      border-left-color: var(--nb-c-success, #2a2);
-      background: color-mix(in srgb, var(--nb-c-success, #2a2) 7%, transparent);
-    }
+  :deep(.md__callout) {
+    margin-block: var(--nb-spacing-8);
+    padding: var(--nb-spacing-8) var(--nb-spacing-12);
+    border-radius: var(--nb-radius-sm, 8px);
+    border: 1px solid var(--nb-c-info-surface-border, var(--nb-c-border));
+    background: var(--nb-c-info-surface);
+    color: var(--nb-c-on-info-surface, var(--nb-c-text));
   }
 
-  &__callout-title {
+  :deep(.md__callout--tip) {
+    background: var(--nb-c-success-surface);
+    border-color: var(--nb-c-success-surface-border, var(--nb-c-border));
+    color: var(--nb-c-on-success-surface, var(--nb-c-text));
+  }
+
+  :deep(.md__callout--warning) {
+    background: var(--nb-c-warning-surface);
+    border-color: var(--nb-c-warning-surface-border, var(--nb-c-border));
+    color: var(--nb-c-on-warning-surface, var(--nb-c-text));
+  }
+
+  :deep(.md__callout--danger) {
+    background: var(--nb-c-danger-surface);
+    border-color: var(--nb-c-danger-surface-border, var(--nb-c-border));
+    color: var(--nb-c-on-danger-surface, var(--nb-c-text));
+  }
+
+  :deep(.md__callout-title) {
     display: block;
-    margin-bottom: calc(var(--nb-base-unit) / 2);
+    margin-block-end: var(--nb-spacing-4);
   }
 
-  &__details {
-    margin: var(--nb-base-unit) 0;
-    border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-    border-radius: 8px;
-    padding: var(--nb-base-unit);
+  :deep(.md__details) {
+    margin-block: var(--nb-spacing-8);
+    border: 1px solid var(--nb-c-border);
+    border-radius: var(--nb-radius-sm, 8px);
+    padding: var(--nb-spacing-8);
 
     summary {
       cursor: pointer;
-      font-weight: 600;
+      font-weight: var(--nb-type-label-lg-weight, 600);
     }
   }
 
-  &__ref {
-    color: var(--nb-c-primary, inherit);
+  :deep(.md__ref) {
+    color: var(--nb-c-primary);
     text-decoration: none;
-    border-bottom: 1px dashed currentColor;
+    border-block-end: 1px dashed currentColor;
+  }
 
-    &--item {
-      font-family: var(--nb-font-mono, monospace);
-      font-size: 0.9em;
+  :deep(button.md__ref) {
+    background: none;
+    border: 0;
+    border-block-end: 1px dashed currentColor;
+    padding: 0;
+    cursor: pointer;
+    font-family: var(--nb-font-family-mono);
+    font-size: var(--nb-type-code-sm-size);
+
+    &:focus-visible {
+      outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline-offset: 2px;
     }
   }
 
-  &__mention {
-    color: var(--nb-c-primary, inherit);
-    font-weight: 600;
+  :deep(.md__mention) {
+    color: var(--nb-c-primary);
+    font-weight: var(--nb-type-label-lg-weight, 600);
   }
 
-  &__embed {
+  :deep(.md__embed) {
     display: block;
-    font-family: var(--nb-font-mono, monospace);
-    font-size: 0.85em;
-    opacity: 0.7;
-    border: 1px dashed color-mix(in srgb, currentColor 30%, transparent);
-    border-radius: 6px;
-    padding: var(--nb-base-unit);
+    font-size: var(--nb-type-body-sm-size);
+    color: var(--nb-c-text-muted);
+    border: 1px dashed var(--nb-c-border);
+    border-radius: var(--nb-radius-sm, 8px);
+    padding: var(--nb-spacing-8);
   }
 }
 </style>

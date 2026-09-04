@@ -1,27 +1,48 @@
 /**
- * Workspace store: the overview cache, the current user, and the SSE feed
- * that invalidates views. Plain composable state, no store library (house
- * apps keep state small and local).
+ * Workspace store: the overview cache, the current user, the SSE feed that
+ * invalidates views, connection health, and a small notification ring.
+ * Plain composable state, no store library.
  */
 
 import { computed, ref } from 'vue'
-import {
-  api,
-  auth,
-  subscribeEvents,
-  type ILiveEvent,
-  type IOverview,
-} from '@/api/client'
+import { api, auth, subscribeEvents } from '@/api/client'
+import type { ILiveEvent, IOverview } from '@/types/api'
+
+export interface IMe {
+  id: string
+  handle: string
+  kind: string
+  role: string
+  scopes: string[]
+  email?: string
+  name?: string
+}
+
+export interface IAppNotification {
+  id: string
+  title: string
+  description?: string
+  timestamp: string
+  read: boolean
+}
 
 const overview = ref<IOverview | null>(null)
-const me = ref<{ id: string; handle: string; role: string } | null>(null)
+const me = ref<IMe | null>(null)
+const connectionDown = ref(false)
+const notifications = ref<IAppNotification[]>([])
 const listeners = new Set<(event: ILiveEvent) => void>()
 let unsubscribe: (() => void) | null = null
+
+const NOTIFY_VERBS = new Set([
+  'comment.created',
+  'item.assigned',
+  'member.provisioned',
+])
 
 export function useWorkspace() {
   async function loadMe(): Promise<boolean> {
     try {
-      me.value = await auth.me()
+      me.value = (await auth.me()) as IMe
       return true
     } catch {
       me.value = null
@@ -35,16 +56,37 @@ export function useWorkspace() {
 
   function connect(): void {
     if (unsubscribe) return
-    unsubscribe = subscribeEvents((event) => {
-      // Board/list/doc structure changes refresh the overview lazily.
-      if (event.entity === 'board' || event.entity === 'list') void refresh()
-      for (const listener of listeners) listener(event)
-    })
+    unsubscribe = subscribeEvents(
+      (event) => {
+        connectionDown.value = false
+        if (event.entity === 'board' || event.entity === 'list') void refresh()
+        if (NOTIFY_VERBS.has(event.verb) && event.actor_kind !== 'human') {
+          notifications.value = [
+            {
+              id: event.id,
+              title: describe(event),
+              timestamp: new Date().toISOString(),
+              read: false,
+            },
+            ...notifications.value,
+          ].slice(0, 30)
+        }
+        for (const listener of listeners) listener(event)
+      },
+      (down) => (connectionDown.value = down),
+    )
   }
 
   function onLive(listener: (event: ILiveEvent) => void): () => void {
     listeners.add(listener)
     return () => listeners.delete(listener)
+  }
+
+  function markAllRead(): void {
+    notifications.value = notifications.value.map((n) => ({
+      ...n,
+      read: true,
+    }))
   }
 
   async function logout(): Promise<void> {
@@ -59,6 +101,12 @@ export function useWorkspace() {
     overview: computed(() => overview.value),
     me: computed(() => me.value),
     isAdmin: computed(() => me.value?.role === 'admin'),
+    connectionDown: computed(() => connectionDown.value),
+    notifications: computed(() => notifications.value),
+    unreadCount: computed(
+      () => notifications.value.filter((n) => !n.read).length,
+    ),
+    markAllRead,
     loadMe,
     refresh,
     connect,
@@ -67,8 +115,22 @@ export function useWorkspace() {
   }
 }
 
-/** Cross-view UI state: which item the shell inspector is showing. */
+function describe(event: ILiveEvent): string {
+  switch (event.verb) {
+    case 'comment.created':
+      return 'An agent commented on an item'
+    case 'item.assigned':
+      return 'An item assignment changed'
+    case 'member.provisioned':
+      return 'A new member joined via single sign-on'
+    default:
+      return event.verb
+  }
+}
+
+/** Cross-view UI state: inspector selection and the new-board dialog. */
 const inspectedItemKey = ref<string | null>(null)
+const newBoardOpen = ref(false)
 
 export function useInspector() {
   return {
@@ -76,4 +138,8 @@ export function useInspector() {
     open: (key: string) => (inspectedItemKey.value = key),
     close: () => (inspectedItemKey.value = null),
   }
+}
+
+export function useUiState() {
+  return { newBoardOpen }
 }

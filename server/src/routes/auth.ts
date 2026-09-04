@@ -255,14 +255,22 @@ export function authRoutes(sso?: ISsoRuntime): Hono<IAuthEnv> {
     return c.json({ ok: true })
   })
 
-  app.get('/me', requireAuth(), (c) => {
+  app.get('/me', requireAuth(), async (c) => {
     const actor = c.get('actor')
+    const row = (
+      await c.get('db').query<{
+        email: string | null
+        name: string
+      }>('SELECT email, name FROM actor WHERE id = ?', [actor.id])
+    )[0]
     return c.json({
       id: actor.id,
       handle: actor.handle,
       kind: actor.kind,
       role: actor.role,
       scopes: actor.scopes,
+      email: row?.email ?? undefined,
+      name: row?.name ?? undefined,
     })
   })
 

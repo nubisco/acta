@@ -3,8 +3,13 @@
     <NbPanel class="login__panel">
       <NbNubiscoMark class="login__mark" />
       <h1>Acta</h1>
-      <p v-if="stage === 'email'">Sign in with your workspace email.</p>
-      <p v-else>Enter the six-digit code sent to {{ email }}.</p>
+
+      <NbBanner
+        v-if="ssoError"
+        status="error"
+        variant="inline"
+        :title="ssoError"
+      />
 
       <template v-if="ssoAvailable && stage === 'email'">
         <NbButton variant="primary" @click="startSso">
@@ -13,47 +18,77 @@
         <p class="login__divider">or use a one-time code</p>
       </template>
 
-      <NbForm v-if="stage === 'email'" @submit.prevent="requestCode">
-        <NbField label="Email">
-          <NbTextInput
-            v-model="email"
-            type="email"
-            placeholder="you@nubisco.io"
-            autofocus
-          />
-        </NbField>
-        <NbButton type="submit" variant="primary" :disabled="!email || busy"
-          >Send code</NbButton
-        >
+      <NbForm
+        v-if="stage === 'email'"
+        id="login-email-form"
+        aria-label="Request a sign-in code"
+        @submit.prevent="requestCode"
+      >
+        <NbBanner
+          v-if="formError"
+          status="error"
+          variant="inline"
+          :title="formError"
+        />
+        <NbTextInput
+          id="field-email"
+          ref="emailInput"
+          v-model="email"
+          type="email"
+          label="Workspace email"
+          placeholder="you@nubisco.io"
+          :error="errors.email"
+          @blur="validateEmail"
+        />
+        <template #footer>
+          <NbButton type="submit" variant="primary" :loading="busy">
+            Send code
+          </NbButton>
+        </template>
       </NbForm>
 
-      <NbForm v-else @submit.prevent="verify">
-        <NbField label="Code">
-          <NbTextInput
-            v-model="code"
-            inputmode="numeric"
-            placeholder="123456"
-            autofocus
-          />
-        </NbField>
-        <NbButton
-          type="submit"
-          variant="primary"
-          :disabled="code.length !== 6 || busy"
-          >Sign in</NbButton
-        >
-        <NbButton variant="ghost" @click="stage = 'email'">Back</NbButton>
+      <NbForm
+        v-else
+        id="login-code-form"
+        aria-label="Enter your sign-in code"
+        @submit.prevent="verify"
+      >
+        <NbBanner
+          v-if="formError"
+          status="error"
+          variant="inline"
+          :title="formError"
+        />
+        <NbTextInput
+          id="field-code"
+          ref="codeInput"
+          v-model="code"
+          inputmode="numeric"
+          label="Six-digit code"
+          :placeholder="`Sent to ${email}`"
+          :maxlength="6"
+          :error="errors.code"
+          @blur="validateCode"
+        />
+        <template #footer>
+          <NbButton type="button" variant="secondary" @click="backToEmail">
+            Use a different email
+          </NbButton>
+          <NbButton type="submit" variant="primary" :loading="busy">
+            Sign in
+          </NbButton>
+        </template>
       </NbForm>
     </NbPanel>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  NbBanner,
   NbButton,
-  NbField,
   NbForm,
   NbNubiscoMark,
   NbPanel,
@@ -68,6 +103,11 @@ const code = ref('')
 const stage = ref<'email' | 'code'>('email')
 const busy = ref(false)
 const ssoAvailable = ref(false)
+const ssoError = ref('')
+const formError = ref('')
+const errors = reactive<{ email?: string; code?: string }>({})
+const emailInput = ref<InstanceType<typeof NbTextInput> | null>(null)
+const codeInput = ref<InstanceType<typeof NbTextInput> | null>(null)
 const toast = useToast()
 const router = useRouter()
 const route = useRoute()
@@ -88,7 +128,7 @@ onMounted(async () => {
       sso_state: 'The sign-in attempt expired; try again',
       sso_token: 'Single sign-on failed; try again',
     }
-    toast.error(messages[error] ?? 'Sign-in failed', { retain: true })
+    ssoError.value = messages[error] ?? 'Sign-in failed'
   }
 })
 
@@ -96,21 +136,49 @@ function startSso(): void {
   window.location.href = '/api/v1/auth/sso/start'
 }
 
+function validateEmail(): void {
+  errors.email = /.+@.+\..+/.test(email.value)
+    ? undefined
+    : 'Enter your workspace email address'
+}
+
+function validateCode(): void {
+  errors.code = /^\d{6}$/.test(code.value)
+    ? undefined
+    : 'The code is six digits'
+}
+
+function backToEmail(): void {
+  stage.value = 'email'
+  code.value = ''
+  formError.value = ''
+  requestAnimationFrame(() => emailInput.value?.focus())
+}
+
 async function requestCode(): Promise<void> {
+  validateEmail()
+  if (errors.email) return
   busy.value = true
+  formError.value = ''
   try {
     await auth.requestOtp(email.value)
     stage.value = 'code'
-    toast.info('If that address is a member, a code is on its way')
+    toast.info('If that address is a member, a code is on its way', {
+      retain: true,
+    })
+    requestAnimationFrame(() => codeInput.value?.focus())
   } catch {
-    toast.error('Could not request a code')
+    formError.value = 'Could not request a code; try again'
   } finally {
     busy.value = false
   }
 }
 
 async function verify(): Promise<void> {
+  validateCode()
+  if (errors.code) return
   busy.value = true
+  formError.value = ''
   try {
     await auth.verifyOtp(email.value, code.value)
     await ws.loadMe()
@@ -118,7 +186,7 @@ async function verify(): Promise<void> {
     ws.connect()
     void router.push(String(route.query.to ?? '/'))
   } catch {
-    toast.error('Invalid or expired code')
+    formError.value = 'That code is invalid or expired'
   } finally {
     busy.value = false
   }
@@ -130,12 +198,17 @@ async function verify(): Promise<void> {
   min-height: 100dvh;
   display: grid;
   place-items: center;
+  background: var(--nb-c-bg);
 
   &__panel {
     width: min(90vw, 24rem);
     display: grid;
-    gap: calc(var(--nb-base-unit) * 2);
+    gap: var(--nb-spacing-16);
     text-align: center;
+
+    h1 {
+      margin: 0;
+    }
   }
 
   &__mark {
@@ -144,8 +217,8 @@ async function verify(): Promise<void> {
   }
 
   &__divider {
-    font-size: 0.85rem;
-    opacity: 0.6;
+    font-size: var(--nb-type-body-sm-size);
+    color: var(--nb-c-text-subtle);
     margin: 0;
   }
 }

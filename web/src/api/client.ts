@@ -43,113 +43,26 @@ export function newOpId(): string {
   return `web:${crypto.randomUUID()}`
 }
 
-// -- Types mirrored from the compact server responses -----------------------
-
-export interface IOverview {
-  workspace: { id: string; name: string }
-  boards: {
-    key: string
-    name: string
-    archived?: boolean
-    lists: { id: string; name: string; role?: string; items: number }[]
-  }[]
-  labels: {
-    group_name: string
-    board_key: string | null
-    id: string
-    name: string
-    color: string
-  }[]
-  actors: { id: string; handle: string; kind: string; name: string }[]
-  doc_roots: { slug: string; title: string; children: number }[]
-}
-
-export interface IBoardItemRow {
-  key: string
-  title: string
-  list: string
-  labels?: string[]
-  assignees?: string[]
-  due?: number
-  done?: boolean
-  archived?: boolean
-  cmts?: number
-  chk?: string
-  rev: number
-  updated: number
-  pos: number
-  description?: string
-}
-
-export interface IItemDetail {
-  key: string
-  board: string
-  list: string
-  title: string
-  description: string
-  labels?: string[]
-  assignees?: string[]
-  due?: number
-  done?: boolean
-  archived?: boolean
-  rev: number
-  created: number
-  updated: number
-  comments?: {
-    id: string
-    by: string
-    agent?: boolean
-    ts: number
-    body: string
-  }[]
-  checklists?: { name: string; items: { text: string; done: boolean }[] }[]
-  links?: {
-    out: { ref_type: string; target: string }[]
-    in: { src_kind: string; src_id: string }[]
-  }
-  attachments?: {
-    id: string
-    kind: string
-    filename: string
-    url: string | null
-    size: number | null
-  }[]
-  activity?: { ts: number; verb: string; summary: string; actor_kind: string }[]
-}
-
-export interface IDocNode {
-  slug: string
-  title: string
-  depth: number
-  rev: number
-  updated: number
-}
-
-export interface IDocDetail {
-  slug: string
-  title: string
-  layout?: 'wide'
-  tags: string[]
-  rev: number
-  updated: number
-  body: string
-  sections?: { slug: string; level: number; hash: string }[]
-  backlinks?: { src_kind: string; src_id: string }[]
-  versions?: { rev: number; created_at: number; handle: string }[]
-}
-
-export interface IEventRow {
-  id: string
-  ts: number
-  actor_id: string
-  actor_kind: string
-  on_behalf_of: string | null
-  verb: string
-  entity: string
-  entity_id: string
-  summary: string
-  caused_by: string | null
-}
+export type {
+  IOverview,
+  IBoardItemRow,
+  IItemDetail,
+  IDocNode,
+  IDocDetail,
+  IEventRow,
+  ISearchResult,
+  ILiveEvent,
+} from '@/types/api'
+import type {
+  IOverview,
+  IBoardItemRow,
+  IItemDetail,
+  IDocNode,
+  IDocDetail,
+  IEventRow,
+  ISearchResult,
+  ILiveEvent,
+} from '@/types/api'
 
 // -- Auth -------------------------------------------------------------------
 
@@ -161,6 +74,8 @@ export const auth = {
       kind: string
       role: string
       scopes: string[]
+      email?: string
+      name?: string
     }>('/auth/me'),
   requestOtp: (email: string) =>
     req<{ ok: boolean }>('/auth/otp', {
@@ -208,15 +123,7 @@ export const api = {
     ),
 
   search: (q: string, types?: string[]) =>
-    req<{
-      results: {
-        type: string
-        ref: string
-        title: string
-        snippet: string
-        board?: string
-      }[]
-    }>(
+    req<{ results: ISearchResult[] }>(
       `/search?${new URLSearchParams({ q, ...(types ? { types: types.join(',') } : {}) })}`,
     ),
 
@@ -292,6 +199,25 @@ export const api = {
   revokeAgentToken: (actorId: string) =>
     req<{ ok: boolean }>(`/tokens/${actorId}`, { method: 'DELETE' }),
 
+  createMember: (member: {
+    email: string
+    handle: string
+    name: string
+    role: 'admin' | 'member'
+  }) =>
+    req<{ id: string; handle: string }>('/members', {
+      method: 'POST',
+      body: JSON.stringify(member),
+    }),
+  updateMember: (
+    id: string,
+    patch: { role?: 'admin' | 'member'; disabled?: boolean; name?: string },
+  ) =>
+    req<{ ok: boolean }>(`/members/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+
   createIngestToken: (name: string, board: string, list?: string) =>
     req<{ token: string; actor_id: string }>('/ingest_tokens', {
       method: 'POST',
@@ -301,18 +227,13 @@ export const api = {
 
 // -- SSE --------------------------------------------------------------------
 
-export interface ILiveEvent {
-  id: string
-  verb: string
-  entity: string
-  entity_id: string
-  actor_kind: string
-}
-
 export function subscribeEvents(
   handler: (event: ILiveEvent) => void,
+  onHealth?: (down: boolean) => void,
 ): () => void {
   const source = new EventSource(`${BASE}/events/stream`)
+  source.onopen = () => onHealth?.(false)
+  source.onerror = () => onHealth?.(true)
   source.onmessage = (msg) => {
     try {
       handler(JSON.parse(msg.data) as ILiveEvent)

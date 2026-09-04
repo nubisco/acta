@@ -2,25 +2,63 @@
   <div class="home">
     <h1>{{ ws.overview.value?.workspace.name ?? 'Workspace' }}</h1>
 
+    <component :is="actions.Outlet">
+      <NbButton
+        size="sm"
+        variant="primary"
+        icon="plus"
+        @click="ui.newBoardOpen.value = true"
+      >
+        Create board
+      </NbButton>
+    </component>
+
+    <div v-if="load.state.value === 'loading'" class="home__grid">
+      <NbSkeleton
+        v-for="index in 3"
+        :key="index"
+        variant="block"
+        height="10rem"
+        :label="index === 1 ? 'Loading boards' : undefined"
+      />
+    </div>
+
     <NbEmptyState
-      v-if="boards.length === 0"
-      title="No boards yet"
-      description="Create your first board to start tracking work."
+      v-else-if="load.state.value === 'error'"
+      kind="error"
+      title="Could not load your boards"
+      :description="load.message.value"
     >
-      <NbButton variant="primary" @click="createBoard">New board</NbButton>
+      <template #actions>
+        <NbButton variant="secondary" @click="reload">Retry</NbButton>
+      </template>
     </NbEmptyState>
+
+    <div v-else-if="boards.length === 0" class="home__empty">
+      <NbEmptyState
+        title="No boards yet"
+        description="A board holds a project's items as lists. Create the first one to start tracking work."
+      >
+        <template #actions>
+          <NbButton
+            variant="primary"
+            icon="plus"
+            @click="ui.newBoardOpen.value = true"
+          >
+            Create board
+          </NbButton>
+        </template>
+      </NbEmptyState>
+    </div>
 
     <NbCardGrid v-else>
       <NbCard
         v-for="board in boards"
         :key="board.key"
-        class="home__card"
-        @click="router.push(`/b/${board.key}`)"
+        :title="board.name"
+        :href="`/b/${board.key}`"
       >
-        <header>
-          <strong>{{ board.name }}</strong>
-          <NbBadge>{{ board.key }}</NbBadge>
-        </header>
+        <span class="home__key">{{ board.key }}</span>
         <ul class="home__lists">
           <li v-for="list in board.lists" :key="list.id">
             <span>{{ list.name }}</span>
@@ -28,135 +66,94 @@
           </li>
         </ul>
       </NbCard>
-      <NbCard class="home__card home__card--new" @click="createBoard">
-        <NbIcon name="plus" />
-        <span>New board</span>
-      </NbCard>
     </NbCardGrid>
 
     <section v-if="recent.length > 0" class="home__activity">
       <h2>Recent activity</h2>
       <ActivityList :events="recent" />
     </section>
-
-    <TextPromptModal
-      :open="creating"
-      title="New board"
-      :fields="[
-        { name: 'name', label: 'Name', placeholder: 'Stagewright' },
-        {
-          name: 'key',
-          label: 'Key (2-5 uppercase letters)',
-          placeholder: 'SW',
-        },
-      ]"
-      @close="creating = false"
-      @submit="submitBoard"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
 import {
-  NbBadge,
   NbButton,
   NbCard,
   NbCardGrid,
   NbEmptyState,
-  NbIcon,
-  useToast,
+  NbSkeleton,
+  useShellSlot,
 } from '@nubisco/ui'
-import { api, newOpId, type IEventRow } from '@/api/client'
-import { useWorkspace } from '@/stores/workspace'
+import { api } from '@/api/client'
+import type { IEventRow } from '@/types/api'
+import { useLoadState } from '@/lib/state'
+import { useUiState, useWorkspace } from '@/stores/workspace'
 import ActivityList from '@/components/ActivityList.vue'
-import TextPromptModal from '@/components/TextPromptModal.vue'
 
 const ws = useWorkspace()
-const router = useRouter()
-const toast = useToast()
+const ui = useUiState()
+const load = useLoadState()
+const actions = useShellSlot('topbar-right')
 
 const boards = computed(() =>
   (ws.overview.value?.boards ?? []).filter((b) => !b.archived),
 )
 const recent = ref<IEventRow[]>([])
 
-onMounted(async () => {
-  const { events } = await api.activity({ limit: '15' })
-  recent.value = events
-})
-
-const creating = ref(false)
-
-function createBoard(): void {
-  creating.value = true
+async function reload(): Promise<void> {
+  const result = await load.run(
+    Promise.all([ws.refresh(), api.activity({ limit: '12' })]),
+  )
+  if (result) recent.value = result[1].events
 }
 
-async function submitBoard(values: Record<string, string>): Promise<void> {
-  creating.value = false
-  const key = values.key.toUpperCase().trim()
-  const { results } = await api.boardWrite([
-    {
-      op: 'create',
-      op_id: newOpId(),
-      key,
-      name: values.name,
-      template: 'kanban6',
-    },
-  ])
-  if (results[0].ok) {
-    await ws.refresh()
-    void router.push(`/b/${key}`)
-  } else {
-    toast.error(String((results[0] as { error: string }).error))
-  }
-}
+void reload()
 </script>
 
 <style scoped lang="scss">
 .home {
   display: grid;
-  gap: calc(var(--nb-base-unit) * 3);
+  gap: var(--nb-spacing-24);
+  align-content: start;
 
-  &__card {
-    cursor: pointer;
-
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: var(--nb-base-unit);
-    }
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: var(--nb-spacing-16);
   }
 
-  &__card--new {
-    display: grid;
-    place-items: center;
-    gap: var(--nb-base-unit);
-    color: var(--nb-c-text-muted, inherit);
+  &__empty {
+    min-height: 24rem;
+    padding-block: var(--nb-spacing-24);
+  }
+
+  &__key {
+    font-family: var(--nb-font-family-mono);
+    font-size: var(--nb-type-code-sm-size);
+    color: var(--nb-c-text-subtle);
   }
 
   &__lists {
     list-style: none;
-    margin: 0;
+    margin: var(--nb-spacing-8) 0 0;
     padding: 0;
     display: grid;
-    gap: calc(var(--nb-base-unit) / 2);
+    gap: var(--nb-spacing-4);
 
     li {
       display: flex;
       justify-content: space-between;
-      font-size: 0.85rem;
+      font-size: var(--nb-type-body-sm-size);
     }
   }
 
   &__count {
-    opacity: 0.6;
+    color: var(--nb-c-text-muted);
   }
 
   &__activity h2 {
-    margin-bottom: var(--nb-base-unit);
+    margin-block-end: var(--nb-spacing-8);
   }
 }
 </style>

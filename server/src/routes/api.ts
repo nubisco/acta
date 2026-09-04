@@ -387,6 +387,14 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
       start(controller) {
         const encoder = new TextEncoder()
         controller.enqueue(encoder.encode(': connected\n\n'))
+        // Keepalive: Cloudflare (and some proxies) close idle streams.
+        const keepalive = setInterval(() => {
+          try {
+            controller.enqueue(encoder.encode(': ping\n\n'))
+          } catch {
+            clearInterval(keepalive)
+          }
+        }, 20_000)
         const off = onEvent((event) => {
           if (event.workspace_id !== workspaceId) return
           const data = JSON.stringify({
@@ -399,8 +407,13 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
           controller.enqueue(encoder.encode(`data: ${data}\n\n`))
         })
         c.req.raw.signal.addEventListener('abort', () => {
+          clearInterval(keepalive)
           off()
-          controller.close()
+          try {
+            controller.close()
+          } catch {
+            // already closed
+          }
         })
       },
     })

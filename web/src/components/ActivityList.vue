@@ -1,34 +1,38 @@
 <template>
-  <ul class="activity">
+  <ul class="activity" aria-label="Activity">
     <li v-for="event in events" :key="event.id">
       <NbAiLabel v-if="event.actor_kind === 'agent'" />
-      <NbIcon
+      <NbBadge
         v-else-if="event.actor_kind === 'system'"
-        name="gear"
-        class="activity__system"
-      />
-      <span class="activity__summary">{{ event.summary }}</span>
-      <span v-if="event.caused_by" class="activity__rule">rule</span>
-      <time class="activity__time">{{ relative(event.ts) }}</time>
+        size="sm"
+        variant="grey"
+      >
+        System
+      </NbBadge>
+      <span
+        v-nb-tooltip="{
+          body: event.summary,
+          overflowOnly: true,
+          focusable: true,
+        }"
+        class="activity__summary"
+      >
+        {{ event.summary }}
+      </span>
+      <NbBadge v-if="event.caused_by" size="sm" variant="purple">Rule</NbBadge>
+      <time :datetime="new Date(event.ts).toISOString()" class="activity__time">
+        {{ relativeTime(event.ts) }}
+      </time>
     </li>
   </ul>
 </template>
 
 <script setup lang="ts">
-import { NbAiLabel, NbIcon } from '@nubisco/ui'
-import type { IEventRow } from '@/api/client'
+import { NbAiLabel, NbBadge } from '@nubisco/ui'
+import type { IEventRow } from '@/types/api'
+import { relativeTime } from '@/lib/state'
 
 defineProps<{ events: IEventRow[] }>()
-
-function relative(ts: number): string {
-  const diff = Date.now() - ts
-  const minutes = Math.round(diff / 60_000)
-  if (minutes < 1) return 'now'
-  if (minutes < 60) return `${minutes}m`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}h`
-  return new Date(ts).toLocaleDateString()
-}
 </script>
 
 <style scoped lang="scss">
@@ -37,13 +41,13 @@ function relative(ts: number): string {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: calc(var(--nb-base-unit) / 2);
+  gap: var(--nb-spacing-4);
 
   li {
     display: flex;
     align-items: center;
-    gap: var(--nb-base-unit);
-    font-size: 0.85rem;
+    gap: var(--nb-spacing-8);
+    font-size: var(--nb-type-body-sm-size);
   }
 
   &__summary {
@@ -53,20 +57,8 @@ function relative(ts: number): string {
     white-space: nowrap;
   }
 
-  &__rule {
-    font-size: 0.7rem;
-    opacity: 0.6;
-    border: 1px solid currentColor;
-    border-radius: 4px;
-    padding: 0 4px;
-  }
-
-  &__system {
-    opacity: 0.5;
-  }
-
   &__time {
-    opacity: 0.5;
+    color: var(--nb-c-text-subtle);
     white-space: nowrap;
   }
 }
