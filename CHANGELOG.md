@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/nubisco/acta/compare/v1.1.0...v1.2.0) (2026-09-04)
+
+
+### Features
+
+* external single sign-on (JWT redirect + JWKS) and member management ([2b6dd80](https://github.com/nubisco/acta/commit/2b6dd80dd1e41cfd6b423595078ea96dbb9cf590))
+
 # [1.1.0](https://github.com/nubisco/acta/compare/v1.0.0...v1.1.0) (2026-09-04)
 
 
