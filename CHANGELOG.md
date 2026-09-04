@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/nubisco/acta/compare/v1.2.0...v1.3.0) (2026-09-04)
+
+
+### Features
+
+* **web:** rebuild the app on the Nubisco UI 3.3.0 guidelines ([94277ba](https://github.com/nubisco/acta/commit/94277bae8efffffa29e36cc38c3fb3422fe013d8))
+
 # [1.2.0](https://github.com/nubisco/acta/compare/v1.1.0...v1.2.0) (2026-09-04)
 
 
