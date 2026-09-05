@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/nubisco/acta/compare/v1.4.0...v1.5.0) (2026-09-05)
+
+
+### Features
+
+* **web:** adopt the Acta app icon and identity assets ([0e786fd](https://github.com/nubisco/acta/commit/0e786fdd213eb28b1dc526e5155a92325a7d1a07)), closes [#16253A](https://github.com/nubisco/acta/issues/16253A)
+
 # [1.4.0](https://github.com/nubisco/acta/compare/v1.3.0...v1.4.0) (2026-09-05)
 
 
