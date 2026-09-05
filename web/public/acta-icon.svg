@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Acta">
+  <title>Acta</title>
+  <defs>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="12"/></filter>
+    <filter id="soft2" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="16"/></filter>
+    <linearGradient id="tsheen" x1="0" y1="0" x2="0.7" y2="0.9"><stop offset="0" stop-color="#fff" stop-opacity="0.07"/><stop offset="0.45" stop-color="#fff" stop-opacity="0.02"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="gnd" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512"><stop offset="0" stop-color="#16253a"/><stop offset="1" stop-color="#0b101c"/></linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.26" r="0.8"><stop offset="0" stop-color="#6ee7d8" stop-opacity="0.16"/><stop offset="1" stop-color="#6ee7d8" stop-opacity="0"/></radialGradient>
+
+    <!-- board (back shape): azure -> indigo -->
+    <linearGradient id="bdf" gradientUnits="userSpaceOnUse" x1="96" y1="96" x2="328" y2="388"><stop offset="0" stop-color="#5fa4f5"/><stop offset="0.5" stop-color="#3a6ede"/><stop offset="1" stop-color="#2c3fa8"/></linearGradient>
+    <linearGradient id="bde" gradientUnits="userSpaceOnUse" x1="96" y1="96" x2="328" y2="388"><stop offset="0" stop-color="#2c5188"/><stop offset="0.5" stop-color="#1e3a7e"/><stop offset="1" stop-color="#172058"/></linearGradient>
+    <linearGradient id="bds" gradientUnits="userSpaceOnUse" x1="96" y1="96" x2="96" y2="213"><stop offset="0" stop-color="#fff" stop-opacity="0.4"/><stop offset="1" stop-color="#fff" stop-opacity="0.0"/></linearGradient>
+
+    <!-- page (front shape): mint -> deep teal -->
+    <linearGradient id="pgf2" gradientUnits="userSpaceOnUse" x1="244" y1="172" x2="416" y2="428"><stop offset="0" stop-color="#3fd9b6"/><stop offset="1" stop-color="#0e7f96"/></linearGradient>
+    <linearGradient id="pge2" gradientUnits="userSpaceOnUse" x1="244" y1="172" x2="416" y2="428"><stop offset="0" stop-color="#0f6f66"/><stop offset="1" stop-color="#07485a"/></linearGradient>
+    <linearGradient id="pgs2" gradientUnits="userSpaceOnUse" x1="244" y1="172" x2="244" y2="274"><stop offset="0" stop-color="#fff" stop-opacity="0.42"/><stop offset="1" stop-color="#fff" stop-opacity="0.0"/></linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#gnd)"/><rect width="512" height="512" rx="116" fill="url(#glow)"/>
+
+  <!-- ===== board (back): drop shadow, extrusion edge, fill, sheen, outline ===== -->
+  <g transform="translate(0,14)" fill="#000" opacity="0.36" filter="url(#soft2)"><rect x="96" y="110" width="232" height="292" rx="36"/></g>
+  <rect x="96" y="110" width="232" height="292" rx="36" fill="url(#bde)"/>
+  <rect x="96" y="96" width="232" height="292" rx="36" fill="url(#bdf)"/>
+  <rect x="96" y="96" width="232" height="292" rx="36" fill="url(#bds)"/>
+  <rect x="96" y="96" width="232" height="292" rx="36" fill="none" stroke="#101a3a" stroke-opacity="0.22" stroke-width="3"/>
+
+  <!-- board cards: two columns, dark underlay +3 then white, opacity falling down the column -->
+  <rect x="128" y="135" width="78" height="40" rx="12" fill="#0e1c40" opacity="0.18"/>
+  <rect x="128" y="132" width="78" height="40" rx="12" fill="#ffffff" opacity="0.52"/>
+  <rect x="128" y="187" width="78" height="58" rx="12" fill="#0e1c40" opacity="0.18"/>
+  <rect x="128" y="184" width="78" height="58" rx="12" fill="#ffffff" opacity="0.44"/>
+  <rect x="128" y="257" width="78" height="40" rx="12" fill="#0e1c40" opacity="0.18"/>
+  <rect x="128" y="254" width="78" height="40" rx="12" fill="#ffffff" opacity="0.34"/>
+  <rect x="220" y="135" width="78" height="58" rx="12" fill="#0e1c40" opacity="0.18"/>
+  <rect x="220" y="132" width="78" height="58" rx="12" fill="#ffffff" opacity="0.48"/>
+  <rect x="220" y="205" width="78" height="40" rx="12" fill="#0e1c40" opacity="0.18"/>
+  <rect x="220" y="202" width="78" height="40" rx="12" fill="#ffffff" opacity="0.38"/>
+
+  <!-- ===== page (front): same sandwich, deeper shadow because it floats higher ===== -->
+  <g transform="translate(0,18)" fill="#000" opacity="0.44" filter="url(#soft2)"><rect x="244" y="184" width="172" height="256" rx="32"/></g>
+  <rect x="244" y="184" width="172" height="256" rx="32" fill="url(#pge2)"/>
+  <rect x="244" y="172" width="172" height="256" rx="32" fill="url(#pgf2)"/>
+  <rect x="244" y="172" width="172" height="256" rx="32" fill="url(#pgs2)"/>
+  <rect x="244" y="172" width="172" height="256" rx="32" fill="none" stroke="#083242" stroke-opacity="0.22" stroke-width="3"/>
+
+  <!-- page content: title slab + prose lines, underlay +3 -->
+  <rect x="272" y="207" width="96" height="22" rx="11" fill="#053640" opacity="0.18"/>
+  <rect x="272" y="204" width="96" height="22" rx="11" fill="#ffffff" opacity="0.52"/>
+  <rect x="272" y="245" width="116" height="14" rx="7" fill="#053640" opacity="0.18"/>
+  <rect x="272" y="242" width="116" height="14" rx="7" fill="#ffffff" opacity="0.44"/>
+  <rect x="272" y="273" width="102" height="14" rx="7" fill="#053640" opacity="0.18"/>
+  <rect x="272" y="270" width="102" height="14" rx="7" fill="#ffffff" opacity="0.38"/>
+  <rect x="272" y="301" width="116" height="14" rx="7" fill="#053640" opacity="0.18"/>
+  <rect x="272" y="298" width="116" height="14" rx="7" fill="#ffffff" opacity="0.34"/>
+  <rect x="272" y="329" width="82" height="14" rx="7" fill="#053640" opacity="0.18"/>
+  <rect x="272" y="326" width="82" height="14" rx="7" fill="#ffffff" opacity="0.30"/>
+  <rect x="272" y="365" width="116" height="14" rx="7" fill="#053640" opacity="0.18"/>
+  <rect x="272" y="362" width="116" height="14" rx="7" fill="#ffffff" opacity="0.34"/>
+  <rect x="272" y="393" width="98" height="14" rx="7" fill="#053640" opacity="0.18"/>
+  <rect x="272" y="390" width="98" height="14" rx="7" fill="#ffffff" opacity="0.28"/>
+
+  <rect width="512" height="512" rx="116" fill="url(#tsheen)"/><rect x="1" y="1" width="510" height="510" rx="115" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="2"/>
+</svg>

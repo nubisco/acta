@@ -1,5 +1,13 @@
 @use '@nubisco/ui/styles';
 
+/* Acta identity colors from the branding kit. These are brand accents, not
+ * replacements for the @nubisco/ui semantic tokens. */
+:root {
+  --acta-brand-azure: #5fa4f5;
+  --acta-brand-teal: #3fd9b6;
+  --acta-brand-indigo: #2c3fa8;
+}
+
 *,
 *::before,
 *::after {

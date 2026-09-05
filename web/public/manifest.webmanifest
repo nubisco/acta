@@ -1,0 +1,21 @@
+{
+  "name": "Acta",
+  "short_name": "Acta",
+  "description": "Boards and docs for teams and their agents",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#16253A",
+  "background_color": "#0B101C",
+  "icons": [
+    {
+      "src": "/icons/acta-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/acta-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
