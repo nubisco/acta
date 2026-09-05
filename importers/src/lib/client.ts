@@ -79,8 +79,14 @@ export interface IAttachmentInput {
   content_base64?: string
 }
 
-const ITEM_OPS_PER_CALL = 100
-const SMALL_OPS_PER_CALL = 50
+/* Sized for the Cloudflare Workers deployment: an invocation has bounded
+ * subrequests and CPU, and every item op costs a dozen-plus D1 queries, so
+ * large chunks die with "Too many API requests by single Worker invocation"
+ * or CPU-limit kills. Small chunks plus idempotent-op retries converge. */
+const ITEM_OPS_PER_CALL = 5
+const SMALL_OPS_PER_CALL = 20
+/** Pacing between batch calls; sustained bursts trip free-plan limits. */
+const INTER_CHUNK_DELAY_MS = 400
 
 export class ActaClient {
   private baseUrl: string
@@ -102,17 +108,37 @@ export class ActaClient {
     path: string,
     body?: unknown,
   ): Promise<unknown> {
-    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
-      method,
-      headers: {
-        authorization: `Bearer ${this.token}`,
-        ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    })
-    const text = await res.text()
-    if (!res.ok) throw new ActaHttpError(res.status, text)
-    return JSON.parse(text)
+    // Every write op is idempotent (op_id), so transient edge failures
+    // (429, 5xx, Workers CPU/subrequest kills) are safe to retry.
+    const attempts = 6
+    let lastError: unknown
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      if (attempt > 0)
+        await new Promise((r) => setTimeout(r, 3000 * 2 ** (attempt - 1)))
+      try {
+        const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+          method,
+          headers: {
+            authorization: `Bearer ${this.token}`,
+            ...(body !== undefined
+              ? { 'content-type': 'application/json' }
+              : {}),
+          },
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+        })
+        const text = await res.text()
+        if (res.status === 429 || res.status >= 500) {
+          lastError = new ActaHttpError(res.status, text.slice(0, 200))
+          continue
+        }
+        if (!res.ok) throw new ActaHttpError(res.status, text)
+        return JSON.parse(text)
+      } catch (error) {
+        if (error instanceof ActaHttpError && error.status < 500) throw error
+        lastError = error
+      }
+    }
+    throw lastError
   }
 
   async overview(): Promise<IOverview> {
@@ -133,6 +159,7 @@ export class ActaClient {
   ): Promise<TOpResult[]> {
     const out: TOpResult[] = []
     for (let i = 0; i < ops.length; i += chunkSize) {
+      if (i > 0) await new Promise((r) => setTimeout(r, INTER_CHUNK_DELAY_MS))
       const res = (await this.request('POST', path, {
         ops: ops.slice(i, i + chunkSize),
       })) as { results: TOpResult[] }
