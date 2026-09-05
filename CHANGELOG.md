@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/nubisco/acta/compare/v1.3.0...v1.4.0) (2026-09-05)
+
+
+### Features
+
+* **web:** WYSIWYG editing, item modal, richer cards and adaptive shell ([ecfaf5d](https://github.com/nubisco/acta/commit/ecfaf5dbb9772b75192e438bfe156c52a8c4c574))
+
 # [1.3.0](https://github.com/nubisco/acta/compare/v1.2.0...v1.3.0) (2026-09-04)
 
 
