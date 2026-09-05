@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/nubisco/acta/compare/v1.5.0...v1.5.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **importers:** survive Workers free-plan limits during bulk import ([fda53b9](https://github.com/nubisco/acta/commit/fda53b9553a9128d7d24907640cc5ab0569a8813))
+
 # [1.5.0](https://github.com/nubisco/acta/compare/v1.4.0...v1.5.0) (2026-09-05)
 
 
