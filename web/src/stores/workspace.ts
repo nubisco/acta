@@ -128,9 +128,18 @@ function describe(event: ILiveEvent): string {
   }
 }
 
-/** Cross-view UI state: inspector selection and the new-board dialog. */
+/** Cross-view UI state: inspector selection and dialogs. */
 const inspectedItemKey = ref<string | null>(null)
 const newBoardOpen = ref(false)
+const itemModalKey = ref<string | null>(null)
+
+/**
+ * Dual-flavor sidebar: dense routes collapse to the icon rail, navigation-
+ * heavy routes expand. The user's toggle overrides the route default until
+ * the next navigation.
+ */
+export type TSidebarVariant = 'compact' | 'verbose'
+const sidebarChoice = ref<TSidebarVariant | null>(null)
 
 export function useInspector() {
   return {
@@ -140,6 +149,12 @@ export function useInspector() {
   }
 }
 
+const DENSE_ROUTES = new Set(['board', 'docs'])
+
 export function useUiState() {
-  return { newBoardOpen }
+  return { newBoardOpen, itemModalKey, sidebarChoice }
+}
+
+export function sidebarDefaultFor(routeName: unknown): TSidebarVariant {
+  return DENSE_ROUTES.has(String(routeName)) ? 'compact' : 'verbose'
 }

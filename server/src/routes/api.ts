@@ -236,6 +236,42 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     })
   })
 
+  // Workspaces (multi-tenant groundwork: one today, Trello-style many later)
+  app.get('/workspaces', async (c) => {
+    const ctx = ctxOf(c)
+    const me = (
+      await ctx.db.query<{ email: string | null }>(
+        'SELECT email FROM actor WHERE id = ?',
+        [ctx.actor.id],
+      )
+    )[0]
+    if (!me?.email) {
+      const current = (
+        await ctx.db.query<{ id: string; name: string }>(
+          'SELECT id, name FROM workspace WHERE id = ?',
+          [ctx.workspaceId],
+        )
+      )[0]
+      return c.json({
+        workspaces: [{ id: current.id, name: current.name, current: true }],
+      })
+    }
+    const rows = await ctx.db.query<{ id: string; name: string }>(
+      `SELECT w.id, w.name FROM workspace w
+         JOIN actor a ON a.workspace_id = w.id
+        WHERE a.email = ? AND a.kind = 'human' AND a.disabled = 0
+        ORDER BY w.name`,
+      [me.email],
+    )
+    return c.json({
+      workspaces: rows.map((w) => ({
+        id: w.id,
+        name: w.name,
+        current: w.id === ctx.workspaceId,
+      })),
+    })
+  })
+
   // Members (admin) ---------------------------------------------------------
   app.post('/members', async (c) => {
     const ctx = ctxOf(c)

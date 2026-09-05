@@ -5,7 +5,7 @@
     v-else
     ref="shell"
     v-model:inspector-visible="inspectorVisible"
-    sidebar-variant="verbose"
+    :sidebar-variant="sidebarVariant"
     sidebar-label="Acta sections"
     inspector-size="sm"
     inspector-label="Item"
@@ -13,34 +13,42 @@
     resizable
   >
     <template #sidebar-logo>
-      <NbSidebarBrand title="Acta" subtitle="boards + docs" icon="kanban" />
+      <WorkspaceSwitcher :compact="sidebarVariant === 'compact'" />
     </template>
 
     <template #sidebar-nav>
-      <NbSidebarMenu density="compact">
+      <template v-if="sidebarVariant === 'compact'">
+        <NbSidebarLink
+          v-for="entry in navEntries"
+          :key="entry.to"
+          v-nb-tooltip="{ body: entry.label }"
+          :to="entry.to"
+          :active="entry.active"
+          @click.prevent="router.push(entry.to)"
+        >
+          <NbIcon :name="entry.icon" :size="18" />
+        </NbSidebarLink>
+        <NbSidebarLink
+          v-for="board in boards"
+          :key="board.key"
+          v-nb-tooltip="{ body: board.name }"
+          :to="`/b/${board.key}`"
+          :active="
+            route.name === 'board' && route.params.boardKey === board.key
+          "
+          @click.prevent="router.push(`/b/${board.key}`)"
+        >
+          <span class="rail-key">{{ board.key.slice(0, 2) }}</span>
+        </NbSidebarLink>
+      </template>
+      <NbSidebarMenu v-else density="compact">
         <NbSidebarMenuItem
-          label="Home"
-          icon="house"
-          to="/"
-          :active="route.name === 'home'"
-        />
-        <NbSidebarMenuItem
-          label="Docs"
-          icon="book-open"
-          to="/docs"
-          :active="route.name === 'docs'"
-        />
-        <NbSidebarMenuItem
-          label="Search"
-          icon="magnifying-glass"
-          to="/search"
-          :active="route.name === 'search'"
-        />
-        <NbSidebarMenuItem
-          label="Activity"
-          icon="pulse"
-          to="/activity"
-          :active="route.name === 'activity'"
+          v-for="entry in navEntries"
+          :key="entry.to"
+          :label="entry.label"
+          :icon="entry.icon"
+          :to="entry.to"
+          :active="entry.active"
         />
         <NbSidebarMenuGroup v-if="boards.length > 0" label="Boards">
           <NbSidebarMenuItem
@@ -59,12 +67,34 @@
     </template>
 
     <template #sidebar-bottom>
-      <NbSidebarMenu density="compact">
+      <NotificationBell :compact="sidebarVariant === 'compact'" />
+      <template v-if="sidebarVariant === 'compact'">
+        <NbSidebarLink
+          v-nb-tooltip="{ body: 'Settings' }"
+          to="/settings"
+          :active="route.name === 'settings'"
+          @click.prevent="router.push('/settings')"
+        >
+          <NbIcon name="gear" :size="18" />
+        </NbSidebarLink>
+        <NbSidebarLink
+          v-nb-tooltip="{ body: 'Expand sidebar' }"
+          @click.prevent="toggleSidebar"
+        >
+          <NbIcon name="caret-line-right" :size="18" />
+        </NbSidebarLink>
+      </template>
+      <NbSidebarMenu v-else density="compact">
         <NbSidebarMenuItem
           label="Settings"
           icon="gear"
           to="/settings"
           :active="route.name === 'settings'"
+        />
+        <NbSidebarMenuItem
+          label="Collapse sidebar"
+          icon="caret-line-left"
+          @click="toggleSidebar"
         />
       </NbSidebarMenu>
       <NbUserMenu
@@ -94,24 +124,32 @@
 
     <template #topbar-left>
       <NbBreadcrumbs v-if="trail.length > 1" title="Acta">
-        <template v-for="(crumb, index) in trail" :key="crumb.to ?? crumb.text">
-          <RouterLink
-            v-if="index < trail.length - 1 && crumb.to"
-            :to="crumb.to"
-          >
-            {{ crumb.text }}
-          </RouterLink>
-          <span v-else aria-current="page">{{ crumb.text }}</span>
-        </template>
+        <RouterLink
+          v-for="crumb in trail.slice(0, -1)"
+          :key="crumb.to ?? crumb.text"
+          :to="crumb.to ?? '/'"
+        >
+          {{ crumb.text }}
+        </RouterLink>
+        <span aria-current="page">{{ trail[trail.length - 1].text }}</span>
       </NbBreadcrumbs>
     </template>
 
     <template #topbar-right>
-      <NbNotificationCenter
-        :items="notificationItems"
-        align="end"
-        @mark-all-read="ws.markAllRead"
-      />
+      <form
+        class="topbar-search"
+        role="search"
+        aria-label="Search Acta"
+        @submit.prevent="submitSearch"
+      >
+        <NbTextInput
+          id="field-topbar-search"
+          v-model="searchQuery"
+          size="sm"
+          placeholder="Search..."
+          aria-label="Search Acta"
+        />
+      </form>
     </template>
 
     <RouterView />
@@ -137,6 +175,12 @@
     @close="ui.newBoardOpen.value = false"
     @created="onBoardCreated"
   />
+  <ItemModal
+    v-if="ui.itemModalKey.value"
+    :open="ui.itemModalKey.value !== null"
+    :item-key="ui.itemModalKey.value"
+    @close="ui.itemModalKey.value = null"
+  />
   <NbCommandPalette placeholder="Search Acta..." />
   <NbToaster />
 </template>
@@ -149,21 +193,30 @@ import {
   NbBreadcrumbs,
   NbCommandPalette,
   NbEmptyState,
-  NbNotificationCenter,
+  NbIcon,
   NbShell,
-  NbSidebarBrand,
+  NbSidebarLink,
   NbSidebarMenu,
   NbSidebarMenuGroup,
   NbSidebarMenuItem,
+  NbTextInput,
   NbToaster,
   NbUserMenu,
   useCommandPalette,
   useTheme,
 } from '@nubisco/ui'
-import { useInspector, useUiState, useWorkspace } from '@/stores/workspace'
+import {
+  sidebarDefaultFor,
+  useInspector,
+  useUiState,
+  useWorkspace,
+} from '@/stores/workspace'
 import DocsTreePanel from '@/components/DocsTreePanel.vue'
 import ItemInspector from '@/components/ItemInspector.vue'
+import ItemModal from '@/components/ItemModal.vue'
 import NewBoardModal from '@/components/NewBoardModal.vue'
+import NotificationBell from '@/components/NotificationBell.vue'
+import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -178,9 +231,41 @@ router.afterEach(() => {
   requestAnimationFrame(() => shell.value?.focusMain())
 })
 
+// Dual-flavor sidebar: route density decides; the user's toggle overrides
+// until the next navigation.
+const sidebarVariant = computed(
+  () => ui.sidebarChoice.value ?? sidebarDefaultFor(route.name),
+)
+watch(
+  () => route.name,
+  () => {
+    ui.sidebarChoice.value = null
+  },
+)
+function toggleSidebar(): void {
+  ui.sidebarChoice.value =
+    sidebarVariant.value === 'compact' ? 'verbose' : 'compact'
+}
+
 const boards = computed(() =>
   (ws.overview.value?.boards ?? []).filter((b) => !b.archived),
 )
+
+const navEntries = computed(() => [
+  { to: '/', label: 'Home', icon: 'house', active: route.name === 'home' },
+  {
+    to: '/docs',
+    label: 'Docs',
+    icon: 'book-open',
+    active: route.name === 'docs',
+  },
+  {
+    to: '/activity',
+    label: 'Activity',
+    icon: 'pulse',
+    active: route.name === 'activity',
+  },
+])
 
 function openCount(board: {
   lists: { role?: string; items: number }[]
@@ -236,14 +321,11 @@ watch(inspectorVisible, (visible) => {
   if (!visible) inspector.close()
 })
 
-const notificationItems = computed(() =>
-  ws.notifications.value.map((n) => ({
-    id: n.id,
-    title: n.title,
-    time: n.timestamp,
-    read: n.read,
-  })),
-)
+const searchQuery = ref('')
+function submitSearch(): void {
+  const q = searchQuery.value.trim()
+  void router.push({ name: 'search', query: q ? { q } : undefined })
+}
 
 async function signOut(): Promise<void> {
   await ws.logout()
@@ -255,8 +337,8 @@ function onBoardCreated(key: string): void {
   void router.push(`/b/${key}`)
 }
 
-// Command palette: navigation + create + theme. Registrations are diffed so
-// removed boards unregister (commands are global).
+// Command palette: navigation + create + view controls. Registrations are
+// diffed so removed boards unregister (commands are global).
 let registered = new Set<string>()
 watch(
   () => ws.overview.value,
@@ -302,6 +384,13 @@ watch(
           handler: () => (ui.newBoardOpen.value = true),
         },
         {
+          id: 'sidebar:toggle',
+          label: 'Toggle sidebar',
+          icon: 'sidebar-simple',
+          namespace: 'View',
+          handler: toggleSidebar,
+        },
+        {
           id: 'theme:toggle',
           label: 'Toggle theme',
           icon: 'moon',
@@ -320,3 +409,16 @@ watch(
   { immediate: true },
 )
 </script>
+
+<style scoped lang="scss">
+.topbar-search {
+  display: flex;
+  align-items: center;
+}
+
+.rail-key {
+  font-family: var(--nb-font-family-mono);
+  font-size: var(--nb-type-label-sm-size);
+  font-weight: var(--nb-type-label-lg-weight, 600);
+}
+</style>

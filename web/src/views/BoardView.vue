@@ -108,6 +108,7 @@
           class="board__card"
           type="button"
           @click="inspector.open(String(item.key))"
+          @dblclick="openItemModal(String(item.key))"
         >
           <span class="board__card-title">
             <s v-if="item.done">{{ item.title }}</s>
@@ -119,9 +120,17 @@
               v-for="label in (item.labels as string[]) ?? []"
               :key="label"
               size="sm"
-              variant="grey"
+              :variant="variants.get(label) ?? 'grey'"
             >
               {{ label }}
+            </NbBadge>
+            <NbBadge
+              v-if="item.due && !item.done && Number(item.due) < Date.now()"
+              size="sm"
+              variant="orange"
+              dot
+            >
+              Overdue
             </NbBadge>
             <span
               v-if="item.chk"
@@ -137,13 +146,11 @@
             >
               <NbIcon name="chat-circle" /> {{ item.cmts }}
             </span>
-            <span
+            <ActorAvatar
               v-for="assignee in (item.assignees as string[]) ?? []"
               :key="assignee"
-              class="board__card-chip"
-            >
-              @{{ assignee }}
-            </span>
+              :handle="assignee"
+            />
           </span>
         </button>
       </template>
@@ -171,12 +178,23 @@ import {
 import { api, newOpId } from '@/api/client'
 import type { IBoardItemRow } from '@/types/api'
 import { humanise, useLoadState } from '@/lib/state'
-import { useInspector, useWorkspace } from '@/stores/workspace'
+import { labelVariants } from '@/lib/labels'
+import { useInspector, useUiState, useWorkspace } from '@/stores/workspace'
+import ActorAvatar from '@/components/ActorAvatar.vue'
 
 const props = defineProps<{ boardKey?: string }>()
 
 const ws = useWorkspace()
 const inspector = useInspector()
+const ui = useUiState()
+
+/* A dblclick always fires the click handler first, which opens the
+ * inspector; close it again so the modal stands alone. */
+function openItemModal(key: string): void {
+  inspector.close()
+  ui.itemModalKey.value = key
+}
+const variants = computed(() => labelVariants(ws.overview.value))
 const toast = useToast()
 const load = useLoadState()
 const filterBar = useShellSlot('fixedbar')

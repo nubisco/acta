@@ -199,6 +199,11 @@ export const api = {
   revokeAgentToken: (actorId: string) =>
     req<{ ok: boolean }>(`/tokens/${actorId}`, { method: 'DELETE' }),
 
+  workspaces: () =>
+    req<{ workspaces: { id: string; name: string; current: boolean }[] }>(
+      '/workspaces',
+    ),
+
   createMember: (member: {
     email: string
     handle: string

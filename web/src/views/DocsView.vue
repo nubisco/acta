@@ -89,24 +89,13 @@
         </NbButton>
       </div>
 
-      <div v-if="editing" class="docs__editor">
-        <NbForm id="doc-editor" aria-label="Edit document">
-          <NbField orientation="stack" label="Markdown" v-slot="{ id }">
-            <NbTextInput
-              :id="id"
-              v-model="draft"
-              multiline
-              :rows="24"
-              size="sm"
-            />
-          </NbField>
-        </NbForm>
-        <MarkdownView
-          class="docs__preview"
-          :source="draft"
-          :wide="doc.layout === 'wide'"
-        />
-      </div>
+      <MarkdownEditor
+        v-if="editing"
+        v-model="draft"
+        autofocus
+        placeholder="Start writing. Headings, lists, quotes and code all form as you type."
+        class="docs__editor"
+      />
       <MarkdownView v-else :source="viewedBody" :wide="doc.layout === 'wide'" />
 
       <footer
@@ -129,10 +118,7 @@ import {
   NbDataTable,
   NbDefinitionList,
   NbEmptyState,
-  NbField,
-  NbForm,
   NbSkeleton,
-  NbTextInput,
   useConfirm,
   useShellSlot,
   useToast,
@@ -140,6 +126,7 @@ import {
 import { api, newOpId, ApiHttpError } from '@/api/client'
 import type { IDocDetail } from '@/types/api'
 import { humanise, relativeTime, useLoadState } from '@/lib/state'
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 
 const props = defineProps<{ slug?: string }>()
@@ -338,10 +325,7 @@ async function restoreVersion(): Promise<void> {
   }
 
   &__editor {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
-    gap: var(--nb-spacing-16);
-    align-items: start;
+    min-block-size: 24rem;
   }
 
   &__backlinks {

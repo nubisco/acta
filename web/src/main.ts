@@ -1,4 +1,5 @@
 import { createApp, type Plugin } from 'vue'
+import { createI18n } from 'vue-i18n'
 import { createRouter, createWebHistory } from 'vue-router'
 import NubiscoUI, {
   configureTheme,
@@ -13,6 +14,19 @@ import App from './App.vue'
 import { useWorkspace } from './stores/workspace'
 
 configureTheme({ storageKey: 'acta.theme' })
+
+// Acta ships no translated copy of its own yet; the catalog exists so
+// @nubisco/ui components (NbUserMenu) can resolve their userMenu.* strings,
+// falling back to their built-in en/pt defaults. Without this plugin those
+// components throw vue-i18n's NOT_INSTALLED error during setup.
+const i18n = createI18n({
+  legacy: false,
+  locale: typeof navigator !== 'undefined' ? navigator.language : 'en',
+  fallbackLocale: 'en',
+  messages: {},
+  missingWarn: false,
+  fallbackWarn: false,
+})
 
 const router = createRouter({
   history: createWebHistory(),
@@ -84,6 +98,7 @@ router.afterEach((to) => {
 
 createApp(App)
   .use(NubiscoUI as unknown as Plugin)
+  .use(i18n as unknown as Plugin)
   .use(router)
   .use(NbCommandPalettePlugin as unknown as Plugin)
   .mount('#app')
