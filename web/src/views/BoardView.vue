@@ -1,31 +1,16 @@
 <template>
   <div class="board">
+    <!-- Adding lives in the shell topbar (always present) and at the foot of
+         every column (adds in place); the title is asked for in the modal, so
+         the filter bar is purely filters. -->
+    <component :is="topbarActions.Outlet">
+      <NbButton size="sm" variant="primary" icon="plus" @click="openNewItem()">
+        Add item
+      </NbButton>
+    </component>
+
     <component :is="filterBar.Outlet">
       <div class="board__filters" role="search" aria-label="Filter items">
-        <NbForm
-          id="board-composer"
-          aria-label="Add item"
-          @submit.prevent="createItem"
-        >
-          <div class="board__composer">
-            <NbTextInput
-              id="field-new-item"
-              v-model="newTitle"
-              size="sm"
-              placeholder="Add an item..."
-              aria-label="New item title"
-            />
-            <NbButton
-              type="submit"
-              size="sm"
-              variant="primary"
-              icon="plus"
-              :loading="creating"
-            >
-              Add item
-            </NbButton>
-          </div>
-        </NbForm>
         <NbSelect
           id="field-filter-label"
           v-model="labelFilter"
@@ -95,7 +80,7 @@
         description="Items move across this board's lists as work progresses."
       >
         <template #actions>
-          <NbButton variant="primary" icon="plus" @click="focusComposer">
+          <NbButton variant="primary" icon="plus" @click="openNewItem()">
             Add the first item
           </NbButton>
         </template>
@@ -103,6 +88,17 @@
     </div>
 
     <NbBoard v-else :columns="columns" :items="boardItems" @move="onMove">
+      <template #column-footer="{ column }">
+        <NbButton
+          size="sm"
+          variant="ghost"
+          icon="plus"
+          class="board__col-add"
+          @click="openNewItem(String(column.id))"
+        >
+          Add item
+        </NbButton>
+      </template>
       <template #card="{ item }">
         <button
           class="board__card"
@@ -155,6 +151,15 @@
         </button>
       </template>
     </NbBoard>
+
+    <NewItemModal
+      :open="newItemOpen"
+      :board-key="boardKey"
+      :lists="boardMeta?.lists ?? []"
+      :list="newItemList"
+      @close="newItemOpen = false"
+      @created="onItemCreated"
+    />
   </div>
 </template>
 
@@ -165,7 +170,6 @@ import {
   NbBoard,
   NbButton,
   NbEmptyState,
-  NbForm,
   NbIcon,
   NbSelect,
   NbSkeleton,
@@ -179,8 +183,10 @@ import { api, newOpId } from '@/api/client'
 import type { IBoardItemRow } from '@/types/api'
 import { humanise, useLoadState } from '@/lib/state'
 import { labelVariants } from '@/lib/labels'
+import { roleColor } from '@/lib/colors'
 import { useInspector, useUiState, useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'
+import NewItemModal from '@/components/NewItemModal.vue'
 
 const props = defineProps<{ boardKey?: string }>()
 
@@ -198,14 +204,32 @@ const variants = computed(() => labelVariants(ws.overview.value))
 const toast = useToast()
 const load = useLoadState()
 const filterBar = useShellSlot('fixedbar')
+const topbarActions = useShellSlot('topbar-right')
 
 const items = ref<IBoardItemRow[]>([])
 const labelFilter = ref('')
 const assigneeFilter = ref('')
 const stateFilter = ref('open')
 const textFilter = ref('')
-const newTitle = ref('')
-const creating = ref(false)
+
+/* The new-item modal, and which list it creates into: a column footer names
+ * its own column, the topbar button leaves it to the modal's backlog default. */
+const newItemOpen = ref(false)
+const newItemList = ref<string | undefined>(undefined)
+
+function openNewItem(list?: string): void {
+  newItemList.value = list
+  newItemOpen.value = true
+}
+
+async function onItemCreated(key: string): Promise<void> {
+  newItemOpen.value = false
+  await loadItems()
+  await ws.refresh()
+  // Carry straight on: the item exists, the inspector is where the rest of
+  // it (labels, assignees, description) gets filled in.
+  if (key) inspector.open(key)
+}
 
 const boardKey = computed(() => props.boardKey ?? '')
 const boardMeta = computed(() =>
@@ -226,21 +250,6 @@ const columns = computed(() =>
     color: roleColor(list.role),
   })),
 )
-
-function roleColor(role?: string): string | undefined {
-  switch (role) {
-    case 'active':
-      return 'var(--nb-c-primary)'
-    case 'blocked':
-      return 'var(--nb-c-status-error)'
-    case 'review':
-      return 'var(--nb-c-status-warning)'
-    case 'done':
-      return 'var(--nb-c-status-valid)'
-    default:
-      return undefined
-  }
-}
 
 const boardItems = computed<IBoardItem[]>(() =>
   items.value.map((row) => ({ id: row.key, columnId: row.list, ...row })),
@@ -304,10 +313,6 @@ function clearFilters(): void {
   stateFilter.value = 'open'
 }
 
-function focusComposer(): void {
-  document.getElementById('field-new-item')?.focus()
-}
-
 async function onMove(event: IBoardMoveEvent): Promise<void> {
   const row = items.value.find((r) => r.key === event.itemId)
   if (!row) return
@@ -323,29 +328,6 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
     toast.error(humanise(err), { title: 'Move failed' })
   }
   await loadItems()
-}
-
-async function createItem(): Promise<void> {
-  const title = newTitle.value.trim()
-  if (!title || !boardMeta.value) return
-  creating.value = true
-  const backlog =
-    boardMeta.value.lists.find((l) => l.role === 'backlog') ??
-    boardMeta.value.lists[0]
-  try {
-    const { results } = await api.itemWrite(
-      [{ op: 'create', op_id: newOpId(), list: backlog.name, title }],
-      boardKey.value,
-    )
-    if (!results[0].ok) throw new Error((results[0] as { error: string }).error)
-    newTitle.value = ''
-    await loadItems()
-    await ws.refresh()
-  } catch (err) {
-    toast.error(humanise(err), { title: 'Could not add the item' })
-  } finally {
-    creating.value = false
-  }
 }
 </script>
 
@@ -366,10 +348,11 @@ async function createItem(): Promise<void> {
     padding-block: var(--nb-spacing-8);
   }
 
-  &__composer {
-    display: flex;
-    align-items: center;
-    gap: var(--nb-spacing-8);
+  /* Full-width and quiet: present in every column without shouting in any. */
+  &__col-add {
+    width: 100%;
+    justify-content: flex-start;
+    color: var(--nb-c-text-muted);
   }
 
   &__skeleton {
