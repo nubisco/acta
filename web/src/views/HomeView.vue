@@ -214,11 +214,11 @@ void reload()
     color: var(--nb-c-bg);
   }
 
+  /* Plain flow inside the card body: any height/percentage game here makes
+   * the card outgrow its grid track and eat the row gap. */
   &__distribution {
     display: grid;
     gap: var(--nb-spacing-8);
-    align-content: end;
-    height: 100%;
     padding-block-start: var(--nb-spacing-8);
   }
 
