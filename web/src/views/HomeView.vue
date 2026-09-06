@@ -61,15 +61,40 @@
         :subtitle="board.key"
         :href="`/b/${board.key}`"
       >
-        <ul class="home__lists">
-          <li v-for="list in visibleLists(board)" :key="list.id">
-            <span class="home__list-name">{{ list.name }}</span>
-            <span class="home__count">{{ list.items }}</span>
-          </li>
-          <li v-if="board.lists.length > LIST_PREVIEW" class="home__more">
-            +{{ board.lists.length - LIST_PREVIEW }} more lists
-          </li>
-        </ul>
+        <template #icon>
+          <span
+            class="home__mark"
+            :style="{ background: chartColorFor(board.key) }"
+            aria-hidden="true"
+          >
+            {{ board.key.slice(0, 2) }}
+          </span>
+        </template>
+        <div class="home__distribution">
+          <div
+            v-if="itemCount(board) > 0"
+            class="home__bar"
+            role="img"
+            :aria-label="`${itemCount(board)} items across ${board.lists.length} lists`"
+          >
+            <span
+              v-for="seg in segments(board)"
+              :key="seg.id"
+              v-nb-tooltip="{
+                header: seg.name,
+                body: `${seg.items} ${seg.items === 1 ? 'item' : 'items'}`,
+              }"
+              class="home__seg"
+              :style="{ flexGrow: seg.items, background: seg.color }"
+            />
+          </div>
+          <p class="home__caption">
+            <template v-if="itemCount(board) > 0">
+              {{ board.lists.length }} lists · {{ itemCount(board) }} items
+            </template>
+            <template v-else>No items yet</template>
+          </p>
+        </div>
         <template #footer>
           <NbBadge size="sm" variant="grey">
             {{ openCount(board) }} open
@@ -102,11 +127,10 @@ import {
 } from '@nubisco/ui'
 import { api } from '@/api/client'
 import type { IEventRow, TOverviewBoard } from '@/types/api'
+import { chartColorFor, roleColor } from '@/lib/colors'
 import { useLoadState } from '@/lib/state'
 import { useUiState, useWorkspace } from '@/stores/workspace'
 import ActivityList from '@/components/ActivityList.vue'
-
-const LIST_PREVIEW = 6
 
 const ws = useWorkspace()
 const ui = useUiState()
@@ -118,8 +142,27 @@ const boards = computed(() =>
 )
 const recent = ref<IEventRow[]>([])
 
-function visibleLists(board: TOverviewBoard): TOverviewBoard['lists'] {
-  return board.lists.slice(0, LIST_PREVIEW)
+function itemCount(board: TOverviewBoard): number {
+  return board.lists.reduce((sum, l) => sum + l.items, 0)
+}
+
+interface IDistributionSegment {
+  id: string
+  name: string
+  items: number
+  color: string
+}
+
+/** One segment per non-empty list, colored by the list's role. */
+function segments(board: TOverviewBoard): IDistributionSegment[] {
+  return board.lists
+    .filter((l) => l.items > 0)
+    .map((l) => ({
+      id: l.id,
+      name: l.name,
+      items: l.items,
+      color: roleColor(l.role) ?? 'var(--nb-c-text-subtle)',
+    }))
 }
 
 function openCount(board: TOverviewBoard): number {
@@ -159,35 +202,42 @@ void reload()
     padding-block: var(--nb-spacing-24);
   }
 
-  &__lists {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: var(--nb-spacing-4);
-
-    li {
-      display: flex;
-      justify-content: space-between;
-      gap: var(--nb-spacing-8);
-      font-size: var(--nb-type-body-sm-size);
-      line-height: var(--nb-type-body-sm-line-height);
-    }
-  }
-
-  &__list-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  &__count {
+  &__mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 32px;
+    block-size: 32px;
+    border-radius: var(--nb-radius-sm);
     font-family: var(--nb-font-family-mono);
-    font-variant-numeric: tabular-nums;
-    color: var(--nb-c-text-muted);
+    font-size: var(--nb-type-label-md-size);
+    font-weight: var(--nb-type-label-lg-weight, 600);
+    color: var(--nb-c-bg);
   }
 
-  &__more {
+  &__distribution {
+    display: grid;
+    gap: var(--nb-spacing-8);
+    align-content: end;
+    height: 100%;
+    padding-block-start: var(--nb-spacing-8);
+  }
+
+  &__bar {
+    display: flex;
+    gap: 2px;
+    block-size: 8px;
+  }
+
+  &__seg {
+    flex-basis: 0;
+    min-inline-size: 4px;
+    border-radius: 2px;
+  }
+
+  &__caption {
+    margin: 0;
+    font-size: var(--nb-type-label-sm-size);
     color: var(--nb-c-text-subtle);
   }
 

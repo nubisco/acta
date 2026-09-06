@@ -21,6 +21,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { chartColorFor } from '@/lib/colors'
 import { useWorkspace } from '@/stores/workspace'
 
 // A generic avatar belongs in @nubisco/ui eventually (no NbAvatar exists
@@ -58,11 +59,7 @@ const initials = computed(() => {
   return name.slice(0, 2).toUpperCase()
 })
 
-const color = computed(() => {
-  let hash = 0
-  for (const ch of props.handle) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
-  return `var(--nb-c-chart-${(hash % 8) + 1})`
-})
+const color = computed(() => chartColorFor(props.handle))
 </script>
 
 <style scoped lang="scss">
