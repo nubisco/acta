@@ -32,6 +32,7 @@ function page(
     updatedAt: null,
     authorName: null,
     createdAt: null,
+    comments: [],
   }
 }
 
@@ -43,9 +44,23 @@ describe('normalizePage', () => {
     expect(home.versionCount).toBe(3)
     expect(home.authorName).toBe('José Silva')
     expect(home.createdAt).toBe('2026-07-25T08:00:00.000Z')
+    expect(home.comments).toEqual([])
     const stagewright = pages.find((p) => p.id === '102')!
     expect(stagewright.parentId).toBe('101') // last ancestor
     expect(stagewright.wide).toBe(true)
+  })
+
+  it('carries page comments through, with string ids and defaults', () => {
+    const manual = fixturePages().find((p) => p.id === '101')!
+    expect(manual.comments).toHaveLength(2)
+    expect(manual.comments[0]).toEqual({
+      id: '5001',
+      body: '<p>Looks <strong>good</strong> to me.</p>',
+      author: 'Ivan Marjanovic',
+      createdAt: '2026-07-26T09:00:00.000Z',
+      inlineContext: null,
+    })
+    expect(manual.comments[1].inlineContext).toBe('Careful with permissions.')
   })
 
   it('accepts a simplified flat shape', () => {
@@ -143,5 +158,75 @@ describe('planConfluenceImport', () => {
     expect(() =>
       planConfluenceImport(fixturePages(), { root: 'Not A Slug' }),
     ).toThrow()
+  })
+
+  it('puts provenance on the create op and mirrors it in a set_meta op', () => {
+    const plan = planConfluenceImport(fixturePages(), {
+      sourceBase: 'https://nubisco.atlassian.net/wiki',
+    })
+    const home = plan.pages.find((p) => p.pageId === '100')!
+    const meta = {
+      source: 'confluence',
+      author: 'José Silva',
+      created_at: '2026-07-25T08:00:00.000Z',
+      updated_at: '2026-07-29T10:00:00.000Z',
+      versions: 3,
+      url: 'https://nubisco.atlassian.net/wiki/pages/viewpage.action?pageId=100',
+    }
+    expect(home.op.op === 'create' && home.op.imported_meta).toEqual(meta)
+    expect(home.metaOp).toEqual({
+      op: 'set_meta',
+      op_id: 'confluence:meta:100',
+      ref: 'nubisco-home',
+      imported_meta: meta,
+    })
+  })
+
+  it('omits the source url without --source-base', () => {
+    const plan = planConfluenceImport(fixturePages())
+    const home = plan.pages.find((p) => p.pageId === '100')!
+    expect(
+      home.op.op === 'create' && home.op.imported_meta?.url,
+    ).toBeUndefined()
+  })
+
+  it('plans page comments with quoted inline context and provenance', () => {
+    const plan = planConfluenceImport(fixturePages())
+    const manual = plan.pages.find((p) => p.pageId === '101')!
+    expect(manual.commentOps).toHaveLength(2)
+    expect(manual.commentOps[0]).toEqual({
+      op: 'comment',
+      op_id: 'confluence:comment:5001',
+      ref: 'nubisco-home/the-nubisco-manual',
+      body: 'Looks **good** to me.',
+      imported_meta: {
+        source: 'confluence',
+        author: 'Ivan Marjanovic',
+        created_at: '2026-07-26T09:00:00.000Z',
+      },
+    })
+    expect(
+      manual.commentOps[1].op === 'comment' && manual.commentOps[1].body,
+    ).toBe('> Careful with permissions.\n\nShould this move?')
+  })
+
+  it('skips comments that convert to an empty body, with a reason', () => {
+    const withEmpty = page('1', 'Alpha', '<p>a</p>')
+    withEmpty.comments = [
+      {
+        id: 'c1',
+        body: '<p></p>',
+        author: null,
+        createdAt: null,
+        inlineContext: null,
+      },
+    ]
+    const plan = planConfluenceImport([withEmpty])
+    expect(plan.pages[0].commentOps).toHaveLength(0)
+    expect(
+      plan.skips.some(
+        (s) => s.kind === 'comments' && s.reason.includes('empty'),
+      ),
+    ).toBe(true)
   })
 })

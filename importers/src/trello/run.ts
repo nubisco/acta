@@ -100,7 +100,7 @@ async function runBoardItems(
     }
   }
 
-  // Follow-ups: comments, complete flag, archive ---------------------------
+  // Follow-ups: comments, complete flag, archive, provenance ---------------
   const followUps: TItemOp[] = []
   for (const item of board.items) {
     const key = keyByCard.get(item.cardId)
@@ -111,6 +111,7 @@ async function runBoardItems(
         op_id: comment.opId,
         key,
         body: comment.body,
+        imported_meta: comment.meta,
       })
     if (item.complete)
       followUps.push({
@@ -124,17 +125,39 @@ async function runBoardItems(
         op_id: `trello:${item.cardId}:archive`,
         key,
       })
+    // set_meta on every item, so items whose create op merely replayed (an
+    // earlier import without provenance) get enriched too.
+    followUps.push({
+      op: 'set_meta',
+      op_id: `trello:meta:${item.cardId}`,
+      key,
+      imported_meta: item.meta,
+    })
   }
   const followUpResults = opts.dryRun
     ? new Map<string, TOpResult>()
     : resultsById(await client.writeItems(followUps))
 
+  section.source('metas', board.items.length)
   for (const item of board.items) {
     const kind = item.archive ? 'items_archived' : 'items_open'
     const key = keyByCard.get(item.cardId)
     if (!key) {
       section.failed(kind, item.cardId, 'item create failed')
+      section.skipped('metas', item.cardId, 'item was not created')
       continue
+    }
+    if (opts.dryRun) {
+      section.created('metas')
+    } else {
+      const meta = followUpResults.get(`trello:meta:${item.cardId}`)
+      if (meta?.ok) section.created('metas')
+      else
+        section.failed(
+          'metas',
+          item.cardId,
+          meta && !meta.ok ? meta.error : 'no result',
+        )
     }
     let itemOk = true
     if (!opts.dryRun && item.archive) {
@@ -319,5 +342,125 @@ export async function runTrelloImport(
   }
   for (const board of plan.boards) {
     await runBoardItems(board, client, report, opts)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// --fix-comments: retrofit provenance onto previously imported comments
+// ---------------------------------------------------------------------------
+
+const IMPORTED_COMMENT_RE =
+  /^\*\*\[imported\]\*\* ([\s\S]+?) · (\S+):\n\n([\s\S]*)$/
+
+export interface IParsedImportedComment {
+  author: string
+  date: string
+  rest: string
+}
+
+/** Parses the `**[imported]** {author} · {date}:\n\n{rest}` body prefix. */
+export function parseImportedComment(
+  body: string,
+): IParsedImportedComment | null {
+  const match = IMPORTED_COMMENT_RE.exec(body)
+  if (!match) return null
+  return { author: match[1], date: match[2], rest: match[3] }
+}
+
+/**
+ * Rewrites comments that still carry the `**[imported]** ...` body prefix
+ * from the pre-provenance import: the prefix moves into imported_meta and the
+ * body shrinks to the original text. Comments already carrying imported
+ * metadata are skipped, so re-runs converge.
+ */
+export async function runTrelloFixComments(
+  plan: ITrelloPlan,
+  client: ActaClient,
+  report: ImportReport,
+  opts: { dryRun: boolean },
+): Promise<void> {
+  for (const board of plan.boards) {
+    const withComments = board.items.filter((i) => i.comments.length > 0)
+    if (withComments.length === 0) continue
+    const section = report.section(`fix comments ${board.key} (${board.name})`)
+    if (opts.dryRun) {
+      const n = withComments.reduce((sum, i) => sum + i.comments.length, 0)
+      section.note(
+        `dry-run: would examine ${n} imported comment(s) on ${withComments.length} item(s)`,
+      )
+      continue
+    }
+
+    // Replaying each create op is the sanctioned way to resolve a card id to
+    // its Acta key (op_id dedupe returns the original result).
+    const createResults = resultsById(
+      await client.writeItems(withComments.map((i) => i.create)),
+    )
+    const keyByCard = new Map<string, string>()
+    for (const item of withComments) {
+      const result = createResults.get(item.create.op_id)
+      if (result?.ok && result.key) {
+        keyByCard.set(item.cardId, result.key)
+      } else {
+        section.source('comments', item.comments.length)
+        section.skipped(
+          'comments',
+          item.cardId,
+          'item was not created',
+          item.comments.length,
+        )
+      }
+    }
+
+    const commentsByKey = await client.itemComments([...keyByCard.values()])
+    const updates: TItemOp[] = []
+    for (const key of keyByCard.values()) {
+      for (const comment of commentsByKey.get(key) ?? []) {
+        if (comment.imported) {
+          section.source('comments')
+          section.skipped(
+            'comments',
+            comment.id,
+            'already carries imported metadata',
+          )
+          continue
+        }
+        const parsed = parseImportedComment(comment.body)
+        if (!parsed) continue // not an imported comment; leave untouched
+        section.source('comments')
+        if (parsed.rest.length === 0) {
+          section.skipped(
+            'comments',
+            comment.id,
+            'imported comment is empty after the prefix',
+          )
+          continue
+        }
+        updates.push({
+          op: 'comment_update',
+          op_id: `trello:fixcmt:${comment.id}`,
+          key,
+          comment_id: comment.id,
+          body: parsed.rest,
+          imported_meta: {
+            source: 'trello',
+            author: parsed.author,
+            created_at: parsed.date,
+          },
+        })
+      }
+    }
+
+    const results = resultsById(await client.writeItems(updates))
+    for (const update of updates) {
+      const result = results.get(update.op_id)
+      if (result?.ok) section.created('comments')
+      else
+        section.failed(
+          'comments',
+          update.op_id,
+          result && !result.ok ? result.error : 'no result',
+        )
+    }
   }
 }

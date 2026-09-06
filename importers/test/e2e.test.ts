@@ -19,7 +19,10 @@ import { planConfluenceImport } from '../src/confluence/plan'
 import { runConfluenceImport } from '../src/confluence/run'
 import { zTrelloBoard } from '../src/trello/model'
 import { planTrelloImport, type ITrelloPlanOptions } from '../src/trello/plan'
-import { runTrelloImport } from '../src/trello/run'
+import {
+  runTrelloFixComments,
+  runTrelloImport,
+} from '../src/trello/run'
 
 let db: BunSqliteDriver
 let app: Awaited<ReturnType<typeof createApp>>
@@ -151,7 +154,8 @@ describe('trello import end to end', () => {
     const epicKey = mapping['trello:68851e80000000000000c003'].key
     const epic = (await itemGet(ctx, { keys: [epicKey] })).items[0] as {
       checklists?: { name: string; items: { text: string; done: boolean }[] }[]
-      comments?: { body: string }[]
+      comments?: { body: string; imported?: Record<string, unknown> }[]
+      imported?: Record<string, unknown>
     }
     expect(epic.checklists!.map((c) => c.name)).toEqual(['Phase 0', 'Phase 1'])
     expect(epic.checklists![1].items).toEqual([
@@ -162,6 +166,14 @@ describe('trello import end to end', () => {
     expect(epic.comments![0].body).toStartWith(
       '**[imported]** Ivan Marjanovic · 2026-08-28T09:00:00.000Z:',
     )
+    expect(epic.comments![0].imported).toEqual({
+      source: 'trello',
+      author: 'Ivan Marjanovic',
+      created_at: '2026-08-28T09:00:00.000Z',
+    })
+    // Item provenance from the create op (and re-sent as set_meta).
+    expect(epic.imported?.source).toBe('trello')
+    expect(epic.imported?.url).toStartWith('https://trello.com/c/')
 
     const crashKey = mapping['trello:68851e80000000000000c002'].key
     const crash = (await itemGet(ctx, { keys: [crashKey] })).items[0] as {
@@ -242,6 +254,66 @@ describe('trello import end to end', () => {
     expect(await count('label')).toBe(before.labels)
   })
 
+  it('fix-comments moves the body prefix into provenance and converges', async () => {
+    const imported = await importTrello()
+    const mapping = imported.mappings as Record<string, { key: string }>
+    const epicKey = mapping['trello:68851e80000000000000c003'].key
+
+    // Simulate a comment left by the pre-provenance importer: prefixed body,
+    // no imported_meta.
+    await client.writeItems([
+      {
+        op: 'comment',
+        op_id: 'legacy:comment:1',
+        key: epicKey,
+        body: '**[imported]** Ada · 2026-01-01T00:00:00.000Z:\n\nOld text',
+      },
+    ])
+
+    const plan = planTrelloImport(
+      [
+        { board: fixtureBoard('trello-stagewright.json'), forcedKey: 'SW' },
+        { board: fixtureBoard('trello-labs.json'), forcedKey: 'LABS' },
+      ],
+      await trelloOpts(),
+    )
+    const report = new ImportReport('trello-fix-comments', false)
+    await runTrelloFixComments(plan, client, report, { dryRun: false })
+    if (!report.ok()) report.print()
+    expect(report.ok()).toBe(true)
+
+    const comments = (await client.itemComments([epicKey])).get(epicKey)!
+    const fixed = comments.find((c) => c.body === 'Old text')!
+    expect(fixed.imported).toEqual({
+      source: 'trello',
+      author: 'Ada',
+      created_at: '2026-01-01T00:00:00.000Z',
+    })
+    // Comments imported with provenance already are left untouched.
+    const section = report.sections.find((s) =>
+      s.name.startsWith('fix comments SW'),
+    )!
+    expect(section.counts.comments).toEqual({
+      source: 3,
+      created: 1,
+      skipped: 2,
+      failed: 0,
+    })
+
+    // Second run: everything now carries provenance, nothing to rewrite.
+    const second = new ImportReport('trello-fix-comments', false)
+    await runTrelloFixComments(plan, client, second, { dryRun: false })
+    expect(second.ok()).toBe(true)
+    const secondSection = second.sections.find((s) =>
+      s.name.startsWith('fix comments SW'),
+    )!
+    expect(secondSection.counts.comments.created).toBe(0)
+    expect(secondSection.counts.comments.skipped).toBe(3)
+    expect(
+      (await client.itemComments([epicKey])).get(epicKey),
+    ).toHaveLength(3)
+  })
+
   it('dry-run performs no writes', async () => {
     const throwingClient = new ActaClient({
       baseUrl: 'http://acta.test',
@@ -279,17 +351,38 @@ describe('confluence import end to end', () => {
     const home = (await docGet(ctx, 'manual')) as {
       title: string
       body: string
+      imported?: Record<string, unknown>
     }
     expect(home.title).toBe('Nubisco Home')
     expect(home.body).toContain('> [!INFO] Read me')
     expect(home.body).toContain('[[doc:manual/the-nubisco-manual]]')
+    expect(home.imported).toEqual({
+      source: 'confluence',
+      author: 'José Silva',
+      created_at: '2026-07-25T08:00:00.000Z',
+      updated_at: '2026-07-29T10:00:00.000Z',
+      versions: 3,
+    })
 
-    const manual = (await docGet(ctx, 'manual/the-nubisco-manual')) as {
+    const manual = (await docGet(ctx, 'manual/the-nubisco-manual', {
+      include: ['comments'],
+    })) as {
       body: string
+      comments?: { body: string; imported?: Record<string, unknown> }[]
     }
     expect(manual.body).toContain(':::details Details inside')
     expect(manual.body).toContain('| Role | Owner |')
     expect(manual.body).toContain('- One\n  - Nested')
+    expect(manual.comments).toHaveLength(2)
+    expect(manual.comments![0].body).toBe('Looks **good** to me.')
+    expect(manual.comments![0].imported).toEqual({
+      source: 'confluence',
+      author: 'Ivan Marjanovic',
+      created_at: '2026-07-26T09:00:00.000Z',
+    })
+    expect(manual.comments![1].body).toBe(
+      '> Careful with permissions.\n\nShould this move?',
+    )
 
     const product = (await docGet(
       ctx,
@@ -332,6 +425,12 @@ describe('confluence import end to end', () => {
       (await db.query<{ n: number }>('SELECT COUNT(*) AS n FROM document'))[0]
         .n,
     ).toBe(3)
+    expect(
+      (
+        await db.query<{ n: number }>('SELECT COUNT(*) AS n FROM doc_comment')
+      )[0].n,
+    ).toBe(2)
+    // set_meta does not bump the rev either.
     const revs = await db.query<{ rev: number }>('SELECT rev FROM document')
     expect(revs.every((r) => r.rev === 1)).toBe(true)
   })

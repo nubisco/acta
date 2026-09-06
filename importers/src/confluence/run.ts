@@ -1,12 +1,13 @@
 /**
  * Applies a Confluence plan against a running Acta server: stub docs first,
- * then pages in parents-before-children order, then a tree-fidelity check
- * (every imported page must sit at its expected depth).
+ * then pages in parents-before-children order, then provenance set_meta ops
+ * and page comments, then a tree-fidelity check (every imported page must sit
+ * at its expected depth).
  */
 
 import type { ActaClient } from '../lib/client'
 import type { ImportReport } from '../lib/report'
-import type { IConfluencePlan } from './plan'
+import type { IConfluencePagePlan, IConfluencePlan } from './plan'
 
 export function printConfluencePlan(plan: IConfluencePlan): void {
   console.log('\n== plan ==')
@@ -72,6 +73,24 @@ export async function runConfluenceImport(
         ]),
       )
 
+  // Provenance and comments follow the creates. set_meta runs for every page
+  // whose create came back ok, and an op_id replay is ok too: that is what
+  // enriches pages already present from the earlier lossy import.
+  const pageOk = (page: IConfluencePagePlan): boolean =>
+    opts.dryRun || results.get(page.op.op_id)?.ok === true
+  const followUps = plan.pages
+    .filter(pageOk)
+    .flatMap((page) => [page.metaOp, ...page.commentOps])
+  const followUpResults =
+    opts.dryRun || followUps.length === 0
+      ? new Map<string, { ok: boolean; error?: string }>()
+      : new Map(
+          (await client.writeDocs(followUps)).map((r) => [
+            r.op_id,
+            r.ok ? { ok: true } : { ok: false, error: r.error },
+          ]),
+        )
+
   for (const [space, pages] of bySpace) {
     const section = report.section(`space ${space}`)
     section.source('pages', pages.length)
@@ -88,6 +107,33 @@ export async function runConfluenceImport(
             `slug ${page.slug} already exists on the server`,
           )
         else section.failed('pages', page.pageId, result?.error ?? 'no result')
+      }
+
+      section.source('metas', 1)
+      if (opts.dryRun) {
+        section.created('metas')
+      } else if (!pageOk(page)) {
+        section.skipped('metas', page.pageId, 'page was not created')
+      } else {
+        const meta = followUpResults.get(page.metaOp.op_id)
+        if (meta?.ok) section.created('metas')
+        else section.failed('metas', page.pageId, meta?.error ?? 'no result')
+      }
+
+      if (page.commentOps.length > 0) {
+        section.source('comments', page.commentOps.length)
+        for (const op of page.commentOps) {
+          if (opts.dryRun) {
+            section.created('comments')
+          } else if (!pageOk(page)) {
+            section.skipped('comments', op.op_id, 'page was not created')
+          } else {
+            const result = followUpResults.get(op.op_id)
+            if (result?.ok) section.created('comments')
+            else
+              section.failed('comments', op.op_id, result?.error ?? 'no result')
+          }
+        }
       }
 
       for (const macro of page.issues.unknownMacros)

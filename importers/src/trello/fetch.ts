@@ -4,7 +4,7 @@
  * same JSON shape, and downloads file attachments when credentials allow.
  */
 
-const TRELLO_API = 'https://api.trello.com/1'
+export const TRELLO_API = 'https://api.trello.com/1'
 
 export interface ITrelloCreds {
   key: string

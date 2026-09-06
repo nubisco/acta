@@ -6,7 +6,12 @@
  */
 
 import { BOARD_KEY_RE, slugify } from '@nubisco/acta-shared'
-import type { TBoardOp, TItemOp, TLabelOp } from '@nubisco/acta-shared'
+import type {
+  TBoardOp,
+  TImportedMeta,
+  TItemOp,
+  TLabelOp,
+} from '@nubisco/acta-shared'
 import type { ISkipEntry } from '../lib/report'
 import type {
   TTrelloAction,
@@ -110,6 +115,7 @@ export interface IPlannedAttachment {
 export interface IPlannedComment {
   opId: string
   body: string
+  meta: TImportedMeta
 }
 
 export interface IPlannedItem {
@@ -118,6 +124,9 @@ export interface IPlannedItem {
   createdAt: string | null
   listName: string
   create: TItemCreate
+  /** Same provenance as the create op, re-sent by run as set_meta so items
+   *  that already exist from an earlier import get enriched too. */
+  meta: TImportedMeta
   comments: IPlannedComment[]
   complete: boolean
   archive: boolean
@@ -393,6 +402,11 @@ export function planTrelloImport(
         return {
           opId: `trello:${card.id}:comment:${action.id}`,
           body: truncate(body, COMMENT_MAX, notes, `comment on ${card.id}`),
+          meta: {
+            source: 'trello',
+            author,
+            created_at: action.date || undefined,
+          },
         }
       })
       const knownComments = Math.max(card.badges?.comments ?? 0, actions.length)
@@ -430,6 +444,12 @@ export function planTrelloImport(
       const archive = card.closed || (doneAsArchived && role === 'done')
       counts[archive ? 'items_archived' : 'items_open'] += 1
 
+      const meta: TImportedMeta = {
+        source: 'trello',
+        url: card.shortLink
+          ? `https://trello.com/c/${card.shortLink}`
+          : undefined,
+      }
       items.push({
         cardId: card.id,
         shortLink: card.shortLink,
@@ -448,7 +468,9 @@ export function planTrelloImport(
           assignees: assignees.length > 0 ? assignees : undefined,
           due: Number.isFinite(due) ? due : undefined,
           checklists: checklists.length > 0 ? checklists : undefined,
+          imported_meta: meta,
         },
+        meta,
         comments,
         complete: card.dueComplete,
         archive,

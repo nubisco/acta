@@ -111,6 +111,38 @@ describe('storageToMarkdown: macros', () => {
     ).toBe('```ts\nconst a = 1 < 2\n```')
   })
 
+  it('maps panel divs to callouts by data-panel-type', () => {
+    expect(md('<div data-type="panel" data-panel-type="info"><p>I.</p></div>')).toBe(
+      '> [!INFO]\n> I.',
+    )
+    expect(md('<div data-type="panel" data-panel-type="tip"><p>T.</p></div>')).toBe(
+      '> [!TIP]\n> T.',
+    )
+    expect(
+      md('<div data-type="panel" data-panel-type="success"><p>S.</p></div>'),
+    ).toBe('> [!TIP]\n> S.')
+    expect(md('<div data-type="panel" data-panel-type="note"><p>N.</p></div>')).toBe(
+      '> [!NOTE]\n> N.',
+    )
+    expect(
+      md('<div data-type="panel" data-panel-type="warning"><p>W.</p></div>'),
+    ).toBe('> [!WARNING]\n> W.')
+    expect(
+      md('<div data-type="panel" data-panel-type="error"><p>E.</p></div>'),
+    ).toBe('> [!WARNING]\n> E.')
+  })
+
+  it('defaults custom or untyped panel divs to NOTE', () => {
+    expect(
+      md('<div data-type="panel-custom" data-panel-type="x"><p>C.</p></div>'),
+    ).toBe('> [!NOTE]\n> C.')
+    expect(md('<div data-type="panel"><p>P.</p></div>')).toBe('> [!NOTE]\n> P.')
+  })
+
+  it('keeps non-panel divs as flat containers', () => {
+    expect(md('<div class="wrap"><p>a</p><p>b</p></div>')).toBe('a\n\nb')
+  })
+
   it('preserves unknown macros as NOTE callouts and reports them', () => {
     const result = storageToMarkdown(
       '<ac:structured-macro ac:name="jira"><ac:rich-text-body><p>PROJ-1</p></ac:rich-text-body></ac:structured-macro>',

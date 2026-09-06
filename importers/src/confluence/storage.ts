@@ -265,7 +265,23 @@ class Renderer {
       case 'ac:structured-macro':
       case 'ac:macro':
         return this.macro(el)
-      case 'div':
+      case 'div': {
+        // ADF panels serialize as <div data-type="panel..."> in exported
+        // HTML; map them to callouts. Every other div stays a flat container.
+        if ((el.attrs['data-type'] ?? '').startsWith('panel')) {
+          const type =
+            {
+              info: 'INFO',
+              tip: 'TIP',
+              success: 'TIP',
+              note: 'NOTE',
+              warning: 'WARNING',
+              error: 'WARNING',
+            }[el.attrs['data-panel-type'] ?? ''] ?? 'NOTE'
+          return [callout(type, '', this.render(el.children))]
+        }
+        return this.blocks(el.children)
+      }
       case 'ac:layout':
       case 'ac:layout-section':
       case 'ac:layout-cell':

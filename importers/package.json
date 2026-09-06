@@ -9,6 +9,7 @@
     "test": "bun test",
     "types:check": "tsc -p tsconfig.json",
     "trello-import": "bun src/trello-import.ts",
+    "trello-enrich": "bun src/trello-enrich.ts",
     "confluence-import": "bun src/confluence-import.ts"
   },
   "dependencies": {

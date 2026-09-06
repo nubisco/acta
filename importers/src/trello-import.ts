@@ -5,12 +5,15 @@
  *   bun src/trello-import.ts --files board1.json board2.json \
  *     --map member-map.json [--dry-run] [--done-as-archived [SW,LABS]] \
  *     [--key SW=board1.json ...] [--fetch <boardIdOrShortLink> ...] \
- *     [--out import-report.json]
+ *     [--fix-comments] [--out import-report.json]
  *
  * Reads local Trello board-export JSON files (or fetches boards live when
  * TRELLO_KEY/TRELLO_TOKEN are set and --fetch is used) and writes to a
  * running Acta server (ACTA_URL, ACTA_TOKEN) through the batch endpoints.
  * --dry-run prints the full plan and reconciliation without writing.
+ * --fix-comments imports nothing new: it rewrites comments imported before
+ * provenance existed, moving the `**[imported]** ...` body prefix into
+ * imported_meta.
  */
 
 import { readFileSync } from 'node:fs'
@@ -25,7 +28,11 @@ import {
 } from './trello/fetch'
 import { zTrelloBoard } from './trello/model'
 import { planTrelloImport, type ITrelloPlanInput } from './trello/plan'
-import { printTrelloPlan, runTrelloImport } from './trello/run'
+import {
+  printTrelloPlan,
+  runTrelloFixComments,
+  runTrelloImport,
+} from './trello/run'
 
 const SEEDED_TAXONOMY = [
   'bug',
@@ -41,17 +48,26 @@ function usage(): void {
   console.error(
     'usage: bun src/trello-import.ts --files <board.json ...> [--map member-map.json]\n' +
       '         [--dry-run] [--done-as-archived [KEYS]] [--key KEY=board.json ...]\n' +
-      '         [--fetch <boardIdOrShortLink> ...] [--out import-report.json]\n' +
+      '         [--fetch <boardIdOrShortLink> ...] [--fix-comments]\n' +
+      '         [--out import-report.json]\n' +
       'env: ACTA_URL, ACTA_TOKEN, TRELLO_KEY, TRELLO_TOKEN',
   )
 }
 
-interface IKeyAssignment {
+export interface IKeyAssignment {
   key: string
   match: string
 }
 
-function forcedKeyFor(
+export function parseKeyAssignments(values: string[]): IKeyAssignment[] {
+  return values.map((v) => {
+    const idx = v.indexOf('=')
+    if (idx === -1) throw new Error(`--key expects KEY=path, got ${v}`)
+    return { key: v.slice(0, idx), match: v.slice(idx + 1) }
+  })
+}
+
+export function forcedKeyFor(
   assignments: IKeyAssignment[],
   candidates: string[],
 ): string | undefined {
@@ -71,12 +87,9 @@ export async function main(argv: string[]): Promise<number> {
     return 2
   }
   const dryRun = hasFlag(args, 'dry-run')
+  const fixComments = hasFlag(args, 'fix-comments')
   const outPath = flagValue(args, 'out') ?? 'import-report.json'
-  const keyAssignments: IKeyAssignment[] = flagValues(args, 'key').map((v) => {
-    const idx = v.indexOf('=')
-    if (idx === -1) throw new Error(`--key expects KEY=path, got ${v}`)
-    return { key: v.slice(0, idx), match: v.slice(idx + 1) }
-  })
+  const keyAssignments = parseKeyAssignments(flagValues(args, 'key'))
   const doneValues = flagValues(args, 'done-as-archived').flatMap((v) =>
     v.split(',').filter(Boolean),
   )
@@ -95,7 +108,10 @@ export async function main(argv: string[]): Promise<number> {
 
   const creds = trelloCredsFromEnv()
   const client = new ActaClient()
-  const report = new ImportReport('trello-import', dryRun)
+  const report = new ImportReport(
+    fixComments ? 'trello-fix-comments' : 'trello-import',
+    dryRun,
+  )
 
   // Workspace context: reuse seeded/existing labels by name, avoid board key
   // collisions, validate mapped member handles.
@@ -155,13 +171,17 @@ export async function main(argv: string[]): Promise<number> {
     doneAsArchived,
   })
 
-  if (dryRun) printTrelloPlan(plan)
-  await runTrelloImport(plan, client, report, {
-    dryRun,
-    downloadAttachment: creds
-      ? (att) => downloadTrelloAttachment(att.url, creds)
-      : undefined,
-  })
+  if (fixComments) {
+    await runTrelloFixComments(plan, client, report, { dryRun })
+  } else {
+    if (dryRun) printTrelloPlan(plan)
+    await runTrelloImport(plan, client, report, {
+      dryRun,
+      downloadAttachment: creds
+        ? (att) => downloadTrelloAttachment(att.url, creds)
+        : undefined,
+    })
+  }
 
   report.print()
   report.write(outPath)

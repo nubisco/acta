@@ -229,6 +229,22 @@ describe('planTrelloImport', () => {
     ])
   })
 
+  it('carries trello provenance on the create op and the planned item', () => {
+    const plan = planTrelloImport(
+      [{ board: fixture('trello-stagewright.json') }],
+      baseOpts(),
+    )
+    const crash = plan.boards[0].items.find(
+      (i) => i.create.title === '[SW] Fix crash on load',
+    )!
+    expect(crash.create.imported_meta).toEqual({
+      source: 'trello',
+      url: `https://trello.com/c/${crash.shortLink}`,
+    })
+    // run re-sends the same object as set_meta.
+    expect(crash.meta).toEqual(crash.create.imported_meta!)
+  })
+
   it('imports comments with the provenance prefix, sorted by date', () => {
     const plan = planTrelloImport(
       [{ board: fixture('trello-stagewright.json') }],
@@ -244,6 +260,11 @@ describe('planTrelloImport', () => {
     expect(epic.comments[0].opId).toBe(
       'trello:68851e80000000000000c003:comment:687f2a800000000000000t01',
     )
+    expect(epic.comments[0].meta).toEqual({
+      source: 'trello',
+      author: 'Ivan Marjanovic',
+      created_at: '2026-08-28T09:00:00.000Z',
+    })
     // badges said 3 comments; only 2 were in the export actions.
     const skip = plan.boards[0].skips.find((s) => s.kind === 'comments')
     expect(skip?.n).toBe(1)

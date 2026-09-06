@@ -4,7 +4,7 @@
  * Usage:
  *   bun src/confluence-import.ts --dir pages/ [--dry-run] [--root manual]
  *     [--trello-map map.json] [--include-personal] [--fetch SPACEKEY ...]
- *     [--out import-report.json]
+ *     [--source-base https://x.atlassian.net/wiki] [--out import-report.json]
  *
  * --dir accepts a directory of page JSON files or a single JSON file; each
  * file holds one page, an array of pages, or a Confluence REST response
@@ -34,7 +34,8 @@ function usage(): void {
   console.error(
     'usage: bun src/confluence-import.ts --dir <pages-dir-or-file.json>\n' +
       '         [--dry-run] [--root manual] [--trello-map map.json]\n' +
-      '         [--include-personal] [--fetch SPACEKEY ...] [--out import-report.json]\n' +
+      '         [--include-personal] [--fetch SPACEKEY ...]\n' +
+      '         [--source-base https://x.atlassian.net/wiki] [--out import-report.json]\n' +
       'env: ACTA_URL, ACTA_TOKEN, CONFLUENCE_BASE, CONFLUENCE_EMAIL, CONFLUENCE_API_TOKEN',
   )
 }
@@ -117,6 +118,7 @@ export async function main(argv: string[]): Promise<number> {
     trelloBoards,
     existingSlugs,
     includePersonal: hasFlag(args, 'include-personal'),
+    sourceBase: flagValue(args, 'source-base'),
   })
 
   if (dryRun) printConfluencePlan(plan)

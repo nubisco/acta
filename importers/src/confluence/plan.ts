@@ -2,11 +2,12 @@
  * Pure Confluence-pages → doc-write plan converter (mvp F12). Builds the doc
  * tree with parents before children, slugs from the slugified title path, and
  * converts every storage body to enhanced Markdown. Original author/date and
- * version counts land in the report (the API has no imported-metadata field).
+ * version counts land in imported_meta on each page (create + set_meta, so
+ * pages from the earlier lossy import get enriched too) and in the report.
  */
 
 import { DOC_SLUG_RE, slugify } from '@nubisco/acta-shared'
-import type { TDocOp } from '@nubisco/acta-shared'
+import type { TDocOp, TImportedMeta } from '@nubisco/acta-shared'
 import type { ISkipEntry } from '../lib/report'
 import type { IConfluencePage } from './model'
 import { storageToMarkdown, type IConversionIssues } from './storage'
@@ -26,6 +27,8 @@ export interface IConfluencePlanOptions {
   existingSlugs?: Set<string>
   /** Personal spaces (key starting with ~) are skipped unless set. */
   includePersonal?: boolean
+  /** Confluence base (e.g. https://x.atlassian.net/wiki) for source urls. */
+  sourceBase?: string
 }
 
 export interface IConfluencePagePlan {
@@ -36,6 +39,9 @@ export interface IConfluencePagePlan {
   depth: number
   spaceKey: string | null
   op: TDocOp
+  /** set_meta with the same provenance; enriches pre-existing pages. */
+  metaOp: TDocOp
+  commentOps: TDocOp[]
   issues: IConversionIssues
   authorName: string | null
   createdAt: string | null
@@ -177,12 +183,60 @@ export function planConfluenceImport(
       )
   }
 
+  const convertOpts = {
+    resolvePage: (title: string) => slugByTitle.get(title.toLowerCase()) ?? null,
+    trelloBoards: opts.trelloBoards ?? DEFAULT_TRELLO_BOARD_MAP,
+  }
+
   const planned: IConfluencePagePlan[] = ordered.map((page) => {
     const slug = slugById.get(page.id)!
-    const { markdown, issues } = storageToMarkdown(page.storage, {
-      resolvePage: (title) => slugByTitle.get(title.toLowerCase()) ?? null,
-      trelloBoards: opts.trelloBoards ?? DEFAULT_TRELLO_BOARD_MAP,
-    })
+    const { markdown, issues } = storageToMarkdown(page.storage, convertOpts)
+    const meta: TImportedMeta = {
+      source: 'confluence',
+      author: page.authorName ?? undefined,
+      created_at: page.createdAt ?? undefined,
+      updated_at: page.updatedAt ?? undefined,
+      versions: page.versionCount ?? undefined,
+      url: opts.sourceBase
+        ? `${opts.sourceBase}/pages/viewpage.action?pageId=${page.id}`
+        : undefined,
+    }
+    const commentOps: TDocOp[] = []
+    for (const comment of page.comments) {
+      // Comment conversion issues land in the page's issue lists.
+      const converted = storageToMarkdown(comment.body, convertOpts)
+      issues.unknownMacros.push(...converted.issues.unknownMacros)
+      issues.unresolvedLinks.push(...converted.issues.unresolvedLinks)
+      issues.skippedAttachments.push(...converted.issues.skippedAttachments)
+      const quoted = comment.inlineContext
+        ? comment.inlineContext
+            .split('\n')
+            .map((line) => `> ${line}`)
+            .join('\n')
+        : ''
+      const body = quoted
+        ? `${quoted}\n\n${converted.markdown}`
+        : converted.markdown
+      if (body.trim().length === 0) {
+        skips.push({
+          kind: 'comments',
+          id: comment.id,
+          reason: `comment on page ${page.id} empty after conversion`,
+        })
+        continue
+      }
+      commentOps.push({
+        op: 'comment',
+        op_id: `confluence:comment:${comment.id}`,
+        ref: slug,
+        body,
+        imported_meta: {
+          source: 'confluence',
+          author: comment.author ?? undefined,
+          created_at: comment.createdAt ?? undefined,
+        },
+      })
+    }
     return {
       pageId: page.id,
       title: page.title,
@@ -199,7 +253,15 @@ export function planConfluenceImport(
         body: markdown,
         layout: page.wide ? 'wide' : 'default',
         tags: [],
+        imported_meta: meta,
       },
+      metaOp: {
+        op: 'set_meta',
+        op_id: `confluence:meta:${page.id}`,
+        ref: slug,
+        imported_meta: meta,
+      },
+      commentOps,
       issues,
       authorName: page.authorName,
       createdAt: page.createdAt,

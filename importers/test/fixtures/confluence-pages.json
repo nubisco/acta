@@ -28,7 +28,22 @@
         "value": "<h2>Chapters</h2><ul><li>One<ul><li>Nested</li></ul></li><li>Two</li></ul><ac:structured-macro ac:name=\"note\"><ac:rich-text-body><p>Careful with permissions.</p><ac:structured-macro ac:name=\"expand\"><ac:parameter ac:name=\"title\">Details inside</ac:parameter><ac:rich-text-body><p>Hidden text.</p></ac:rich-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro><table><tbody><tr><th>Role</th><th>Owner</th></tr><tr><td>CEO</td><td>Jos&#233;</td></tr></tbody></table>"
       }
     },
-    "version": { "number": 1 }
+    "version": { "number": 1 },
+    "comments": [
+      {
+        "id": 5001,
+        "body": "<p>Looks <strong>good</strong> to me.</p>",
+        "author": "Ivan Marjanovic",
+        "created_at": "2026-07-26T09:00:00.000Z"
+      },
+      {
+        "id": "5002",
+        "body": "<p>Should this move?</p>",
+        "author": "José Silva",
+        "created_at": "2026-07-27T10:00:00.000Z",
+        "inline_context": "Careful with permissions."
+      }
+    ]
   },
   {
     "id": "102",

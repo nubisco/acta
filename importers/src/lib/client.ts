@@ -70,6 +70,15 @@ export interface IItemAttachment {
   url: string | null
 }
 
+export interface IItemComment {
+  id: string
+  by: string
+  agent?: boolean
+  ts: number
+  body: string
+  imported?: Record<string, unknown>
+}
+
 export interface IAttachmentInput {
   item?: string
   doc?: string
@@ -188,6 +197,19 @@ export class ActaClient {
     return (await this.request('POST', '/api/v1/attachments', input)) as {
       id: string
     }
+  }
+
+  /** Read comments of existing items (with any stored imported provenance). */
+  async itemComments(keys: string[]): Promise<Map<string, IItemComment[]>> {
+    const out = new Map<string, IItemComment[]>()
+    for (let i = 0; i < keys.length; i += 50) {
+      const res = (await this.request('POST', '/api/v1/items/get', {
+        keys: keys.slice(i, i + 50),
+        include: ['comments'],
+      })) as { items: { key: string; comments?: IItemComment[] }[] }
+      for (const item of res.items) out.set(item.key, item.comments ?? [])
+    }
+    return out
   }
 
   /** Read attachments of existing items (attachment adds have no op_id). */

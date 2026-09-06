@@ -8,6 +8,16 @@ import { z } from 'zod'
 
 const zId = z.union([z.string(), z.number()]).transform(String)
 
+const zConfluenceCommentRaw = z.object({
+  id: zId,
+  /** Comment body in storage (XHTML) format. */
+  body: z.string(),
+  author: z.string().nullish(),
+  created_at: z.string().nullish(),
+  /** The highlighted text an inline comment anchors to. */
+  inline_context: z.string().nullish(),
+})
+
 export const zConfluencePageRaw = z.object({
   id: zId,
   title: z.string().min(1),
@@ -36,7 +46,16 @@ export const zConfluencePageRaw = z.object({
       createdDate: z.string().nullish(),
     })
     .nullish(),
+  comments: z.array(zConfluenceCommentRaw).nullish(),
 })
+
+export interface IConfluenceComment {
+  id: string
+  body: string
+  author: string | null
+  createdAt: string | null
+  inlineContext: string | null
+}
 
 export interface IConfluencePage {
   id: string
@@ -49,6 +68,7 @@ export interface IConfluencePage {
   updatedAt: string | null
   authorName: string | null
   createdAt: string | null
+  comments: IConfluenceComment[]
 }
 
 function metadataWide(metadata: unknown): boolean {
@@ -93,5 +113,12 @@ export function normalizePage(raw: unknown): IConfluencePage {
       page.history?.createdBy?.displayName ??
       null,
     createdAt: page.history?.createdDate ?? null,
+    comments: (page.comments ?? []).map((comment) => ({
+      id: comment.id,
+      body: comment.body,
+      author: comment.author ?? null,
+      createdAt: comment.created_at ?? null,
+      inlineContext: comment.inline_context ?? null,
+    })),
   }
 }
