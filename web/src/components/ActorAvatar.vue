@@ -1,8 +1,19 @@
 <template>
   <span
-    v-nb-tooltip="{ body: displayName, aria: 'label' }"
+    v-nb-tooltip="{
+      header: displayName,
+      body: `@${props.handle}`,
+      tip: kindLabel,
+      aria: 'label',
+      focusable: true,
+    }"
     class="avatar"
-    :style="{ background: color }"
+    :style="{
+      background: color,
+      inlineSize: `${size}px`,
+      blockSize: `${size}px`,
+      fontSize: `${Math.round(size * 0.45)}px`,
+    }"
   >
     {{ initials }}
   </span>
@@ -14,8 +25,10 @@ import { useWorkspace } from '@/stores/workspace'
 
 // A generic avatar belongs in @nubisco/ui eventually (no NbAvatar exists
 // yet); this is the minimal domain stand-in: initials on a deterministic
-// chart-token color, named for assistive tech via the tooltip directive.
-const props = defineProps<{ handle: string }>()
+// chart-token color, with the user info hint (name, handle, kind) on hover.
+const props = withDefaults(defineProps<{ handle: string; size?: number }>(), {
+  size: 20,
+})
 
 const ws = useWorkspace()
 
@@ -24,6 +37,19 @@ const actor = computed(() =>
 )
 
 const displayName = computed(() => actor.value?.name ?? `@${props.handle}`)
+
+const kindLabel = computed(() => {
+  switch (actor.value?.kind) {
+    case 'agent':
+      return 'AI agent'
+    case 'system':
+      return 'System account'
+    case 'human':
+      return 'Member'
+    default:
+      return undefined
+  }
+})
 
 const initials = computed(() => {
   const name = actor.value?.name ?? props.handle
@@ -44,10 +70,7 @@ const color = computed(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  inline-size: 20px;
-  block-size: 20px;
   border-radius: 50%;
-  font-size: 9px;
   font-weight: var(--nb-type-label-lg-weight, 600);
   color: var(--nb-c-bg);
   flex: none;

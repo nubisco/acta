@@ -19,6 +19,8 @@ export interface IOverview {
   doc_roots: { slug: string; title: string; children: number }[]
 }
 
+export type TOverviewBoard = IOverview['boards'][number]
+
 export interface IBoardItemRow {
   key: string
   title: string

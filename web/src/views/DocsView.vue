@@ -53,7 +53,7 @@
     </NbEmptyState>
 
     <article v-else class="docs__doc">
-      <h1>{{ doc.title }}</h1>
+      <h1 class="type-heading-04">{{ doc.title }}</h1>
 
       <NbBanner
         v-if="conflict"
@@ -76,17 +76,17 @@
           :rows="versionRows"
           row-key="rev"
           size="sm"
-          aria-label="Version history"
+          aria-label="Version history. Select a version to compare it with the current one."
           @row-click="viewVersion"
         />
-        <NbButton
-          v-if="viewedVersion !== doc.rev"
-          size="sm"
-          variant="primary"
-          @click="restoreVersion"
-        >
-          Restore v{{ viewedVersion }}
-        </NbButton>
+        <div v-if="viewingOld" class="docs__history-actions">
+          <NbButton size="sm" variant="primary" @click="restoreVersion">
+            Restore v{{ viewedVersion }}
+          </NbButton>
+          <NbButton size="sm" variant="ghost" @click="backToCurrent">
+            Back to current
+          </NbButton>
+        </div>
       </div>
 
       <MarkdownEditor
@@ -96,7 +96,15 @@
         placeholder="Start writing. Headings, lists, quotes and code all form as you type."
         class="docs__editor"
       />
-      <MarkdownView v-else :source="viewedBody" :wide="doc.layout === 'wide'" />
+      <template v-else-if="viewingOld">
+        <NbBanner
+          status="info"
+          variant="inline"
+          :title="`Comparing v${viewedVersion} (left) with the current v${doc.rev}`"
+        />
+        <DocDiff :original="viewedBody" :modified="doc.body" />
+      </template>
+      <MarkdownView v-else :source="doc.body" :wide="doc.layout === 'wide'" />
 
       <footer
         v-if="doc.backlinks && doc.backlinks.length > 0"
@@ -110,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import {
   NbBanner,
@@ -128,6 +136,9 @@ import type { IDocDetail } from '@/types/api'
 import { humanise, relativeTime, useLoadState } from '@/lib/state'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
+
+// Monaco is heavy; the diff surface loads only when a version is compared.
+const DocDiff = defineAsyncComponent(() => import('@/components/DocDiff.vue'))
 
 const props = defineProps<{ slug?: string }>()
 
@@ -148,6 +159,9 @@ const viewedBody = ref('')
 const slug = computed(() => props.slug || undefined)
 const isDirty = computed(
   () => editing.value && doc.value !== null && draft.value !== doc.value.body,
+)
+const viewingOld = computed(
+  () => doc.value !== null && viewedVersion.value !== doc.value.rev,
 )
 
 const versionColumns = [
@@ -267,9 +281,19 @@ async function reloadKeepDraft(): Promise<void> {
 
 async function viewVersion(row: { rev: number }): Promise<void> {
   if (!doc.value) return
+  if (row.rev === doc.value.rev) {
+    backToCurrent()
+    return
+  }
   const old = await api.docGet(doc.value.slug, undefined, row.rev)
   viewedVersion.value = row.rev
   viewedBody.value = old.body
+}
+
+function backToCurrent(): void {
+  if (!doc.value) return
+  viewedVersion.value = doc.value.rev
+  viewedBody.value = doc.value.body
 }
 
 async function restoreVersion(): Promise<void> {
@@ -321,7 +345,11 @@ async function restoreVersion(): Promise<void> {
   &__history {
     display: grid;
     gap: var(--nb-spacing-8);
-    justify-items: start;
+  }
+
+  &__history-actions {
+    display: flex;
+    gap: var(--nb-spacing-8);
   }
 
   &__editor {

@@ -30,9 +30,9 @@
         :options="eventOptions"
       />
       <NbField
+        v-slot="{ id }"
         label="Secret"
         hint="Optional. Deliveries are HMAC-signed with it (x-acta-signature)."
-        v-slot="{ id }"
       >
         <NbTextInput :id="id" v-model="secret" />
       </NbField>

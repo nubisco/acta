@@ -17,6 +17,21 @@ export interface ILifecycleBadge {
   dot: boolean
 }
 
+/** The lifecycle a card moves through; `done`/`archived` map to server ops. */
+export type TItemStatus = 'open' | 'done' | 'archived'
+
+export const ITEM_STATUS_OPTIONS = [
+  { label: 'Open', value: 'open' },
+  { label: 'Done', value: 'done' },
+  { label: 'Archived', value: 'archived' },
+] as const
+
+function statusOf(detail: IItemDetail): TItemStatus {
+  if (detail.archived) return 'archived'
+  if (detail.done) return 'done'
+  return 'open'
+}
+
 export interface ISelectOptionView {
   label: string
   value: string
@@ -41,6 +56,7 @@ export function useItem(itemKey: Ref<string>) {
     assignees: [] as string[],
     labels: [] as string[],
     description: '',
+    status: 'open' as TItemStatus,
   })
 
   const listOptions = ref<ISelectOptionView[]>([])
@@ -73,6 +89,7 @@ export function useItem(itemKey: Ref<string>) {
       draft.assignees = detail.assignees ?? []
       draft.labels = detail.labels ?? []
       draft.description = detail.description
+      draft.status = statusOf(detail)
       computeLifecycle(detail)
       linkFacts.value = [
         ...(detail.links?.out ?? []).map((link) => ({
@@ -230,6 +247,28 @@ export function useItem(itemKey: Ref<string>) {
     if (ok && op === 'restore') toast.success('Restored to its list.')
   }
 
+  /**
+   * Status is the user-facing card state; the server models it as two
+   * booleans, so a status change is a short op sequence, not a field write.
+   */
+  async function commitStatus(): Promise<void> {
+    if (!item.value) return
+    const current = statusOf(item.value)
+    const target = draft.status
+    if (target === current) return
+    const ops: ('complete' | 'reopen' | 'archive' | 'restore')[] = []
+    if (current === 'archived') ops.push('restore')
+    if (current === 'done' && target !== 'done') ops.push('reopen')
+    if (target === 'done' && !item.value.done) ops.push('complete')
+    if (target === 'archived') ops.push('archive')
+    for (const op of ops) {
+      const ok = await write({ op, op_id: newOpId(), key: item.value.key })
+      if (!ok) return
+    }
+    if (target === 'archived')
+      toast.success('Archived. Find it under the archived filter.')
+  }
+
   return {
     item: computed(() => item.value),
     viewState,
@@ -251,6 +290,7 @@ export function useItem(itemKey: Ref<string>) {
     commitDue,
     commitAssignees: () => commitSet('assign'),
     commitLabels: () => commitSet('label'),
+    commitStatus,
     toggleCheck,
     addComment,
     toggle,

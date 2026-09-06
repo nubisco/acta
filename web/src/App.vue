@@ -7,13 +7,20 @@
     v-model:inspector-visible="inspectorVisible"
     :sidebar-variant="sidebarVariant"
     sidebar-label="Acta sections"
-    inspector-size="sm"
+    :inspector-size="route.name === 'docs' ? 'sm' : 'md'"
     inspector-label="Item"
     collapse-at="md"
     resizable
   >
     <template #sidebar-logo>
-      <WorkspaceSwitcher :compact="sidebarVariant === 'compact'" />
+      <NbSidebarBrand
+        title="Acta"
+        :subtitle="ws.overview.value?.workspace.name"
+      >
+        <template #icon>
+          <img class="brand-mark" src="/acta-icon.svg" alt="" />
+        </template>
+      </NbSidebarBrand>
     </template>
 
     <template #sidebar-nav>
@@ -22,6 +29,7 @@
           v-for="entry in navEntries"
           :key="entry.to"
           v-nb-tooltip="{ body: entry.label }"
+          v-nb-tour-step="entry.tour"
           :to="entry.to"
           :active="entry.active"
           @click.prevent="router.push(entry.to)"
@@ -45,6 +53,7 @@
         <NbSidebarMenuItem
           v-for="entry in navEntries"
           :key="entry.to"
+          v-nb-tour-step="entry.tour"
           :label="entry.label"
           :icon="entry.icon"
           :to="entry.to"
@@ -67,7 +76,10 @@
     </template>
 
     <template #sidebar-bottom>
-      <NotificationBell :compact="sidebarVariant === 'compact'" />
+      <NotificationBell
+        v-nb-tour-step="'notifications'"
+        :compact="sidebarVariant === 'compact'"
+      />
       <template v-if="sidebarVariant === 'compact'">
         <NbSidebarLink
           v-nb-tooltip="{ body: 'Settings' }"
@@ -137,6 +149,7 @@
 
     <template #topbar-right>
       <form
+        v-nb-tour-step="'topbar-search'"
         class="topbar-search"
         role="search"
         aria-label="Search Acta"
@@ -160,13 +173,6 @@
         v-else-if="inspector.itemKey.value"
         :item-key="inspector.itemKey.value"
       />
-      <NbEmptyState
-        v-else
-        size="sm"
-        :icon="null"
-        title="No item selected"
-        description="Select a card to see its details here."
-      />
     </template>
   </NbShell>
 
@@ -182,6 +188,12 @@
     @close="ui.itemModalKey.value = null"
   />
   <NbCommandPalette placeholder="Search Acta..." />
+  <NbWalkthrough
+    v-if="!route.meta.frameless"
+    :walkthrough="introTour"
+    :labels="tourLabels"
+    auto-start
+  />
   <NbToaster />
 </template>
 
@@ -192,9 +204,9 @@ import {
   NbBanner,
   NbBreadcrumbs,
   NbCommandPalette,
-  NbEmptyState,
   NbIcon,
   NbShell,
+  NbSidebarBrand,
   NbSidebarLink,
   NbSidebarMenu,
   NbSidebarMenuGroup,
@@ -202,9 +214,11 @@ import {
   NbTextInput,
   NbToaster,
   NbUserMenu,
+  NbWalkthrough,
   useCommandPalette,
   useTheme,
 } from '@nubisco/ui'
+import { introTour, tourLabels } from '@/lib/tour'
 import {
   sidebarDefaultFor,
   useInspector,
@@ -216,7 +230,6 @@ import ItemInspector from '@/components/ItemInspector.vue'
 import ItemModal from '@/components/ItemModal.vue'
 import NewBoardModal from '@/components/NewBoardModal.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
-import WorkspaceSwitcher from '@/components/WorkspaceSwitcher.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -252,17 +265,25 @@ const boards = computed(() =>
 )
 
 const navEntries = computed(() => [
-  { to: '/', label: 'Home', icon: 'house', active: route.name === 'home' },
+  {
+    to: '/',
+    label: 'Home',
+    icon: 'house',
+    tour: 'nav-home',
+    active: route.name === 'home',
+  },
   {
     to: '/docs',
     label: 'Docs',
     icon: 'book-open',
+    tour: 'nav-docs',
     active: route.name === 'docs',
   },
   {
     to: '/activity',
     label: 'Activity',
     icon: 'pulse',
+    tour: 'nav-activity',
     active: route.name === 'activity',
   },
 ])
@@ -306,8 +327,11 @@ const trail = computed<ICrumb[]>(() => {
 })
 
 const inspectorVisible = ref(false)
+// The inspector only stays open while it has content: an item, or the docs
+// tree on the docs route. An empty-but-open inspector is dead space.
 watch(inspector.itemKey, (key) => {
   if (key !== null) inspectorVisible.value = true
+  else if (route.name !== 'docs') inspectorVisible.value = false
 })
 watch(
   () => route.name,
@@ -420,5 +444,12 @@ watch(
   font-family: var(--nb-font-family-mono);
   font-size: var(--nb-type-label-sm-size);
   font-weight: var(--nb-type-label-lg-weight, 600);
+}
+
+.brand-mark {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--nb-radius-sm);
 }
 </style>

@@ -43,6 +43,13 @@
           {{ it.lifecycle.value.text }}
         </NbBadge>
       </div>
+      <NbInlineEdit
+        v-model="it.draft.title"
+        label="Item title"
+        size="lg"
+        class="inspector-title"
+        @commit="it.commitTitle"
+      />
       <NbBanner
         v-if="it.saveError.value"
         status="error"
@@ -50,12 +57,13 @@
         :title="it.saveError.value"
       />
       <div class="inspector-fields">
-        <NbField v-slot="{ id }" label="Title">
-          <NbTextInput
+        <NbField v-slot="{ id }" label="Status">
+          <NbSelect
             :id="id"
-            v-model="it.draft.title"
+            v-model="it.draft.status"
             size="sm"
-            @blur="it.commitTitle"
+            :options="[...ITEM_STATUS_OPTIONS]"
+            @change="it.commitStatus"
           />
         </NbField>
         <NbField v-slot="{ id }" label="List">
@@ -100,11 +108,32 @@
 
     <NbShellPanel title="Description" fluid>
       <MarkdownEditor
+        v-if="editingDescription"
         v-model="it.draft.description"
         placeholder="Describe this item..."
         class="inspector-editor"
-        @blur="it.commitDescription"
+        autofocus
+        @blur="commitDescription"
       />
+      <div
+        v-else-if="it.draft.description.trim()"
+        class="inspector-description"
+        role="button"
+        tabindex="0"
+        aria-label="Description. Press Enter to edit."
+        @click="editingDescription = true"
+        @keydown.enter.prevent="editingDescription = true"
+      >
+        <MarkdownView :source="it.draft.description" />
+      </div>
+      <button
+        v-else
+        type="button"
+        class="inspector-description-empty"
+        @click="editingDescription = true"
+      >
+        Add a description...
+      </button>
     </NbShellPanel>
 
     <NbShellPanel
@@ -146,29 +175,11 @@
     <NbShellPanel v-if="it.linkFacts.value.length > 0" title="Links" fluid>
       <NbDefinitionList :items="it.linkFacts.value" layout="stacked" />
     </NbShellPanel>
-
-    <footer class="inspector-actions">
-      <NbButton
-        size="xs"
-        :variant="it.item.value.done ? 'secondary' : 'primary'"
-        @click="it.toggle(it.item.value.done ? 'reopen' : 'complete')"
-      >
-        {{ it.item.value.done ? 'Reopen' : 'Complete' }}
-      </NbButton>
-      <NbButton
-        size="xs"
-        variant="ghost"
-        outlined
-        @click="it.toggle(it.item.value.archived ? 'restore' : 'archive')"
-      >
-        {{ it.item.value.archived ? 'Restore' : 'Archive' }}
-      </NbButton>
-    </footer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { ref, toRef, watch } from 'vue'
 import {
   NbBadge,
   NbBanner,
@@ -178,19 +189,31 @@ import {
   NbDefinitionList,
   NbEmptyState,
   NbField,
+  NbInlineEdit,
   NbInlineLoading,
   NbSelect,
   NbShellPanel,
   NbSkeleton,
-  NbTextInput,
 } from '@nubisco/ui'
-import { useItem } from '@/composables/useItem'
+import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
 import CommentThread from '@/components/CommentThread.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import MarkdownView from '@/components/MarkdownView.vue'
 
 const props = defineProps<{ itemKey: string }>()
 
 const it = useItem(toRef(props, 'itemKey'))
+
+// Presentation-first description, same contract as the item modal.
+const editingDescription = ref(false)
+watch(toRef(props, 'itemKey'), () => {
+  editingDescription.value = false
+})
+
+function commitDescription(): void {
+  editingDescription.value = false
+  it.commitDescription()
+}
 </script>
 
 <style scoped lang="scss">
@@ -218,13 +241,73 @@ const it = useItem(toRef(props, 'itemKey'))
   gap: var(--nb-spacing-8);
 }
 
+.inspector-title {
+  margin-block-end: var(--nb-spacing-12);
+}
+
 .inspector-editor {
-  border: 1px solid var(--nb-c-border);
+  border: 1px solid var(--nb-c-primary);
   border-radius: var(--nb-radius-sm, 8px);
   padding: var(--nb-spacing-8);
 
-  &:focus-within {
+  :deep(.tiptap h1),
+  :deep(.tiptap h2) {
+    font-size: var(--nb-type-heading-02-size);
+    line-height: 1.25;
+  }
+
+  :deep(.tiptap h3),
+  :deep(.tiptap h4) {
+    font-size: var(--nb-type-heading-01-size);
+    line-height: 1.3;
+  }
+}
+
+.inspector-description {
+  border-radius: var(--nb-radius-sm, 8px);
+  padding: var(--nb-spacing-4);
+  margin: calc(var(--nb-spacing-4) * -1);
+  cursor: text;
+
+  /* Item descriptions are notes, not documents: clamp the prose headings
+   * to panel scale. */
+  :deep(.md h1),
+  :deep(.md h2) {
+    font-size: var(--nb-type-heading-02-size);
+    line-height: 1.25;
+  }
+
+  :deep(.md h3),
+  :deep(.md h4) {
+    font-size: var(--nb-type-heading-01-size);
+    line-height: 1.3;
+  }
+
+  &:hover {
+    background: var(--nb-c-surface-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+    outline-offset: 1px;
+  }
+}
+
+.inspector-description-empty {
+  border: 1px dashed var(--nb-c-border);
+  border-radius: var(--nb-radius-sm, 8px);
+  background: transparent;
+  padding: var(--nb-spacing-8);
+  color: var(--nb-c-text-subtle);
+  font: inherit;
+  font-size: var(--nb-type-body-sm-size);
+  text-align: start;
+  cursor: text;
+  width: 100%;
+
+  &:hover {
     border-color: var(--nb-c-primary);
+    color: var(--nb-c-text-muted);
   }
 }
 
@@ -239,12 +322,5 @@ const it = useItem(toRef(props, 'itemKey'))
   padding: 0;
   display: grid;
   gap: var(--nb-spacing-8);
-}
-
-.inspector-actions {
-  display: flex;
-  gap: var(--nb-spacing-8);
-  padding: var(--nb-spacing-16);
-  border-block-start: 1px solid var(--nb-c-border);
 }
 </style>

@@ -355,6 +355,10 @@ async function createItem(): Promise<void> {
   gap: var(--nb-spacing-16);
   align-content: start;
 
+  /* Trello-parity column width: fixed-ish tracks, board scrolls
+   * horizontally instead of stretching a few columns across the screen. */
+  --nb-board-column-track: minmax(272px, 340px);
+
   &__filters {
     display: flex;
     gap: var(--nb-spacing-8);

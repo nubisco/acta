@@ -1,6 +1,6 @@
 <template>
   <div class="settings">
-    <h1>Settings</h1>
+    <h1 class="type-heading-03">Settings</h1>
 
     <component :is="filterBar.Outlet">
       <NbTabs
@@ -41,12 +41,18 @@
         size="sm"
         aria-label="Members and agents"
       >
+        <template #cell-handle="{ row }">
+          <span class="settings__member">
+            <ActorAvatar :handle="row.rawHandle" />
+            <span>{{ row.handle }}</span>
+          </span>
+        </template>
         <template #cell-kind="{ row }">
           <NbAiLabel v-if="row.kind === 'agent'" />
           <NbBadge v-else-if="row.kind === 'system'" size="sm" variant="grey">
             System
           </NbBadge>
-          <span v-else>Human</span>
+          <NbBadge v-else size="sm" variant="blue">Member</NbBadge>
         </template>
       </NbDataTable>
 
@@ -61,23 +67,39 @@
     </section>
 
     <section v-if="tab === 'labels'" class="settings__section">
-      <div
+      <NbPanel
         v-for="group in labelGroups"
         :key="`${group.name}:${group.board ?? ''}`"
         class="settings__labels"
       >
-        <h2>
-          {{ group.name }}
-          <span v-if="group.board" class="settings__scope">
-            {{ group.board }}
+        <div class="settings__labels-head">
+          <h2 class="type-heading-01">{{ group.name }}</h2>
+          <NbBadge v-if="group.board" size="sm" variant="grey">
+            {{ boardName(group.board) }}
+          </NbBadge>
+          <NbBadge v-else size="sm" variant="grey">Workspace</NbBadge>
+          <span class="settings__scope">
+            {{ group.labels.length }}
+            {{ group.labels.length === 1 ? 'label' : 'labels' }}
           </span>
-        </h2>
+        </div>
         <div class="settings__chips">
-          <NbBadge v-for="label in group.labels" :key="label.id" size="sm">
+          <NbBadge
+            v-for="label in group.labels"
+            :key="label.id"
+            size="md"
+            :variant="variants.get(label.name) ?? 'grey'"
+          >
             {{ label.name }}
           </NbBadge>
         </div>
-      </div>
+      </NbPanel>
+      <NbEmptyState
+        v-if="labelGroups.length === 0"
+        size="sm"
+        title="No labels yet"
+        description="Labels are created on boards or through imports and can be managed here."
+      />
     </section>
 
     <section v-if="tab === 'webhooks'" class="settings__section">
@@ -226,6 +248,7 @@ import {
   NbButton,
   NbDataTable,
   NbEmptyState,
+  NbPanel,
   NbTabs,
   NbTextInput,
   useShellSlot,
@@ -233,7 +256,9 @@ import {
 } from '@nubisco/ui'
 import { api } from '@/api/client'
 import { humanise } from '@/lib/state'
+import { labelVariants } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'
+import ActorAvatar from '@/components/ActorAvatar.vue'
 import NewMemberModal from '@/components/NewMemberModal.vue'
 import NewTokenModal from '@/components/NewTokenModal.vue'
 import NewWebhookModal from '@/components/NewWebhookModal.vue'
@@ -270,10 +295,17 @@ const actorColumns = [
 const actorRows = computed(() =>
   (ws.overview.value?.actors ?? []).map((a) => ({
     handle: `@${a.handle}`,
+    rawHandle: a.handle,
     name: a.name,
     kind: a.kind,
   })),
 )
+
+const variants = computed(() => labelVariants(ws.overview.value))
+
+function boardName(key: string): string {
+  return ws.overview.value?.boards.find((b) => b.key === key)?.name ?? key
+}
 
 const labelGroups = computed(() => {
   const groups = new Map<
@@ -408,7 +440,7 @@ async function copyIngest(): Promise<void> {
   &__section {
     display: grid;
     gap: var(--nb-spacing-16);
-    justify-items: start;
+    justify-items: stretch;
   }
 
   &__row {
@@ -423,15 +455,33 @@ async function copyIngest(): Promise<void> {
     margin-block-start: var(--nb-spacing-8);
   }
 
-  &__labels h2 {
-    margin: 0 0 var(--nb-spacing-8);
-    font-size: var(--nb-type-heading-01-size);
+  &__labels {
+    display: grid;
+    gap: var(--nb-spacing-12);
+    justify-self: stretch;
+    border-radius: var(--nb-radius-md);
+  }
+
+  &__labels-head {
+    display: flex;
+    align-items: center;
+    gap: var(--nb-spacing-8);
+
+    h2 {
+      margin: 0;
+    }
+  }
+
+  &__member {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nb-spacing-8);
   }
 
   &__scope {
     font-size: var(--nb-type-label-sm-size);
     color: var(--nb-c-text-subtle);
-    margin-inline-start: var(--nb-spacing-4);
+    margin-inline-start: auto;
   }
 
   &__chips {

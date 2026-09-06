@@ -26,12 +26,12 @@
     <div v-else-if="it.item.value" class="item-modal">
       <div class="item-modal__main">
         <div class="item-modal__title-row">
-          <NbTextInput
-            id="field-modal-title"
+          <NbInlineEdit
             v-model="it.draft.title"
-            size="lg"
-            aria-label="Item title"
-            @blur="it.commitTitle"
+            label="Item title"
+            size="xl"
+            class="item-modal__title"
+            @commit="it.commitTitle"
           />
           <NbBadge
             v-if="it.lifecycle.value"
@@ -53,11 +53,32 @@
         <section class="item-modal__section">
           <h3>Description</h3>
           <MarkdownEditor
+            v-if="editingDescription"
             v-model="it.draft.description"
             placeholder="Describe this item... headings, lists and code all work"
             class="item-modal__editor"
-            @blur="it.commitDescription"
+            autofocus
+            @blur="commitDescription"
           />
+          <div
+            v-else-if="it.draft.description.trim()"
+            class="item-modal__description"
+            role="button"
+            tabindex="0"
+            aria-label="Description. Press Enter to edit."
+            @click="editDescription"
+            @keydown.enter.prevent="editDescription"
+          >
+            <MarkdownView :source="it.draft.description" />
+          </div>
+          <button
+            v-else
+            type="button"
+            class="item-modal__description-empty"
+            @click="editDescription"
+          >
+            Add a description...
+          </button>
         </section>
 
         <section
@@ -107,6 +128,15 @@
           :dwell="1200"
           reserve-space
         />
+        <NbField v-slot="{ id }" label="Status">
+          <NbSelect
+            :id="id"
+            v-model="it.draft.status"
+            size="sm"
+            :options="[...ITEM_STATUS_OPTIONS]"
+            @change="it.commitStatus"
+          />
+        </NbField>
         <NbField v-slot="{ id }" label="List">
           <NbSelect
             :id="id"
@@ -168,33 +198,11 @@
         />
       </aside>
     </div>
-
-    <template #footer>
-      <NbButton
-        v-if="it.item.value"
-        type="button"
-        size="sm"
-        variant="ghost"
-        outlined
-        @click="it.toggle(it.item.value.archived ? 'restore' : 'archive')"
-      >
-        {{ it.item.value.archived ? 'Restore' : 'Archive' }}
-      </NbButton>
-      <NbButton
-        v-if="it.item.value"
-        type="button"
-        size="sm"
-        :variant="it.item.value.done ? 'secondary' : 'primary'"
-        @click="it.toggle(it.item.value.done ? 'reopen' : 'complete')"
-      >
-        {{ it.item.value.done ? 'Reopen' : 'Complete' }}
-      </NbButton>
-    </template>
   </NbModal>
 </template>
 
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import {
   NbBadge,
   NbBanner,
@@ -204,18 +212,19 @@ import {
   NbDefinitionList,
   NbEmptyState,
   NbField,
+  NbInlineEdit,
   NbInlineLoading,
   NbModal,
   NbSelect,
   NbSkeleton,
-  NbTextInput,
 } from '@nubisco/ui'
-import { useItem } from '@/composables/useItem'
+import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
 import { labelVariants } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import CommentThread from '@/components/CommentThread.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import MarkdownView from '@/components/MarkdownView.vue'
 
 const props = defineProps<{ open: boolean; itemKey: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -223,6 +232,22 @@ const emit = defineEmits<{ close: [] }>()
 const ws = useWorkspace()
 const it = useItem(toRef(props, 'itemKey'))
 const variants = computed(() => labelVariants(ws.overview.value))
+
+// Presentation-first description: rendered markdown until the user opts into
+// editing; the editor commits and yields the surface back on blur.
+const editingDescription = ref(false)
+watch(toRef(props, 'itemKey'), () => {
+  editingDescription.value = false
+})
+
+function editDescription(): void {
+  editingDescription.value = true
+}
+
+function commitDescription(): void {
+  editingDescription.value = false
+  it.commitDescription()
+}
 </script>
 
 <style scoped lang="scss">
@@ -245,8 +270,18 @@ const variants = computed(() => labelVariants(ws.overview.value))
 
   &__title-row {
     display: flex;
-    align-items: center;
+    align-items: start;
     gap: var(--nb-spacing-12);
+
+    .nb-badge {
+      margin-block-start: var(--nb-spacing-4);
+      flex: none;
+    }
+  }
+
+  &__title {
+    flex: 1;
+    min-inline-size: 0;
   }
 
   &__section h3 {
@@ -265,12 +300,66 @@ const variants = computed(() => labelVariants(ws.overview.value))
   }
 
   &__editor {
-    border: 1px solid var(--nb-c-border);
+    border: 1px solid var(--nb-c-primary);
     border-radius: var(--nb-radius-sm, 8px);
     padding: var(--nb-spacing-12);
 
-    &:focus-within {
+    :deep(.tiptap h1),
+    :deep(.tiptap h2) {
+      font-size: var(--nb-type-heading-02-size);
+      line-height: 1.25;
+    }
+
+    :deep(.tiptap h3),
+    :deep(.tiptap h4) {
+      font-size: var(--nb-type-heading-01-size);
+      line-height: 1.3;
+    }
+  }
+
+  &__description {
+    border-radius: var(--nb-radius-sm, 8px);
+    padding: var(--nb-spacing-4);
+    margin: calc(var(--nb-spacing-4) * -1);
+    cursor: text;
+
+    /* Item descriptions are notes, not documents: clamp the prose headings
+     * to dialog scale. */
+    :deep(.md h1),
+    :deep(.md h2) {
+      font-size: var(--nb-type-heading-02-size);
+      line-height: 1.25;
+    }
+
+    :deep(.md h3),
+    :deep(.md h4) {
+      font-size: var(--nb-type-heading-01-size);
+      line-height: 1.3;
+    }
+
+    &:hover {
+      background: var(--nb-c-surface-hover);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline-offset: 1px;
+    }
+  }
+
+  &__description-empty {
+    border: 1px dashed var(--nb-c-border);
+    border-radius: var(--nb-radius-sm, 8px);
+    background: transparent;
+    padding: var(--nb-spacing-12);
+    color: var(--nb-c-text-subtle);
+    font: inherit;
+    text-align: start;
+    cursor: text;
+
+    &:hover {
       border-color: var(--nb-c-primary);
+      color: var(--nb-c-text-muted);
     }
   }
 

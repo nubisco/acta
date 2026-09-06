@@ -1,6 +1,6 @@
 <template>
   <div class="activity-view">
-    <h1>Activity</h1>
+    <h1 class="type-heading-03">Activity</h1>
 
     <component :is="filterBar.Outlet">
       <div class="activity-view__filters">
@@ -148,7 +148,6 @@ onScopeDispose(
   display: grid;
   gap: var(--nb-spacing-16);
   align-content: start;
-  justify-items: start;
 
   h1 {
     margin: 0;
@@ -158,8 +157,9 @@ onScopeDispose(
     padding-block: var(--nb-spacing-8);
   }
 
-  &__loading {
-    justify-self: stretch;
+  /* The feed stretches; standalone actions (Load more) do not. */
+  > .nb-button {
+    justify-self: start;
   }
 }
 </style>

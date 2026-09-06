@@ -1,6 +1,6 @@
 <template>
   <div class="search">
-    <h1>Search</h1>
+    <h1 class="type-heading-03">Search</h1>
 
     <component :is="filterBar.Outlet">
       <div class="search__bar" role="search" aria-label="Search Acta">
