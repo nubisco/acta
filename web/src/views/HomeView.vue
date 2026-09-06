@@ -58,7 +58,6 @@
         v-for="board in boards"
         :key="board.key"
         :title="board.name"
-        :subtitle="board.key"
         :href="`/b/${board.key}`"
       >
         <template #icon>
