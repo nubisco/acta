@@ -18,6 +18,7 @@ interface IR2Body {
 interface IR2Bucket {
   put(key: string, value: Uint8Array): Promise<unknown>
   get(key: string): Promise<IR2Body | null>
+  delete(key: string): Promise<void>
 }
 
 interface IAssetsBinding {
@@ -51,6 +52,9 @@ function r2BlobStore(bucket: IR2Bucket): IBlobStore {
       const object = await bucket.get(id)
       if (!object) return null
       return new Uint8Array(await object.arrayBuffer())
+    },
+    delete: async (id) => {
+      await bucket.delete(id)
     },
   }
 }

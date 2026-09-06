@@ -39,6 +39,7 @@ export interface IItemRow {
   created_by: string
   created_at: number
   updated_at: number
+  imported_meta: string | null
 }
 
 export interface IDocRow {
@@ -55,6 +56,7 @@ export interface IDocRow {
   rev: number
   created_at: number
   updated_at: number
+  imported_meta: string | null
 }
 
 export async function boardByKey(ctx: ICtx, key: string): Promise<IBoardRow> {

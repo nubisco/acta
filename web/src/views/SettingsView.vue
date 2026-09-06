@@ -82,8 +82,17 @@
             {{ group.labels.length }}
             {{ group.labels.length === 1 ? 'label' : 'labels' }}
           </span>
+          <NbButton
+            v-if="ws.isAdmin.value"
+            size="xs"
+            variant="ghost"
+            @click="toggleManage(group)"
+          >
+            {{ managing === groupKey(group) ? 'Done' : 'Manage' }}
+          </NbButton>
         </div>
-        <div class="settings__chips">
+
+        <div v-if="managing !== groupKey(group)" class="settings__chips">
           <NbBadge
             v-for="label in group.labels"
             :key="label.id"
@@ -92,6 +101,79 @@
           >
             {{ label.name }}
           </NbBadge>
+        </div>
+
+        <div v-else class="settings__label-editor">
+          <div
+            v-for="label in group.labels"
+            :key="label.id"
+            class="settings__label-row"
+          >
+            <NbBadge size="md" :variant="variants.get(label.name) ?? 'grey'">
+              {{ label.name }}
+            </NbBadge>
+            <NbInlineEdit
+              :model-value="label.name"
+              label="Label name"
+              @commit="(name: string) => renameLabel(label, name)"
+            />
+            <NbSelect
+              :id="`field-label-color-${label.id}`"
+              :model-value="label.color"
+              size="sm"
+              :options="colorOptions"
+              aria-label="Label color"
+              @update:model-value="
+                (color) => recolorLabel(label, String(color ?? ''))
+              "
+            />
+            <NbSelect
+              :id="`field-label-merge-${label.id}`"
+              model-value=""
+              size="sm"
+              :options="mergeOptions(group, label)"
+              placeholder="Merge into..."
+              aria-label="Merge into another label"
+              @update:model-value="
+                (target) => mergeLabel(label, String(target ?? ''), group)
+              "
+            />
+            <NbButton
+              size="xs"
+              variant="danger"
+              outlined
+              icon="trash-simple"
+              :aria-label="`Delete label ${label.name}`"
+              @click="deleteLabel(label)"
+            />
+          </div>
+          <form
+            class="settings__label-create"
+            @submit.prevent="createLabel(group)"
+          >
+            <NbTextInput
+              :id="`field-label-new-${groupKey(group)}`"
+              v-model="newLabelName"
+              size="sm"
+              placeholder="New label name..."
+              aria-label="New label name"
+            />
+            <NbSelect
+              :id="`field-label-new-color-${groupKey(group)}`"
+              v-model="newLabelColor"
+              size="sm"
+              :options="colorOptions"
+              aria-label="New label color"
+            />
+            <NbButton
+              type="submit"
+              size="sm"
+              variant="secondary"
+              :disabled="!newLabelName.trim()"
+            >
+              Add label
+            </NbButton>
+          </form>
         </div>
       </NbPanel>
       <NbEmptyState
@@ -248,13 +330,16 @@ import {
   NbButton,
   NbDataTable,
   NbEmptyState,
+  NbInlineEdit,
   NbPanel,
+  NbSelect,
   NbTabs,
   NbTextInput,
+  useConfirm,
   useShellSlot,
   useToast,
 } from '@nubisco/ui'
-import { api } from '@/api/client'
+import { api, newOpId as opId } from '@/api/client'
 import { humanise } from '@/lib/state'
 import { labelVariants } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'
@@ -265,6 +350,7 @@ import NewWebhookModal from '@/components/NewWebhookModal.vue'
 
 const ws = useWorkspace()
 const toast = useToast()
+const confirm = useConfirm()
 const filterBar = useShellSlot('fixedbar')
 
 const tab = ref('members')
@@ -307,15 +393,20 @@ function boardName(key: string): string {
   return ws.overview.value?.boards.find((b) => b.key === key)?.name ?? key
 }
 
-const labelGroups = computed(() => {
-  const groups = new Map<
-    string,
-    {
-      name: string
-      board: string | null
-      labels: { id: string; name: string }[]
-    }
-  >()
+interface ILabelView {
+  id: string
+  name: string
+  color: string
+}
+
+interface ILabelGroupView {
+  name: string
+  board: string | null
+  labels: ILabelView[]
+}
+
+const labelGroups = computed<ILabelGroupView[]>(() => {
+  const groups = new Map<string, ILabelGroupView>()
   for (const label of ws.overview.value?.labels ?? []) {
     const key = `${label.group_name}:${label.board_key ?? ''}`
     if (!groups.has(key))
@@ -324,10 +415,135 @@ const labelGroups = computed(() => {
         board: label.board_key,
         labels: [],
       })
-    groups.get(key)!.labels.push({ id: label.id, name: label.name })
+    groups.get(key)!.labels.push({
+      id: label.id,
+      name: label.name,
+      color: label.color,
+    })
   }
   return [...groups.values()]
 })
+
+// -- Label management -------------------------------------------------------
+
+const managing = ref<string | null>(null)
+const newLabelName = ref('')
+const newLabelColor = ref('gray')
+
+const colorOptions = [
+  'gray',
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'lime',
+  'blue',
+  'sky',
+  'purple',
+  'pink',
+  'black',
+].map((c) => ({ label: c, value: c }))
+
+function groupKey(group: ILabelGroupView): string {
+  return `${group.name}:${group.board ?? ''}`
+}
+
+function toggleManage(group: ILabelGroupView): void {
+  managing.value = managing.value === groupKey(group) ? null : groupKey(group)
+  newLabelName.value = ''
+}
+
+function mergeOptions(group: ILabelGroupView, label: ILabelView) {
+  return group.labels
+    .filter((l) => l.id !== label.id)
+    .map((l) => ({ label: l.name, value: l.id }))
+}
+
+async function runLabelOps(
+  ops: Parameters<typeof api.labelWrite>[0],
+  failure: string,
+): Promise<void> {
+  try {
+    const { results } = await api.labelWrite(ops)
+    const bad = results.find((r) => !r.ok)
+    if (bad) throw new Error((bad as { error: string }).error)
+    await ws.refresh()
+  } catch (err) {
+    toast.error(humanise(err), { title: failure })
+  }
+}
+
+function renameLabel(label: ILabelView, name: string): void {
+  const trimmed = name.trim()
+  if (!trimmed || trimmed === label.name) return
+  void runLabelOps(
+    [{ op: 'label_update', op_id: opId(), label: label.id, name: trimmed }],
+    'Rename failed',
+  )
+}
+
+function recolorLabel(label: ILabelView, color: string): void {
+  if (!color || color === label.color) return
+  void runLabelOps(
+    [{ op: 'label_update', op_id: opId(), label: label.id, color }],
+    'Color change failed',
+  )
+}
+
+function mergeLabel(
+  label: ILabelView,
+  targetId: string,
+  group: ILabelGroupView,
+): void {
+  if (!targetId) return
+  const target = group.labels.find((l) => l.id === targetId)
+  if (!target) return
+  void confirm({
+    title: 'Merge labels',
+    message: `Every item labeled "${label.name}" gets "${target.name}" instead, and "${label.name}" is deleted.`,
+    subject: `${label.name} → ${target.name}`,
+    confirmLabel: 'Merge labels',
+    cancelLabel: 'Keep both',
+    onConfirm: () =>
+      void runLabelOps(
+        [{ op: 'label_merge', op_id: opId(), from: label.id, into: target.id }],
+        'Merge failed',
+      ),
+  })
+}
+
+function deleteLabel(label: ILabelView): void {
+  void confirm({
+    title: 'Delete label',
+    message: 'It is removed from every item that carries it.',
+    subject: label.name,
+    confirmLabel: 'Delete label',
+    cancelLabel: 'Keep it',
+    onConfirm: () =>
+      void runLabelOps(
+        [{ op: 'label_delete', op_id: opId(), label: label.id }],
+        'Delete failed',
+      ),
+  })
+}
+
+function createLabel(group: ILabelGroupView): void {
+  const name = newLabelName.value.trim()
+  if (!name) return
+  void runLabelOps(
+    [
+      {
+        op: 'label_create',
+        op_id: opId(),
+        group: group.name,
+        name,
+        color: newLabelColor.value,
+      },
+    ],
+    'Create failed',
+  )
+  newLabelName.value = ''
+}
 
 const listsLoading = ref(true)
 const listsError = ref('')
@@ -476,6 +692,30 @@ async function copyIngest(): Promise<void> {
     display: inline-flex;
     align-items: center;
     gap: var(--nb-spacing-8);
+  }
+
+  &__label-editor {
+    display: grid;
+    gap: var(--nb-spacing-8);
+  }
+
+  &__label-row {
+    display: grid;
+    grid-template-columns: 9rem minmax(0, 1fr) 8rem 10rem auto;
+    gap: var(--nb-spacing-8);
+    align-items: center;
+  }
+
+  &__label-create {
+    display: flex;
+    gap: var(--nb-spacing-8);
+    padding-block-start: var(--nb-spacing-8);
+    border-block-start: 1px solid var(--nb-c-border);
+
+    > :first-child {
+      flex: 1;
+      max-inline-size: 20rem;
+    }
   }
 
   &__scope {

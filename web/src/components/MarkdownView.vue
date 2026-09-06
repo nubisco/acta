@@ -69,6 +69,18 @@ function renderRefs(html: string): string {
   )
 }
 
+function renderTaskLists(html: string): string {
+  // GFM task syntax: "- [ ] text" / "- [x] text". markdown-it leaves the
+  // brackets as literal text at the start of the list item.
+  return html.replace(
+    /<li>(<p>)?\[([ xX])\]\s?/g,
+    (_m, p: string | undefined, mark: string) =>
+      `<li class="md__task">${p ?? ''}<input type="checkbox" disabled${
+        mark.trim() ? ' checked' : ''
+      }> `,
+  )
+}
+
 function renderCallouts(html: string): string {
   // markdown-it renders "> [!INFO] Title\n> body" as a blockquote whose first
   // paragraph starts with [!INFO]. Rewrite those blockquotes.
@@ -114,6 +126,7 @@ const html = computed(() => {
   if (details) buffer.push(`:::details ${details.title}`, ...details.lines)
   flush()
   let out = parts.join('')
+  out = renderTaskLists(out)
   out = renderCallouts(out)
   out = renderRefs(out)
   // Mermaid fences render as marked code blocks for now (diagram rendering
@@ -184,6 +197,17 @@ function onClick(event: MouseEvent): void {
     td {
       border: 1px solid var(--nb-c-border);
       padding: var(--nb-spacing-4) var(--nb-spacing-8);
+    }
+  }
+
+  :deep(.md__task) {
+    list-style: none;
+    margin-inline-start: calc(var(--nb-spacing-16) * -1);
+
+    input[type='checkbox'] {
+      accent-color: var(--nb-c-primary);
+      margin-inline-end: var(--nb-spacing-4);
+      vertical-align: -2px;
     }
   }
 

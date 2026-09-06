@@ -50,6 +50,11 @@
         class="inspector-title"
         @commit="it.commitTitle"
       />
+      <ProvenanceNote
+        v-if="it.item.value.imported"
+        :imported="it.item.value.imported"
+        class="inspector-provenance"
+      />
       <NbBanner
         v-if="it.saveError.value"
         status="error"
@@ -103,6 +108,23 @@
             @change="it.commitLabels"
           />
         </NbField>
+        <form class="inspector-new-checklist" @submit.prevent="addChecklist">
+          <NbTextInput
+            id="field-inspector-new-checklist"
+            v-model="newChecklist"
+            size="sm"
+            placeholder="Add a checklist..."
+            aria-label="New checklist name"
+          />
+          <NbButton
+            type="submit"
+            size="xs"
+            variant="secondary"
+            :disabled="!newChecklist.trim()"
+          >
+            Add
+          </NbButton>
+        </form>
       </div>
     </NbShellPanel>
 
@@ -148,19 +170,28 @@
             checklist.items.length
           }}
         </span>
+        <NbButton
+          size="xxs"
+          variant="ghost"
+          icon="trash-simple"
+          :aria-label="`Delete checklist ${checklist.name}`"
+          @click="confirmDeleteChecklist(checklist.name)"
+        />
       </template>
-      <ul class="inspector-checklist">
-        <li v-for="entry in checklist.items" :key="entry.text">
-          <NbCheckbox
-            :model-value="entry.done"
-            :label="entry.text"
-            @update:model-value="
-              (done: boolean) =>
-                it.toggleCheck(checklist.name, entry.text, done)
-            "
-          />
-        </li>
-      </ul>
+      <ChecklistBody
+        :items="checklist.items"
+        @toggle="(text, done) => it.toggleCheck(checklist.name, text, done)"
+        @add="(text) => it.addChecklistEntry(checklist.name, text)"
+        @remove="(text) => it.removeChecklistEntry(checklist.name, text)"
+      />
+    </NbShellPanel>
+
+    <NbShellPanel title="Attachments" fluid>
+      <AttachmentsPanel
+        :owner="{ item: it.item.value.key }"
+        :attachments="it.item.value.attachments ?? []"
+        @changed="it.load"
+      />
     </NbShellPanel>
 
     <NbShellPanel title="Comments" fill>
@@ -184,7 +215,6 @@ import {
   NbBadge,
   NbBanner,
   NbButton,
-  NbCheckbox,
   NbDatePicker,
   NbDefinitionList,
   NbEmptyState,
@@ -194,15 +224,39 @@ import {
   NbSelect,
   NbShellPanel,
   NbSkeleton,
+  NbTextInput,
+  useConfirm,
 } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
+import AttachmentsPanel from '@/components/AttachmentsPanel.vue'
+import ChecklistBody from '@/components/ChecklistBody.vue'
 import CommentThread from '@/components/CommentThread.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
+import ProvenanceNote from '@/components/ProvenanceNote.vue'
 
 const props = defineProps<{ itemKey: string }>()
 
 const it = useItem(toRef(props, 'itemKey'))
+const confirm = useConfirm()
+
+const newChecklist = ref('')
+
+function addChecklist(): void {
+  void it.addChecklist(newChecklist.value)
+  newChecklist.value = ''
+}
+
+function confirmDeleteChecklist(name: string): void {
+  void confirm({
+    title: 'Delete checklist',
+    message: 'Every entry on it goes too.',
+    subject: name,
+    confirmLabel: 'Delete checklist',
+    cancelLabel: 'Keep it',
+    onConfirm: () => void it.deleteChecklist(name),
+  })
+}
 
 // Presentation-first description, same contract as the item modal.
 const editingDescription = ref(false)
@@ -316,11 +370,16 @@ function commitDescription(): void {
   color: var(--nb-c-text-muted);
 }
 
-.inspector-checklist {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
+.inspector-provenance {
+  margin-block-end: var(--nb-spacing-8);
+}
+
+.inspector-new-checklist {
+  display: flex;
   gap: var(--nb-spacing-8);
+
+  > :first-child {
+    flex: 1;
+  }
 }
 </style>

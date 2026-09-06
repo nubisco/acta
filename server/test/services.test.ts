@@ -3,6 +3,12 @@ import { contentHash, sectionMap } from '@nubisco/acta-shared'
 import { bootstrapWorkspace } from '../src/core/bootstrap'
 import type { ICtx } from '../src/core/ctx'
 import { openDb, type BunSqliteDriver } from '../src/db'
+import {
+  AttachmentStore,
+  attachmentDelete,
+  attachmentUpload,
+  UPLOAD_MAX_BYTES,
+} from '../src/services/attachments'
 import { boardWrite } from '../src/services/boards'
 import { docWrite } from '../src/services/docs'
 import { itemWrite } from '../src/services/items'
@@ -410,6 +416,216 @@ describe('docs', () => {
     const sections = sectionMap(doc.body)
     expect(contentHash(doc.body)).toBe(contentHash(doc.body))
     expect(sections).toHaveLength(2)
+  })
+
+  it('comments on docs without touching the doc rev', async () => {
+    await docWrite(ctx, [
+      {
+        op: 'create',
+        op_id: 'd1',
+        slug: 'manual',
+        title: 'Manual',
+        body: 'Body.',
+        layout: 'default',
+        tags: [],
+      },
+    ])
+    const commented = await docWrite(ctx, [
+      { op: 'comment', op_id: 'c1', ref: 'manual', body: 'Looks right.' },
+      {
+        op: 'comment',
+        op_id: 'c2',
+        ref: 'manual',
+        body: 'Imported remark.',
+        imported_meta: {
+          source: 'confluence',
+          author: 'Original Author',
+          created_at: '2026-07-20T10:00:00Z',
+        },
+      },
+    ])
+    expect(commented.every((r) => r.ok)).toBe(true)
+
+    const doc = (await docGet(ctx, 'manual', { include: ['comments'] })) as {
+      rev: number
+      comments: {
+        by: string
+        body: string
+        imported?: { source: string; author?: string }
+      }[]
+    }
+    expect(doc.rev).toBe(1)
+    expect(doc.comments).toHaveLength(2)
+    expect(doc.comments[0]).toMatchObject({ by: 'jose', body: 'Looks right.' })
+    expect(doc.comments[0].imported).toBeUndefined()
+    expect(doc.comments[1].imported).toMatchObject({
+      source: 'confluence',
+      author: 'Original Author',
+    })
+
+    // Doc comments are searchable like item comments.
+    const hits = (await search(ctx, {
+      query: 'Imported remark',
+      limit: 20,
+    })) as { results: { type: string; title: string }[] }
+    expect(
+      hits.results.some((r) => r.type === 'comment' && r.title === 'manual'),
+    ).toBe(true)
+  })
+
+  it('stores and clears provenance without bumping rev', async () => {
+    await docWrite(ctx, [
+      {
+        op: 'create',
+        op_id: 'd1',
+        slug: 'imported-page',
+        title: 'Imported page',
+        body: 'Body.',
+        layout: 'default',
+        tags: [],
+        imported_meta: {
+          source: 'confluence',
+          author: 'José Silva',
+          created_at: '2026-07-25T01:41:28Z',
+          versions: 3,
+        },
+      },
+    ])
+    let doc = (await docGet(ctx, 'imported-page')) as {
+      rev: number
+      imported?: { source: string; versions?: number }
+    }
+    expect(doc.rev).toBe(1)
+    expect(doc.imported).toMatchObject({ source: 'confluence', versions: 3 })
+
+    const cleared = await docWrite(ctx, [
+      { op: 'set_meta', op_id: 'm1', ref: 'imported-page', imported_meta: null },
+    ])
+    expect(cleared[0].ok).toBe(true)
+    doc = (await docGet(ctx, 'imported-page')) as typeof doc
+    expect(doc.rev).toBe(1)
+    expect(doc.imported).toBeUndefined()
+  })
+})
+
+describe('item provenance', () => {
+  beforeEach(seedBoard)
+
+  it('accepts imported_meta on create, comment, and set_meta', async () => {
+    const created = await itemWrite(ctx, [
+      {
+        op: 'create',
+        op_id: 'i1',
+        board: 'SW',
+        list: 'To Do',
+        title: 'Migrated card',
+        imported_meta: {
+          source: 'trello',
+          author: 'Ivan Marjanovic',
+          created_at: '2026-07-26T09:00:00Z',
+          url: 'https://trello.com/c/abc123',
+        },
+      },
+    ])
+    expect(created[0].ok).toBe(true)
+    const key = (created[0] as { key: string }).key
+
+    await itemWrite(ctx, [
+      {
+        op: 'comment',
+        op_id: 'i2',
+        key,
+        body: 'Old remark.',
+        imported_meta: { source: 'trello', author: 'Daniela Pinho' },
+      },
+    ])
+
+    let got = (await itemGet(ctx, { keys: [key] })).items[0] as {
+      rev: number
+      imported?: { source: string; author?: string }
+      comments?: { imported?: { author?: string } }[]
+    }
+    expect(got.imported).toMatchObject({
+      source: 'trello',
+      author: 'Ivan Marjanovic',
+    })
+    expect(got.comments?.[0].imported).toMatchObject({
+      author: 'Daniela Pinho',
+    })
+
+    // set_meta rewrites provenance without a rev bump.
+    const revBefore = got.rev
+    const setMeta = await itemWrite(ctx, [
+      {
+        op: 'set_meta',
+        op_id: 'i3',
+        key,
+        imported_meta: { source: 'trello', author: 'José Silva' },
+      },
+    ])
+    expect(setMeta[0].ok).toBe(true)
+    got = (await itemGet(ctx, { keys: [key] })).items[0] as typeof got
+    expect(got.rev).toBe(revBefore)
+    expect(got.imported).toMatchObject({ author: 'José Silva' })
+  })
+})
+
+describe('attachments', () => {
+  beforeEach(seedBoard)
+
+  it('uploads raw bytes and deletes, blob included', async () => {
+    const blobs = new Map<string, Uint8Array>()
+    const store = new AttachmentStore({
+      put: async (id, bytes) => void blobs.set(id, bytes),
+      get: async (id) => blobs.get(id) ?? null,
+      delete: async (id) => void blobs.delete(id),
+    })
+    const created = await itemWrite(ctx, [
+      { op: 'create', op_id: 'a1', board: 'SW', list: 'To Do', title: 'Card' },
+    ])
+    const key = (created[0] as { key: string }).key
+
+    const bytes = new TextEncoder().encode('file-contents')
+    const uploaded = await attachmentUpload(
+      ctx,
+      store,
+      { item: key, filename: 'notes.txt', mime: 'text/plain' },
+      bytes,
+    )
+    expect(uploaded.size).toBe(bytes.byteLength)
+    expect(blobs.size).toBe(1)
+
+    const got = (await itemGet(ctx, { keys: [key] })).items[0] as {
+      attachments?: { id: string; filename: string; size: number | null }[]
+    }
+    expect(got.attachments).toHaveLength(1)
+    expect(got.attachments?.[0].filename).toBe('notes.txt')
+
+    await attachmentDelete(ctx, store, uploaded.id)
+    expect(blobs.size).toBe(0)
+    const after = (await itemGet(ctx, { keys: [key] })).items[0] as {
+      attachments?: unknown[]
+    }
+    expect(after.attachments).toHaveLength(0)
+  })
+
+  it('rejects oversized raw uploads', async () => {
+    const store = new AttachmentStore({
+      put: async () => undefined,
+      get: async () => null,
+    })
+    const created = await itemWrite(ctx, [
+      { op: 'create', op_id: 'a2', board: 'SW', list: 'To Do', title: 'Card' },
+    ])
+    const key = (created[0] as { key: string }).key
+    expect(
+      attachmentUpload(
+        ctx,
+        store,
+        { item: key, filename: 'big.bin' },
+        new Uint8Array(UPLOAD_MAX_BYTES + 1),
+      ),
+    ).rejects.toThrow('capped')
   })
 })
 

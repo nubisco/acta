@@ -4,6 +4,15 @@
          every column (adds in place); the title is asked for in the modal, so
          the filter bar is purely filters. -->
     <component :is="topbarActions.Outlet">
+      <NbButton
+        size="sm"
+        :variant="stateFilter === 'archived' ? 'secondary' : 'ghost'"
+        icon="archive"
+        :aria-pressed="stateFilter === 'archived'"
+        @click="toggleArchived"
+      >
+        {{ stateFilter === 'archived' ? 'Back to board' : 'Archived' }}
+      </NbButton>
       <NbButton size="sm" variant="primary" icon="plus" @click="openNewItem()">
         Add item
       </NbButton>
@@ -305,6 +314,10 @@ onScopeDispose(
       void loadItems()
   }),
 )
+
+function toggleArchived(): void {
+  stateFilter.value = stateFilter.value === 'archived' ? 'open' : 'archived'
+}
 
 function clearFilters(): void {
   labelFilter.value = ''

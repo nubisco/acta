@@ -21,6 +21,25 @@ export interface IOverview {
 
 export type TOverviewBoard = IOverview['boards'][number]
 
+/** Provenance carried across from a migration source. */
+export interface IImportedMeta {
+  source: string
+  author?: string
+  created_at?: string
+  updated_at?: string
+  url?: string
+  versions?: number
+}
+
+export interface ICommentRow {
+  id: string
+  by: string
+  agent?: boolean
+  ts: number
+  body: string
+  imported?: IImportedMeta
+}
+
 export interface IBoardItemRow {
   key: string
   title: string
@@ -52,13 +71,8 @@ export interface IItemDetail {
   rev: number
   created: number
   updated: number
-  comments?: {
-    id: string
-    by: string
-    agent?: boolean
-    ts: number
-    body: string
-  }[]
+  imported?: IImportedMeta
+  comments?: ICommentRow[]
   checklists?: { name: string; items: { text: string; done: boolean }[] }[]
   links?: {
     out: { ref_type: string; target: string }[]
@@ -90,9 +104,11 @@ export interface IDocDetail {
   rev: number
   updated: number
   body: string
+  imported?: IImportedMeta
   sections?: { slug: string; level: number; hash: string }[]
   backlinks?: { src_kind: string; src_id: string }[]
   versions?: { rev: number; created_at: number; handle: string }[]
+  comments?: ICommentRow[]
 }
 
 export interface IEventRow {

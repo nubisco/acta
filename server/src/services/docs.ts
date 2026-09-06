@@ -82,8 +82,8 @@ async function applyDocOp(
         [ctx.workspaceId, parent?.id ?? null],
       )
       await ctx.db.run(
-        `INSERT INTO document (id, workspace_id, slug, title, parent_id, board_id, pos, body, layout, tags, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO document (id, workspace_id, slug, title, parent_id, board_id, pos, body, layout, tags, created_at, updated_at, imported_meta)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           ctx.workspaceId,
@@ -97,6 +97,7 @@ async function applyDocOp(
           JSON.stringify(op.tags),
           ts,
           ts,
+          op.imported_meta ? JSON.stringify(op.imported_meta) : null,
         ],
       )
       await ctx.db.run(
@@ -106,6 +107,82 @@ async function applyDocOp(
       await syncDocDerived(ctx, id, op.slug, op.title, op.body)
       await emitEvent(ctx, 'doc.created', 'doc', id, `created doc ${op.slug}`)
       return { slug: op.slug, id, rev: 1 }
+    }
+    case 'comment': {
+      const doc = await docBySlug(ctx, op.ref)
+      const id = newId('cmt')
+      await ctx.db.run(
+        'INSERT INTO doc_comment (id, workspace_id, document_id, actor_id, body, created_at, imported_meta) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          id,
+          ctx.workspaceId,
+          doc.id,
+          ctx.actor.id,
+          op.body,
+          ts,
+          op.imported_meta ? JSON.stringify(op.imported_meta) : null,
+        ],
+      )
+      await ftsUpsert(ctx, 'comment', id, doc.slug, op.body)
+      for (const ref of extractRefs(op.body)) {
+        await ctx.db.run(
+          `INSERT OR IGNORE INTO link (workspace_id, src_kind, src_id, ref_type, target)
+           VALUES (?, 'comment', ?, ?, ?)`,
+          [ctx.workspaceId, id, ref.type, ref.target],
+        )
+      }
+      await emitEvent(
+        ctx,
+        'comment.created',
+        'doc',
+        doc.id,
+        `commented on ${doc.slug}`,
+      )
+      return { slug: doc.slug, id, rev: doc.rev }
+    }
+    case 'comment_update': {
+      const doc = await docBySlug(ctx, op.ref)
+      const existing = (
+        await ctx.db.query<{ id: string; body: string }>(
+          'SELECT id, body FROM doc_comment WHERE id = ? AND document_id = ?',
+          [op.comment_id, doc.id],
+        )
+      )[0]
+      if (!existing)
+        throw new ApiError(404, `comment ${op.comment_id} not on ${doc.slug}`)
+      const body = op.body ?? existing.body
+      await ctx.db.run(
+        `UPDATE doc_comment SET body = ?, edited_at = CASE WHEN ? THEN ? ELSE edited_at END,
+           imported_meta = CASE WHEN ? THEN ? ELSE imported_meta END WHERE id = ?`,
+        [
+          body,
+          op.body !== undefined ? 1 : 0,
+          ts,
+          op.imported_meta !== undefined ? 1 : 0,
+          op.imported_meta ? JSON.stringify(op.imported_meta) : null,
+          existing.id,
+        ],
+      )
+      if (op.body !== undefined) {
+        await ftsUpsert(ctx, 'comment', existing.id, doc.slug, body)
+        await emitEvent(
+          ctx,
+          'comment.updated',
+          'doc',
+          doc.id,
+          `edited a comment on ${doc.slug}`,
+        )
+      }
+      return { slug: doc.slug, id: existing.id, rev: doc.rev }
+    }
+    case 'set_meta': {
+      // Provenance is bookkeeping, not content: no rev bump, no event noise.
+      const doc = await docBySlug(ctx, op.ref)
+      await ctx.db.run('UPDATE document SET imported_meta = ? WHERE id = ?', [
+        op.imported_meta ? JSON.stringify(op.imported_meta) : null,
+        doc.id,
+      ])
+      return { slug: doc.slug, rev: doc.rev }
     }
     case 'replace': {
       const doc = await docBySlug(ctx, op.ref)

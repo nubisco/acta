@@ -228,6 +228,44 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ name, board, list }),
     }),
+
+  // -- Attachments ----------------------------------------------------------
+
+  attachmentAddUrl: (owner: { item?: string; doc?: string }, url: string) =>
+    req<{ id: string; filename: string; url?: string }>('/attachments', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...owner,
+        filename: url.split('/').pop()?.split('?')[0] || url,
+        url,
+      }),
+    }),
+
+  attachmentUpload: async (
+    owner: { item?: string; doc?: string },
+    file: File,
+  ) => {
+    const params = new URLSearchParams({ filename: file.name })
+    if (owner.item) params.set('item', owner.item)
+    if (owner.doc) params.set('doc', owner.doc)
+    if (file.type) params.set('mime', file.type)
+    const res = await fetch(`${BASE}/attachments/raw?${params}`, {
+      method: 'POST',
+      credentials: 'include',
+      body: file,
+    })
+    const body = await res.json().catch(() => null)
+    if (!res.ok) throw new ApiHttpError(res.status, body)
+    return body as { id: string; filename: string; size: number }
+  },
+
+  attachmentDelete: (id: string) =>
+    req<{ ok: boolean }>(`/attachments/${id}`, { method: 'DELETE' }),
+}
+
+/** Download/view href for a stored attachment. */
+export function attachmentHref(id: string): string {
+  return `${BASE}/attachments/${id}`
 }
 
 // -- SSE --------------------------------------------------------------------

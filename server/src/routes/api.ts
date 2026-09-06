@@ -32,7 +32,10 @@ import { newId } from '@nubisco/acta-shared'
 import { now } from '../core/ctx'
 import {
   attachmentAdd,
+  attachmentDelete,
   attachmentGet,
+  attachmentUpload,
+  zAttachmentUpload,
   zAttachmentAdd,
   type AttachmentStore,
 } from '../services/attachments'
@@ -221,6 +224,26 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     requireScope(ctx, 'write')
     const body = zAttachmentAdd.parse(await c.req.json())
     return c.json(await attachmentAdd(ctx, store, body))
+  })
+
+  // Binary upload path: metadata in the query, the body is the file itself.
+  app.post('/attachments/raw', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'write')
+    const params = zAttachmentUpload.parse({
+      item: c.req.query('item'),
+      doc: c.req.query('doc'),
+      filename: c.req.query('filename'),
+      mime: c.req.query('mime'),
+    })
+    const bytes = new Uint8Array(await c.req.arrayBuffer())
+    return c.json(await attachmentUpload(ctx, store, params, bytes))
+  })
+
+  app.delete('/attachments/:id', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'write')
+    return c.json(await attachmentDelete(ctx, store, c.req.param('id')))
   })
 
   app.get('/attachments/:id', async (c) => {

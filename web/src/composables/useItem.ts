@@ -224,6 +224,62 @@ export function useItem(itemKey: Ref<string>) {
     })
   }
 
+  function checklistEntries(name: string): { text: string; done: boolean }[] {
+    return (
+      (item.value?.checklists ?? []).find(
+        (cl) => cl.name.toLowerCase() === name.toLowerCase(),
+      )?.items ?? []
+    )
+  }
+
+  async function addChecklist(name: string): Promise<void> {
+    if (!item.value || !name.trim()) return
+    await write({
+      op: 'checklist_set',
+      op_id: newOpId(),
+      key: item.value.key,
+      checklist: name.trim(),
+    })
+  }
+
+  async function addChecklistEntry(
+    checklist: string,
+    text: string,
+  ): Promise<void> {
+    if (!item.value || !text.trim()) return
+    await write({
+      op: 'checklist_set',
+      op_id: newOpId(),
+      key: item.value.key,
+      checklist,
+      items: [...checklistEntries(checklist), { text: text.trim(), done: false }],
+    })
+  }
+
+  async function removeChecklistEntry(
+    checklist: string,
+    text: string,
+  ): Promise<void> {
+    if (!item.value) return
+    await write({
+      op: 'checklist_set',
+      op_id: newOpId(),
+      key: item.value.key,
+      checklist,
+      items: checklistEntries(checklist).filter((it) => it.text !== text),
+    })
+  }
+
+  async function deleteChecklist(checklist: string): Promise<void> {
+    if (!item.value) return
+    await write({
+      op: 'checklist_delete',
+      op_id: newOpId(),
+      key: item.value.key,
+      checklist,
+    })
+  }
+
   async function addComment(): Promise<void> {
     if (!item.value || !commentDraft.value.trim()) return
     commenting.value = true
@@ -292,6 +348,10 @@ export function useItem(itemKey: Ref<string>) {
     commitLabels: () => commitSet('label'),
     commitStatus,
     toggleCheck,
+    addChecklist,
+    addChecklistEntry,
+    removeChecklistEntry,
+    deleteChecklist,
     addComment,
     toggle,
   }

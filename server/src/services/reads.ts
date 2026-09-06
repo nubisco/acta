@@ -19,6 +19,18 @@ type TItemGet = z.infer<typeof zItemGet>
 type TSearch = z.infer<typeof zSearch>
 type TActivityQuery = z.infer<typeof zActivityQuery>
 
+/** Stored provenance JSON → response object; absent/invalid → undefined. */
+function parseImportedMeta(
+  raw: string | null | undefined,
+): Record<string, unknown> | undefined {
+  if (!raw) return undefined
+  try {
+    return JSON.parse(raw) as Record<string, unknown>
+  } catch {
+    return undefined
+  }
+}
+
 // --------------------------------------------------------------------------
 // workspace_overview
 // --------------------------------------------------------------------------
@@ -247,6 +259,7 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
       rev: item.rev,
       created: item.created_at,
       updated: item.updated_at,
+      imported: parseImportedMeta(item.imported_meta),
     }
     if (include.has('comments')) {
       out.comments = (
@@ -256,8 +269,9 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
           created_at: number
           handle: string
           kind: string
+          imported_meta: string | null
         }>(
-          `SELECT c.id, c.body, c.created_at, a.handle, a.kind FROM comment c
+          `SELECT c.id, c.body, c.created_at, a.handle, a.kind, c.imported_meta FROM comment c
              JOIN actor a ON a.id = c.actor_id WHERE c.item_id = ? ORDER BY c.created_at`,
           [item.id],
         )
@@ -267,6 +281,7 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
         agent: c.kind === 'agent' || undefined,
         ts: c.created_at,
         body: c.body,
+        imported: parseImportedMeta(c.imported_meta),
       }))
     }
     if (include.has('checklists')) {
@@ -397,6 +412,30 @@ export async function docGet(
     rev,
     updated: doc.updated_at,
     body,
+    imported: parseImportedMeta(doc.imported_meta),
+  }
+  if (include.has('comments')) {
+    out.comments = (
+      await ctx.db.query<{
+        id: string
+        body: string
+        created_at: number
+        handle: string
+        kind: string
+        imported_meta: string | null
+      }>(
+        `SELECT c.id, c.body, c.created_at, a.handle, a.kind, c.imported_meta FROM doc_comment c
+           JOIN actor a ON a.id = c.actor_id WHERE c.document_id = ? ORDER BY c.created_at`,
+        [doc.id],
+      )
+    ).map((c) => ({
+      id: c.id,
+      by: c.handle,
+      agent: c.kind === 'agent' || undefined,
+      ts: c.created_at,
+      body: c.body,
+      imported: parseImportedMeta(c.imported_meta),
+    }))
   }
   if (include.has('sections')) {
     out.sections = sectionMap(body).map((s) => ({

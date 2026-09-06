@@ -186,6 +186,20 @@ CREATE TABLE IF NOT EXISTS doc_version (
   UNIQUE (document_id, rev)
 );
 
+-- Comments on documents. A separate table rather than a nullable rework of
+-- comment: the migration model is additive CREATE IF NOT EXISTS only.
+CREATE TABLE IF NOT EXISTS doc_comment (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  document_id TEXT NOT NULL REFERENCES document(id),
+  actor_id TEXT NOT NULL REFERENCES actor(id),
+  body TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  edited_at INTEGER,
+  imported_meta TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_doc_comment_doc ON doc_comment(document_id, created_at);
+
 -- Typed references extracted from markdown on save (backlinks both ways).
 CREATE TABLE IF NOT EXISTS link (
   workspace_id TEXT NOT NULL REFERENCES workspace(id),

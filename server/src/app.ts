@@ -104,7 +104,7 @@ export async function createApp(
 
 /** Bun-only filesystem blob store; the Workers entrypoint supplies R2. */
 async function fsBlobStore(dir: string): Promise<IBlobStore> {
-  const { mkdirSync, writeFileSync, readFileSync, existsSync } =
+  const { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } =
     await import('node:fs')
   const { join } = await import('node:path')
   mkdirSync(dir, { recursive: true })
@@ -117,6 +117,10 @@ async function fsBlobStore(dir: string): Promise<IBlobStore> {
       const path = join(dir, id)
       if (!existsSync(path)) return Promise.resolve(null)
       return Promise.resolve(new Uint8Array(readFileSync(path)))
+    },
+    delete: (id) => {
+      rmSync(join(dir, id), { force: true })
+      return Promise.resolve()
     },
   }
 }

@@ -3,11 +3,25 @@
     <ul class="thread__list" aria-label="Comments">
       <li v-for="comment in comments" :key="comment.id">
         <div class="thread__head">
-          <ActorAvatar :handle="comment.by" />
-          <strong>@{{ comment.by }}</strong>
-          <NbAiLabel v-if="comment.agent" />
-          <time :datetime="new Date(comment.ts).toISOString()">
-            {{ relativeTime(comment.ts) }}
+          <template v-if="comment.imported?.author">
+            <strong>{{ comment.imported.author }}</strong>
+            <NbBadge
+              v-nb-tooltip="{
+                body: `Imported from ${comment.imported.source}`,
+              }"
+              size="sm"
+              variant="grey"
+            >
+              imported
+            </NbBadge>
+          </template>
+          <template v-else>
+            <ActorAvatar :handle="comment.by" />
+            <strong>@{{ comment.by }}</strong>
+            <NbAiLabel v-if="comment.agent" />
+          </template>
+          <time :datetime="timestampIso(comment)">
+            {{ timestampLabel(comment) }}
           </time>
         </div>
         <MarkdownView :source="comment.body" />
@@ -35,7 +49,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { NbAiLabel, NbButton, NbForm } from '@nubisco/ui'
+import { NbAiLabel, NbBadge, NbButton, NbForm } from '@nubisco/ui'
 import { relativeTime } from '@/lib/state'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
@@ -47,6 +61,27 @@ interface ICommentView {
   agent?: boolean
   ts: number
   body: string
+  imported?: { source: string; author?: string; created_at?: string }
+}
+
+/** Imported comments keep their original timestamp, not the import's. */
+function timestampIso(comment: ICommentView): string {
+  const original = comment.imported?.created_at
+  if (original && !Number.isNaN(Date.parse(original)))
+    return new Date(original).toISOString()
+  return new Date(comment.ts).toISOString()
+}
+
+function timestampLabel(comment: ICommentView): string {
+  const original = comment.imported?.created_at
+  if (original && !Number.isNaN(Date.parse(original))) {
+    return new Date(original).toLocaleDateString(undefined, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+  }
+  return relativeTime(comment.ts)
 }
 
 const props = defineProps<{

@@ -111,8 +111,8 @@ async function applyItemOp(
         board.id,
       ])
       await ctx.db.run(
-        `INSERT INTO item (id, workspace_id, board_id, list_id, key, title, description, pos, due, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO item (id, workspace_id, board_id, list_id, key, title, description, pos, due, created_by, created_at, updated_at, imported_meta)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           ctx.workspaceId,
@@ -126,6 +126,7 @@ async function applyItemOp(
           ctx.actor.id,
           ts,
           ts,
+          op.imported_meta ? JSON.stringify(op.imported_meta) : null,
         ],
       )
       for (const ref of op.labels ?? []) {
@@ -240,8 +241,16 @@ async function applyItemOp(
       const item = await itemByKey(ctx, op.key)
       const id = newId('cmt')
       await ctx.db.run(
-        'INSERT INTO comment (id, workspace_id, item_id, actor_id, body, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [id, ctx.workspaceId, item.id, ctx.actor.id, op.body, ts],
+        'INSERT INTO comment (id, workspace_id, item_id, actor_id, body, created_at, imported_meta) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          id,
+          ctx.workspaceId,
+          item.id,
+          ctx.actor.id,
+          op.body,
+          ts,
+          op.imported_meta ? JSON.stringify(op.imported_meta) : null,
+        ],
       )
       await ftsUpsert(ctx, 'comment', id, item.key, op.body)
       await syncLinks(ctx, 'comment', id, op.body)
@@ -316,6 +325,30 @@ async function applyItemOp(
       )
       return { key: item.key, rev }
     }
+    case 'checklist_delete': {
+      const item = await itemByKey(ctx, op.key)
+      const checklist = (
+        await ctx.db.query<{ id: string }>(
+          'SELECT id FROM checklist WHERE item_id = ? AND lower(name) = lower(?)',
+          [item.id, op.checklist],
+        )
+      )[0]
+      if (!checklist)
+        throw new ApiError(404, `checklist ${op.checklist} not on ${op.key}`)
+      await ctx.db.run('DELETE FROM checklist_item WHERE checklist_id = ?', [
+        checklist.id,
+      ])
+      await ctx.db.run('DELETE FROM checklist WHERE id = ?', [checklist.id])
+      const rev = await bumpRev(ctx, item)
+      await emitEvent(
+        ctx,
+        'item.checklist',
+        'item',
+        item.id,
+        `removed checklist ${op.checklist} from ${item.key}`,
+      )
+      return { key: item.key, rev }
+    }
     case 'label': {
       const item = await itemByKey(ctx, op.key)
       for (const ref of op.add ?? []) {
@@ -341,6 +374,51 @@ async function applyItemOp(
         `labels changed on ${item.key}`,
       )
       return { key: item.key, rev }
+    }
+    case 'comment_update': {
+      const item = await itemByKey(ctx, op.key)
+      const existing = (
+        await ctx.db.query<{ id: string; body: string }>(
+          'SELECT id, body FROM comment WHERE id = ? AND item_id = ?',
+          [op.comment_id, item.id],
+        )
+      )[0]
+      if (!existing)
+        throw new ApiError(404, `comment ${op.comment_id} not on ${item.key}`)
+      const body = op.body ?? existing.body
+      await ctx.db.run(
+        `UPDATE comment SET body = ?, edited_at = CASE WHEN ? THEN ? ELSE edited_at END,
+           imported_meta = CASE WHEN ? THEN ? ELSE imported_meta END WHERE id = ?`,
+        [
+          body,
+          op.body !== undefined ? 1 : 0,
+          ts,
+          op.imported_meta !== undefined ? 1 : 0,
+          op.imported_meta ? JSON.stringify(op.imported_meta) : null,
+          existing.id,
+        ],
+      )
+      if (op.body !== undefined) {
+        await ftsUpsert(ctx, 'comment', existing.id, item.key, body)
+        await syncLinks(ctx, 'comment', existing.id, body)
+        await emitEvent(
+          ctx,
+          'comment.updated',
+          'item',
+          item.id,
+          `edited a comment on ${item.key}`,
+        )
+      }
+      return { key: item.key, id: existing.id, rev: item.rev }
+    }
+    case 'set_meta': {
+      // Provenance is bookkeeping, not content: no rev bump, no event noise.
+      const item = await itemByKey(ctx, op.key)
+      await ctx.db.run('UPDATE item SET imported_meta = ? WHERE id = ?', [
+        op.imported_meta ? JSON.stringify(op.imported_meta) : null,
+        item.id,
+      ])
+      return { key: item.key, rev: item.rev }
     }
     case 'assign': {
       const item = await itemByKey(ctx, op.key)

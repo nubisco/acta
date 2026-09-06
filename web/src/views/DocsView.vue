@@ -54,6 +54,7 @@
 
     <article v-else class="docs__doc">
       <h1 class="type-heading-04">{{ doc.title }}</h1>
+      <ProvenanceNote v-if="doc.imported" :imported="doc.imported" />
 
       <NbBanner
         v-if="conflict"
@@ -113,6 +114,21 @@
         <h2>Referenced by</h2>
         <NbDefinitionList :items="backlinkFacts" layout="columns" />
       </footer>
+
+      <section v-if="!editing && !viewingOld" class="docs__comments">
+        <h2>
+          Comments
+          <span v-if="doc.comments && doc.comments.length > 0">
+            ({{ doc.comments.length }})
+          </span>
+        </h2>
+        <CommentThread
+          v-model="commentDraft"
+          :comments="doc.comments ?? []"
+          :commenting="commenting"
+          @submit="submitComment"
+        />
+      </section>
     </article>
   </div>
 </template>
@@ -134,8 +150,10 @@ import {
 import { api, newOpId, ApiHttpError } from '@/api/client'
 import type { IDocDetail } from '@/types/api'
 import { humanise, relativeTime, useLoadState } from '@/lib/state'
+import CommentThread from '@/components/CommentThread.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
+import ProvenanceNote from '@/components/ProvenanceNote.vue'
 
 // Monaco is heavy; the diff surface loads only when a version is compared.
 const DocDiff = defineAsyncComponent(() => import('@/components/DocDiff.vue'))
@@ -193,7 +211,11 @@ async function loadDoc(): Promise<void> {
   }
   try {
     load.state.value = 'loading'
-    doc.value = await api.docGet(slug.value, ['backlinks', 'versions'])
+    doc.value = await api.docGet(slug.value, [
+      'backlinks',
+      'versions',
+      'comments',
+    ])
     viewedVersion.value = doc.value.rev
     viewedBody.value = doc.value.body
     editing.value = false
@@ -296,6 +318,38 @@ function backToCurrent(): void {
   viewedBody.value = doc.value.body
 }
 
+const commentDraft = ref('')
+const commenting = ref(false)
+
+async function submitComment(): Promise<void> {
+  if (!doc.value || !commentDraft.value.trim()) return
+  commenting.value = true
+  try {
+    const { results } = await api.docWrite([
+      {
+        op: 'comment',
+        op_id: newOpId(),
+        ref: doc.value.slug,
+        body: commentDraft.value.trim(),
+      },
+    ])
+    if (!results[0].ok) throw new Error((results[0] as { error: string }).error)
+    commentDraft.value = ''
+    const refreshed = await api.docGet(doc.value.slug, [
+      'backlinks',
+      'versions',
+      'comments',
+    ])
+    doc.value = refreshed
+    viewedVersion.value = refreshed.rev
+    viewedBody.value = refreshed.body
+  } catch (err) {
+    toast.error(humanise(err), { title: 'Comment failed' })
+  } finally {
+    commenting.value = false
+  }
+}
+
 async function restoreVersion(): Promise<void> {
   if (!doc.value) return
   try {
@@ -363,6 +417,22 @@ async function restoreVersion(): Promise<void> {
     h2 {
       margin: 0 0 var(--nb-spacing-8);
       font-size: var(--nb-type-heading-01-size);
+    }
+  }
+
+  &__comments {
+    border-block-start: 1px solid var(--nb-c-border);
+    padding-block-start: var(--nb-spacing-16);
+    max-inline-size: 46rem;
+
+    h2 {
+      margin: 0 0 var(--nb-spacing-12);
+      font-size: var(--nb-type-heading-01-size);
+
+      span {
+        color: var(--nb-c-text-subtle);
+        font-weight: 400;
+      }
     }
   }
 }

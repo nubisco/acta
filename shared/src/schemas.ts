@@ -22,6 +22,27 @@ export const zListRole = z.enum([
 ])
 
 // --------------------------------------------------------------------------
+// Imported provenance (migrations). Stored verbatim, shown by the UI so
+// migrated content keeps its true author and dates instead of the importer's.
+// --------------------------------------------------------------------------
+
+export const zImportedMeta = z.object({
+  /** Where this came from: 'trello', 'confluence', or another system name. */
+  source: z.string().min(1).max(40),
+  /** Original author display name. */
+  author: z.string().max(200).optional(),
+  /** Original creation timestamp (ISO 8601). */
+  created_at: z.string().max(40).optional(),
+  /** Original last-update timestamp (ISO 8601). */
+  updated_at: z.string().max(40).optional(),
+  /** Canonical URL in the source system. */
+  url: z.string().max(500).optional(),
+  /** Revision count in the source system, when it had versions. */
+  versions: z.number().int().min(1).optional(),
+})
+export type TImportedMeta = z.infer<typeof zImportedMeta>
+
+// --------------------------------------------------------------------------
 // item_write ops
 // --------------------------------------------------------------------------
 
@@ -54,6 +75,7 @@ export const zItemCreateOp = z.object({
       }),
     )
     .optional(),
+  imported_meta: zImportedMeta.optional(),
 })
 
 export const zItemUpdateOp = z.object({
@@ -80,6 +102,25 @@ export const zItemCommentOp = z.object({
   op_id: zOpId,
   key: zItemKey,
   body: z.string().min(1).max(50_000),
+  imported_meta: zImportedMeta.optional(),
+})
+
+export const zItemSetMetaOp = z.object({
+  op: z.literal('set_meta'),
+  op_id: zOpId,
+  key: zItemKey,
+  /** null clears previously stored provenance. Does not bump rev. */
+  imported_meta: zImportedMeta.nullable(),
+})
+
+export const zItemCommentUpdateOp = z.object({
+  op: z.literal('comment_update'),
+  op_id: zOpId,
+  key: zItemKey,
+  comment_id: z.string().min(1),
+  body: z.string().min(1).max(50_000).optional(),
+  /** undefined keeps stored provenance, null clears it. */
+  imported_meta: zImportedMeta.nullable().optional(),
 })
 
 export const zItemChecklistSetOp = z.object({
@@ -92,6 +133,13 @@ export const zItemChecklistSetOp = z.object({
     .optional(),
   check: z.array(z.string()).optional(),
   uncheck: z.array(z.string()).optional(),
+})
+
+export const zItemChecklistDeleteOp = z.object({
+  op: z.literal('checklist_delete'),
+  op_id: zOpId,
+  key: zItemKey,
+  checklist: z.string().min(1),
 })
 
 export const zItemLabelOp = z.object({
@@ -118,9 +166,12 @@ export const zItemOp = z.discriminatedUnion('op', [
   zItemUpdateOp,
   zItemMoveOp,
   zItemCommentOp,
+  zItemCommentUpdateOp,
   zItemChecklistSetOp,
+  zItemChecklistDeleteOp,
   zItemLabelOp,
   zItemAssignOp,
+  zItemSetMetaOp,
   simpleItemOp('archive'),
   simpleItemOp('restore'),
   simpleItemOp('complete'),
@@ -197,6 +248,30 @@ export const zDocOp = z.discriminatedUnion('op', [
     layout: z.enum(['default', 'wide']).default('default'),
     tags: z.array(z.string()).max(20).default([]),
     board: zBoardKey.optional(),
+    imported_meta: zImportedMeta.optional(),
+  }),
+  z.object({
+    op: z.literal('comment'),
+    op_id: zOpId,
+    ref: zDocSlug,
+    body: z.string().min(1).max(50_000),
+    imported_meta: zImportedMeta.optional(),
+  }),
+  z.object({
+    op: z.literal('comment_update'),
+    op_id: zOpId,
+    ref: zDocSlug,
+    comment_id: z.string().min(1),
+    body: z.string().min(1).max(50_000).optional(),
+    /** undefined keeps stored provenance, null clears it. */
+    imported_meta: zImportedMeta.nullable().optional(),
+  }),
+  z.object({
+    op: z.literal('set_meta'),
+    op_id: zOpId,
+    ref: zDocSlug,
+    /** null clears previously stored provenance. Does not bump rev. */
+    imported_meta: zImportedMeta.nullable(),
   }),
   z.object({
     op: z.literal('replace'),
