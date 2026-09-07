@@ -340,6 +340,28 @@ function onBoardCreated(key: string): void {
   void router.push(`/b/${key}`)
 }
 
+// Deep-linkable inspector: the open card lives in the URL as ?item=KEY, so
+// what you are looking at is what you share. Both directions sync with an
+// equality guard so neither watcher re-triggers the other.
+watch(
+  () => route.query.item,
+  (raw) => {
+    const target = typeof raw === 'string' && raw ? raw : null
+    if (target !== inspector.itemKey.value) {
+      if (target) inspector.open(target)
+      else inspector.close()
+    }
+  },
+  { immediate: true },
+)
+watch(inspector.itemKey, (key) => {
+  const current = typeof route.query.item === 'string' ? route.query.item : null
+  if ((key ?? null) === current) return
+  void router.replace({
+    query: { ...route.query, item: key ?? undefined },
+  })
+})
+
 // Views register their own actions under a context (lib/commands.ts); the
 // route name IS the context, so the palette stays contextualized for free.
 watch(
