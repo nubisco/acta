@@ -348,7 +348,7 @@ watch(
   (raw) => {
     const target = typeof raw === 'string' && raw ? raw : null
     if (target !== inspector.itemKey.value) {
-      if (target) inspector.open(target)
+      if (target) inspector.restore(target)
       else inspector.close()
     }
   },
@@ -357,10 +357,12 @@ watch(
 watch(inspector.itemKey, (key) => {
   const current = typeof route.query.item === 'string' ? route.query.item : null
   if ((key ?? null) === current) return
-  // Opening or hopping card-to-card (a [[ref]] chip in a description) PUSHES,
-  // so browser Back walks the chain the reader followed. Closing REPLACES,
-  // so a closed inspector does not resurrect on Back.
-  const navigate = key ? router.push : router.replace
+  // Forward hops PUSH so browser Back walks the chain the reader followed;
+  // trail-backs and closes REPLACE so neither duplicates the history nor
+  // resurrects a closed inspector.
+  const navigate =
+    key && inspector.navMode.value === 'push' ? router.push : router.replace
+  inspector.navMode.value = 'push'
   void navigate({
     query: { ...route.query, item: key ?? undefined },
   })

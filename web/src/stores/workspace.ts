@@ -141,11 +141,43 @@ const itemModalKey = ref<string | null>(null)
 export type TSidebarVariant = 'compact' | 'verbose'
 const sidebarChoice = ref<TSidebarVariant | null>(null)
 
+/**
+ * Cards opened from inside the inspector (a [[ref]] chip in a description)
+ * form a trail, so the inspector carries its own way back in addition to
+ * browser history. `navMode` tells the URL sync how to record the change:
+ * forward hops push history entries, trail-backs replace.
+ */
+const inspectorTrail = ref<string[]>([])
+const inspectorNavMode = ref<'push' | 'replace'>('push')
+
 export function useInspector() {
   return {
     itemKey: inspectedItemKey,
-    open: (key: string) => (inspectedItemKey.value = key),
-    close: () => (inspectedItemKey.value = null),
+    trail: inspectorTrail,
+    navMode: inspectorNavMode,
+    open: (key: string) => {
+      if (inspectedItemKey.value && inspectedItemKey.value !== key)
+        inspectorTrail.value = [...inspectorTrail.value, inspectedItemKey.value]
+      inspectorNavMode.value = 'push'
+      inspectedItemKey.value = key
+    },
+    back: () => {
+      const previous = inspectorTrail.value.at(-1) ?? null
+      inspectorTrail.value = inspectorTrail.value.slice(0, -1)
+      inspectorNavMode.value = 'replace'
+      inspectedItemKey.value = previous
+    },
+    /** URL-driven change (deep link, browser Back): no trail bookkeeping,
+     * except that landing on the trail's tail IS a back step. */
+    restore: (key: string | null) => {
+      if (inspectorTrail.value.at(-1) === key)
+        inspectorTrail.value = inspectorTrail.value.slice(0, -1)
+      inspectedItemKey.value = key
+    },
+    close: () => {
+      inspectorTrail.value = []
+      inspectedItemKey.value = null
+    },
   }
 }
 

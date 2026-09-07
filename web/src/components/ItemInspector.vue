@@ -33,6 +33,15 @@
         />
       </template>
       <div class="inspector-head">
+        <NbButton
+          v-if="inspector.trail.value.length > 0"
+          v-nb-tooltip="{ body: `Back to ${inspector.trail.value.at(-1)}` }"
+          size="xs"
+          variant="ghost"
+          icon="arrow-left"
+          :aria-label="`Back to ${inspector.trail.value.at(-1)}`"
+          @click="inspector.back()"
+        />
         <span class="inspector-key">{{ it.item.value.key }}</span>
         <NbBadge
           v-if="it.lifecycle.value"
@@ -228,6 +237,7 @@ import {
   useConfirm,
 } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
+import { useInspector } from '@/stores/workspace'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'
 import ChecklistBody from '@/components/ChecklistBody.vue'
 import CommentThread from '@/components/CommentThread.vue'
@@ -238,6 +248,7 @@ import ProvenanceNote from '@/components/ProvenanceNote.vue'
 const props = defineProps<{ itemKey: string }>()
 
 const it = useItem(toRef(props, 'itemKey'))
+const inspector = useInspector()
 const confirm = useConfirm()
 
 const newChecklist = ref('')
