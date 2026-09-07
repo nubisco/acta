@@ -468,9 +468,30 @@ export async function docGet(
 // search / activity
 // --------------------------------------------------------------------------
 
+/**
+ * User input is not FTS5 syntax: a card key like LA-335 parses as
+ * "LA NOT 335" and free text with quotes or parens throws. Every token is
+ * quoted (AND semantics), and the last becomes a prefix match so search-as-
+ * you-type sees results before a word is finished. Keys still hit because
+ * the tokenizer splits the indexed ref column the same way.
+ */
+function ftsMatchExpr(raw: string): string | null {
+  const tokens = raw
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (tokens.length === 0) return null
+  return tokens
+    .map((t, i) => (i === tokens.length - 1 ? `"${t}"*` : `"${t}"`))
+    .join(' ')
+}
+
 export async function search(ctx: ICtx, params: TSearch) {
+  const match = ftsMatchExpr(params.query)
+  if (!match) return { results: [] }
   const types = params.types ?? ['item', 'doc', 'comment']
-  const args: unknown[] = [params.query]
+  const args: unknown[] = [match]
   let filter = `kind IN (${types.map(() => '?').join(',')})`
   args.push(...types)
   if (params.board) {

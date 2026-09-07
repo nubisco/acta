@@ -149,21 +149,7 @@
     </template>
 
     <template #topbar-right>
-      <form
-        v-nb-tour-step="'topbar-search'"
-        class="topbar-search"
-        role="search"
-        aria-label="Search Acta"
-        @submit.prevent="submitSearch"
-      >
-        <NbTextInput
-          id="field-topbar-search"
-          v-model="searchQuery"
-          size="sm"
-          placeholder="Search..."
-          aria-label="Search Acta"
-        />
-      </form>
+      <GlobalSearch v-nb-tour-step="'topbar-search'" />
     </template>
 
     <RouterView />
@@ -212,7 +198,6 @@ import {
   NbSidebarMenu,
   NbSidebarMenuGroup,
   NbSidebarMenuItem,
-  NbTextInput,
   NbToaster,
   NbUserMenu,
   NbWalkthrough,
@@ -229,6 +214,7 @@ import {
 import ItemInspector from '@/components/ItemInspector.vue'
 import ItemModal from '@/components/ItemModal.vue'
 import DocPreviewModal from '@/components/DocPreviewModal.vue'
+import GlobalSearch from '@/components/GlobalSearch.vue'
 import NewBoardModal from '@/components/NewBoardModal.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 
@@ -344,12 +330,6 @@ watch(inspectorVisible, (visible) => {
   if (!visible) inspector.close()
 })
 
-const searchQuery = ref('')
-function submitSearch(): void {
-  const q = searchQuery.value.trim()
-  void router.push({ name: 'search', query: q ? { q } : undefined })
-}
-
 async function signOut(): Promise<void> {
   await ws.logout()
   void router.push({ name: 'login' })
@@ -442,11 +422,6 @@ watch(
 </script>
 
 <style scoped lang="scss">
-.topbar-search {
-  display: flex;
-  align-items: center;
-}
-
 .rail-key {
   font-family: var(--nb-font-family-mono);
   font-size: var(--nb-type-label-sm-size);

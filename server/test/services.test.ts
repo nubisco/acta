@@ -155,6 +155,25 @@ describe('items', () => {
     ])
   })
 
+  it('search survives raw user input and finds items by key', async () => {
+    await itemWrite(
+      ctx,
+      [{ op: 'create', op_id: 'i1', list: 'To Do', title: 'Tune the amp' }],
+      'SW',
+    )
+    // A key is not FTS5 syntax (the hyphen parses as NOT); it must still hit.
+    const byKey = (await search(ctx, { query: 'SW-1', limit: 20 })) as {
+      results: { type: string; ref: string }[]
+    }
+    expect(byKey.results.some((r) => r.ref === 'SW-1')).toBe(true)
+    // Operator soup must not throw, and a half-typed word already matches.
+    await search(ctx, { query: '"(AND OR NOT*', limit: 20 })
+    const prefix = (await search(ctx, { query: 'tun', limit: 20 })) as {
+      results: { ref: string }[]
+    }
+    expect(prefix.results.some((r) => r.ref === 'SW-1')).toBe(true)
+  })
+
   it('enforces if_rev and reports current rev on conflict', async () => {
     await itemWrite(
       ctx,
