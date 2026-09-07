@@ -196,7 +196,20 @@
             multiple
             :options="it.assigneeOptions.value"
             @change="it.commitAssignees"
-          />
+          >
+            <template #option="{ option }">
+              <ActorChip :handle="String(option.value)" />
+            </template>
+            <template #value="{ values }">
+              <span class="assignee-values">
+                <ActorChip
+                  v-for="handle in values"
+                  :key="String(handle)"
+                  :handle="String(handle)"
+                />
+              </span>
+            </template>
+          </NbSelect>
         </NbField>
         <div v-if="it.draft.assignees.length > 0" class="item-modal__avatars">
           <ActorAvatar
@@ -257,6 +270,7 @@ import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
 import { labelVariants } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'
+import ActorChip from '@/components/ActorChip.vue'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'
 import ChecklistBody from '@/components/ChecklistBody.vue'
 import CommentThread from '@/components/CommentThread.vue'
@@ -459,5 +473,13 @@ function commitDescription(): void {
       padding-block-start: var(--nb-spacing-16);
     }
   }
+}
+
+.assignee-values {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-inline-size: 0;
 }
 </style>

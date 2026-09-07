@@ -110,7 +110,7 @@ export function useItem(itemKey: Ref<string>) {
       }))
       assigneeOptions.value = (ws.overview.value?.actors ?? [])
         .filter((a) => a.kind === 'human')
-        .map((a) => ({ label: `@${a.handle}`, value: a.handle }))
+        .map((a) => ({ label: a.name, value: a.handle }))
       labelOptions.value = (ws.overview.value?.labels ?? [])
         .filter((l) => l.board_key === null || l.board_key === detail.board)
         .map((l) => ({ label: l.name, value: l.name }))

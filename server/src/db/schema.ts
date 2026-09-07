@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS actor (
   handle TEXT NOT NULL,
   name TEXT NOT NULL,
   email TEXT,
+  avatar_url TEXT,
   role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
   on_behalf_of TEXT REFERENCES actor(id),
   disabled INTEGER NOT NULL DEFAULT 0,
@@ -298,3 +299,13 @@ CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
   kind, ref, title, body, board_key, tokenize = 'unicode61'
 );
 `
+
+/**
+ * Columns added after a table already shipped. CREATE IF NOT EXISTS is a
+ * no-op on existing databases, so these run separately on every migrate;
+ * the drivers swallow the "duplicate column" error that means the column
+ * is already there. Append only, never edit or reorder.
+ */
+export const ADDITIVE_COLUMNS = [
+  'ALTER TABLE actor ADD COLUMN avatar_url TEXT',
+]

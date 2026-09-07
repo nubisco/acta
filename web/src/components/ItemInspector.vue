@@ -105,7 +105,20 @@
             multiple
             :options="it.assigneeOptions.value"
             @change="it.commitAssignees"
-          />
+          >
+            <template #option="{ option }">
+              <ActorChip :handle="String(option.value)" />
+            </template>
+            <template #value="{ values }">
+              <span class="assignee-values">
+                <ActorChip
+                  v-for="handle in values"
+                  :key="String(handle)"
+                  :handle="String(handle)"
+                />
+              </span>
+            </template>
+          </NbSelect>
         </NbField>
         <NbField v-slot="{ id }" label="Labels">
           <NbSelect
@@ -239,6 +252,7 @@ import {
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
 import { useInspector } from '@/stores/workspace'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'
+import ActorChip from '@/components/ActorChip.vue'
 import ChecklistBody from '@/components/ChecklistBody.vue'
 import CommentThread from '@/components/CommentThread.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
@@ -392,5 +406,13 @@ function commitDescription(): void {
   > :first-child {
     flex: 1;
   }
+}
+
+.assignee-values {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-inline-size: 0;
 }
 </style>

@@ -81,8 +81,9 @@ export async function workspaceOverview(ctx: ICtx) {
     handle: string
     kind: string
     name: string
+    avatar_url: string | null
   }>(
-    'SELECT id, handle, kind, name FROM actor WHERE workspace_id = ? AND disabled = 0 ORDER BY handle',
+    'SELECT id, handle, kind, name, avatar_url FROM actor WHERE workspace_id = ? AND disabled = 0 ORDER BY handle',
     [ctx.workspaceId],
   )
   const docRoots = await ctx.db.query<{

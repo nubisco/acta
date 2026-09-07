@@ -15,12 +15,22 @@
       fontSize: `${Math.round(size * 0.45)}px`,
     }"
   >
+    <!-- The image (uploaded or SSO-synced) rides on top of the initials, so
+         a broken or slow URL degrades to the deterministic fallback. -->
+    <img
+      v-if="avatarUrl"
+      class="avatar__img"
+      :src="avatarUrl"
+      alt=""
+      loading="lazy"
+      @error="imageFailed = true"
+    />
     {{ initials }}
   </span>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { chartColorFor } from '@/lib/colors'
 import { useWorkspace } from '@/stores/workspace'
 
@@ -60,10 +70,16 @@ const initials = computed(() => {
 })
 
 const color = computed(() => chartColorFor(props.handle))
+
+const imageFailed = ref(false)
+const avatarUrl = computed(() =>
+  imageFailed.value ? null : (actor.value?.avatar_url ?? null),
+)
 </script>
 
 <style scoped lang="scss">
 .avatar {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -71,5 +87,14 @@ const color = computed(() => chartColorFor(props.handle))
   font-weight: var(--nb-type-label-lg-weight, 600);
   color: var(--nb-c-bg);
   flex: none;
+  overflow: hidden;
+}
+
+.avatar__img {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
 }
 </style>

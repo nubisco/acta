@@ -16,8 +16,9 @@
 import { computed, inject, nextTick, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { useRouter } from 'vue-router'
-import { useDocPreview, useInspector } from '@/stores/workspace'
+import { useDocPreview, useInspector, useWorkspace } from '@/stores/workspace'
 import { useRefCards } from '@/stores/refs'
+import { chartColorFor } from '@/lib/colors'
 import { DOC_NAV_KEY } from '@/lib/keys'
 
 const props = defineProps<{ source: string; wide?: boolean }>()
@@ -26,6 +27,7 @@ const router = useRouter()
 const inspector = useInspector()
 const docPreview = useDocPreview()
 const refCards = useRefCards()
+const ws = useWorkspace()
 const rootEl = ref<HTMLElement | null>(null)
 // Surfaces that ARE the docs space navigate on doc refs; everywhere else a
 // doc ref opens the quick-look modal so the reader keeps their context.
@@ -81,7 +83,7 @@ function renderRefs(html: string): string {
         return esc(raw)
       }
       if (target.startsWith('@'))
-        return `<span class="md__mention">${esc(target)}</span>`
+        return `<span class="md__mention" data-handle="${esc(target.slice(1))}">${esc(target)}</span>`
       if (target.startsWith('board:'))
         return `<a class="md__ref" data-ref-type="board" data-ref="${esc(target.slice(6))}" href="/b/${esc(target.slice(6))}">${esc(alias ?? target.slice(6))}</a>`
       if (target.startsWith('doc:'))
@@ -220,9 +222,43 @@ function hydrateItemRefs(): void {
   }
 }
 
+/**
+ * @mentions render as avatar + display name (the @handle is storage, never
+ * presentation): a tiny initials-or-image disc from the same actor data the
+ * rest of the app uses.
+ */
+function hydrateMentions(): void {
+  const root = rootEl.value
+  const actors = ws.overview.value?.actors
+  if (!root || !actors) return
+  for (const el of root.querySelectorAll<HTMLElement>('.md__mention')) {
+    const handle = el.getAttribute('data-handle')
+    if (!handle || el.dataset.hydrated === '1') continue
+    const actor = actors.find((a) => a.handle === handle)
+    if (!actor) continue
+    el.dataset.hydrated = '1'
+    const initials = actor.name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase()
+    const disc = actor.avatar_url
+      ? `<img class="md__mention-avatar" src="${esc(actor.avatar_url)}" alt="">`
+      : `<span class="md__mention-avatar" style="background:${esc(chartColorFor(handle))}">${esc(initials)}</span>`
+    el.innerHTML = `${disc}${esc(actor.name)}`
+    el.title = `@${handle}`
+  }
+}
+
 watch(
-  [() => html.value, () => refCards.version.value],
-  () => void nextTick(hydrateItemRefs),
+  [() => html.value, () => refCards.version.value, () => ws.overview.value],
+  () =>
+    void nextTick(() => {
+      hydrateItemRefs()
+      hydrateMentions()
+    }),
   { immediate: true, flush: 'post' },
 )
 </script>
@@ -439,8 +475,27 @@ watch(
   }
 
   :deep(.md__mention) {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    vertical-align: -0.3em;
     color: var(--nb-c-primary);
     font-weight: var(--nb-type-label-lg-weight, 600);
+
+    .md__mention-avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      inline-size: 16px;
+      block-size: 16px;
+      border-radius: 50%;
+      overflow: hidden;
+      object-fit: cover;
+      flex: none;
+      font-size: 8px;
+      font-weight: var(--nb-type-label-lg-weight, 600);
+      color: var(--nb-c-bg);
+    }
   }
 
   :deep(.md__embed) {

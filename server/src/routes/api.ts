@@ -350,18 +350,24 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
         role: z.enum(['admin', 'member']).optional(),
         disabled: z.boolean().optional(),
         name: z.string().min(1).max(120).optional(),
+        /** Core identity field; SSO providers and self-hosted uploads both
+         * write it here. null clears back to the initials fallback. */
+        avatar_url: z.string().url().max(2000).nullable().optional(),
       })
       .parse(await c.req.json())
     if (c.req.param('id') === ctx.actor.id && body.disabled)
       throw new ApiError(400, 'you cannot disable yourself')
     await ctx.db.run(
       `UPDATE actor SET role = COALESCE(?, role), name = COALESCE(?, name),
-              disabled = COALESCE(?, disabled)
+              disabled = COALESCE(?, disabled),
+              avatar_url = CASE WHEN ? THEN ? ELSE avatar_url END
         WHERE workspace_id = ? AND id = ? AND kind = 'human'`,
       [
         body.role ?? null,
         body.name ?? null,
         body.disabled === undefined ? null : body.disabled ? 1 : 0,
+        body.avatar_url !== undefined ? 1 : 0,
+        body.avatar_url ?? null,
         ctx.workspaceId,
         c.req.param('id'),
       ],

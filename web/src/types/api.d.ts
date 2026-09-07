@@ -15,7 +15,13 @@ export interface IOverview {
     name: string
     color: string
   }[]
-  actors: { id: string; handle: string; kind: string; name: string }[]
+  actors: {
+    id: string
+    handle: string
+    kind: string
+    name: string
+    avatar_url?: string | null
+  }[]
   doc_roots: { slug: string; title: string; children: number }[]
 }
 

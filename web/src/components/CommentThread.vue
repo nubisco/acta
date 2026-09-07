@@ -17,7 +17,7 @@
           </template>
           <template v-else>
             <ActorAvatar :handle="comment.by" />
-            <strong>@{{ comment.by }}</strong>
+            <strong>{{ authorName(comment.by) }}</strong>
             <NbAiLabel v-if="comment.agent" />
           </template>
           <time :datetime="timestampIso(comment)">
@@ -51,6 +51,7 @@
 import { computed } from 'vue'
 import { NbAiLabel, NbBadge, NbButton, NbForm } from '@nubisco/ui'
 import { relativeTime } from '@/lib/state'
+import { useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
@@ -70,6 +71,14 @@ function timestampIso(comment: ICommentView): string {
   if (original && !Number.isNaN(Date.parse(original)))
     return new Date(original).toISOString()
   return new Date(comment.ts).toISOString()
+}
+
+const ws = useWorkspace()
+function authorName(handle: string): string {
+  return (
+    ws.overview.value?.actors.find((a) => a.handle === handle)?.name ??
+    `@${handle}`
+  )
 }
 
 function timestampLabel(comment: ICommentView): string {

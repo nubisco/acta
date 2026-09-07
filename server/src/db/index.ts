@@ -4,7 +4,7 @@
  * service layer only ever sees ISqlDriver.
  */
 
-import { SCHEMA_SQL } from './schema'
+import { ADDITIVE_COLUMNS, SCHEMA_SQL } from './schema'
 
 export interface ISqlDriver {
   query<T = Record<string, unknown>>(
@@ -54,6 +54,13 @@ export class BunSqliteDriver implements ISqlDriver {
 
   migrate(): void {
     this.db.exec(SCHEMA_SQL)
+    for (const statement of ADDITIVE_COLUMNS) {
+      try {
+        this.db.exec(statement)
+      } catch (err) {
+        if (!String(err).includes('duplicate column')) throw err
+      }
+    }
   }
 
   query<T = Record<string, unknown>>(
@@ -135,6 +142,13 @@ export class D1Driver implements ISqlDriver {
           continue
         }
         throw err
+      }
+    }
+    for (const statement of ADDITIVE_COLUMNS) {
+      try {
+        await this.db.prepare(statement).run()
+      } catch (err) {
+        if (!String(err).includes('duplicate column')) throw err
       }
     }
     this.migrated = true
