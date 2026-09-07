@@ -201,6 +201,50 @@ export class ActaClient {
     }
   }
 
+  /**
+   * Binary upload path (the inline base64 endpoint is capped at ~1 MB; this
+   * one takes up to 25 MB). Same retry posture as request(): uploads are
+   * deduped by filename before calling, so a retried success is harmless.
+   */
+  async uploadAttachment(
+    owner: { item?: string; doc?: string },
+    filename: string,
+    mime: string | undefined,
+    bytes: Uint8Array,
+  ): Promise<{ id: string }> {
+    const params = new URLSearchParams({ filename })
+    if (owner.item) params.set('item', owner.item)
+    if (owner.doc) params.set('doc', owner.doc)
+    if (mime) params.set('mime', mime)
+    const attempts = 6
+    let lastError: unknown
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      if (attempt > 0)
+        await new Promise((r) => setTimeout(r, 3000 * 2 ** (attempt - 1)))
+      try {
+        const res = await this.fetchImpl(
+          `${this.baseUrl}/api/v1/attachments/raw?${params}`,
+          {
+            method: 'POST',
+            headers: { authorization: `Bearer ${this.token}` },
+            body: bytes,
+          },
+        )
+        const text = await res.text()
+        if (res.status === 429 || res.status >= 500) {
+          lastError = new ActaHttpError(res.status, text.slice(0, 200))
+          continue
+        }
+        if (!res.ok) throw new ActaHttpError(res.status, text)
+        return JSON.parse(text) as { id: string }
+      } catch (error) {
+        if (error instanceof ActaHttpError && error.status < 500) throw error
+        lastError = error
+      }
+    }
+    throw lastError
+  }
+
   /** Read comments of existing items (with any stored imported provenance). */
   async itemComments(keys: string[]): Promise<Map<string, IItemComment[]>> {
     const out = new Map<string, IItemComment[]>()

@@ -341,12 +341,12 @@ async function enrichBoard(
         continue
       }
       try {
-        await client.addAttachment({
-          item: itemKey!,
+        await client.uploadAttachment(
+          { item: itemKey! },
           filename,
-          mime: downloaded.mime ?? att.mimeType ?? undefined,
-          content_base64: Buffer.from(downloaded.bytes).toString('base64'),
-        })
+          downloaded.mime ?? att.mimeType ?? undefined,
+          downloaded.bytes,
+        )
         section.created('attachments')
       } catch (err) {
         section.failed('attachments', att.id, String(err))
