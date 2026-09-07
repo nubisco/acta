@@ -162,7 +162,7 @@ function onClick(event: MouseEvent): void {
 
 <style scoped lang="scss">
 .md {
-  line-height: var(--nb-type-body-md-line-height);
+  line-height: 1.65;
 
   :deep(p),
   :deep(li),
@@ -170,10 +170,21 @@ function onClick(event: MouseEvent): void {
     max-width: 68ch;
   }
 
+  :deep(p) {
+    margin-block: var(--nb-spacing-12);
+  }
+
   :deep(h1),
   :deep(h2),
   :deep(h3) {
-    margin-block: var(--nb-spacing-24) var(--nb-spacing-8);
+    margin-block: var(--nb-spacing-32, 2rem) var(--nb-spacing-8);
+  }
+
+  /* A rule is a breath, not a line squeezed between paragraphs. */
+  :deep(hr) {
+    border: 0;
+    border-block-start: 1px solid var(--nb-c-border);
+    margin-block: var(--nb-spacing-32, 2rem);
   }
 
   :deep(pre) {
@@ -211,36 +222,48 @@ function onClick(event: MouseEvent): void {
     }
   }
 
+  /* Callouts wear their kind: a solid accent bar and a soft tint of the
+   * same hue, the way Confluence panels read. */
   :deep(.md__callout) {
-    margin-block: var(--nb-spacing-8);
-    padding: var(--nb-spacing-8) var(--nb-spacing-12);
-    border-radius: var(--nb-radius-sm, 8px);
-    border: 1px solid var(--nb-c-info-surface-border, var(--nb-c-border));
-    background: var(--nb-c-info-surface);
-    color: var(--nb-c-on-info-surface, var(--nb-c-text));
+    --callout-accent: var(--nb-c-info);
+    margin-block: var(--nb-spacing-16);
+    margin-inline: 0;
+    padding: var(--nb-spacing-12) var(--nb-spacing-16);
+    border: 0;
+    border-inline-start: 3px solid var(--callout-accent);
+    border-radius: var(--nb-radius-xs, 2px);
+    background: color-mix(in srgb, var(--callout-accent) 9%, transparent);
+    color: var(--nb-c-text);
+
+    p:first-of-type {
+      margin-block-start: 0;
+    }
+
+    p:last-child {
+      margin-block-end: 0;
+    }
+  }
+
+  :deep(.md__callout--note) {
+    --callout-accent: var(--nb-c-primary);
   }
 
   :deep(.md__callout--tip) {
-    background: var(--nb-c-success-surface);
-    border-color: var(--nb-c-success-surface-border, var(--nb-c-border));
-    color: var(--nb-c-on-success-surface, var(--nb-c-text));
+    --callout-accent: var(--nb-c-success);
   }
 
   :deep(.md__callout--warning) {
-    background: var(--nb-c-warning-surface);
-    border-color: var(--nb-c-warning-surface-border, var(--nb-c-border));
-    color: var(--nb-c-on-warning-surface, var(--nb-c-text));
+    --callout-accent: var(--nb-c-warning);
   }
 
   :deep(.md__callout--danger) {
-    background: var(--nb-c-danger-surface);
-    border-color: var(--nb-c-danger-surface-border, var(--nb-c-border));
-    color: var(--nb-c-on-danger-surface, var(--nb-c-text));
+    --callout-accent: var(--nb-c-danger);
   }
 
   :deep(.md__callout-title) {
     display: block;
     margin-block-end: var(--nb-spacing-4);
+    color: var(--callout-accent);
   }
 
   :deep(.md__details) {

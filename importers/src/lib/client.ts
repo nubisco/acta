@@ -136,6 +136,8 @@ export class ActaClient {
           body: body !== undefined ? JSON.stringify(body) : undefined,
         })
         const text = await res.text()
+        if (process.env.ACTA_TRACE)
+          console.error(`[trace] ${method} ${path} -> ${res.status}`)
         if (res.status === 429 || res.status >= 500) {
           lastError = new ActaHttpError(res.status, text.slice(0, 200))
           continue
@@ -202,9 +204,10 @@ export class ActaClient {
   /** Read comments of existing items (with any stored imported provenance). */
   async itemComments(keys: string[]): Promise<Map<string, IItemComment[]>> {
     const out = new Map<string, IItemComment[]>()
-    for (let i = 0; i < keys.length; i += 50) {
+    for (let i = 0; i < keys.length; i += ITEM_OPS_PER_CALL) {
+      if (i > 0) await new Promise((r) => setTimeout(r, INTER_CHUNK_DELAY_MS))
       const res = (await this.request('POST', '/api/v1/items/get', {
-        keys: keys.slice(i, i + 50),
+        keys: keys.slice(i, i + ITEM_OPS_PER_CALL),
         include: ['comments'],
       })) as { items: { key: string; comments?: IItemComment[] }[] }
       for (const item of res.items) out.set(item.key, item.comments ?? [])
@@ -217,9 +220,10 @@ export class ActaClient {
     keys: string[],
   ): Promise<Map<string, IItemAttachment[]>> {
     const out = new Map<string, IItemAttachment[]>()
-    for (let i = 0; i < keys.length; i += 50) {
+    for (let i = 0; i < keys.length; i += ITEM_OPS_PER_CALL) {
+      if (i > 0) await new Promise((r) => setTimeout(r, INTER_CHUNK_DELAY_MS))
       const res = (await this.request('POST', '/api/v1/items/get', {
-        keys: keys.slice(i, i + 50),
+        keys: keys.slice(i, i + ITEM_OPS_PER_CALL),
         include: ['attachments'],
       })) as { items: { key: string; attachments?: IItemAttachment[] }[] }
       for (const item of res.items) out.set(item.key, item.attachments ?? [])

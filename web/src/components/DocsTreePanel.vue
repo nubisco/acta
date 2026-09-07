@@ -125,11 +125,11 @@ function onCreated(slug: string): void {
 
 <style scoped lang="scss">
 .doc-tree {
+  /* Placement, width and scrolling belong to the shell's contextbar; the
+   * panel only lays out its own header and tree. */
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  border-inline-end: 1px solid var(--nb-c-border);
-  padding-inline-end: var(--nb-spacing-16);
+  min-height: 100%;
 
   &__head {
     display: flex;
@@ -150,7 +150,6 @@ function onCreated(slug: string): void {
   &__body {
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
   }
 
   &__loading {

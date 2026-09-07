@@ -1,138 +1,142 @@
 <template>
   <div class="docs">
-    <DocsTreePanel class="docs__tree" />
-
-    <div class="docs__content">
-    <component :is="topbarActions.Outlet">
-      <template v-if="doc && !editing">
-        <NbButton
-          size="sm"
-          variant="secondary"
-          :aria-expanded="showHistory"
-          @click="showHistory = !showHistory"
-        >
-          Version history (v{{ doc.rev }})
-        </NbButton>
-        <NbButton size="sm" variant="primary" @click="startEdit">Edit</NbButton>
-      </template>
-      <template v-else-if="doc && editing">
-        <NbButton size="sm" variant="secondary" @click="cancelEdit">
-          Cancel
-        </NbButton>
-        <NbButton size="sm" variant="primary" :loading="saving" @click="save">
-          Save changes
-        </NbButton>
-      </template>
+    <component :is="treebar.Outlet">
+      <DocsTreePanel />
     </component>
 
-    <div v-if="!slug" class="docs__placeholder">
-      <NbEmptyState
-        title="Select a document"
-        description="Pick a page from the Documents panel, or create a new one."
-      />
-    </div>
-
-    <div v-else-if="load.state.value === 'loading'" class="docs__loading">
-      <NbSkeleton variant="heading" label="Loading document" />
-      <NbSkeleton variant="text" :lines="8" />
-    </div>
-
-    <NbEmptyState
-      v-else-if="load.state.value === 'forbidden'"
-      kind="forbidden"
-      title="You do not have access to this page"
-      description="Ask a workspace admin if you think you should."
-    />
-
-    <NbEmptyState
-      v-else-if="load.state.value === 'error' || !doc"
-      kind="error"
-      title="Could not load this page"
-      :description="load.message.value"
-    >
-      <template #actions>
-        <NbButton variant="secondary" @click="loadDoc">Retry</NbButton>
-      </template>
-    </NbEmptyState>
-
-    <article v-else class="docs__doc">
-      <h1 class="type-heading-04">{{ doc.title }}</h1>
-      <ProvenanceNote v-if="doc.imported" :imported="doc.imported" />
-
-      <NbBanner
-        v-if="conflict"
-        status="error"
-        variant="inline"
-        title="This page changed while you were editing"
-      >
-        Your draft is kept below. Reload to see the newer version, then merge by
-        hand.
-        <template #action>
-          <NbButton size="sm" variant="secondary" @click="reloadKeepDraft">
-            Reload page
+    <div class="docs__content">
+      <component :is="topbarActions.Outlet">
+        <template v-if="doc && !editing">
+          <NbButton
+            size="sm"
+            variant="secondary"
+            :aria-expanded="showHistory"
+            @click="showHistory = !showHistory"
+          >
+            Version history (v{{ doc.rev }})
+          </NbButton>
+          <NbButton size="sm" variant="primary" @click="startEdit"
+            >Edit</NbButton
+          >
+        </template>
+        <template v-else-if="doc && editing">
+          <NbButton size="sm" variant="secondary" @click="cancelEdit">
+            Cancel
+          </NbButton>
+          <NbButton size="sm" variant="primary" :loading="saving" @click="save">
+            Save changes
           </NbButton>
         </template>
-      </NbBanner>
+      </component>
 
-      <div v-if="showHistory && doc.versions" class="docs__history">
-        <NbDataTable
-          :columns="versionColumns"
-          :rows="versionRows"
-          row-key="rev"
-          size="sm"
-          aria-label="Version history. Select a version to compare it with the current one."
-          @row-click="viewVersion"
+      <div v-if="!slug" class="docs__placeholder">
+        <NbEmptyState
+          title="Select a document"
+          description="Pick a page from the Documents panel, or create a new one."
         />
-        <div v-if="viewingOld" class="docs__history-actions">
-          <NbButton size="sm" variant="primary" @click="restoreVersion">
-            Restore v{{ viewedVersion }}
-          </NbButton>
-          <NbButton size="sm" variant="ghost" @click="backToCurrent">
-            Back to current
-          </NbButton>
-        </div>
       </div>
 
-      <MarkdownEditor
-        v-if="editing"
-        v-model="draft"
-        autofocus
-        placeholder="Start writing. Headings, lists, quotes and code all form as you type."
-        class="docs__editor"
+      <div v-else-if="load.state.value === 'loading'" class="docs__loading">
+        <NbSkeleton variant="heading" label="Loading document" />
+        <NbSkeleton variant="text" :lines="8" />
+      </div>
+
+      <NbEmptyState
+        v-else-if="load.state.value === 'forbidden'"
+        kind="forbidden"
+        title="You do not have access to this page"
+        description="Ask a workspace admin if you think you should."
       />
-      <template v-else-if="viewingOld">
-        <NbBanner
-          status="info"
-          variant="inline"
-          :title="`Comparing v${viewedVersion} (left) with the current v${doc.rev}`"
-        />
-        <DocDiff :original="viewedBody" :modified="doc.body" />
-      </template>
-      <MarkdownView v-else :source="doc.body" :wide="doc.layout === 'wide'" />
 
-      <footer
-        v-if="doc.backlinks && doc.backlinks.length > 0"
-        class="docs__backlinks"
+      <NbEmptyState
+        v-else-if="load.state.value === 'error' || !doc"
+        kind="error"
+        title="Could not load this page"
+        :description="load.message.value"
       >
-        <h2>Referenced by</h2>
-        <NbDefinitionList :items="backlinkFacts" layout="columns" />
-      </footer>
+        <template #actions>
+          <NbButton variant="secondary" @click="loadDoc">Retry</NbButton>
+        </template>
+      </NbEmptyState>
 
-      <section v-if="!editing && !viewingOld" class="docs__comments">
-        <h2>
-          Comments
-          <span v-if="doc.comments && doc.comments.length > 0">
-            ({{ doc.comments.length }})
-          </span>
-        </h2>
-        <CommentThread
-          v-model="commentDraft"
-          :comments="doc.comments ?? []"
-          :commenting="commenting"
-          @submit="submitComment"
+      <article v-else class="docs__doc">
+        <h1 class="type-heading-04">{{ doc.title }}</h1>
+        <ProvenanceNote v-if="doc.imported" :imported="doc.imported" />
+
+        <NbBanner
+          v-if="conflict"
+          status="error"
+          variant="inline"
+          title="This page changed while you were editing"
+        >
+          Your draft is kept below. Reload to see the newer version, then merge
+          by hand.
+          <template #action>
+            <NbButton size="sm" variant="secondary" @click="reloadKeepDraft">
+              Reload page
+            </NbButton>
+          </template>
+        </NbBanner>
+
+        <div v-if="showHistory && doc.versions" class="docs__history">
+          <NbDataTable
+            :columns="versionColumns"
+            :rows="versionRows"
+            row-key="rev"
+            size="sm"
+            aria-label="Version history. Select a version to compare it with the current one."
+            @row-click="viewVersion"
+          />
+          <div v-if="viewingOld" class="docs__history-actions">
+            <NbButton size="sm" variant="primary" @click="restoreVersion">
+              Restore v{{ viewedVersion }}
+            </NbButton>
+            <NbButton size="sm" variant="ghost" @click="backToCurrent">
+              Back to current
+            </NbButton>
+          </div>
+        </div>
+
+        <MarkdownEditor
+          v-if="editing"
+          v-model="draft"
+          autofocus
+          placeholder="Start writing. Headings, lists, quotes and code all form as you type."
+          class="docs__editor"
         />
-      </section>
-    </article>
+        <template v-else-if="viewingOld">
+          <NbBanner
+            status="info"
+            variant="inline"
+            :title="`Comparing v${viewedVersion} (left) with the current v${doc.rev}`"
+          />
+          <DocDiff :original="viewedBody" :modified="doc.body" />
+        </template>
+        <MarkdownView v-else :source="doc.body" :wide="doc.layout === 'wide'" />
+
+        <footer
+          v-if="doc.backlinks && doc.backlinks.length > 0"
+          class="docs__backlinks"
+        >
+          <h2>Referenced by</h2>
+          <NbDefinitionList :items="backlinkFacts" layout="columns" />
+        </footer>
+
+        <section v-if="!editing && !viewingOld" class="docs__comments">
+          <h2>
+            Comments
+            <span v-if="doc.comments && doc.comments.length > 0">
+              ({{ doc.comments.length }})
+            </span>
+          </h2>
+          <CommentThread
+            v-model="commentDraft"
+            :comments="doc.comments ?? []"
+            :commenting="commenting"
+            @submit="submitComment"
+          />
+        </section>
+      </article>
     </div>
   </div>
 </template>
@@ -169,6 +173,7 @@ const toast = useToast()
 const confirm = useConfirm()
 const load = useLoadState()
 const topbarActions = useShellSlot('topbar-right')
+const treebar = useShellSlot('contextbar')
 
 const doc = ref<IDocDetail | null>(null)
 const editing = ref(false)
@@ -378,38 +383,19 @@ async function restoreVersion(): Promise<void> {
 
 <style scoped lang="scss">
 .docs {
-  /* Confluence-style split: the document tree stays on the left, the page
-   * fills the rest, and the shell inspector stays free for item details. */
+  /* The tree lives in the shell's contextbar; the page itself reads as an
+   * isolated column, Confluence-style, instead of running edge to edge. */
   display: grid;
-  grid-template-columns: 16rem minmax(0, 1fr);
-  gap: var(--nb-spacing-24);
-  align-items: start;
   min-height: 0;
-
-  &__tree {
-    position: sticky;
-    top: 0;
-    max-height: calc(100vh - 8rem);
-  }
 
   &__content {
     display: grid;
     gap: var(--nb-spacing-16);
     align-content: start;
     min-width: 0;
-  }
-
-  @media (max-width: 56rem) {
-    grid-template-columns: 1fr;
-
-    &__tree {
-      position: static;
-      max-height: 16rem;
-      border-inline-end: 0;
-      padding-inline-end: 0;
-      border-block-end: 1px solid var(--nb-c-border);
-      padding-block-end: var(--nb-spacing-12);
-    }
+    width: 100%;
+    max-inline-size: 52rem;
+    margin-inline: auto;
   }
 
   &__placeholder {
@@ -457,7 +443,8 @@ async function restoreVersion(): Promise<void> {
 
   &__comments {
     border-block-start: 1px solid var(--nb-c-border);
-    padding-block-start: var(--nb-spacing-16);
+    margin-block-start: var(--nb-spacing-24);
+    padding-block-start: var(--nb-spacing-24);
     max-inline-size: 46rem;
 
     h2 {

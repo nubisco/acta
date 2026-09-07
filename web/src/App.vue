@@ -9,6 +9,7 @@
     sidebar-label="Acta sections"
     inspector-size="md"
     inspector-label="Item"
+    contextbar-label="Documents"
     collapse-at="md"
     resizable
   >
