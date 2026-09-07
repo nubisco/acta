@@ -38,6 +38,21 @@ const CALLOUT_TYPES: Record<string, string> = {
   DANGER: 'danger',
 }
 
+/* Phosphor regular glyphs (fill=currentColor, so they take the accent). */
+const CALLOUT_ICONS: Record<string, string> = {
+  info: '<path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-40a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176ZM112,84a12,12,0,1,1,12,12A12,12,0,0,1,112,84Z"/>',
+  note: '<path d="M229.66,58.34l-32-32a8,8,0,0,0-11.32,0l-96,96A8,8,0,0,0,88,128v32a8,8,0,0,0,8,8h32a8,8,0,0,0,5.66-2.34l96-96A8,8,0,0,0,229.66,58.34ZM124.69,152H104V131.31l64-64L188.69,88ZM200,76.69,179.31,56,192,43.31,212.69,64ZM224,128v80a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32h80a8,8,0,0,1,0,16H48V208H208V128a8,8,0,0,1,16,0Z"/>',
+  tip: '<path d="M176,232a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,232Zm40-128a87.55,87.55,0,0,1-33.64,69.21A16.24,16.24,0,0,0,176,186v6a16,16,0,0,1-16,16H96a16,16,0,0,1-16-16v-6a16,16,0,0,0-6.23-12.66A87.59,87.59,0,0,1,40,104.49C39.74,56.83,78.26,17.14,125.88,16A88,88,0,0,1,216,104Zm-16,0a72,72,0,0,0-73.74-72c-39,.92-70.47,33.39-70.26,72.39a71.65,71.65,0,0,0,27.64,56.3A32,32,0,0,1,96,186v6h64v-6a32.15,32.15,0,0,1,12.47-25.35A71.65,71.65,0,0,0,200,104Zm-16.11-9.34a57.6,57.6,0,0,0-46.56-46.55,8,8,0,0,0-2.66,15.78c16.57,2.79,30.63,16.85,33.44,33.45A8,8,0,0,0,176,104a9,9,0,0,0,1.35-.11A8,8,0,0,0,183.89,94.66Z"/>',
+  warning:
+    '<path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"/>',
+  danger:
+    '<path d="M120,136V80a8,8,0,0,1,16,0v56a8,8,0,0,1-16,0ZM232,91.55v72.9a15.86,15.86,0,0,1-4.69,11.31l-51.55,51.55A15.86,15.86,0,0,1,164.45,232H91.55a15.86,15.86,0,0,1-11.31-4.69L28.69,175.76A15.86,15.86,0,0,1,24,164.45V91.55a15.86,15.86,0,0,1,4.69-11.31L80.24,28.69A15.86,15.86,0,0,1,91.55,24h72.9a15.86,15.86,0,0,1,11.31,4.69l51.55,51.55A15.86,15.86,0,0,1,232,91.55Zm-16,0L164.45,40H91.55L40,91.55v72.9L91.55,216h72.9L216,164.45ZM128,160a12,12,0,1,0,12,12A12,12,0,0,0,128,160Z"/>',
+}
+
+function calloutIcon(kind: string): string {
+  return `<svg class="md__callout-icon" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">${CALLOUT_ICONS[kind]}</svg>`
+}
+
 function esc(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -91,7 +106,7 @@ function renderCallouts(html: string): string {
       const heading = title.trim()
         ? `<strong class="md__callout-title">${title.trim()}</strong>`
         : ''
-      return `<blockquote class="md__callout md__callout--${kind}">${heading}<p>`
+      return `<blockquote class="md__callout md__callout--${kind}">${calloutIcon(kind)}${heading}<p>`
     },
   )
 }
@@ -226,9 +241,11 @@ function onClick(event: MouseEvent): void {
    * same hue, the way Confluence panels read. */
   :deep(.md__callout) {
     --callout-accent: var(--nb-c-info);
+    position: relative;
     margin-block: var(--nb-spacing-16);
     margin-inline: 0;
     padding: var(--nb-spacing-12) var(--nb-spacing-16);
+    padding-inline-start: calc(var(--nb-spacing-16) * 2 + 20px);
     border: 0;
     border-inline-start: 3px solid var(--callout-accent);
     border-radius: var(--nb-radius-xs, 2px);
@@ -242,6 +259,15 @@ function onClick(event: MouseEvent): void {
     p:last-child {
       margin-block-end: 0;
     }
+  }
+
+  :deep(.md__callout-icon) {
+    position: absolute;
+    inset-block-start: calc(var(--nb-spacing-12) + 0.2em);
+    inset-inline-start: var(--nb-spacing-16);
+    inline-size: 20px;
+    block-size: 20px;
+    color: var(--callout-accent);
   }
 
   :deep(.md__callout--note) {
