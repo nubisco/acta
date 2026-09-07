@@ -5,7 +5,9 @@
         <NbCheckbox
           :model-value="entry.done"
           :label="entry.text"
-          @update:model-value="(done: boolean) => emit('toggle', entry.text, done)"
+          @update:model-value="
+            (done: boolean) => emit('toggle', entry.text, done)
+          "
         />
         <NbButton
           size="xxs"

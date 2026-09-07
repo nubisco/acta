@@ -9,7 +9,9 @@
         />
         <a
           class="attachments__name"
-          :href="att.kind === 'url' && att.url ? att.url : attachmentHref(att.id)"
+          :href="
+            att.kind === 'url' && att.url ? att.url : attachmentHref(att.id)
+          "
           target="_blank"
           rel="noopener"
         >

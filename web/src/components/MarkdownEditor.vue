@@ -28,6 +28,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Markdown } from 'tiptap-markdown'
+import { RefTypeahead, SlashMenu } from '@/components/editor/suggestions'
 
 const props = defineProps<{
   modelValue: string
@@ -64,6 +65,10 @@ const editor = new Editor({
       breaks: false,
       transformPastedText: true,
     }),
+    // `[[` searches docs and cards; `/` opens the insert menu. Both write
+    // plain enhanced-markdown, keeping editor and reader byte-compatible.
+    RefTypeahead,
+    SlashMenu,
   ],
   onBlur: () => emit('blur'),
   onUpdate: ({ editor: instance }) => {

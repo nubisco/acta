@@ -3,6 +3,7 @@
        extension transforms emit markup. -->
   <!-- eslint-disable vue/no-v-html -->
   <div
+    ref="rootEl"
     class="md"
     :class="{ 'md--wide': wide }"
     @click="onClick"
@@ -12,15 +13,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, inject, nextTick, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { useRouter } from 'vue-router'
-import { useInspector } from '@/stores/workspace'
+import { useDocPreview, useInspector } from '@/stores/workspace'
+import { useRefCards } from '@/stores/refs'
+import { DOC_NAV_KEY } from '@/lib/keys'
 
 const props = defineProps<{ source: string; wide?: boolean }>()
 
 const router = useRouter()
 const inspector = useInspector()
+const docPreview = useDocPreview()
+const refCards = useRefCards()
+const rootEl = ref<HTMLElement | null>(null)
+// Surfaces that ARE the docs space navigate on doc refs; everywhere else a
+// doc ref opens the quick-look modal so the reader keeps their context.
+const docNav = inject(DOC_NAV_KEY, null)
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: false })
 
@@ -161,6 +170,9 @@ const html = computed(() => {
 function onClick(event: MouseEvent): void {
   const el = (event.target as HTMLElement).closest('.md__ref')
   if (!el) return
+  // A ref click is fully handled here; surfaces that treat clicks as "start
+  // editing" (the inspector description) must not also react to it.
+  event.stopPropagation()
   const refType = el.getAttribute('data-ref-type')
   const ref = el.getAttribute('data-ref') ?? ''
   if (refType === 'item') {
@@ -171,8 +183,48 @@ function onClick(event: MouseEvent): void {
     return
   event.preventDefault()
   if (refType === 'board') void router.push(`/b/${ref}`)
-  else if (refType === 'doc') void router.push(`/docs/${ref}`)
+  else if (refType === 'doc') {
+    if (docNav) docNav(ref)
+    else docPreview.open(ref)
+  }
 }
+
+/**
+ * Card refs hydrate into live chips after render: the markdown pass emits a
+ * bare [[KEY]] button, then the shared ref cache fills in title and state,
+ * and re-fills them whenever board events land. v-html rewrites wipe the
+ * patched DOM, so hydration re-runs on both the html and the cache version.
+ */
+function hydrateItemRefs(): void {
+  const root = rootEl.value
+  if (!root) return
+  for (const el of root.querySelectorAll<HTMLElement>('.md__ref--item')) {
+    const key = el.getAttribute('data-ref') ?? ''
+    refCards.request(key)
+    const card = refCards.cards.get(key)
+    if (card === undefined) continue
+    if (card === null) {
+      el.classList.add('md__ref--chip', 'md__ref--gone')
+      el.title = 'This card no longer exists'
+      el.textContent = key
+      continue
+    }
+    el.classList.add('md__ref--chip')
+    el.classList.toggle('md__ref--done', !!card.done)
+    el.classList.toggle('md__ref--archived', !!card.archived)
+    el.title = card.archived ? `${card.list} · archived` : card.list
+    el.innerHTML =
+      `<span class="md__chip-dot" aria-hidden="true"></span>` +
+      `<span class="md__chip-key">${esc(card.key)}</span>` +
+      `<span class="md__chip-title">${esc(card.title)}</span>`
+  }
+}
+
+watch(
+  [() => html.value, () => refCards.version.value],
+  () => void nextTick(hydrateItemRefs),
+  { immediate: true, flush: 'post' },
+)
 </script>
 
 <style scoped lang="scss">
@@ -322,6 +374,67 @@ function onClick(event: MouseEvent): void {
     &:focus-visible {
       outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
       outline-offset: 2px;
+    }
+  }
+
+  /* A hydrated card ref: inline chip with the list as a colored dot, the key
+   * in mono and the live title, the Confluence smart-link mental model. */
+  :deep(.md__ref.md__ref--chip) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-inline-size: 34ch;
+    padding: 1px 8px;
+    border: 1px solid var(--nb-c-border);
+    border-block-end: 1px solid var(--nb-c-border);
+    border-radius: 999px;
+    background: var(--nb-c-bg-soft, transparent);
+    color: var(--nb-c-text);
+    vertical-align: -0.35em;
+
+    .md__chip-dot {
+      flex: none;
+      inline-size: 7px;
+      block-size: 7px;
+      border-radius: 50%;
+      background: var(--nb-c-primary);
+    }
+
+    .md__chip-key {
+      flex: none;
+      font-family: var(--nb-font-family-mono);
+      font-size: var(--nb-type-code-sm-size);
+      color: var(--nb-c-text-muted);
+    }
+
+    .md__chip-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: var(--nb-font-family-sans);
+      font-size: var(--nb-font-size-13, 13px);
+    }
+
+    &.md__ref--done .md__chip-dot {
+      background: var(--nb-c-success);
+    }
+
+    &.md__ref--archived {
+      opacity: 0.65;
+
+      .md__chip-dot {
+        background: var(--nb-c-text-muted);
+      }
+
+      .md__chip-title {
+        text-decoration: line-through;
+      }
+    }
+
+    &.md__ref--gone {
+      opacity: 0.6;
+      cursor: default;
+      text-decoration: line-through;
     }
   }
 

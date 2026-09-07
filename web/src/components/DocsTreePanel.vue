@@ -69,6 +69,7 @@ import { NbButton, NbEmptyState, NbSkeleton, NbTree } from '@nubisco/ui'
 import { api } from '@/api/client'
 import type { IDocTreeNode } from '@/types/docs'
 import { useLoadState } from '@/lib/state'
+import { useViewCommands } from '@/lib/commands'
 import { useWorkspace } from '@/stores/workspace'
 import DocsTreeNode from '@/components/DocsTreeNode.vue'
 import NewDocModal from '@/components/NewDocModal.vue'
@@ -130,6 +131,18 @@ async function loadTree(): Promise<void> {
   }
   tree.value = roots
 }
+
+useViewCommands('docs', [
+  {
+    id: 'docs:new',
+    label: 'New document',
+    icon: 'plus',
+    namespace: 'Docs',
+    handler: () => {
+      creating.value = true
+    },
+  },
+])
 
 void loadTree()
 onScopeDispose(

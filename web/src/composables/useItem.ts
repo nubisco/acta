@@ -252,7 +252,10 @@ export function useItem(itemKey: Ref<string>) {
       op_id: newOpId(),
       key: item.value.key,
       checklist,
-      items: [...checklistEntries(checklist), { text: text.trim(), done: false }],
+      items: [
+        ...checklistEntries(checklist),
+        { text: text.trim(), done: false },
+      ],
     })
   }
 

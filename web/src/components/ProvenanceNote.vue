@@ -2,7 +2,8 @@
   <p class="provenance">
     <NbIcon name="download-simple" :size="13" />
     <span>
-      Imported from {{ sourceName }}<template v-if="imported.author">
+      Imported from {{ sourceName
+      }}<template v-if="imported.author">
         · originally by {{ imported.author }}</template
       ><template v-if="createdLabel"> · {{ createdLabel }}</template
       ><template v-if="imported.versions && imported.versions > 1">

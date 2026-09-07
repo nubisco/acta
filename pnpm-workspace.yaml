@@ -3,3 +3,7 @@ packages:
   - web
   - shared
   - importers
+# Our own releases install immediately: the release-age check exists to
+# distrust strangers' fresh publishes, and we are not strangers to ourselves.
+minimumReleaseAgeExclude:
+  - '@nubisco/*'

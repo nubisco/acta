@@ -187,6 +187,7 @@
     :item-key="ui.itemModalKey.value"
     @close="ui.itemModalKey.value = null"
   />
+  <DocPreviewModal />
   <NbCommandPalette placeholder="Search Acta..." />
   <NbWalkthrough
     v-if="!route.meta.frameless"
@@ -227,6 +228,7 @@ import {
 } from '@/stores/workspace'
 import ItemInspector from '@/components/ItemInspector.vue'
 import ItemModal from '@/components/ItemModal.vue'
+import DocPreviewModal from '@/components/DocPreviewModal.vue'
 import NewBoardModal from '@/components/NewBoardModal.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 
@@ -357,6 +359,14 @@ function onBoardCreated(key: string): void {
   ui.newBoardOpen.value = false
   void router.push(`/b/${key}`)
 }
+
+// Views register their own actions under a context (lib/commands.ts); the
+// route name IS the context, so the palette stays contextualized for free.
+watch(
+  () => route.name,
+  (name) => palette.setContext(name ? String(name) : undefined),
+  { immediate: true },
+)
 
 // Command palette: navigation + create + view controls. Registrations are
 // diffed so removed boards unregister (commands are global).

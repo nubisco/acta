@@ -149,6 +149,17 @@ export function useInspector() {
   }
 }
 
+/** Quick-look modal for docs referenced outside the docs space. */
+const previewDocSlug = ref<string | null>(null)
+
+export function useDocPreview() {
+  return {
+    slug: previewDocSlug,
+    open: (slug: string) => (previewDocSlug.value = slug),
+    close: () => (previewDocSlug.value = null),
+  }
+}
+
 const DENSE_ROUTES = new Set(['board', 'docs'])
 
 export function useUiState() {

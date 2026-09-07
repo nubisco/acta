@@ -150,7 +150,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, provide, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import {
   NbBanner,
@@ -166,6 +166,8 @@ import {
 import { api, newOpId, ApiHttpError } from '@/api/client'
 import type { IDocDetail } from '@/types/api'
 import { humanise, relativeTime, useLoadState } from '@/lib/state'
+import { DOC_NAV_KEY } from '@/lib/keys'
+import { useViewCommands } from '@/lib/commands'
 import CommentThread from '@/components/CommentThread.vue'
 import DocsTreePanel from '@/components/DocsTreePanel.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
@@ -180,6 +182,36 @@ const props = defineProps<{ slug?: string }>()
 const toast = useToast()
 const confirm = useConfirm()
 const router = useRouter()
+
+// Inside the docs space a doc ref navigates for real; the quick-look modal
+// is for every other surface.
+provide(DOC_NAV_KEY, (target: string) => void router.push(`/docs/${target}`))
+
+useViewCommands('docs', [
+  {
+    id: 'docs:edit',
+    label: 'Edit page',
+    icon: 'pencil-simple',
+    namespace: 'Docs',
+    handler: () => {
+      if (doc.value && !editing.value) startEdit()
+    },
+  },
+  {
+    id: 'docs:delete',
+    label: 'Delete page',
+    icon: 'trash',
+    namespace: 'Docs',
+    handler: removeDoc,
+  },
+  {
+    id: 'docs:history',
+    label: 'Version history',
+    icon: 'clock-counter-clockwise',
+    namespace: 'Docs',
+    handler: () => (showHistory.value = !showHistory.value),
+  },
+])
 
 function removeDoc(): void {
   const current = doc.value

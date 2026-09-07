@@ -191,6 +191,7 @@ import {
 import { api, newOpId } from '@/api/client'
 import type { IBoardItemRow } from '@/types/api'
 import { humanise, useLoadState } from '@/lib/state'
+import { useViewCommands } from '@/lib/commands'
 import { labelVariants } from '@/lib/labels'
 import { roleColor } from '@/lib/colors'
 import { useInspector, useUiState, useWorkspace } from '@/stores/workspace'
@@ -321,6 +322,23 @@ onScopeDispose(
 function toggleArchived(): void {
   stateFilter.value = stateFilter.value === 'archived' ? 'open' : 'archived'
 }
+
+useViewCommands('board', [
+  {
+    id: 'board:add-card',
+    label: 'Add card',
+    icon: 'plus',
+    namespace: 'Board',
+    handler: () => openNewItem(),
+  },
+  {
+    id: 'board:toggle-archived',
+    label: 'Toggle archived cards',
+    icon: 'archive',
+    namespace: 'Board',
+    handler: toggleArchived,
+  },
+])
 
 function clearFilters(): void {
   labelFilter.value = ''
