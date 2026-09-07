@@ -357,7 +357,11 @@ watch(
 watch(inspector.itemKey, (key) => {
   const current = typeof route.query.item === 'string' ? route.query.item : null
   if ((key ?? null) === current) return
-  void router.replace({
+  // Opening or hopping card-to-card (a [[ref]] chip in a description) PUSHES,
+  // so browser Back walks the chain the reader followed. Closing REPLACES,
+  // so a closed inspector does not resurrect on Back.
+  const navigate = key ? router.push : router.replace
+  void navigate({
     query: { ...route.query, item: key ?? undefined },
   })
 })
