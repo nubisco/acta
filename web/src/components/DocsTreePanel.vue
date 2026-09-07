@@ -45,7 +45,7 @@
         </template>
       </NbEmptyState>
 
-      <NbTree v-else v-model="selected" size="sm" compact>
+      <NbTree ref="treeRef" v-else v-model="selected" size="sm" compact>
         <DocsTreeNode v-for="node in tree" :key="node.slug" :node="node" />
       </NbTree>
     </div>
@@ -63,7 +63,7 @@
 // The documents tree lives on the LEFT of the docs view (the Confluence
 // mental model), leaving the shell inspector free for item details opened
 // from inside a page.
-import { computed, onScopeDispose, ref } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NbButton, NbEmptyState, NbSkeleton, NbTree } from '@nubisco/ui'
 import { api } from '@/api/client'
@@ -81,6 +81,28 @@ const tree = ref<IDocTreeNode[]>([])
 const creating = ref(false)
 
 const currentSlug = computed(() => String(route.params.slug ?? ''))
+const treeRef = ref<InstanceType<typeof NbTree> | null>(null)
+
+// Landing on a doc (deep link, breadcrumb, in-page ref) must show WHERE it
+// lives: expand its ancestor chain so the selected node is actually visible,
+// then bring it into the panel's viewport. Slugs are ancestor paths, so the
+// chain is every proper prefix of the current slug.
+watch(
+  [currentSlug, tree],
+  async () => {
+    const slug = currentSlug.value
+    if (!slug || tree.value.length === 0) return
+    const parts = slug.split('/')
+    treeRef.value?.expandIds(
+      parts.slice(0, -1).map((_, i) => parts.slice(0, i + 1).join('/')),
+    )
+    await nextTick()
+    document
+      .querySelector('.doc-tree [aria-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest' })
+  },
+  { immediate: true, flush: 'post' },
+)
 const selected = computed<string | null>({
   get: () => currentSlug.value || null,
   set: (slug) => {

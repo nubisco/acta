@@ -310,6 +310,8 @@ export const zDocOp = z.discriminatedUnion('op', [
     slug: zDocSlug.optional(),
   }),
   z.object({ op: z.literal('archive'), op_id: zOpId, ref: zDocSlug }),
+  /** Hard delete. Leaf pages only: refused while child pages exist. */
+  z.object({ op: z.literal('delete'), op_id: zOpId, ref: zDocSlug }),
 ])
 export type TDocOp = z.infer<typeof zDocOp>
 

@@ -128,7 +128,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'doc_write',
     description:
-      'Batch document mutations, idempotent via op_id. Ops: create, replace (needs if_rev), patch_section (needs section slug + if_hash from doc_get sections; conflicts only when the same section changed), append (no read needed, ideal for logs), move, rename, archive. Section edits transfer only the changed section, not the whole document.',
+      'Batch document mutations, idempotent via op_id. Ops: create, replace (needs if_rev), patch_section (needs section slug + if_hash from doc_get sections; conflicts only when the same section changed), append (no read needed, ideal for logs), move, rename, archive, delete (hard delete, leaf pages only). Section edits transfer only the changed section, not the whole document.',
     schema: zDocWrite,
     write: true,
     handler: async (ctx, args) => {
@@ -195,7 +195,19 @@ export const MCP_TOOLS: IMcpTool[] = [
 /** attachment_add needs the file store; built at server start. */
 export function createMcpTools(store: AttachmentStore): IMcpTool[] {
   return [
-    ...MCP_TOOLS,
+    // doc_write's delete op removes attachment blobs, which needs the store
+    // this factory holds; the static definition can't reach it.
+    ...MCP_TOOLS.map((tool) =>
+      tool.name === 'doc_write'
+        ? {
+            ...tool,
+            handler: async (ctx: ICtx, args: unknown) => {
+              const body = args as z.infer<typeof zDocWrite>
+              return { results: await docWrite(ctx, body.ops, store) }
+            },
+          }
+        : tool,
+    ),
     {
       name: 'attachment_add',
       description:

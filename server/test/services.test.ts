@@ -393,6 +393,54 @@ describe('docs', () => {
     expect(versions.versions.map((v) => v.rev)).toEqual([2, 1])
   })
 
+  it('deletes leaf docs fully and refuses while children exist', async () => {
+    await docWrite(ctx, [
+      {
+        op: 'create',
+        op_id: 'dd1',
+        slug: 'manual',
+        title: 'Manual',
+        body: 'Root body.',
+        layout: 'default',
+        tags: [],
+      },
+      {
+        op: 'create',
+        op_id: 'dd2',
+        slug: 'manual/vision',
+        title: 'Vision',
+        parent: 'manual',
+        body: 'Vision body with a findable pineapple.',
+        layout: 'default',
+        tags: [],
+      },
+      { op: 'comment', op_id: 'dd3', ref: 'manual/vision', body: 'A remark.' },
+    ])
+
+    const refused = await docWrite(ctx, [
+      { op: 'delete', op_id: 'dd4', ref: 'manual' },
+    ])
+    expect(refused[0].ok).toBe(false)
+    expect((refused[0] as { error: string }).error).toContain('child pages')
+
+    const deleted = await docWrite(ctx, [
+      { op: 'delete', op_id: 'dd5', ref: 'manual/vision' },
+    ])
+    expect(deleted[0].ok).toBe(true)
+
+    expect(docGet(ctx, 'manual/vision')).rejects.toThrow()
+    const hits = (await search(ctx, { query: 'pineapple', limit: 20 })) as {
+      results: unknown[]
+    }
+    expect(hits.results).toHaveLength(0)
+
+    // The parent became a leaf and can go now.
+    const root = await docWrite(ctx, [
+      { op: 'delete', op_id: 'dd6', ref: 'manual' },
+    ])
+    expect(root[0].ok).toBe(true)
+  })
+
   it('appends without needing a read', async () => {
     await docWrite(ctx, [
       {
@@ -499,7 +547,12 @@ describe('docs', () => {
     expect(doc.imported).toMatchObject({ source: 'confluence', versions: 3 })
 
     const cleared = await docWrite(ctx, [
-      { op: 'set_meta', op_id: 'm1', ref: 'imported-page', imported_meta: null },
+      {
+        op: 'set_meta',
+        op_id: 'm1',
+        ref: 'imported-page',
+        imported_meta: null,
+      },
     ])
     expect(cleared[0].ok).toBe(true)
     doc = (await docGet(ctx, 'imported-page')) as typeof doc

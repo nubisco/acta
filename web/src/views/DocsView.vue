@@ -18,6 +18,14 @@
           <NbButton size="sm" variant="primary" @click="startEdit"
             >Edit</NbButton
           >
+          <NbButton
+            v-nb-tooltip="{ body: 'Delete page' }"
+            size="sm"
+            variant="secondary"
+            icon="trash"
+            aria-label="Delete page"
+            @click="removeDoc"
+          />
         </template>
         <template v-else-if="doc && editing">
           <NbButton size="sm" variant="secondary" @click="cancelEdit">
@@ -143,7 +151,7 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import {
   NbBanner,
   NbButton,
@@ -171,6 +179,36 @@ const props = defineProps<{ slug?: string }>()
 
 const toast = useToast()
 const confirm = useConfirm()
+const router = useRouter()
+
+function removeDoc(): void {
+  const current = doc.value
+  if (!current) return
+  void confirm({
+    title: 'Delete page',
+    message: `"${current.title}" and its comments, versions and attachments will be permanently deleted. Pages that still have child pages cannot be deleted.`,
+    confirmLabel: 'Delete page',
+    cancelLabel: 'Cancel',
+    onConfirm: async () => {
+      try {
+        const { results } = await api.docWrite([
+          { op: 'delete', op_id: newOpId(), ref: current.slug },
+        ])
+        if (!results[0].ok) {
+          toast.error(String(results[0].error ?? 'Delete failed'), {
+            title: 'Delete failed',
+          })
+          return
+        }
+        toast.success(`Deleted "${current.title}"`)
+        const parent = current.slug.split('/').slice(0, -1).join('/')
+        void router.push(parent ? `/docs/${parent}` : '/docs')
+      } catch (err) {
+        toast.error(humanise(err), { title: 'Delete failed' })
+      }
+    },
+  })
+}
 const load = useLoadState()
 const topbarActions = useShellSlot('topbar-right')
 const treebar = useShellSlot('contextbar')

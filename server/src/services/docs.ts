@@ -9,14 +9,19 @@ import {
 import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
 import { emitEvent } from '../core/events'
-import { ftsUpsert } from '../core/fts'
+import { ftsDelete, ftsUpsert } from '../core/fts'
 import { withOp } from '../core/ops'
 import { boardByKey, docBySlug, type IDocRow } from '../core/store'
+import type { AttachmentStore } from './attachments'
 
-export async function docWrite(ctx: ICtx, ops: TDocOp[]): Promise<TOpResult[]> {
+export async function docWrite(
+  ctx: ICtx,
+  ops: TDocOp[],
+  store?: AttachmentStore,
+): Promise<TOpResult[]> {
   const results: TOpResult[] = []
   for (const op of ops) {
-    results.push(await withOp(ctx, op.op_id, () => applyDocOp(ctx, op)))
+    results.push(await withOp(ctx, op.op_id, () => applyDocOp(ctx, op, store)))
   }
   return results
 }
@@ -64,6 +69,7 @@ async function syncDocDerived(
 async function applyDocOp(
   ctx: ICtx,
   op: TDocOp,
+  store?: AttachmentStore,
 ): Promise<{ slug?: string; id?: string; rev?: number }> {
   const ts = now()
   switch (op.op) {
@@ -309,6 +315,58 @@ async function applyDocOp(
         `archived ${doc.slug}`,
       )
       return { slug: doc.slug, rev: doc.rev }
+    }
+    case 'delete': {
+      // Leaf pages only: a subtree disappearing because of one op on its root
+      // is more loss than a hard delete without undo should allow. Comments,
+      // versions, attachments (with their blobs), links and search rows all
+      // belong to the page and go with it.
+      const doc = await docBySlug(ctx, op.ref)
+      const children = await ctx.db.query<{ id: string }>(
+        'SELECT id FROM document WHERE parent_id = ? LIMIT 1',
+        [doc.id],
+      )
+      if (children.length > 0)
+        throw new ApiError(
+          409,
+          `${doc.slug} has child pages; delete or move them first`,
+        )
+      const comments = await ctx.db.query<{ id: string }>(
+        'SELECT id FROM doc_comment WHERE document_id = ?',
+        [doc.id],
+      )
+      for (const comment of comments) {
+        await ftsDelete(ctx, 'comment', comment.id)
+        await ctx.db.run(
+          "DELETE FROM link WHERE src_kind = 'comment' AND src_id = ?",
+          [comment.id],
+        )
+      }
+      await ctx.db.run('DELETE FROM doc_comment WHERE document_id = ?', [
+        doc.id,
+      ])
+      await ctx.db.run('DELETE FROM doc_version WHERE document_id = ?', [
+        doc.id,
+      ])
+      const attachments = await ctx.db.query<{ id: string; kind: string }>(
+        "SELECT id, kind FROM attachment WHERE owner_kind = 'doc' AND owner_id = ?",
+        [doc.id],
+      )
+      for (const attachment of attachments) {
+        if (attachment.kind === 'file') await store?.remove(attachment.id)
+      }
+      await ctx.db.run(
+        "DELETE FROM attachment WHERE owner_kind = 'doc' AND owner_id = ?",
+        [doc.id],
+      )
+      await ctx.db.run(
+        "DELETE FROM link WHERE src_kind = 'doc' AND src_id = ?",
+        [doc.id],
+      )
+      await ftsDelete(ctx, 'doc', doc.slug)
+      await ctx.db.run('DELETE FROM document WHERE id = ?', [doc.id])
+      await emitEvent(ctx, 'doc.deleted', 'doc', doc.id, `deleted ${doc.slug}`)
+      return { slug: doc.slug }
     }
   }
 }
