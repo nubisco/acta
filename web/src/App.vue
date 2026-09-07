@@ -37,18 +37,35 @@
         >
           <NbIcon :name="entry.icon" :size="18" />
         </NbSidebarLink>
+        <!-- The rail cannot afford a row per board (a dozen two-letter codes
+             read as noise), so boards fold behind one icon whose menu carries
+             what the rail cannot: full names and open counts. -->
         <NbSidebarLink
-          v-for="board in boards"
-          :key="board.key"
-          v-nb-tooltip="{ body: board.name }"
-          :to="`/b/${board.key}`"
-          :active="
-            route.name === 'board' && route.params.boardKey === board.key
-          "
-          @click.prevent="router.push(`/b/${board.key}`)"
+          ref="boardsRailTrigger"
+          v-nb-tooltip="{ body: 'Boards' }"
+          :active="route.name === 'board'"
+          aria-label="Boards"
+          aria-haspopup="menu"
+          :aria-expanded="boardsMenuOpen"
+          @click.prevent="toggleBoardsMenu"
         >
-          <span class="rail-key">{{ board.key.slice(0, 2) }}</span>
+          <NbIcon name="kanban" :size="18" />
         </NbSidebarLink>
+        <NbMenu
+          ref="boardsMenu"
+          v-model:open="boardsMenuOpen"
+          size="sm"
+          :min-width="220"
+          @close="boardsMenuOpen = false"
+        >
+          <NbMenuItem
+            v-for="board in boards"
+            :key="board.key"
+            :label="board.name"
+            :shortcut="String(openCount(board) ?? '')"
+            @select="openBoardFromMenu(board.key)"
+          />
+        </NbMenu>
       </template>
       <NbSidebarMenu v-else density="compact">
         <NbSidebarMenuItem
@@ -192,6 +209,8 @@ import {
   NbBreadcrumbs,
   NbCommandPalette,
   NbIcon,
+  NbMenu,
+  NbMenuItem,
   NbShell,
   NbSidebarBrand,
   NbSidebarLink,
@@ -250,6 +269,29 @@ function toggleSidebar(): void {
 const boards = computed(() =>
   (ws.overview.value?.boards ?? []).filter((b) => !b.archived),
 )
+
+// Collapsed-rail boards menu: opens to the right of its rail icon.
+const boardsRailTrigger = ref<{ $el: HTMLElement } | null>(null)
+const boardsMenu = ref<InstanceType<typeof NbMenu> | null>(null)
+const boardsMenuOpen = ref(false)
+
+function toggleBoardsMenu(): void {
+  if (boardsMenuOpen.value) {
+    boardsMenuOpen.value = false
+    return
+  }
+  const el = boardsRailTrigger.value?.$el
+  if (el && boardsMenu.value) {
+    const rect = el.getBoundingClientRect()
+    boardsMenu.value.setPositionXY(rect.right + 8, rect.top)
+  }
+  boardsMenuOpen.value = true
+}
+
+function openBoardFromMenu(key: string): void {
+  boardsMenuOpen.value = false
+  void router.push(`/b/${key}`)
+}
 
 const navEntries = computed(() => [
   {
@@ -450,12 +492,6 @@ watch(
 </script>
 
 <style scoped lang="scss">
-.rail-key {
-  font-family: var(--nb-font-family-mono);
-  font-size: var(--nb-type-label-sm-size);
-  font-weight: var(--nb-type-label-lg-weight, 600);
-}
-
 .brand-mark {
   display: block;
   width: 28px;
