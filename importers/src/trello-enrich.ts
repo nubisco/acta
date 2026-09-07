@@ -4,7 +4,7 @@
  *
  *   1. Archived cards (boards/{id}/cards/closed) become archived items.
  *   2. Attachments (cards/{id}/attachments) land on every imported item:
- *      link attachments by url, uploaded files downloaded (up to 8 MB) and
+ *      link attachments by url, uploaded files downloaded (up to 25 MB) and
  *      stored inline.
  *
  * Usage:
@@ -41,7 +41,7 @@ import {
 import { planTrelloImport } from './trello/plan'
 import { forcedKeyFor, parseKeyAssignments } from './trello-import'
 
-const ENRICH_ATTACHMENT_MAX = 8 * 1024 * 1024
+const ENRICH_ATTACHMENT_MAX = 25 * 1024 * 1024
 /** Pacing between Trello REST calls; sustained bursts trip rate limits. */
 const REST_PACE_MS = 150
 
@@ -313,7 +313,7 @@ async function enrichBoard(
           section.skipped(
             'attachments',
             att.id,
-            `file attachment ${filename} skipped (${att.bytes} bytes > 8 MB)`,
+            `file attachment ${filename} skipped (${att.bytes} bytes > 25 MB)`,
           )
           continue
         }
@@ -336,7 +336,7 @@ async function enrichBoard(
         section.skipped(
           'attachments',
           att.id,
-          `file attachment ${filename} skipped (larger than 8 MB)`,
+          `file attachment ${filename} skipped (larger than 25 MB)`,
         )
         continue
       }
