@@ -7,7 +7,7 @@
     v-model:inspector-visible="inspectorVisible"
     :sidebar-variant="sidebarVariant"
     sidebar-label="Acta sections"
-    :inspector-size="route.name === 'docs' ? 'sm' : 'md'"
+    inspector-size="md"
     inspector-label="Item"
     collapse-at="md"
     resizable
@@ -168,9 +168,8 @@
     <RouterView />
 
     <template #inspector>
-      <DocsTreePanel v-if="route.name === 'docs' && !inspector.itemKey.value" />
       <ItemInspector
-        v-else-if="inspector.itemKey.value"
+        v-if="inspector.itemKey.value"
         :item-key="inspector.itemKey.value"
       />
     </template>
@@ -225,7 +224,6 @@ import {
   useUiState,
   useWorkspace,
 } from '@/stores/workspace'
-import DocsTreePanel from '@/components/DocsTreePanel.vue'
 import ItemInspector from '@/components/ItemInspector.vue'
 import ItemModal from '@/components/ItemModal.vue'
 import NewBoardModal from '@/components/NewBoardModal.vue'
@@ -327,17 +325,15 @@ const trail = computed<ICrumb[]>(() => {
 })
 
 const inspectorVisible = ref(false)
-// The inspector only stays open while it has content: an item, or the docs
-// tree on the docs route. An empty-but-open inspector is dead space.
+// The inspector only stays open while it has an item; an empty-but-open
+// inspector is dead space. The docs tree lives in the docs view itself.
 watch(inspector.itemKey, (key) => {
-  if (key !== null) inspectorVisible.value = true
-  else if (route.name !== 'docs') inspectorVisible.value = false
+  inspectorVisible.value = key !== null
 })
 watch(
   () => route.name,
-  (name) => {
-    if (name === 'docs') inspectorVisible.value = true
-    else if (!inspector.itemKey.value) inspectorVisible.value = false
+  () => {
+    if (!inspector.itemKey.value) inspectorVisible.value = false
   },
   { immediate: true },
 )

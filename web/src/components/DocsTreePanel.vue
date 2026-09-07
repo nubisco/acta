@@ -1,18 +1,19 @@
 <template>
-  <div class="nb-inspector">
-    <NbShellPanel title="Documents" fill>
-      <template #toolbar>
-        <NbButton
-          v-nb-tooltip="{ body: 'New document' }"
-          size="xs"
-          variant="secondary"
-          icon="plus"
-          aria-label="New document"
-          @click="creating = true"
-        />
-      </template>
+  <aside class="doc-tree" aria-label="Documents">
+    <header class="doc-tree__head">
+      <span class="doc-tree__title">Documents</span>
+      <NbButton
+        v-nb-tooltip="{ body: 'New document' }"
+        size="xs"
+        variant="secondary"
+        icon="plus"
+        aria-label="New document"
+        @click="creating = true"
+      />
+    </header>
 
-      <div v-if="load.state.value === 'loading'" class="tree-loading">
+    <div class="doc-tree__body">
+      <div v-if="load.state.value === 'loading'" class="doc-tree__loading">
         <NbSkeleton variant="text" :lines="6" label="Loading documents" />
       </div>
 
@@ -47,8 +48,8 @@
       <NbTree v-else v-model="selected" size="sm" compact>
         <DocsTreeNode v-for="node in tree" :key="node.slug" :node="node" />
       </NbTree>
-    </NbShellPanel>
-  </div>
+    </div>
+  </aside>
 
   <NewDocModal
     :open="creating"
@@ -59,15 +60,12 @@
 </template>
 
 <script setup lang="ts">
+// The documents tree lives on the LEFT of the docs view (the Confluence
+// mental model), leaving the shell inspector free for item details opened
+// from inside a page.
 import { computed, onScopeDispose, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  NbButton,
-  NbEmptyState,
-  NbShellPanel,
-  NbSkeleton,
-  NbTree,
-} from '@nubisco/ui'
+import { NbButton, NbEmptyState, NbSkeleton, NbTree } from '@nubisco/ui'
 import { api } from '@/api/client'
 import type { IDocTreeNode } from '@/types/docs'
 import { useLoadState } from '@/lib/state'
@@ -126,7 +124,37 @@ function onCreated(slug: string): void {
 </script>
 
 <style scoped lang="scss">
-.tree-loading {
-  padding: var(--nb-spacing-12);
+.doc-tree {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-inline-end: 1px solid var(--nb-c-border);
+  padding-inline-end: var(--nb-spacing-16);
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--nb-spacing-8);
+    padding-block-end: var(--nb-spacing-8);
+  }
+
+  &__title {
+    font-size: var(--nb-type-label-md-size);
+    font-weight: var(--nb-type-label-md-weight, 600);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--nb-c-text-muted);
+  }
+
+  &__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  &__loading {
+    padding: var(--nb-spacing-12) 0;
+  }
 }
 </style>

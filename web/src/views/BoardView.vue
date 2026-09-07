@@ -261,7 +261,10 @@ const columns = computed(() =>
 )
 
 const boardItems = computed<IBoardItem[]>(() =>
-  items.value.map((row) => ({ id: row.key, columnId: row.list, ...row })),
+  // Cell order is the array order, so sort by pos before handing over.
+  [...items.value]
+    .sort((a, b) => a.pos - b.pos)
+    .map((row) => ({ id: row.key, columnId: row.list, ...row })),
 )
 
 const labelOptions = computed(() => [
@@ -326,18 +329,50 @@ function clearFilters(): void {
   stateFilter.value = 'open'
 }
 
+/**
+ * Fractional position between the drop's neighbors, so a move writes one
+ * row and never renumbers the list.
+ */
+function posBetween(
+  before: IBoardItemRow | undefined,
+  after: IBoardItemRow | undefined,
+): number {
+  if (before && after) return (before.pos + after.pos) / 2
+  if (before) return before.pos + 1024
+  if (after) return after.pos / 2
+  return 1024
+}
+
 async function onMove(event: IBoardMoveEvent): Promise<void> {
   const row = items.value.find((r) => r.key === event.itemId)
   if (!row) return
+  const cell = items.value
+    .filter((r) => r.list === event.toColumnId && r.key !== row.key)
+    .sort((a, b) => a.pos - b.pos)
+  const before = event.beforeItemId
+    ? cell.find((r) => r.key === event.beforeItemId)
+    : undefined
+  const after = event.afterItemId
+    ? cell.find((r) => r.key === event.afterItemId)
+    : undefined
   const previousList = row.list
+  const previousPos = row.pos
   row.list = event.toColumnId
+  row.pos = posBetween(before, after)
   try {
     const { results } = await api.itemWrite([
-      { op: 'move', op_id: newOpId(), key: row.key, list: event.toColumnId },
+      {
+        op: 'move',
+        op_id: newOpId(),
+        key: row.key,
+        list: event.toColumnId,
+        pos: row.pos,
+      },
     ])
     if (!results[0].ok) throw new Error((results[0] as { error: string }).error)
   } catch (err) {
     row.list = previousList
+    row.pos = previousPos
     toast.error(humanise(err), { title: 'Move failed' })
   }
   await loadItems()

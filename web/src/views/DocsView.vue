@@ -1,5 +1,8 @@
 <template>
   <div class="docs">
+    <DocsTreePanel class="docs__tree" />
+
+    <div class="docs__content">
     <component :is="topbarActions.Outlet">
       <template v-if="doc && !editing">
         <NbButton
@@ -130,6 +133,7 @@
         />
       </section>
     </article>
+    </div>
   </div>
 </template>
 
@@ -151,6 +155,7 @@ import { api, newOpId, ApiHttpError } from '@/api/client'
 import type { IDocDetail } from '@/types/api'
 import { humanise, relativeTime, useLoadState } from '@/lib/state'
 import CommentThread from '@/components/CommentThread.vue'
+import DocsTreePanel from '@/components/DocsTreePanel.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
@@ -373,9 +378,39 @@ async function restoreVersion(): Promise<void> {
 
 <style scoped lang="scss">
 .docs {
+  /* Confluence-style split: the document tree stays on the left, the page
+   * fills the rest, and the shell inspector stays free for item details. */
   display: grid;
-  gap: var(--nb-spacing-16);
-  align-content: start;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  gap: var(--nb-spacing-24);
+  align-items: start;
+  min-height: 0;
+
+  &__tree {
+    position: sticky;
+    top: 0;
+    max-height: calc(100vh - 8rem);
+  }
+
+  &__content {
+    display: grid;
+    gap: var(--nb-spacing-16);
+    align-content: start;
+    min-width: 0;
+  }
+
+  @media (max-width: 56rem) {
+    grid-template-columns: 1fr;
+
+    &__tree {
+      position: static;
+      max-height: 16rem;
+      border-inline-end: 0;
+      padding-inline-end: 0;
+      border-block-end: 1px solid var(--nb-c-border);
+      padding-block-end: var(--nb-spacing-12);
+    }
+  }
 
   &__placeholder {
     min-height: 24rem;
