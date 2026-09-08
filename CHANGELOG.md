@@ -1,3 +1,10 @@
+## [1.7.2](https://github.com/nubisco/acta/compare/v1.7.1...v1.7.2) (2026-09-08)
+
+
+### Bug Fixes
+
+* **ingest:** apply labels one at a time so a bad name costs only itself ([34ef6f6](https://github.com/nubisco/acta/commit/34ef6f632b599bc41b8faa26fc2af5263972193c))
+
 ## [1.7.1](https://github.com/nubisco/acta/compare/v1.7.0...v1.7.1) (2026-09-08)
 
 
