@@ -112,19 +112,25 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
     // `create` would mean one unrecognised name loses the whole submission,
     // and the callers here are contact forms: an unlabelled ticket is a
     // nuisance, a dropped ticket is a lost customer.
-    const labelsFailed =
-      body.labels?.length && result.key
-        ? !(
-            await itemWrite(ctx, [
-              {
-                op: 'label',
-                op_id: `ingest:${result.key}:labels`,
-                key: result.key,
-                add: body.labels,
-              },
-            ])
-          )[0].ok
-        : false
+    //
+    // One op per label, not one op for all of them, so an unknown name costs
+    // only itself. A sender routing on several axes at once (kind, product,
+    // provenance) should not lose the two that were right because the third
+    // was not.
+    const labelsSkipped: string[] = []
+    if (result.key) {
+      for (const label of body.labels ?? []) {
+        const applied = await itemWrite(ctx, [
+          {
+            op: 'label',
+            op_id: `ingest:${result.key}:label:${label}`,
+            key: result.key,
+            add: [label],
+          },
+        ])
+        if (!applied[0].ok) labelsSkipped.push(label)
+      }
+    }
 
     // Attachments are best-effort by design. The card is the outcome that
     // has to survive: a caller whose log failed to upload would rather have
@@ -156,7 +162,7 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
       key: result.key,
       ...(attached.length > 0 ? { attached } : {}),
       ...(failed.length > 0 ? { attachments_failed: failed } : {}),
-      ...(labelsFailed ? { labels_failed: true } : {}),
+      ...(labelsSkipped.length > 0 ? { labels_skipped: labelsSkipped } : {}),
     })
   })
 

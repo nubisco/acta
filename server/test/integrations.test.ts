@@ -479,6 +479,16 @@ describe('ingest attachments', () => {
   })
 
   it('still creates the ticket when a label does not exist', async () => {
+    await labelWrite(ctx, [
+      { op: 'group_create', op_id: 'g2', name: 'Kind' },
+      {
+        op: 'label_create',
+        op_id: 'l2',
+        group: 'Kind',
+        name: 'real-label',
+        color: 'gray',
+      },
+    ])
     const created = await app.request('/api/v1/ingest_tokens', {
       method: 'POST',
       headers: {
@@ -493,19 +503,21 @@ describe('ingest attachments', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         title: 'A support request',
-        labels: ['no-such-label'],
+        labels: ['real-label', 'no-such-label'],
       }),
     })
     const json = (await res.json()) as {
       ok: boolean
       key: string
-      labels_failed?: boolean
+      labels_skipped?: string[]
     }
-    // The ticket survives the bad label, and the caller is told about it.
+    // The ticket survives the bad label, the good one still lands, and the
+    // caller is told exactly which name was not recognised.
     expect(json.ok).toBe(true)
-    expect(json.labels_failed).toBe(true)
+    expect(json.labels_skipped).toEqual(['no-such-label'])
     const { items } = await itemGet(ctx, { keys: [json.key] })
     expect(items[0].title).toBe('A support request')
+    expect(items[0].labels).toEqual(['real-label'])
   })
 
   it('still creates the card when an attachment cannot be stored', async () => {
