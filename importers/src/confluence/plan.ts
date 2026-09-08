@@ -184,7 +184,8 @@ export function planConfluenceImport(
   }
 
   const convertOpts = {
-    resolvePage: (title: string) => slugByTitle.get(title.toLowerCase()) ?? null,
+    resolvePage: (title: string) =>
+      slugByTitle.get(title.toLowerCase()) ?? null,
     trelloBoards: opts.trelloBoards ?? DEFAULT_TRELLO_BOARD_MAP,
   }
 

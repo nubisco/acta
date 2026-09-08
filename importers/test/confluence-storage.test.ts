@@ -112,18 +112,18 @@ describe('storageToMarkdown: macros', () => {
   })
 
   it('maps panel divs to callouts by data-panel-type', () => {
-    expect(md('<div data-type="panel" data-panel-type="info"><p>I.</p></div>')).toBe(
-      '> [!INFO]\n> I.',
-    )
-    expect(md('<div data-type="panel" data-panel-type="tip"><p>T.</p></div>')).toBe(
-      '> [!TIP]\n> T.',
-    )
+    expect(
+      md('<div data-type="panel" data-panel-type="info"><p>I.</p></div>'),
+    ).toBe('> [!INFO]\n> I.')
+    expect(
+      md('<div data-type="panel" data-panel-type="tip"><p>T.</p></div>'),
+    ).toBe('> [!TIP]\n> T.')
     expect(
       md('<div data-type="panel" data-panel-type="success"><p>S.</p></div>'),
     ).toBe('> [!TIP]\n> S.')
-    expect(md('<div data-type="panel" data-panel-type="note"><p>N.</p></div>')).toBe(
-      '> [!NOTE]\n> N.',
-    )
+    expect(
+      md('<div data-type="panel" data-panel-type="note"><p>N.</p></div>'),
+    ).toBe('> [!NOTE]\n> N.')
     expect(
       md('<div data-type="panel" data-panel-type="warning"><p>W.</p></div>'),
     ).toBe('> [!WARNING]\n> W.')

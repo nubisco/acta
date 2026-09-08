@@ -19,10 +19,7 @@ import { planConfluenceImport } from '../src/confluence/plan'
 import { runConfluenceImport } from '../src/confluence/run'
 import { zTrelloBoard } from '../src/trello/model'
 import { planTrelloImport, type ITrelloPlanOptions } from '../src/trello/plan'
-import {
-  runTrelloFixComments,
-  runTrelloImport,
-} from '../src/trello/run'
+import { runTrelloFixComments, runTrelloImport } from '../src/trello/run'
 
 let db: BunSqliteDriver
 let app: Awaited<ReturnType<typeof createApp>>
@@ -309,9 +306,7 @@ describe('trello import end to end', () => {
     )!
     expect(secondSection.counts.comments.created).toBe(0)
     expect(secondSection.counts.comments.skipped).toBe(3)
-    expect(
-      (await client.itemComments([epicKey])).get(epicKey),
-    ).toHaveLength(3)
+    expect((await client.itemComments([epicKey])).get(epicKey)).toHaveLength(3)
   })
 
   it('dry-run performs no writes', async () => {

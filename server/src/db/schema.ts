@@ -306,6 +306,4 @@ CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
  * the drivers swallow the "duplicate column" error that means the column
  * is already there. Append only, never edit or reorder.
  */
-export const ADDITIVE_COLUMNS = [
-  'ALTER TABLE actor ADD COLUMN avatar_url TEXT',
-]
+export const ADDITIVE_COLUMNS = ['ALTER TABLE actor ADD COLUMN avatar_url TEXT']
