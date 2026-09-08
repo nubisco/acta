@@ -1,3 +1,10 @@
+## [1.7.3](https://github.com/nubisco/acta/compare/v1.7.2...v1.7.3) (2026-09-08)
+
+
+### Bug Fixes
+
+* **settings:** reveal the ingest token alone, not the whole endpoint ([ec9aa39](https://github.com/nubisco/acta/commit/ec9aa39d687b6ce8c92dd6233ba94c5630d88329))
+
 ## [1.7.2](https://github.com/nubisco/acta/compare/v1.7.1...v1.7.2) (2026-09-08)
 
 
