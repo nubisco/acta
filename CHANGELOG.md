@@ -1,3 +1,15 @@
+# [1.9.0](https://github.com/nubisco/acta/compare/v1.8.0...v1.9.0) (2026-09-08)
+
+
+### Bug Fixes
+
+* **web:** card text that broke its own layout ([c15dda6](https://github.com/nubisco/acta/commit/c15dda639db9677d6e526d4b9407487e08225cd9))
+
+
+### Features
+
+* **board:** right-click a card for a context menu ([3fa236f](https://github.com/nubisco/acta/commit/3fa236f3b7d770ca2185a44c7f9f94da1aec97a6))
+
 # [1.8.0](https://github.com/nubisco/acta/compare/v1.7.3...v1.8.0) (2026-09-08)
 
 
