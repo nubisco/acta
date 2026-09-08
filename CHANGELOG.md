@@ -1,3 +1,32 @@
+# [1.6.0](https://github.com/nubisco/acta/compare/v1.5.1...v1.6.0) (2026-09-08)
+
+
+### Bug Fixes
+
+* **importers:** large attachment uploads use the raw route ([0d06102](https://github.com/nubisco/acta/commit/0d061022be551ead2774908fe7cb148bbcb7fefd))
+* **search:** survive raw user input, find by key, answer while typing ([6fe8b8f](https://github.com/nubisco/acta/commit/6fe8b8f476e90ab9c44fb80c18e1e3c9c1e50f19))
+* **web:** browser Back walks the inspector's card chain ([200fb3a](https://github.com/nubisco/acta/commit/200fb3aa635dde4cf22f00c3585194406b49be64))
+* **web:** home tiles no longer play height games inside the card body ([f9a3c44](https://github.com/nubisco/acta/commit/f9a3c4423af43b5ebe536d5ffc180cd0887dc87c))
+
+
+### Features
+
+* avatars and display names everywhere a person appears ([3cef515](https://github.com/nubisco/acta/commit/3cef51586db387d570d9645a5033c9c3ea014179)), closes [option/#value](https://github.com/nubisco/acta/issues/value)
+* **docs:** delete op and tree reveal of the current page ([1566cc3](https://github.com/nubisco/acta/commit/1566cc3b8764ae7dd35854f512661d33f0bb41d4))
+* full-fidelity foundations, nothing gets lost in migrations or after them ([fb9742f](https://github.com/nubisco/acta/commit/fb9742f6ddcf8d216ad1377585b9fbd2fb11b108))
+* **importers:** migrations carry provenance, comments, and everything the connector hides ([48258c7](https://github.com/nubisco/acta/commit/48258c74069549d629fe1ce038a5abc55e03455c))
+* **web:** adopt @nubisco/ui end to end across the shell and views ([446d99d](https://github.com/nubisco/acta/commit/446d99d62eefc055d3cbeeca3f264d0949539e74))
+* **web:** callouts carry their kind's icon ([ed2f6c7](https://github.com/nubisco/acta/commit/ed2f6c784efb5baf2fb17e439fb0709fbe5331e0))
+* **web:** collapsed rail folds boards behind one menu ([2240d7d](https://github.com/nubisco/acta/commit/2240d7dc10cb0b8db6ebbea84bb35dce7069eedd))
+* **web:** cross-references between docs and cards, editor typeaheads, contextual commands ([e64b9ca](https://github.com/nubisco/acta/commit/e64b9caf68a569c7af40278cff8cda88b1e74dab))
+* **web:** docs adopt the shell contextbar, pages read like documents ([cd804bc](https://github.com/nubisco/acta/commit/cd804bcc4cb329472de5367ebb65f23fcf927073))
+* **web:** docs tree moves left, cards get true manual ordering ([7849514](https://github.com/nubisco/acta/commit/7849514358899fc436815c14689df2c3be96f451))
+* **web:** inspector deep links via ?item=KEY ([4e1a786](https://github.com/nubisco/acta/commit/4e1a786118758f99af6f97c249104902322b6e27))
+* **web:** item creation moves to the topbar and the column feet ([d590309](https://github.com/nubisco/acta/commit/d590309198807d71442689405c2a844508c9ca7c))
+* **web:** migrate to @nubisco/ui 4.x compile-time resolution ([17aa6d0](https://github.com/nubisco/acta/commit/17aa6d08e4e6e80278c96d3e3d7cc16228f07a61))
+* **web:** redesign home board tiles as compact identity cards ([93bdc9b](https://github.com/nubisco/acta/commit/93bdc9ba40828ef8f98cf961ecde384fa62b62d6))
+* **web:** the inspector carries its own back trail ([d68bc5b](https://github.com/nubisco/acta/commit/d68bc5b32631abcfb6132a6d097076ce0bb9da54))
+
 ## [1.5.1](https://github.com/nubisco/acta/compare/v1.5.0...v1.5.1) (2026-09-05)
 
 
