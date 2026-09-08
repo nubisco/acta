@@ -101,13 +101,30 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
           list: list ?? 'Backlog',
           title: body.title,
           description,
-          labels: body.labels,
         },
       ],
       undefined,
     )
     const result = results[0]
     if (!result.ok) return c.json({ error: result.error }, 400)
+
+    // Labels come after the item, and are allowed to fail. Passing them to
+    // `create` would mean one unrecognised name loses the whole submission,
+    // and the callers here are contact forms: an unlabelled ticket is a
+    // nuisance, a dropped ticket is a lost customer.
+    const labelsFailed =
+      body.labels?.length && result.key
+        ? !(
+            await itemWrite(ctx, [
+              {
+                op: 'label',
+                op_id: `ingest:${result.key}:labels`,
+                key: result.key,
+                add: body.labels,
+              },
+            ])
+          )[0].ok
+        : false
 
     // Attachments are best-effort by design. The card is the outcome that
     // has to survive: a caller whose log failed to upload would rather have
@@ -139,6 +156,7 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
       key: result.key,
       ...(attached.length > 0 ? { attached } : {}),
       ...(failed.length > 0 ? { attachments_failed: failed } : {}),
+      ...(labelsFailed ? { labels_failed: true } : {}),
     })
   })
 

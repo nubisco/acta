@@ -478,6 +478,36 @@ describe('ingest attachments', () => {
     expect(attachment?.size).toBe(new TextEncoder().encode(log).byteLength)
   })
 
+  it('still creates the ticket when a label does not exist', async () => {
+    const created = await app.request('/api/v1/ingest_tokens', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${await tokenFor()}`,
+      },
+      body: JSON.stringify({ name: 'Contact form labels', board: 'SUP' }),
+    })
+    const { token } = (await created.json()) as { token: string }
+    const res = await app.request(`/api/v1/ingest/${token}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'A support request',
+        labels: ['no-such-label'],
+      }),
+    })
+    const json = (await res.json()) as {
+      ok: boolean
+      key: string
+      labels_failed?: boolean
+    }
+    // The ticket survives the bad label, and the caller is told about it.
+    expect(json.ok).toBe(true)
+    expect(json.labels_failed).toBe(true)
+    const { items } = await itemGet(ctx, { keys: [json.key] })
+    expect(items[0].title).toBe('A support request')
+  })
+
   it('still creates the card when an attachment cannot be stored', async () => {
     const created = await app.request('/api/v1/ingest_tokens', {
       method: 'POST',
