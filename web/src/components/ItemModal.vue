@@ -175,7 +175,7 @@
           :dwell="1200"
           reserve-space
         />
-        <NbField v-slot="{ id }" label="Status">
+        <NbField v-slot="{ id }" label="Status" orientation="stack">
           <NbSelect
             :id="id"
             v-model="it.draft.status"
@@ -184,7 +184,7 @@
             @change="it.commitStatus"
           />
         </NbField>
-        <NbField v-slot="{ id }" label="List">
+        <NbField v-slot="{ id }" label="List" orientation="stack">
           <NbSelect
             :id="id"
             v-model="it.draft.list"
@@ -193,7 +193,7 @@
             @change="it.commitList"
           />
         </NbField>
-        <NbField v-slot="{ id }" label="Due">
+        <NbField v-slot="{ id }" label="Due" orientation="stack">
           <NbDatePicker
             :id="id"
             v-model="it.draft.due"
@@ -201,7 +201,7 @@
             @change="it.commitDue"
           />
         </NbField>
-        <NbField v-slot="{ id }" label="Assignees">
+        <NbField v-slot="{ id }" label="Assignees" orientation="stack">
           <NbSelect
             :id="id"
             v-model="it.draft.assignees"
@@ -231,7 +231,7 @@
             :handle="handle"
           />
         </div>
-        <NbField v-slot="{ id }" label="Labels">
+        <NbField v-slot="{ id }" label="Labels" orientation="stack">
           <NbSelect
             :id="id"
             v-model="it.draft.labels"

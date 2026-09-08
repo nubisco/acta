@@ -33,7 +33,12 @@ const rootEl = ref<HTMLElement | null>(null)
 // doc ref opens the quick-look modal so the reader keeps their context.
 const docNav = inject(DOC_NAV_KEY, null)
 
-const md = new MarkdownIt({ html: false, linkify: true, breaks: false })
+// `breaks: true` because every surface this renders is typed text, not a
+// prose document: card descriptions, comments, and imported Trello bodies all
+// separate fields with single newlines. CommonMark would join those into one
+// paragraph, so "**From:** a\n**Email:** b" ran together on one line. Trello,
+// Slack and GitHub comments all break on a single newline for the same reason.
+const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
 
 /**
  * Enhanced-Markdown extensions (design-spec §2), applied as source and output
@@ -266,6 +271,11 @@ watch(
 <style scoped lang="scss">
 .md {
   line-height: 1.65;
+
+  /* User content contains things with no break opportunity: a pasted URL, a
+   * stack frame, a run of x's from a load test. Without this they push past
+   * the column and overlap whatever sits beside them, rather than wrapping. */
+  overflow-wrap: anywhere;
 
   :deep(p),
   :deep(li),

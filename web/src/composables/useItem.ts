@@ -331,7 +331,9 @@ export function useItem(itemKey: Ref<string>) {
     if (!item.value) return
     const ok = await write({ op, op_id: newOpId(), key: item.value.key })
     if (ok && op === 'archive')
-      toast.success('Archived. Find it under the archived filter.')
+      toast.success(
+        'Archived. Find it under the archived filter, where it can also be deleted.',
+      )
     if (ok && op === 'restore') toast.success('Restored to its list.')
   }
 
