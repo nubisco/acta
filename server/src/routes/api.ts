@@ -40,6 +40,11 @@ import {
   type AttachmentStore,
 } from '../services/attachments'
 import { ruleList, ruleWrite, zRuleWrite } from '../services/rules'
+import {
+  connectionList,
+  connectionWrite,
+  zConnectionWrite,
+} from '../services/connections'
 import { webhookList, webhookWrite, zWebhookWrite } from '../services/webhooks'
 import { createIngestToken, zIngestTokenCreate } from './ingest'
 
@@ -187,6 +192,20 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     })
   })
   app.get('/webhooks', async (c) => c.json(await webhookList(ctxOf(c))))
+
+  app.post('/connections/write', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'write')
+    const body = zConnectionWrite.parse(await c.req.json())
+    // The results carry the signing secret for a freshly created connection,
+    // which is the only time it is ever returned; the list beside it never
+    // includes one.
+    return c.json({
+      results: await connectionWrite(ctx, body.ops),
+      ...(await connectionList(ctx)),
+    })
+  })
+  app.get('/connections', async (c) => c.json(await connectionList(ctxOf(c))))
 
   app.get('/webhooks/:id/deliveries', async (c) => {
     const ctx = ctxOf(c)

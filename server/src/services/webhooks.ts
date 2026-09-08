@@ -6,6 +6,14 @@ import { defer } from '../core/defer'
 import { emitEvent, onEvent, type IEvent } from '../core/events'
 import { withOp } from '../core/ops'
 import type { ISqlDriver } from '../db'
+import { slackPayload, type ISlackContext } from './slack'
+
+/**
+ * How a destination wants the body shaped. `generic` is Acta's own signed
+ * envelope; `slack` is Block Kit for an Incoming Webhook URL.
+ */
+export const WEBHOOK_FORMATS = ['generic', 'slack'] as const
+export type TWebhookFormat = (typeof WEBHOOK_FORMATS)[number]
 
 export const zWebhookOp = z.discriminatedUnion('op', [
   z.object({
@@ -14,6 +22,7 @@ export const zWebhookOp = z.discriminatedUnion('op', [
     url: z.url(),
     events: z.array(z.string().min(1)).min(1).max(20),
     secret: z.string().max(200).optional(),
+    format: z.enum(WEBHOOK_FORMATS).optional(),
   }),
   z.object({
     op: z.literal('update'),
@@ -22,6 +31,7 @@ export const zWebhookOp = z.discriminatedUnion('op', [
     url: z.url().optional(),
     events: z.array(z.string().min(1)).min(1).max(20).optional(),
     enabled: z.boolean().optional(),
+    format: z.enum(WEBHOOK_FORMATS).optional(),
   }),
   z.object({
     op: z.literal('delete'),
@@ -50,13 +60,14 @@ export async function webhookWrite(ctx: ICtx, ops: TWebhookOp[]) {
           case 'create': {
             const id = newId('whk')
             await ctx.db.run(
-              'INSERT INTO webhook (id, workspace_id, url, events, secret, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+              'INSERT INTO webhook (id, workspace_id, url, events, secret, format, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
               [
                 id,
                 ctx.workspaceId,
                 op.url,
                 JSON.stringify(op.events),
                 op.secret ?? null,
+                op.format ?? 'generic',
                 now(),
               ],
             )
@@ -78,12 +89,14 @@ export async function webhookWrite(ctx: ICtx, ops: TWebhookOp[]) {
               throw new ApiError(404, `webhook ${op.id} not found`)
             await ctx.db.run(
               `UPDATE webhook SET url = COALESCE(?, url), events = COALESCE(?, events),
-                    enabled = COALESCE(?, enabled), failure_count = CASE WHEN ? THEN 0 ELSE failure_count END
+                    enabled = COALESCE(?, enabled), format = COALESCE(?, format),
+                    failure_count = CASE WHEN ? THEN 0 ELSE failure_count END
               WHERE id = ?`,
               [
                 op.url ?? null,
                 op.events ? JSON.stringify(op.events) : null,
                 op.enabled === undefined ? null : op.enabled ? 1 : 0,
+                op.format ?? null,
                 op.enabled === true ? 1 : 0,
                 op.id,
               ],
@@ -126,9 +139,10 @@ export async function webhookList(ctx: ICtx) {
         url: string
         events: string
         enabled: number
+        format: string
         failure_count: number
       }>(
-        'SELECT id, url, events, enabled, failure_count FROM webhook WHERE workspace_id = ?',
+        'SELECT id, url, events, enabled, format, failure_count FROM webhook WHERE workspace_id = ?',
         [ctx.workspaceId],
       )
     ).map((w) => ({
@@ -136,6 +150,7 @@ export async function webhookList(ctx: ICtx) {
       url: w.url,
       events: JSON.parse(w.events) as string[],
       enabled: w.enabled === 1,
+      format: (w.format ?? 'generic') as TWebhookFormat,
       failures: w.failure_count,
     })),
   }
@@ -153,6 +168,34 @@ export interface IDispatcherOptions {
   fetchImpl?: typeof fetch
   /** Backoff between attempts, ms. Overridable for tests. */
   backoffMs?: number
+  /** Acta's public address, so Slack messages can link back to a card. */
+  baseUrl?: string
+}
+
+/**
+ * Names the actor and the card for a Slack message. Both are best-effort: a
+ * missing lookup costs a link or a display name, never the delivery.
+ */
+async function slackContextFor(
+  db: ISqlDriver,
+  event: IEvent,
+  baseUrl?: string,
+): Promise<ISlackContext> {
+  const actor = await db.query<{ name: string }>(
+    'SELECT name FROM actor WHERE id = ?',
+    [event.actor_id],
+  )
+  const item =
+    event.entity === 'item'
+      ? await db.query<{ key: string }>('SELECT key FROM item WHERE id = ?', [
+          event.entity_id,
+        ])
+      : []
+  return {
+    actorName: actor[0]?.name,
+    itemKey: item[0]?.key,
+    baseUrl,
+  }
 }
 
 export async function signPayload(
@@ -192,41 +235,57 @@ export function startWebhookDispatcher(
       url: string
       events: string
       secret: string | null
+      format: string
       failure_count: number
     }>(
-      'SELECT id, url, events, secret, failure_count FROM webhook WHERE workspace_id = ? AND enabled = 1',
+      'SELECT id, url, events, secret, format, failure_count FROM webhook WHERE workspace_id = ? AND enabled = 1',
       [event.workspace_id],
     )
-    for (const hook of hooks) {
-      const patterns = JSON.parse(hook.events) as string[]
-      if (!patterns.some((p) => matchesPattern(p, event.verb))) continue
-      defer(deliver(db, hook, event, fetchImpl, backoffMs))
+    const matching = hooks.filter((hook) =>
+      (JSON.parse(hook.events) as string[]).some((p) =>
+        matchesPattern(p, event.verb),
+      ),
+    )
+    if (matching.length === 0) return
+    // Resolved once per event rather than per hook: two Slack destinations
+    // subscribed to the same verb should not cost two lookups.
+    const context = matching.some((hook) => hook.format === 'slack')
+      ? await slackContextFor(db, event, opts.baseUrl)
+      : {}
+    for (const hook of matching) {
+      defer(deliver(db, hook, event, fetchImpl, backoffMs, context))
     }
   })
 }
 
 async function deliver(
   db: ISqlDriver,
-  hook: { id: string; url: string; secret: string | null },
+  hook: { id: string; url: string; secret: string | null; format?: string },
   event: IEvent,
   fetchImpl: typeof fetch,
   backoffMs: number,
+  slack: ISlackContext = {},
 ): Promise<void> {
-  const body = JSON.stringify({
-    event: event.verb,
-    ts: event.ts,
-    actor: {
-      id: event.actor_id,
-      kind: event.actor_kind,
-      on_behalf_of: event.on_behalf_of,
-    },
-    entity: event.entity,
-    entity_id: event.entity_id,
-    summary: event.summary,
-    payload: event.payload,
-  })
+  const body =
+    hook.format === 'slack'
+      ? JSON.stringify(slackPayload(event, slack))
+      : JSON.stringify({
+          event: event.verb,
+          ts: event.ts,
+          actor: {
+            id: event.actor_id,
+            kind: event.actor_kind,
+            on_behalf_of: event.on_behalf_of,
+          },
+          entity: event.entity,
+          entity_id: event.entity_id,
+          summary: event.summary,
+          payload: event.payload,
+        })
   const headers: Record<string, string> = { 'content-type': 'application/json' }
-  if (hook.secret)
+  // A Slack webhook URL is itself the credential and Slack has no signature
+  // header to check, so signing it would only add a header nobody reads.
+  if (hook.secret && hook.format !== 'slack')
     headers['x-acta-signature'] =
       `sha256=${await signPayload(hook.secret, body)}`
 

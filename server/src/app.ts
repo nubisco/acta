@@ -5,6 +5,7 @@ import { bootstrapWorkspace, type IBootstrapOptions } from './core/bootstrap'
 import { mcpRoutes } from './mcp'
 import { apiRoutes } from './routes/api'
 import { authRoutes, requireAuth, type ISsoRuntime } from './routes/auth'
+import { hookRoutes } from './routes/hooks'
 import { ingestRoutes } from './routes/ingest'
 import { JwksVerifier, type ISsoConfig } from './core/sso'
 import { AttachmentStore, type IBlobStore } from './services/attachments'
@@ -35,6 +36,11 @@ export interface IAppOptions {
   /** Overridable for tests. */
   fetchImpl?: typeof fetch
   webhookBackoffMs?: number
+  /**
+   * Acta's own public address. Only used to turn a card key into a link in
+   * outbound messages; everything works without it, just without the link.
+   */
+  baseUrl?: string
 }
 
 export async function createApp(
@@ -49,6 +55,7 @@ export async function createApp(
   startWebhookDispatcher(db, {
     fetchImpl: opts.fetchImpl,
     backoffMs: opts.webhookBackoffMs,
+    baseUrl: opts.baseUrl,
   })
   startRulesEngine(db, { fetchImpl: opts.fetchImpl })
 
@@ -73,7 +80,10 @@ export async function createApp(
       }
     : undefined
   app.route('/api/v1/auth', authRoutes(ssoRuntime))
-  app.route('/api/v1/ingest', ingestRoutes())
+  app.route('/api/v1/ingest', ingestRoutes(store))
+  // Provider webhooks authenticate by signature, not by session, so they
+  // mount before requireAuth.
+  app.route('/api/v1/hooks', hookRoutes())
   app.use('/api/v1/*', requireAuth())
   app.route('/api/v1', apiRoutes(store))
 

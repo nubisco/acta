@@ -4,6 +4,7 @@ import { newId, zIngest } from '@nubisco/acta-shared'
 import { sha256Hex } from '../core/auth'
 import { ApiError, now, type IActorCtx, type ICtx } from '../core/ctx'
 import type { ISqlDriver } from '../db'
+import { attachmentUpload, type AttachmentStore } from '../services/attachments'
 import { itemWrite } from '../services/items'
 
 interface IIngestEnv {
@@ -19,7 +20,7 @@ interface IIngestEnv {
  * endpoint authenticated by the path token; items are attributed to the
  * token's agent actor.
  */
-export function ingestRoutes(): Hono<IIngestEnv> {
+export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
   const app = new Hono<IIngestEnv>()
 
   app.post('/:token', async (c) => {
@@ -107,7 +108,38 @@ export function ingestRoutes(): Hono<IIngestEnv> {
     )
     const result = results[0]
     if (!result.ok) return c.json({ error: result.error }, 400)
-    return c.json({ ok: true, key: result.key })
+
+    // Attachments are best-effort by design. The card is the outcome that
+    // has to survive: a caller whose log failed to upload would rather have
+    // the ticket without it than a 500 and no ticket at all. Failures are
+    // reported in the response so the caller can retry or log, never thrown.
+    const attached: string[] = []
+    const failed: string[] = []
+    if (store && body.attachments?.length) {
+      for (const file of body.attachments) {
+        try {
+          await attachmentUpload(
+            ctx,
+            store,
+            {
+              item: result.key,
+              filename: file.filename,
+              mime: file.mime ?? 'text/plain; charset=utf-8',
+            },
+            new TextEncoder().encode(file.text),
+          )
+          attached.push(file.filename)
+        } catch {
+          failed.push(file.filename)
+        }
+      }
+    }
+    return c.json({
+      ok: true,
+      key: result.key,
+      ...(attached.length > 0 ? { attached } : {}),
+      ...(failed.length > 0 ? { attachments_failed: failed } : {}),
+    })
   })
 
   return app

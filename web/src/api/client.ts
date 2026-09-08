@@ -165,11 +165,32 @@ export const api = {
         url: string
         events: string[]
         enabled: boolean
+        format: 'generic' | 'slack'
         failures: number
       }[]
     }>('/webhooks'),
   webhookWrite: (ops: unknown[]) =>
     req<{ results: TOpResult[] }>('/webhooks/write', {
+      method: 'POST',
+      body: JSON.stringify({ ops }),
+    }),
+
+  connections: () =>
+    req<{
+      connections: {
+        id: string
+        provider: 'github'
+        name: string
+        board: string
+        list: string | null
+        enabled: boolean
+        config: { labels?: string[]; repos?: string[] }
+        last_event_at: number | null
+        last_error: string | null
+      }[]
+    }>('/connections'),
+  connectionWrite: (ops: unknown[]) =>
+    req<{ results: TOpResult[] }>('/connections/write', {
       method: 'POST',
       body: JSON.stringify({ ops }),
     }),

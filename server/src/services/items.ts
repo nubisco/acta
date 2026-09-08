@@ -465,7 +465,16 @@ async function applyItemOp(
         complete: 'item.completed',
         reopen: 'item.reopened',
       }[op.op]
-      await emitEvent(ctx, verb, 'item', item.id, `${op.op} ${item.key}`)
+      // Past tense: the summary is read as a sentence about something that
+      // happened ("José completed ENG-1"), in the activity feed and in every
+      // outbound message. The op name alone reads as an instruction.
+      const past = {
+        archive: 'archived',
+        restore: 'restored',
+        complete: 'completed',
+        reopen: 'reopened',
+      }[op.op]
+      await emitEvent(ctx, verb, 'item', item.id, `${past} ${item.key}`)
       return { key: item.key, rev }
     }
   }

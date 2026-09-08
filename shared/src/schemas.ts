@@ -412,6 +412,22 @@ export const zIngest = z.object({
   description: z.string().max(100_000).optional(),
   labels: z.array(z.string()).max(20).optional(),
   meta: z.record(z.string(), z.string()).optional(),
+  /**
+   * Text too long to belong in a description: a pasted stack trace, an
+   * engine log, the full body of a support message whose excerpt is all the
+   * description should carry. Each entry becomes a file attachment on the
+   * card, so nothing is lost to a truncation the sender cannot see.
+   */
+  attachments: z
+    .array(
+      z.object({
+        filename: z.string().min(1).max(300),
+        text: z.string().min(1).max(1_000_000),
+        mime: z.string().max(100).optional(),
+      }),
+    )
+    .max(5)
+    .optional(),
 })
 
 // --------------------------------------------------------------------------

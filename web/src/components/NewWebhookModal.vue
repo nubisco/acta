@@ -18,9 +18,15 @@
         ref="urlInput"
         v-model="url"
         label="URL"
-        placeholder="https://example.com/hook"
+        :placeholder="urlPlaceholder"
         :error="errors.url"
         @blur="validateUrl"
+      />
+      <NbSelect
+        id="field-webhook-format"
+        v-model="format"
+        label="Destination"
+        :options="formatOptions"
       />
       <NbSelect
         id="field-webhook-events"
@@ -30,12 +36,20 @@
         :options="eventOptions"
       />
       <NbField
+        v-if="format === 'generic'"
         v-slot="{ id }"
         label="Secret"
         hint="Optional. Deliveries are HMAC-signed with it (x-acta-signature)."
       >
         <NbTextInput :id="id" v-model="secret" />
       </NbField>
+      <NbBanner
+        v-else
+        status="info"
+        variant="inline"
+        title="Paste an Incoming Webhook URL from Slack"
+        description="Slack messages carry no signature, because the URL is itself the credential. Treat it as a secret."
+      />
     </NbForm>
     <template #footer>
       <NbButton type="button" variant="secondary" @click="emit('close')">
@@ -65,12 +79,24 @@ const emit = defineEmits<{ close: []; created: [] }>()
 const url = ref('')
 const events = ref<string[]>(['item.*'])
 const secret = ref('')
+const format = ref<'generic' | 'slack'>('generic')
 const saving = ref(false)
 const serverError = ref('')
 const errors = reactive<{ url?: string }>({})
 const urlInput = ref<InstanceType<typeof NbTextInput> | null>(null)
 
 const isDirty = computed(() => url.value !== '' || secret.value !== '')
+
+const formatOptions = [
+  { label: 'Your own endpoint (signed JSON)', value: 'generic' },
+  { label: 'Slack', value: 'slack' },
+]
+
+const urlPlaceholder = computed(() =>
+  format.value === 'slack'
+    ? 'https://hooks.slack.com/services/...'
+    : 'https://example.com/hook',
+)
 
 const eventOptions = [
   { label: 'All events (*)', value: '*' },
@@ -88,6 +114,7 @@ watch(
       url.value = ''
       events.value = ['item.*']
       secret.value = ''
+      format.value = 'generic'
       serverError.value = ''
       errors.url = undefined
       requestAnimationFrame(() => urlInput.value?.focus())
@@ -118,7 +145,9 @@ async function submit(): Promise<void> {
         op_id: newOpId(),
         url: url.value,
         events: events.value.length > 0 ? events.value : ['*'],
-        secret: secret.value || undefined,
+        secret:
+          format.value === 'slack' ? undefined : secret.value || undefined,
+        format: format.value,
       },
     ])
     if (!results[0].ok) throw new Error((results[0] as { error: string }).error)

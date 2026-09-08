@@ -37,6 +37,8 @@ interface IWorkerEnv {
   ACTA_SSO_APP_ID?: string
   ACTA_SSO_AUTHORIZE_URL?: string
   ACTA_SSO_AUTO_PROVISION?: string
+  /** Public address, used to link back from outbound messages. */
+  ACTA_BASE_URL?: string
 }
 
 interface IExecutionContext {
@@ -61,12 +63,15 @@ function r2BlobStore(bucket: IR2Bucket): IBlobStore {
 
 let appPromise: Promise<Hono<IAppEnv>> | null = null
 
-function getApp(env: IWorkerEnv): Promise<Hono<IAppEnv>> {
+function getApp(env: IWorkerEnv, origin: string): Promise<Hono<IAppEnv>> {
   appPromise ??= (async () => {
     const driver = new D1Driver(env.DB)
     await driver.migrate()
     return createApp(driver, {
       blobStore: r2BlobStore(env.ATTACHMENTS),
+      // Falls back to the origin of the request that warmed this isolate, so
+      // a self-hosted deploy links back to itself with nothing configured.
+      baseUrl: env.ACTA_BASE_URL ?? origin,
       serveAsset: async (path) => {
         const res = await env.ASSETS.fetch(
           new Request(new URL(path, 'https://assets.local').toString()),
@@ -95,7 +100,7 @@ export default {
     executionCtx: IExecutionContext,
   ): Promise<Response> {
     setDeferrer((work) => executionCtx.waitUntil(work))
-    const app = await getApp(env)
+    const app = await getApp(env, new URL(request.url).origin)
     return app.fetch(request)
   },
 }

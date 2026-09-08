@@ -21,6 +21,7 @@ export const ID_PREFIXES = [
   'chk',
   'att',
   'whk',
+  'con',
   'rul',
   'evt',
 ] as const

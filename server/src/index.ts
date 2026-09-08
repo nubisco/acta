@@ -12,6 +12,7 @@ mkdirSync(DATA_DIR, { recursive: true })
 const db = await openDb(`${DATA_DIR}/acta.sqlite`)
 const app = await createApp(db, {
   dataDir: DATA_DIR,
+  baseUrl: process.env.ACTA_BASE_URL,
   serveAsset: WEB_DIST ? bunAssetReader(WEB_DIST) : undefined,
   sso: ssoConfigFromEnv(process.env) ?? undefined,
   bootstrap: {

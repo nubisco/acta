@@ -294,6 +294,39 @@ CREATE TABLE IF NOT EXISTS op_log (
   PRIMARY KEY (workspace_id, op_id)
 );
 
+-- Inbound provider webhooks. Unlike ingest_token, the URL is not the
+-- credential: a provider signs each delivery and we verify the signature,
+-- so the endpoint can be pasted into GitHub's UI without leaking anything.
+CREATE TABLE IF NOT EXISTS connection (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  provider TEXT NOT NULL CHECK (provider IN ('github')),
+  name TEXT NOT NULL,
+  secret TEXT NOT NULL,
+  actor_id TEXT NOT NULL REFERENCES actor(id),
+  board_id TEXT NOT NULL REFERENCES board(id),
+  list_id TEXT REFERENCES list(id),
+  config TEXT NOT NULL DEFAULT '{}',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  last_event_at INTEGER,
+  last_error TEXT,
+  created_at INTEGER NOT NULL
+);
+
+-- What an item IS somewhere else, as opposed to imported_meta which records
+-- where it CAME FROM. The primary key is the dedup: a provider redelivering
+-- the same issue finds the existing card instead of creating a second one.
+CREATE TABLE IF NOT EXISTS external_link (
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  provider TEXT NOT NULL,
+  external_id TEXT NOT NULL,
+  item_id TEXT NOT NULL REFERENCES item(id),
+  url TEXT,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (workspace_id, provider, external_id)
+);
+CREATE INDEX IF NOT EXISTS idx_external_link_item ON external_link(item_id);
+
 -- Full-text search over items, comments, docs (mvp F7).
 CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
   kind, ref, title, body, board_key, tokenize = 'unicode61'
@@ -306,4 +339,10 @@ CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
  * the drivers swallow the "duplicate column" error that means the column
  * is already there. Append only, never edit or reorder.
  */
-export const ADDITIVE_COLUMNS = ['ALTER TABLE actor ADD COLUMN avatar_url TEXT']
+export const ADDITIVE_COLUMNS = [
+  'ALTER TABLE actor ADD COLUMN avatar_url TEXT',
+  // How a destination wants the payload shaped. Slack rejects our own
+  // envelope, so the format lives on the webhook rather than forcing a
+  // second delivery pipeline with its own retries and failure handling.
+  "ALTER TABLE webhook ADD COLUMN format TEXT NOT NULL DEFAULT 'generic'",
+]

@@ -225,6 +225,98 @@
       </div>
     </section>
 
+    <section v-if="tab === 'connections'" class="settings__section">
+      <NbBanner
+        v-if="freshConnection"
+        status="info"
+        variant="inline"
+        title="Add these to the repository's webhook settings now; the secret is shown once"
+        dismissible
+        @close="freshConnection = null"
+      >
+        <NbField v-slot="{ id }" label="Payload URL" orientation="stack">
+          <div class="settings__token">
+            <NbTextInput
+              :id="id"
+              :model-value="connectionUrl"
+              readonly
+              size="sm"
+            />
+            <NbButton
+              size="sm"
+              variant="secondary"
+              @click="copy(connectionUrl)"
+            >
+              Copy
+            </NbButton>
+          </div>
+        </NbField>
+        <NbField v-slot="{ id }" label="Secret" orientation="stack">
+          <div class="settings__token">
+            <NbTextInput
+              :id="id"
+              :model-value="freshConnection.secret"
+              readonly
+              size="sm"
+            />
+            <NbButton
+              size="sm"
+              variant="secondary"
+              @click="copy(freshConnection!.secret)"
+            >
+              Copy
+            </NbButton>
+          </div>
+        </NbField>
+        <p class="settings__hint">
+          Set the content type to <code>application/json</code> and send only
+          the <strong>Issues</strong> event.
+        </p>
+      </NbBanner>
+      <NbDataTable
+        :columns="connectionColumns"
+        :rows="connectionRows"
+        row-key="id"
+        size="sm"
+        aria-label="Connections"
+        :loading="listsLoading"
+        :error="listsError"
+      >
+        <template #cell-status="{ row }">
+          <NbBadge size="sm" :variant="row.statusVariant" :dot="row.statusDot">
+            {{ row.status }}
+          </NbBadge>
+        </template>
+        <template #empty>
+          <NbEmptyState
+            size="sm"
+            title="No connections yet"
+            description="Connect a GitHub repository and its issues become tracking cards on a board of your choice."
+          >
+            <template #actions>
+              <NbButton
+                v-if="ws.isAdmin.value"
+                size="xs"
+                variant="primary"
+                @click="creatingConnection = true"
+              >
+                Connect GitHub
+              </NbButton>
+            </template>
+          </NbEmptyState>
+        </template>
+      </NbDataTable>
+      <div v-if="ws.isAdmin.value" class="settings__row">
+        <NbButton
+          size="sm"
+          variant="primary"
+          @click="creatingConnection = true"
+        >
+          Connect GitHub
+        </NbButton>
+      </div>
+    </section>
+
     <section v-if="tab === 'rules'" class="settings__section">
       <NbBanner
         status="info"
@@ -318,6 +410,11 @@
       @close="creatingWebhook = false"
       @created="onWebhookCreated"
     />
+    <NewConnectionModal
+      :open="creatingConnection"
+      @close="creatingConnection = false"
+      @created="onConnectionCreated"
+    />
   </div>
 </template>
 
@@ -331,6 +428,7 @@ import { useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import NewMemberModal from '@/components/NewMemberModal.vue'
 import NewTokenModal from '@/components/NewTokenModal.vue'
+import NewConnectionModal from '@/components/NewConnectionModal.vue'
 import NewWebhookModal from '@/components/NewWebhookModal.vue'
 
 const ws = useWorkspace()
@@ -342,6 +440,7 @@ const tab = ref('members')
 const tabs = [
   { id: 'members', label: 'Members' },
   { id: 'labels', label: 'Labels' },
+  { id: 'connections', label: 'Connections' },
   { id: 'webhooks', label: 'Webhooks' },
   { id: 'rules', label: 'Rules' },
   { id: 'ingest', label: 'Ingest' },
@@ -351,6 +450,8 @@ const invitingMember = ref(false)
 const creatingAgent = ref(false)
 const creatingIngest = ref(false)
 const creatingWebhook = ref(false)
+const creatingConnection = ref(false)
+const freshConnection = ref<{ id: string; secret: string } | null>(null)
 const freshToken = ref('')
 const freshIngestToken = ref('')
 
@@ -536,6 +637,7 @@ const listsError = ref('')
 interface IWebhookRowView {
   id: string
   url: string
+  destination: string
   events: string
   failures: number
   status: string
@@ -546,10 +648,39 @@ interface IWebhookRowView {
 const webhookRows = ref<IWebhookRowView[]>([])
 const webhookColumns = [
   { key: 'url', header: 'URL' },
+  { key: 'destination', header: 'Destination' },
   { key: 'events', header: 'Events' },
   { key: 'status', header: 'Status' },
   { key: 'failures', header: 'Failures' },
 ]
+
+interface IConnectionRowView {
+  id: string
+  name: string
+  provider: string
+  target: string
+  status: string
+  statusVariant: 'green' | 'grey' | 'orange'
+  statusDot: boolean
+}
+
+const connectionRows = ref<IConnectionRowView[]>([])
+const connectionColumns = [
+  { key: 'name', header: 'Name' },
+  { key: 'provider', header: 'Provider' },
+  { key: 'target', header: 'Creates cards in' },
+  { key: 'status', header: 'Status' },
+]
+
+/**
+ * The endpoint to paste into GitHub. Built from the browser's own origin so
+ * it is right for a self-hosted instance without any configuration.
+ */
+const connectionUrl = computed(() =>
+  freshConnection.value
+    ? `${window.location.origin}/api/v1/hooks/github/${freshConnection.value.id}`
+    : '',
+)
 
 interface IRuleRowView {
   id: string
@@ -571,10 +702,30 @@ async function refreshLists(): Promise<void> {
   listsLoading.value = true
   listsError.value = ''
   try {
-    const [webhooks, rules] = await Promise.all([api.webhooks(), api.rules()])
+    const [webhooks, rules, connections] = await Promise.all([
+      api.webhooks(),
+      api.rules(),
+      api.connections(),
+    ])
+    connectionRows.value = connections.connections.map((c) => ({
+      id: c.id,
+      name: c.name,
+      provider: c.provider,
+      target: c.list ? `${c.board} · ${c.list}` : c.board,
+      status: !c.enabled
+        ? 'Inactive'
+        : c.last_error
+          ? 'Attention'
+          : c.last_event_at
+            ? 'Active'
+            : 'Waiting',
+      statusVariant: !c.enabled ? 'grey' : c.last_error ? 'orange' : 'green',
+      statusDot: c.enabled,
+    }))
     webhookRows.value = webhooks.webhooks.map((w) => ({
       id: w.id,
       url: w.url,
+      destination: w.format === 'slack' ? 'Slack' : 'Signed JSON',
       events: w.events.join(', '),
       failures: w.failures,
       status: !w.enabled ? 'Inactive' : w.failures > 0 ? 'Attention' : 'Active',
@@ -612,6 +763,12 @@ function onIngestToken(token: string): void {
   freshIngestToken.value = token
 }
 
+function onConnectionCreated(payload: { id: string; secret: string }): void {
+  creatingConnection.value = false
+  freshConnection.value = payload
+  void refreshLists()
+}
+
 function onWebhookCreated(): void {
   creatingWebhook.value = false
   void refreshLists()
@@ -620,6 +777,11 @@ function onWebhookCreated(): void {
 async function copyToken(): Promise<void> {
   await navigator.clipboard.writeText(freshToken.value)
   toast.success('Token copied')
+}
+
+async function copy(text: string): Promise<void> {
+  await navigator.clipboard.writeText(text)
+  toast.success('Copied')
 }
 
 async function copyIngest(): Promise<void> {
@@ -654,6 +816,20 @@ async function copyIngest(): Promise<void> {
     gap: var(--nb-spacing-8);
     align-items: center;
     margin-block-start: var(--nb-spacing-8);
+
+    /* These values are copied, and a truncated one reads as the whole
+     * string. Let the field take the row so the endpoint and the secret are
+     * legible without selecting them. */
+    > :first-child {
+      flex: 1;
+      min-inline-size: 0;
+    }
+  }
+
+  &__hint {
+    margin-block: var(--nb-spacing-8) 0;
+    font-size: var(--nb-type-body-sm-size);
+    color: var(--nb-c-text-muted);
   }
 
   &__labels {
