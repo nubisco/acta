@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/nubisco/acta/compare/v1.9.0...v1.10.0) (2026-09-08)
+
+
+### Features
+
+* **web:** archive and restore buttons on the card itself ([987bd12](https://github.com/nubisco/acta/commit/987bd1235ebf3aafe5256f3feeead57fbe0e6f11))
+
 # [1.9.0](https://github.com/nubisco/acta/compare/v1.8.0...v1.9.0) (2026-09-08)
 
 
