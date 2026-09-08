@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/nubisco/acta/compare/v1.6.0...v1.7.0) (2026-09-08)
+
+
+### Features
+
+* inbound GitHub connections and Slack notifications ([fc60fdd](https://github.com/nubisco/acta/commit/fc60fdd2d44e0d35331fc6d4041ece95356459d2))
+
 # [1.6.0](https://github.com/nubisco/acta/compare/v1.5.1...v1.6.0) (2026-09-08)
 
 
