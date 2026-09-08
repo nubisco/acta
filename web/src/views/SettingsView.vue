@@ -359,22 +359,32 @@
         v-if="freshIngestToken"
         status="info"
         variant="inline"
-        title="Copy this endpoint now; the token is shown once"
+        title="Copy this token now; it is shown once"
         dismissible
         @close="freshIngestToken = ''"
       >
-        <div class="settings__token">
-          <NbTextInput
-            id="field-fresh-ingest"
-            :model-value="ingestEndpoint"
-            readonly
-            size="sm"
-            aria-label="Ingest endpoint"
-          />
-          <NbButton size="sm" variant="secondary" @click="copyIngest">
-            Copy
-          </NbButton>
-        </div>
+        <!-- The field holds the token alone, and Copy copies the token alone.
+             Showing the endpoint here as one copyable string invited pasting
+             the whole URL where a credential was wanted. The endpoint is
+             below as reference text, deliberately not copyable. -->
+        <NbField v-slot="{ id }" label="Token" orientation="stack">
+          <div class="settings__token">
+            <NbTextInput
+              :id="id"
+              :model-value="freshIngestToken"
+              readonly
+              size="sm"
+            />
+            <NbButton size="sm" variant="secondary" @click="copyIngest">
+              Copy token
+            </NbButton>
+          </div>
+        </NbField>
+        <p class="settings__hint">
+          Post to
+          <code>{{ ingestEndpointTemplate }}</code>
+          with the token in the path.
+        </p>
       </NbBanner>
       <p>
         Ingest tokens let external forms create items directly:
@@ -455,8 +465,9 @@ const freshConnection = ref<{ id: string; secret: string } | null>(null)
 const freshToken = ref('')
 const freshIngestToken = ref('')
 
-const ingestEndpoint = computed(
-  () => `${window.location.origin}/api/v1/ingest/${freshIngestToken.value}`,
+/** Shown as reference, with the token elided: the token is copied on its own. */
+const ingestEndpointTemplate = computed(
+  () => `${window.location.origin}/api/v1/ingest/<token>`,
 )
 
 const actorColumns = [
@@ -785,7 +796,7 @@ async function copy(text: string): Promise<void> {
 }
 
 async function copyIngest(): Promise<void> {
-  await navigator.clipboard.writeText(ingestEndpoint.value)
+  await navigator.clipboard.writeText(freshIngestToken.value)
   toast.success('Endpoint copied')
 }
 </script>
