@@ -761,3 +761,98 @@ describe('search and activity', () => {
     expect(delta.events[0].actor_kind).toBe('human')
   })
 })
+
+describe('item delete', () => {
+  beforeEach(seedBoard)
+
+  /** A card with everything hanging off it, plus a stored blob. */
+  async function fullCard() {
+    const blobs = new Map<string, Uint8Array>()
+    const store = new AttachmentStore({
+      put: async (id, bytes) => void blobs.set(id, bytes),
+      get: async (id) => blobs.get(id) ?? null,
+      delete: async (id) => void blobs.delete(id),
+    })
+    const created = await itemWrite(ctx, [
+      {
+        op: 'create',
+        op_id: 'd1',
+        board: 'SW',
+        list: 'To Do',
+        title: 'Doomed pineapple',
+        description: 'Body text.',
+        checklists: [{ name: 'Steps', items: [{ text: 'one', done: false }] }],
+      },
+    ])
+    const key = (created[0] as { key: string }).key
+    await itemWrite(ctx, [
+      { op: 'comment', op_id: 'd2', key, body: 'A comment about pineapple.' },
+    ])
+    await attachmentUpload(
+      ctx,
+      store,
+      { item: key, filename: 'notes.txt', mime: 'text/plain' },
+      new TextEncoder().encode('contents'),
+    )
+    return { key, store, blobs }
+  }
+
+  it('refuses to delete a card that is not archived', async () => {
+    const { key, store } = await fullCard()
+    const results = await itemWrite(
+      ctx,
+      [{ op: 'delete', op_id: 'd3', key }],
+      undefined,
+      store,
+    )
+    expect(results[0].ok).toBe(false)
+    expect((results[0] as { error: string }).error).toContain('archive it')
+    // Still fully intact.
+    const { items } = await itemGet(ctx, { keys: [key] })
+    expect(items[0].title).toBe('Doomed pineapple')
+  })
+
+  it('deletes an archived card and everything hanging off it', async () => {
+    const { key, store, blobs } = await fullCard()
+    expect(blobs.size).toBe(1)
+
+    await itemWrite(ctx, [{ op: 'archive', op_id: 'd4', key }])
+    const results = await itemWrite(
+      ctx,
+      [{ op: 'delete', op_id: 'd5', key }],
+      undefined,
+      store,
+    )
+    expect(results[0].ok).toBe(true)
+
+    expect(itemGet(ctx, { keys: [key] })).rejects.toThrow('not found')
+    // The blob goes with the row that named it, or the bucket keeps paying
+    // for a file nothing can reach.
+    expect(blobs.size).toBe(0)
+    for (const table of [
+      'comment',
+      'checklist',
+      'item_label',
+      'item_assignee',
+    ]) {
+      expect(await db.query(`SELECT * FROM ${table}`)).toHaveLength(0)
+    }
+    expect(await db.query('SELECT * FROM checklist_item')).toHaveLength(0)
+    expect(
+      await db.query("SELECT * FROM attachment WHERE owner_kind = 'item'"),
+    ).toHaveLength(0)
+    // Gone from search too, by its own words rather than by key.
+    const found = (await search(ctx, {
+      query: 'pineapple',
+      limit: 20,
+    })) as { results: unknown[] }
+    expect(found.results).toHaveLength(0)
+  })
+
+  it('frees the key alias so a stale reference stops resolving', async () => {
+    const { key, store } = await fullCard()
+    await itemWrite(ctx, [{ op: 'archive', op_id: 'd6', key }])
+    await itemWrite(ctx, [{ op: 'delete', op_id: 'd7', key }], undefined, store)
+    expect(await db.query('SELECT * FROM item_key_alias')).toHaveLength(0)
+  })
+})

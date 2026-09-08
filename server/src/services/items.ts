@@ -8,8 +8,9 @@ import {
 import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
 import { emitEvent } from '../core/events'
-import { ftsUpsert } from '../core/fts'
+import { ftsDelete, ftsUpsert } from '../core/fts'
 import { withOp } from '../core/ops'
+import type { AttachmentStore } from './attachments'
 import {
   actorByRef,
   boardByKey,
@@ -24,11 +25,14 @@ export async function itemWrite(
   ctx: ICtx,
   ops: TItemOp[],
   defaultBoard?: string,
+  store?: AttachmentStore,
 ): Promise<TOpResult[]> {
   const results: TOpResult[] = []
   for (const op of ops) {
     results.push(
-      await withOp(ctx, op.op_id, () => applyItemOp(ctx, op, defaultBoard)),
+      await withOp(ctx, op.op_id, () =>
+        applyItemOp(ctx, op, defaultBoard, store),
+      ),
     )
   }
   return results
@@ -94,6 +98,7 @@ async function applyItemOp(
   ctx: ICtx,
   op: TItemOp,
   defaultBoard?: string,
+  store?: AttachmentStore,
 ): Promise<{ key?: string; id?: string; rev?: number }> {
   const ts = now()
   switch (op.op) {
@@ -476,6 +481,78 @@ async function applyItemOp(
       }[op.op]
       await emitEvent(ctx, verb, 'item', item.id, `${past} ${item.key}`)
       return { key: item.key, rev }
+    }
+    case 'delete': {
+      const item = await itemByKey(ctx, op.key)
+      // Archive is the reversible action and the way work leaves a board.
+      // Requiring it first means nothing is destroyed by a single click, and
+      // that whoever deletes has already seen the card out of their way.
+      if (item.archived !== 1) {
+        throw new ApiError(
+          409,
+          `${item.key} is not archived; archive it before deleting`,
+        )
+      }
+
+      // Comments carry their own search rows and outbound links.
+      const comments = await ctx.db.query<{ id: string }>(
+        'SELECT id FROM comment WHERE item_id = ?',
+        [item.id],
+      )
+      for (const comment of comments) {
+        await ftsDelete(ctx, 'comment', comment.id)
+        await ctx.db.run(
+          "DELETE FROM link WHERE src_kind = 'comment' AND src_id = ?",
+          [comment.id],
+        )
+      }
+      await ctx.db.run('DELETE FROM comment WHERE item_id = ?', [item.id])
+
+      // Checklist items hang off checklists, not off the item.
+      await ctx.db.run(
+        'DELETE FROM checklist_item WHERE checklist_id IN (SELECT id FROM checklist WHERE item_id = ?)',
+        [item.id],
+      )
+      await ctx.db.run('DELETE FROM checklist WHERE item_id = ?', [item.id])
+
+      // Stored blobs go with the rows that name them, or the bucket keeps
+      // paying for files nothing can reach.
+      const attachments = await ctx.db.query<{ id: string; kind: string }>(
+        "SELECT id, kind FROM attachment WHERE owner_kind = 'item' AND owner_id = ?",
+        [item.id],
+      )
+      for (const attachment of attachments) {
+        if (attachment.kind === 'file') await store?.remove(attachment.id)
+      }
+      await ctx.db.run(
+        "DELETE FROM attachment WHERE owner_kind = 'item' AND owner_id = ?",
+        [item.id],
+      )
+
+      await ctx.db.run('DELETE FROM item_label WHERE item_id = ?', [item.id])
+      await ctx.db.run('DELETE FROM item_assignee WHERE item_id = ?', [item.id])
+      await ctx.db.run('DELETE FROM item_key_alias WHERE item_id = ?', [
+        item.id,
+      ])
+      await ctx.db.run('DELETE FROM external_link WHERE item_id = ?', [item.id])
+      await ctx.db.run(
+        "DELETE FROM link WHERE src_kind = 'item' AND src_id = ?",
+        [item.id],
+      )
+      await ftsDelete(ctx, 'item', item.key)
+      await ctx.db.run('DELETE FROM item WHERE id = ?', [item.id])
+
+      // Inbound [[KEY]] references elsewhere are deliberately left alone:
+      // they already render as a "gone" chip, which is more honest than
+      // silently editing someone else's text.
+      await emitEvent(
+        ctx,
+        'item.deleted',
+        'item',
+        item.id,
+        `deleted ${item.key}`,
+      )
+      return { key: item.key }
     }
   }
 }

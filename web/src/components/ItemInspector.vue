@@ -51,6 +51,19 @@
         >
           {{ it.lifecycle.value.text }}
         </NbBadge>
+        <!-- Only on an archived card: archive is the reversible action, and
+             the server refuses a delete before it. -->
+        <NbButton
+          v-if="it.item.value.archived"
+          v-nb-tooltip="{ body: 'Delete permanently' }"
+          class="inspector-delete"
+          size="xs"
+          variant="danger"
+          outlined
+          icon="trash"
+          :aria-label="`Delete ${it.item.value.key} permanently`"
+          @click="confirmDelete"
+        />
       </div>
       <NbInlineEdit
         v-model="it.draft.title"
@@ -257,6 +270,34 @@ function addChecklist(): void {
   newChecklist.value = ''
 }
 
+/**
+ * Names what goes with the card. A confirm that only says "are you sure"
+ * makes the reader guess whether comments and files survive.
+ */
+function confirmDelete(): void {
+  const item = it.item.value
+  if (!item) return
+  const parts = [
+    (item.comments?.length ?? 0) > 0 &&
+      `${item.comments!.length} comment${item.comments!.length === 1 ? '' : 's'}`,
+    (item.attachments?.length ?? 0) > 0 &&
+      `${item.attachments!.length} attachment${item.attachments!.length === 1 ? '' : 's'}`,
+    (item.checklists?.length ?? 0) > 0 && 'its checklists',
+  ].filter(Boolean) as string[]
+  void confirm({
+    title: 'Delete this card',
+    message: parts.length
+      ? `${parts.join(', ')} go too. This cannot be undone.`
+      : 'This cannot be undone.',
+    subject: `${item.key} ${item.title}`,
+    confirmLabel: 'Delete card',
+    cancelLabel: 'Keep it',
+    onConfirm: async () => {
+      if (await it.remove()) inspector.close()
+    },
+  })
+}
+
 function confirmDeleteChecklist(name: string): void {
   void confirm({
     title: 'Delete checklist',
@@ -292,6 +333,10 @@ function commitDescription(): void {
   align-items: center;
   gap: var(--nb-spacing-8);
   margin-block-end: var(--nb-spacing-12);
+}
+
+.inspector-delete {
+  margin-inline-start: auto;
 }
 
 .inspector-key {

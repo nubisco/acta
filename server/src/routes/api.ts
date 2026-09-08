@@ -157,7 +157,7 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     requireScope(ctx, 'write')
     const body = zItemWrite.parse(await c.req.json())
     return c.json({
-      results: await itemWrite(ctx, body.ops, body.default_board),
+      results: await itemWrite(ctx, body.ops, body.default_board, store),
     })
   })
 

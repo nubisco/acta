@@ -41,6 +41,19 @@
           >
             {{ it.lifecycle.value.text }}
           </NbBadge>
+          <!-- Only on an archived card: archive is the reversible action, and
+               the server refuses a delete before it. -->
+          <NbButton
+            v-if="it.item.value.archived"
+            v-nb-tooltip="{ body: 'Delete permanently' }"
+            class="item-modal__delete"
+            size="xs"
+            variant="danger"
+            outlined
+            icon="trash"
+            :aria-label="`Delete ${it.item.value.key} permanently`"
+            @click="confirmDelete"
+          />
         </div>
 
         <ProvenanceNote
@@ -278,6 +291,34 @@ function addChecklist(): void {
   newChecklist.value = ''
 }
 
+/**
+ * Names what goes with the card. A confirm that only says "are you sure"
+ * makes the reader guess whether comments and files survive.
+ */
+function confirmDelete(): void {
+  const item = it.item.value
+  if (!item) return
+  const parts = [
+    (item.comments?.length ?? 0) > 0 &&
+      `${item.comments!.length} comment${item.comments!.length === 1 ? '' : 's'}`,
+    (item.attachments?.length ?? 0) > 0 &&
+      `${item.attachments!.length} attachment${item.attachments!.length === 1 ? '' : 's'}`,
+    (item.checklists?.length ?? 0) > 0 && 'its checklists',
+  ].filter(Boolean) as string[]
+  void confirm({
+    title: 'Delete this card',
+    message: parts.length
+      ? `${parts.join(', ')} go too. This cannot be undone.`
+      : 'This cannot be undone.',
+    subject: `${item.key} ${item.title}`,
+    confirmLabel: 'Delete card',
+    cancelLabel: 'Keep it',
+    onConfirm: async () => {
+      if (await it.remove()) emit('close')
+    },
+  })
+}
+
 function confirmDeleteChecklist(name: string): void {
   void confirm({
     title: 'Delete checklist',
@@ -322,6 +363,11 @@ function commitDescription(): void {
     display: grid;
     gap: var(--nb-spacing-16);
     min-inline-size: 0;
+  }
+
+  &__delete {
+    margin-inline-start: auto;
+    flex: none;
   }
 
   &__title-row {

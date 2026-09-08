@@ -296,6 +296,35 @@ export function useItem(itemKey: Ref<string>) {
     commenting.value = false
   }
 
+  /**
+   * Permanent removal. The server refuses unless the item is archived, so
+   * this is only ever reachable from an archived card; `deleted` lets the
+   * caller close whatever was showing it.
+   */
+  const deleted = ref(false)
+
+  async function remove(): Promise<boolean> {
+    if (!item.value) return false
+    saveError.value = ''
+    // Deliberately not routed through `write`, which reloads the item after
+    // every op. There is nothing left to reload, and doing so would answer a
+    // successful delete with a "could not load this item" error panel.
+    await save.run(async () => {
+      const { results } = await api.itemWrite([
+        { op: 'delete', op_id: newOpId(), key: item.value!.key },
+      ])
+      if (!results[0].ok)
+        throw new Error((results[0] as { error: string }).error)
+    })
+    if (save.status.value === 'error') {
+      saveError.value = humanise(save.error.value)
+      return false
+    }
+    deleted.value = true
+    toast.success('Card deleted.')
+    return true
+  }
+
   async function toggle(
     op: 'complete' | 'reopen' | 'archive' | 'restore',
   ): Promise<void> {
@@ -357,5 +386,7 @@ export function useItem(itemKey: Ref<string>) {
     deleteChecklist,
     addComment,
     toggle,
+    remove,
+    deleted,
   }
 }

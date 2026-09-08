@@ -161,6 +161,17 @@ export const zItemAssignOp = z.object({
 const simpleItemOp = <N extends string>(name: N) =>
   z.object({ op: z.literal(name), op_id: zOpId, key: zItemKey })
 
+/**
+ * Permanent removal, and the only item op that destroys rather than changes.
+ * Refused unless the item is already archived: archive is the reversible
+ * everyday action, so deleting always takes two deliberate steps.
+ */
+export const zItemDeleteOp = z.object({
+  op: z.literal('delete'),
+  op_id: zOpId,
+  key: zItemKey,
+})
+
 export const zItemOp = z.discriminatedUnion('op', [
   zItemCreateOp,
   zItemUpdateOp,
@@ -172,6 +183,7 @@ export const zItemOp = z.discriminatedUnion('op', [
   zItemLabelOp,
   zItemAssignOp,
   zItemSetMetaOp,
+  zItemDeleteOp,
   simpleItemOp('archive'),
   simpleItemOp('restore'),
   simpleItemOp('complete'),

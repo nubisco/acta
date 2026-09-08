@@ -83,7 +83,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'item_write',
     description:
-      'Batch item mutations, transactional per op, idempotent via op_id (safe to retry). Ops: create (with labels/assignees/checklists inline), update (optional if_rev optimistic lock), move (cross-board moves re-key and alias), comment, checklist_set, label, assign, archive, restore, complete, reopen. Up to 100 ops per call; returns {op_id, ok, key, rev} per op.',
+      'Batch item mutations, transactional per op, idempotent via op_id (safe to retry). Ops: create (with labels/assignees/checklists inline), update (optional if_rev optimistic lock), move (cross-board moves re-key and alias), comment, checklist_set, label, assign, archive, restore, complete, reopen, delete (permanent, refused unless the item is archived first). Up to 100 ops per call; returns {op_id, ok, key, rev} per op.',
     schema: zItemWrite,
     write: true,
     handler: async (ctx, args) => {
@@ -195,19 +195,37 @@ export const MCP_TOOLS: IMcpTool[] = [
 /** attachment_add needs the file store; built at server start. */
 export function createMcpTools(store: AttachmentStore): IMcpTool[] {
   return [
-    // doc_write's delete op removes attachment blobs, which needs the store
-    // this factory holds; the static definition can't reach it.
-    ...MCP_TOOLS.map((tool) =>
-      tool.name === 'doc_write'
-        ? {
-            ...tool,
-            handler: async (ctx: ICtx, args: unknown) => {
-              const body = args as z.infer<typeof zDocWrite>
-              return { results: await docWrite(ctx, body.ops, store) }
-            },
-          }
-        : tool,
-    ),
+    // The delete ops on doc_write and item_write remove attachment blobs,
+    // which needs the store this factory holds; the static definitions can't
+    // reach it.
+    ...MCP_TOOLS.map((tool) => {
+      if (tool.name === 'doc_write') {
+        return {
+          ...tool,
+          handler: async (ctx: ICtx, args: unknown) => {
+            const body = args as z.infer<typeof zDocWrite>
+            return { results: await docWrite(ctx, body.ops, store) }
+          },
+        }
+      }
+      if (tool.name === 'item_write') {
+        return {
+          ...tool,
+          handler: async (ctx: ICtx, args: unknown) => {
+            const body = args as z.infer<typeof zItemWrite>
+            return {
+              results: await itemWrite(
+                ctx,
+                body.ops,
+                body.default_board,
+                store,
+              ),
+            }
+          },
+        }
+      }
+      return tool
+    }),
     {
       name: 'attachment_add',
       description:
