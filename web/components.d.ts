@@ -32,6 +32,7 @@ declare module 'vue' {
     NbInlineEdit: typeof import('@nubisco/ui/components/InlineEdit')['NbInlineEdit']
     NbInlineLoading: typeof import('@nubisco/ui/components/InlineLoading')['NbInlineLoading']
     NbMenu: typeof import('@nubisco/ui/components/Menu')['NbMenu']
+    NbMenuDivider: typeof import('@nubisco/ui/components/MenuDivider')['NbMenuDivider']
     NbMenuItem: typeof import('@nubisco/ui/components/MenuItem')['NbMenuItem']
     NbModal: typeof import('@nubisco/ui/components/Modal')['NbModal']
     NbNubiscoMark: typeof import('@nubisco/ui/components/NubiscoMark')['NbNubiscoMark']

@@ -114,6 +114,7 @@
           type="button"
           @click="inspector.open(String(item.key))"
           @dblclick="openItemModal(String(item.key))"
+          @contextmenu.prevent="openCardMenu($event, String(item.key))"
         >
           <span class="board__card-title">
             <s v-if="item.done">{{ item.title }}</s>
@@ -161,6 +162,52 @@
       </template>
     </NbBoard>
 
+    <NbMenu
+      ref="cardMenu"
+      v-model:open="cardMenuOpen"
+      size="sm"
+      :min-width="220"
+      @close="cardMenuOpen = false"
+    >
+      <NbMenuItem
+        icon="arrows-out-simple"
+        label="Open"
+        @select="runCardAction('open')"
+      />
+      <NbMenuItem
+        icon="arrow-line-up"
+        label="Move to top"
+        :disabled="menuItem?.atTop"
+        @select="runCardAction('top')"
+      />
+      <NbMenuItem
+        icon="arrow-line-down"
+        label="Move to bottom"
+        :disabled="menuItem?.atBottom"
+        @select="runCardAction('bottom')"
+      />
+      <NbMenuDivider />
+      <NbMenuItem
+        v-if="menuItem?.row.archived"
+        icon="arrow-counter-clockwise"
+        label="Restore"
+        @select="runCardAction('restore')"
+      />
+      <NbMenuItem
+        v-else
+        icon="archive"
+        label="Archive"
+        @select="runCardAction('archive')"
+      />
+      <NbMenuItem
+        v-if="menuItem?.row.archived"
+        icon="trash"
+        label="Delete card"
+        danger
+        @select="runCardAction('delete')"
+      />
+    </NbMenu>
+
     <NewItemModal
       :open="newItemOpen"
       :board-key="boardKey"
@@ -175,6 +222,7 @@
 <script setup lang="ts">
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import {
+  useConfirm,
   useShellSlot,
   useToast,
   type IBoardItem,
@@ -187,6 +235,7 @@ import { useViewCommands } from '@/lib/commands'
 import { labelVariants } from '@/lib/labels'
 import { roleColor } from '@/lib/colors'
 import { useInspector, useUiState, useWorkspace } from '@/stores/workspace'
+import type { NbMenu } from '@nubisco/ui'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import NewItemModal from '@/components/NewItemModal.vue'
 
@@ -204,6 +253,7 @@ function openItemModal(key: string): void {
 }
 const variants = computed(() => labelVariants(ws.overview.value))
 const toast = useToast()
+const confirm = useConfirm()
 const load = useLoadState()
 const filterBar = useShellSlot('fixedbar')
 const topbarActions = useShellSlot('topbar-right')
@@ -216,6 +266,122 @@ const textFilter = ref('')
 
 /* The new-item modal, and which list it creates into: a column footer names
  * its own column, the topbar button leaves it to the modal's backlog default. */
+// --- card context menu ------------------------------------------------------
+// Right-click is how a board is worked in Trello and Jira, and it is the only
+// place with room for actions that do not deserve a permanent button.
+const cardMenu = ref<InstanceType<typeof NbMenu> | null>(null)
+const cardMenuOpen = ref(false)
+const menuKey = ref('')
+
+/** The right-clicked card, with the edge tests the menu disables against. */
+const menuItem = computed(() => {
+  const row = items.value.find((i) => i.key === menuKey.value)
+  if (!row) return null
+  const column = items.value
+    .filter((i) => i.list === row.list)
+    .sort((a, b) => a.pos - b.pos)
+  return {
+    row,
+    atTop: column[0]?.key === row.key,
+    atBottom: column[column.length - 1]?.key === row.key,
+  }
+})
+
+function openCardMenu(event: MouseEvent, key: string): void {
+  menuKey.value = key
+  cardMenu.value?.setPositionXY(event.clientX, event.clientY)
+  cardMenuOpen.value = true
+}
+
+type TCardAction = 'open' | 'top' | 'bottom' | 'archive' | 'restore' | 'delete'
+
+/**
+ * Every menu entry routes through here. A template handler must be a direct
+ * call: `@select="helper(fn)"` runs `helper(fn)` when the event fires and
+ * throws away whatever it returns, so a helper that returns a closure is
+ * silently never invoked.
+ */
+async function runCardAction(action: TCardAction): Promise<void> {
+  const key = menuKey.value
+  const row = items.value.find((i) => i.key === key)
+  cardMenuOpen.value = false
+  if (!row) return
+
+  if (action === 'open') {
+    inspector.open(key)
+    return
+  }
+  if (action === 'delete') {
+    confirmDeleteCard(key)
+    return
+  }
+  if (action === 'archive' || action === 'restore') {
+    const ok = await runOps(
+      [{ op: action, op_id: newOpId(), key }],
+      `Could not ${action} the card`,
+    )
+    if (ok && action === 'archive')
+      toast.success(
+        'Archived. Find it under the archived filter, where it can also be deleted.',
+      )
+    return
+  }
+
+  // Positions are sparse floats, so moving to an edge is arithmetic on the
+  // neighbour rather than renumbering the column: half the current first, or
+  // a step past the current last.
+  const column = items.value
+    .filter((i) => i.list === row.list)
+    .sort((a, b) => a.pos - b.pos)
+  const pos =
+    action === 'top'
+      ? (column[0]?.pos ?? 1024) / 2
+      : (column[column.length - 1]?.pos ?? 0) + 1024
+  await runOps(
+    [{ op: 'move', op_id: newOpId(), key, list: row.list, pos }],
+    'Could not move the card',
+  )
+}
+
+/** Names what goes with the card, same wording as the inspector. */
+function confirmDeleteCard(key: string): void {
+  const row = items.value.find((i) => i.key === key)
+  if (!row) return
+  void confirm({
+    title: 'Delete this card',
+    message:
+      'Its comments, checklists and attachments go too. This cannot be undone.',
+    subject: `${row.key} ${row.title}`,
+    confirmLabel: 'Delete card',
+    cancelLabel: 'Keep it',
+    onConfirm: async () => {
+      if (
+        await runOps(
+          [{ op: 'delete', op_id: newOpId(), key }],
+          'Could not delete the card',
+        )
+      )
+        toast.success('Card deleted.')
+    },
+  })
+}
+
+/** One write path for the menu: apply, surface any failure, reload. */
+async function runOps(
+  ops: Parameters<typeof api.itemWrite>[0],
+  failure: string,
+): Promise<boolean> {
+  try {
+    const { results } = await api.itemWrite(ops)
+    if (!results[0].ok) throw new Error((results[0] as { error: string }).error)
+    await loadItems()
+    return true
+  } catch (err) {
+    toast.error(humanise(err), { title: failure })
+    return false
+  }
+}
+
 const newItemOpen = ref(false)
 const newItemList = ref<string | undefined>(undefined)
 
