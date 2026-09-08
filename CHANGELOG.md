@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/nubisco/acta/compare/v1.7.3...v1.8.0) (2026-09-08)
+
+
+### Features
+
+* delete a card, once it is archived ([5cfd87f](https://github.com/nubisco/acta/commit/5cfd87fc1420d0583cdeb36406eaf2ac36b5ad5f))
+
 ## [1.7.3](https://github.com/nubisco/acta/compare/v1.7.2...v1.7.3) (2026-09-08)
 
 
