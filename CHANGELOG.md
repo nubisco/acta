@@ -1,3 +1,10 @@
+## [1.7.1](https://github.com/nubisco/acta/compare/v1.7.0...v1.7.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **ingest:** never lose a submission over a label ([56a9768](https://github.com/nubisco/acta/commit/56a97689a4a52e9312f586c7a57ba67f5fc877f7))
+
 # [1.7.0](https://github.com/nubisco/acta/compare/v1.6.0...v1.7.0) (2026-09-08)
 
 
