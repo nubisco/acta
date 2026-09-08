@@ -51,19 +51,41 @@
         >
           {{ it.lifecycle.value.text }}
         </NbBadge>
-        <!-- Only on an archived card: archive is the reversible action, and
-             the server refuses a delete before it. -->
-        <NbButton
-          v-if="it.item.value.archived"
-          v-nb-tooltip="{ body: 'Delete permanently' }"
-          class="inspector-delete"
-          size="xs"
-          variant="danger"
-          outlined
-          icon="trash"
-          :aria-label="`Delete ${it.item.value.key} permanently`"
-          @click="confirmDelete"
-        />
+        <span class="inspector-actions">
+          <!-- Archive was only ever reachable through the Status select,
+               which is why it read as missing. Same set as the board's
+               right-click menu, so both surfaces agree. -->
+          <NbButton
+            v-if="it.item.value.archived"
+            v-nb-tooltip="{ body: 'Restore to its list' }"
+            size="xs"
+            variant="secondary"
+            icon="arrow-counter-clockwise"
+            :aria-label="`Restore ${it.item.value.key}`"
+            @click="it.toggle('restore')"
+          />
+          <NbButton
+            v-else
+            v-nb-tooltip="{ body: 'Archive this card' }"
+            size="xs"
+            variant="ghost"
+            icon="archive"
+            :aria-label="`Archive ${it.item.value.key}`"
+            @click="it.toggle('archive')"
+          />
+          <!-- Delete only on an archived card: archive is the reversible
+               action, and the server refuses a delete before it. -->
+          <NbButton
+            v-if="it.item.value.archived"
+            v-nb-tooltip="{ body: 'Delete permanently' }"
+            size="xs"
+            variant="danger"
+            outlined
+            icon="trash"
+            :aria-label="`Delete ${it.item.value.key} permanently`"
+            @click="confirmDelete"
+          />
+        </span>
       </div>
       <NbInlineEdit
         v-model="it.draft.title"
@@ -335,7 +357,10 @@ function commitDescription(): void {
   margin-block-end: var(--nb-spacing-12);
 }
 
-.inspector-delete {
+.inspector-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nb-spacing-4);
   margin-inline-start: auto;
 }
 

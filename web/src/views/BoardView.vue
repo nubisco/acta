@@ -472,7 +472,27 @@ watch(textFilter, () => {
 
 onScopeDispose(
   ws.onLive((event) => {
-    if (event.entity === 'item' && event.actor_kind !== 'human')
+    if (event.entity !== 'item') return
+    // Someone else's change always needs a reload. Our own usually does not,
+    // because the board already shows it: a drag applies the move locally,
+    // and reloading mid-drag would fight the pointer.
+    //
+    // The exception is anything that changes whether a card still belongs in
+    // the current filter. Archiving from the inspector left the card sitting
+    // on the board until a manual refresh, which reads as the action having
+    // failed.
+    const changesMembership = new Set([
+      'item.archived',
+      'item.restored',
+      'item.deleted',
+      'item.completed',
+      'item.reopened',
+      'item.labeled',
+      'item.assigned',
+      'item.created',
+      'item.updated',
+    ])
+    if (event.actor_kind !== 'human' || changesMembership.has(event.verb))
       void loadItems()
   }),
 )
