@@ -9,5 +9,13 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*", "src/**/*.vue", "vite.config.ts"]
+  "include": [
+    "src/**/*",
+    "src/**/*.vue",
+    "vite.config.ts",
+    // Ambient tags for the components nubiscoUI() resolves at compile time.
+    // Without it every <Nb…> in a template is an unknown global and types as
+    // `any`, which silently drops prop and emit checking across the app.
+    "components.d.ts"
+  ]
 }

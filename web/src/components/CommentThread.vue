@@ -49,7 +49,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { NbAiLabel, NbBadge, NbButton, NbForm } from '@nubisco/ui'
 import { relativeTime } from '@/lib/state'
 import { useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'

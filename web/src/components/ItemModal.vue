@@ -250,22 +250,7 @@
 
 <script setup lang="ts">
 import { computed, ref, toRef, watch } from 'vue'
-import {
-  NbBadge,
-  NbBanner,
-  NbButton,
-  NbDatePicker,
-  NbDefinitionList,
-  NbEmptyState,
-  NbField,
-  NbInlineEdit,
-  NbInlineLoading,
-  NbModal,
-  NbSelect,
-  NbSkeleton,
-  NbTextInput,
-  useConfirm,
-} from '@nubisco/ui'
+import { useConfirm } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
 import { labelVariants } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'

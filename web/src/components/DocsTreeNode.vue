@@ -9,7 +9,6 @@
 </template>
 
 <script setup lang="ts">
-import { NbTreeNode } from '@nubisco/ui'
 import type { IDocTreeNode } from '@/types/docs'
 
 defineProps<{ node: IDocTreeNode }>()

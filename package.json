@@ -61,9 +61,6 @@
     ]
   },
   "pnpm": {
-    "overrides": {
-      "@nubisco/ui": "link:../ui"
-    },
     "onlyBuiltDependencies": [
       "esbuild",
       "simple-git-hooks"

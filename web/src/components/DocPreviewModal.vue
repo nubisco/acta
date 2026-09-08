@@ -43,7 +43,6 @@
 // "Open in Docs" is the door there.
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { NbButton, NbEmptyState, NbModal, NbSkeleton } from '@nubisco/ui'
 import { api } from '@/api/client'
 import type { IDocDetail } from '@/types/api'
 import { humanise } from '@/lib/state'

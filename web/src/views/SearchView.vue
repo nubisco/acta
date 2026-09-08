@@ -73,16 +73,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  NbBadge,
-  NbButton,
-  NbDataTable,
-  NbEmptyState,
-  NbSelect,
-  NbSkeleton,
-  NbTextInput,
-  useShellSlot,
-} from '@nubisco/ui'
+import { useShellSlot } from '@nubisco/ui'
 import { api } from '@/api/client'
 import type { ISearchResult } from '@/types/api'
 import { useLoadState } from '@/lib/state'

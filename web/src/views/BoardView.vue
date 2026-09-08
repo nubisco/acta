@@ -175,14 +175,6 @@
 <script setup lang="ts">
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import {
-  NbBadge,
-  NbBoard,
-  NbButton,
-  NbEmptyState,
-  NbIcon,
-  NbSelect,
-  NbSkeleton,
-  NbTextInput,
   useShellSlot,
   useToast,
   type IBoardItem,

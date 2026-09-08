@@ -45,7 +45,7 @@
         </template>
       </NbEmptyState>
 
-      <NbTree ref="treeRef" v-else v-model="selected" size="sm" compact>
+      <NbTree v-else ref="treeRef" v-model="selected" size="sm" compact>
         <DocsTreeNode v-for="node in tree" :key="node.slug" :node="node" />
       </NbTree>
     </div>
@@ -65,7 +65,7 @@
 // from inside a page.
 import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NbButton, NbEmptyState, NbSkeleton, NbTree } from '@nubisco/ui'
+import type { NbTree } from '@nubisco/ui'
 import { api } from '@/api/client'
 import type { IDocTreeNode } from '@/types/docs'
 import { useLoadState } from '@/lib/state'

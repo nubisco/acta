@@ -72,7 +72,6 @@
 // else, so a card key, a half-typed word, or operator soup all behave.
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { NbIcon, NbTextInput } from '@nubisco/ui'
 import { api } from '@/api/client'
 import type { ISearchResult } from '@/types/api'
 import { useInspector } from '@/stores/workspace'

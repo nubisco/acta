@@ -57,7 +57,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { NbBadge, NbButton, NbIcon, NbPanel, NbSidebarLink } from '@nubisco/ui'
 import { relativeTime } from '@/lib/state'
 import { useWorkspace } from '@/stores/workspace'
 

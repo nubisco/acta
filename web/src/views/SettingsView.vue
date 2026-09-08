@@ -323,22 +323,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import {
-  NbAiLabel,
-  NbBadge,
-  NbBanner,
-  NbButton,
-  NbDataTable,
-  NbEmptyState,
-  NbInlineEdit,
-  NbPanel,
-  NbSelect,
-  NbTabs,
-  NbTextInput,
-  useConfirm,
-  useShellSlot,
-  useToast,
-} from '@nubisco/ui'
+import { useConfirm, useShellSlot, useToast } from '@nubisco/ui'
 import { api, newOpId as opId } from '@/api/client'
 import { humanise } from '@/lib/state'
 import { labelVariants } from '@/lib/labels'

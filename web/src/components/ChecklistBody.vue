@@ -33,7 +33,6 @@
 
 <script setup lang="ts">
 import { ref, useId } from 'vue'
-import { NbButton, NbCheckbox, NbTextInput } from '@nubisco/ui'
 
 defineProps<{ items: { text: string; done: boolean }[] }>()
 

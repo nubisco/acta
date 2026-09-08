@@ -66,14 +66,8 @@
  * `changed` after every mutation.
  */
 import { ref, useId } from 'vue'
-import {
-  NbButton,
-  NbFileUploader,
-  NbIcon,
-  NbTextInput,
-  useConfirm,
-  useToast,
-} from '@nubisco/ui'
+import { useConfirm, useToast } from '@nubisco/ui'
+import type { NbFileUploader } from '@nubisco/ui'
 import { api, attachmentHref } from '@/api/client'
 import { humanise } from '@/lib/state'
 

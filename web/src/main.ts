@@ -7,13 +7,14 @@ import NubiscoUI, {
   NbCommandPalettePlugin,
   useToast,
 } from '@nubisco/ui'
-import '@nubisco/ui/dist/ui.css'
 import 'unfonts.css'
 import './styles/index.scss'
 import App from './App.vue'
+import { registerActaIcons } from './lib/icons'
 import { useWorkspace } from './stores/workspace'
 
 configureTheme({ storageKey: 'acta.theme' })
+registerActaIcons()
 
 // Acta ships no translated copy of its own yet; the catalog exists so
 // @nubisco/ui components (NbUserMenu) can resolve their userMenu.* strings,

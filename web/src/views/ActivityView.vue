@@ -76,14 +76,7 @@
 
 <script setup lang="ts">
 import { onScopeDispose, ref, watch } from 'vue'
-import {
-  NbBanner,
-  NbButton,
-  NbEmptyState,
-  NbSelect,
-  NbSkeleton,
-  useShellSlot,
-} from '@nubisco/ui'
+import { useShellSlot } from '@nubisco/ui'
 import { api } from '@/api/client'
 import type { IEventRow } from '@/types/api'
 import { useLoadState } from '@/lib/state'

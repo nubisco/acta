@@ -24,7 +24,6 @@
 // [[ reference search). Keyboard handling is driven by the suggestion
 // plugin through onKeyDown, exposed here for the VueRenderer bridge.
 import { ref, watch } from 'vue'
-import { NbIcon } from '@nubisco/ui'
 import type { ISuggestionItem } from '@/components/editor/suggestions'
 
 const props = defineProps<{

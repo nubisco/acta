@@ -114,16 +114,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import {
-  NbBadge,
-  NbButton,
-  NbCard,
-  NbCardGrid,
-  NbEmptyState,
-  NbPanel,
-  NbSkeleton,
-  useShellSlot,
-} from '@nubisco/ui'
+import { useShellSlot } from '@nubisco/ui'
 import { api } from '@/api/client'
 import type { IEventRow, TOverviewBoard } from '@/types/api'
 import { chartColorFor, roleColor } from '@/lib/colors'

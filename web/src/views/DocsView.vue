@@ -152,17 +152,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, provide, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
-import {
-  NbBanner,
-  NbButton,
-  NbDataTable,
-  NbDefinitionList,
-  NbEmptyState,
-  NbSkeleton,
-  useConfirm,
-  useShellSlot,
-  useToast,
-} from '@nubisco/ui'
+import { useConfirm, useShellSlot, useToast } from '@nubisco/ui'
 import { api, newOpId, ApiHttpError } from '@/api/client'
 import type { IDocDetail } from '@/types/api'
 import { humanise, relativeTime, useLoadState } from '@/lib/state'

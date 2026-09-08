@@ -233,22 +233,7 @@
 
 <script setup lang="ts">
 import { ref, toRef, watch } from 'vue'
-import {
-  NbBadge,
-  NbBanner,
-  NbButton,
-  NbDatePicker,
-  NbDefinitionList,
-  NbEmptyState,
-  NbField,
-  NbInlineEdit,
-  NbInlineLoading,
-  NbSelect,
-  NbShellPanel,
-  NbSkeleton,
-  NbTextInput,
-  useConfirm,
-} from '@nubisco/ui'
+import { useConfirm } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
 import { useInspector } from '@/stores/workspace'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'

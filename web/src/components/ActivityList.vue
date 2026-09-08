@@ -43,7 +43,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { NbAiLabel, NbBadge, NbIcon } from '@nubisco/ui'
 import type { IEventRow } from '@/types/api'
 import { relativeTime } from '@/lib/state'
 import { useWorkspace } from '@/stores/workspace'

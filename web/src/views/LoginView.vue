@@ -86,15 +86,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  NbBanner,
-  NbButton,
-  NbForm,
-  NbNubiscoMark,
-  NbPanel,
-  NbTextInput,
-  useToast,
-} from '@nubisco/ui'
+import { useToast } from '@nubisco/ui'
+import type { NbTextInput } from '@nubisco/ui'
 import { auth } from '@/api/client'
 import { useWorkspace } from '@/stores/workspace'
 

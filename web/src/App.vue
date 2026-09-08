@@ -204,25 +204,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  NbBanner,
-  NbBreadcrumbs,
-  NbCommandPalette,
-  NbIcon,
-  NbMenu,
-  NbMenuItem,
-  NbShell,
-  NbSidebarBrand,
-  NbSidebarLink,
-  NbSidebarMenu,
-  NbSidebarMenuGroup,
-  NbSidebarMenuItem,
-  NbToaster,
-  NbUserMenu,
-  NbWalkthrough,
-  useCommandPalette,
-  useTheme,
-} from '@nubisco/ui'
+import { useCommandPalette, useTheme } from '@nubisco/ui'
+import type { NbMenu, NbShell } from '@nubisco/ui'
 import { introTour, tourLabels } from '@/lib/tour'
 import {
   sidebarDefaultFor,

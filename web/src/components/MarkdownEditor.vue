@@ -22,7 +22,6 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, watch } from 'vue'
-import { NbIcon } from '@nubisco/ui'
 import { BubbleMenu, Editor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'

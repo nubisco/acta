@@ -55,15 +55,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import {
-  NbBanner,
-  NbButton,
-  NbField,
-  NbForm,
-  NbModal,
-  NbSelect,
-  NbTextInput,
-} from '@nubisco/ui'
+import type { NbTextInput } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
 import { humanise } from '@/lib/state'
 
