@@ -19,33 +19,42 @@
     </component>
 
     <component :is="filterBar.Outlet">
-      <div class="board__filters" role="search" aria-label="Filter items">
-        <NbSelect
-          id="field-filter-label"
-          v-model="labelFilter"
-          size="sm"
-          :options="labelOptions"
-          placeholder="Label"
+      <div class="board__bar">
+        <NbTabs
+          v-model="view"
+          variant="line"
+          :items="viewTabs"
+          aria-label="Board views"
         />
-        <NbSelect
-          id="field-filter-assignee"
-          v-model="assigneeFilter"
-          size="sm"
-          :options="assigneeOptions"
-          placeholder="Assignee"
-        />
-        <NbSelect
-          id="field-filter-state"
-          v-model="stateFilter"
-          size="sm"
-          :options="stateOptions"
-        />
-        <NbTextInput
-          id="field-filter-text"
-          v-model="textFilter"
-          size="sm"
-          placeholder="Filter text..."
-        />
+        <div class="board__filters" role="search" aria-label="Filter items">
+          <NbSelect
+            id="field-filter-label"
+            v-model="labelFilter"
+            size="sm"
+            multiple
+            :options="labelOptions"
+            placeholder="All labels"
+          />
+          <NbSelect
+            id="field-filter-assignee"
+            v-model="assigneeFilter"
+            size="sm"
+            :options="assigneeOptions"
+            placeholder="Assignee"
+          />
+          <NbSelect
+            id="field-filter-state"
+            v-model="stateFilter"
+            size="sm"
+            :options="stateOptions"
+          />
+          <NbTextInput
+            id="field-filter-text"
+            v-model="textFilter"
+            size="sm"
+            placeholder="Filter cards on this board..."
+          />
+        </div>
       </div>
     </component>
 
@@ -95,6 +104,21 @@
         </template>
       </NbEmptyState>
     </div>
+
+    <TableView
+      v-else-if="view === 'table'"
+      :items="items"
+      :variants="variants"
+      @open="(key) => inspector.open(key)"
+    />
+
+    <CalendarView
+      v-else-if="view === 'calendar'"
+      :items="items"
+      @open="(key) => inspector.open(key)"
+    />
+
+    <TimelineView v-else-if="view === 'timeline'" :items="items" />
 
     <NbBoard v-else :columns="columns" :items="boardItems" @move="onMove">
       <template #column-footer="{ column }">
@@ -221,6 +245,7 @@
 
 <script setup lang="ts">
 import { computed, onScopeDispose, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   useConfirm,
   useShellSlot,
@@ -238,9 +263,14 @@ import { useInspector, useUiState, useWorkspace } from '@/stores/workspace'
 import type { NbMenu } from '@nubisco/ui'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import NewItemModal from '@/components/NewItemModal.vue'
+import CalendarView from '@/components/views/CalendarView.vue'
+import TableView from '@/components/views/TableView.vue'
+import TimelineView from '@/components/views/TimelineView.vue'
 
 const props = defineProps<{ boardKey?: string }>()
 
+const route = useRoute()
+const router = useRouter()
 const ws = useWorkspace()
 const inspector = useInspector()
 const ui = useUiState()
@@ -259,7 +289,7 @@ const filterBar = useShellSlot('fixedbar')
 const topbarActions = useShellSlot('topbar-right')
 
 const items = ref<IBoardItemRow[]>([])
-const labelFilter = ref('')
+const labelFilter = ref<string[]>([])
 const assigneeFilter = ref('')
 const stateFilter = ref('open')
 const textFilter = ref('')
@@ -382,6 +412,31 @@ async function runOps(
   }
 }
 
+/**
+ * Which view is showing. In the query string rather than component state so a
+ * link to a timeline stays a timeline, and so the back button steps through
+ * views the way it steps through anything else.
+ */
+const viewTabs = [
+  { id: 'board', label: 'Board' },
+  { id: 'table', label: 'Table' },
+  { id: 'calendar', label: 'Calendar' },
+  { id: 'timeline', label: 'Timeline' },
+]
+
+const view = computed({
+  get: () => {
+    const wanted = String(route.query.view ?? 'board')
+    return viewTabs.some((t) => t.id === wanted) ? wanted : 'board'
+  },
+  set: (value: string) => {
+    const query = { ...route.query }
+    if (value === 'board') delete query.view
+    else query.view = value
+    void router.replace({ query })
+  },
+})
+
 const newItemOpen = ref(false)
 const newItemList = ref<string | undefined>(undefined)
 
@@ -405,7 +460,7 @@ const boardMeta = computed(() =>
 )
 const filtersActive = computed(
   () =>
-    labelFilter.value !== '' ||
+    labelFilter.value.length > 0 ||
     assigneeFilter.value !== '' ||
     textFilter.value !== '' ||
     stateFilter.value !== 'open',
@@ -426,8 +481,10 @@ const boardItems = computed<IBoardItem[]>(() =>
     .map((row) => ({ id: row.key, columnId: row.list, ...row })),
 )
 
+// No "all" entry: an empty multi-select already means every label, and an
+// option that competes with the empty state only creates a second way to say
+// the same thing.
 const labelOptions = computed(() => [
-  { label: 'All labels', value: '' },
   ...(ws.overview.value?.labels ?? [])
     .filter((l) => l.board_key === null || l.board_key === boardKey.value)
     .map((l) => ({ label: l.name, value: l.name })),
@@ -453,7 +510,7 @@ async function loadItems(): Promise<void> {
     state: stateFilter.value,
     limit: '200',
   }
-  if (labelFilter.value) params.label = labelFilter.value
+  if (labelFilter.value.length > 0) params.label = labelFilter.value.join(',')
   if (assigneeFilter.value) params.assignee = assigneeFilter.value
   if (textFilter.value) params.text = textFilter.value
   const result = await load.run(api.boardGet(boardKey.value, params))
@@ -519,7 +576,7 @@ useViewCommands('board', [
 ])
 
 function clearFilters(): void {
-  labelFilter.value = ''
+  labelFilter.value = []
   assigneeFilter.value = ''
   textFilter.value = ''
   stateFilter.value = 'open'
@@ -584,6 +641,21 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
   /* Trello-parity column width: fixed-ish tracks, board scrolls
    * horizontally instead of stretching a few columns across the screen. */
   --nb-board-column-track: minmax(272px, 340px);
+
+  &__views {
+    margin-block-end: var(--nb-spacing-4);
+  }
+
+  /* Views first, then the filters that apply to whichever is showing. Both
+   * left-aligned on their own rows: sharing one row let the filters drift to
+   * the right edge and wrap. */
+  &__bar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--nb-spacing-4);
+    inline-size: 100%;
+  }
 
   &__filters {
     display: flex;

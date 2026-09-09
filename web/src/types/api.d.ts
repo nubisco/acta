@@ -59,6 +59,7 @@ export interface IBoardItemRow {
   chk?: string
   rev: number
   updated: number
+  created?: number
   pos: number
   description?: string
 }

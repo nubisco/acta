@@ -899,3 +899,76 @@ CREATE TABLE IF NOT EXISTS thing (
     expect(produced).toBe(declared)
   })
 })
+
+describe('board label filter', () => {
+  beforeEach(seedBoard)
+
+  it('matches any of several labels, not all of them', async () => {
+    await labelWrite(ctx, [
+      { op: 'group_create', op_id: 'fg', name: 'Kind' },
+      {
+        op: 'label_create',
+        op_id: 'fb',
+        group: 'Kind',
+        name: 'bug',
+        color: 'red',
+      },
+      {
+        op: 'label_create',
+        op_id: 'ff',
+        group: 'Kind',
+        name: 'feature',
+        color: 'green',
+      },
+      {
+        op: 'label_create',
+        op_id: 'fc',
+        group: 'Kind',
+        name: 'chore',
+        color: 'gray',
+      },
+    ])
+    await itemWrite(ctx, [
+      {
+        op: 'create',
+        op_id: 'f1',
+        board: 'SW',
+        list: 'To Do',
+        title: 'A bug',
+        labels: ['bug'],
+      },
+      {
+        op: 'create',
+        op_id: 'f2',
+        board: 'SW',
+        list: 'To Do',
+        title: 'A feature',
+        labels: ['feature'],
+      },
+      {
+        op: 'create',
+        op_id: 'f3',
+        board: 'SW',
+        list: 'To Do',
+        title: 'A chore',
+        labels: ['chore'],
+      },
+    ])
+
+    const one = await boardGet(ctx, {
+      board: 'SW',
+      state: 'open',
+      limit: 50,
+      label: 'bug',
+    })
+    expect(one.items.map((i) => i.title)).toEqual(['A bug'])
+
+    const two = await boardGet(ctx, {
+      board: 'SW',
+      state: 'open',
+      limit: 50,
+      label: 'bug,feature',
+    })
+    expect(two.items.map((i) => i.title).sort()).toEqual(['A bug', 'A feature'])
+  })
+})

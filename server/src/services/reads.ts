@@ -145,11 +145,23 @@ export async function boardGet(ctx: ICtx, params: TBoardGet) {
     args.push(`%${params.text}%`, `%${params.text}%`)
   }
   if (params.label) {
-    where.push(
-      `EXISTS (SELECT 1 FROM item_label il JOIN label lb ON lb.id = il.label_id
-               WHERE il.item_id = i.id AND (lb.id = ? OR lower(lb.name) = lower(?)))`,
-    )
-    args.push(params.label, params.label)
+    // Several labels mean "any of these", the way Jira and Trello read a
+    // multi-select filter. Comma separated so a single value is still the
+    // same request it always was.
+    const labels = params.label
+      .split(',')
+      .map((l) => l.trim())
+      .filter(Boolean)
+    if (labels.length > 0) {
+      const clause = labels
+        .map(() => '(lb.id = ? OR lower(lb.name) = lower(?))')
+        .join(' OR ')
+      where.push(
+        `EXISTS (SELECT 1 FROM item_label il JOIN label lb ON lb.id = il.label_id
+                 WHERE il.item_id = i.id AND (${clause}))`,
+      )
+      for (const label of labels) args.push(label, label)
+    }
   }
   if (params.assignee) {
     where.push(
@@ -193,6 +205,10 @@ export async function boardGet(ctx: ICtx, params: TBoardGet) {
     labels: r.labels ? r.labels.split(',') : undefined,
     assignees: r.assignees ? r.assignees.split(',') : undefined,
     due: r.due ?? undefined,
+    // The timeline needs somewhere for a bar to start. Without it every card
+    // would be a milestone on its due date, which is a worse chart and a less
+    // true one.
+    created: r.created_at,
     done: r.completed === 1 || undefined,
     archived: r.archived === 1 || undefined,
     cmts: r.cmts || undefined,
