@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/nubisco/acta/compare/v1.10.1...v1.11.0) (2026-09-09)
+
+
+### Features
+
+* workspaces in the URL, the way an org is on GitHub ([c175c0f](https://github.com/nubisco/acta/commit/c175c0f2bc48cca72b6c5f36a58fcde0d265e55c))
+
 ## [1.10.1](https://github.com/nubisco/acta/compare/v1.10.0...v1.10.1) (2026-09-09)
 
 
