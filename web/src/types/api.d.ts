@@ -6,6 +6,7 @@ export interface IOverview {
     key: string
     name: string
     archived?: boolean
+    starred?: boolean
     lists: { id: string; name: string; role?: string; items: number }[]
   }[]
   labels: {

@@ -958,6 +958,7 @@ describe('board label filter', () => {
     const one = await boardGet(ctx, {
       board: 'SW',
       state: 'open',
+      detail: 'compact',
       limit: 50,
       label: 'bug',
     })
@@ -966,6 +967,7 @@ describe('board label filter', () => {
     const two = await boardGet(ctx, {
       board: 'SW',
       state: 'open',
+      detail: 'compact',
       limit: 50,
       label: 'bug,feature',
     })

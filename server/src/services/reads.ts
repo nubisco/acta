@@ -47,9 +47,13 @@ export async function workspaceOverview(ctx: ICtx) {
     name: string
     archived: number
     id: string
+    starred: number
   }>(
-    'SELECT id, key, name, archived FROM board WHERE workspace_id = ? ORDER BY key',
-    [ctx.workspaceId],
+    `SELECT b.id, b.key, b.name, b.archived,
+            EXISTS (SELECT 1 FROM board_star s
+                     WHERE s.board_id = b.id AND s.actor_id = ?) AS starred
+       FROM board b WHERE b.workspace_id = ? ORDER BY b.key`,
+    [ctx.actor.id, ctx.workspaceId],
   )
   const lists = await ctx.db.query<{
     board_id: string
@@ -103,6 +107,7 @@ export async function workspaceOverview(ctx: ICtx) {
       key: b.key,
       name: b.name,
       archived: b.archived === 1 || undefined,
+      starred: b.starred === 1 || undefined,
       lists: lists
         .filter((l) => l.board_id === b.id)
         .map((l) => ({

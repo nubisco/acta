@@ -58,6 +58,16 @@ function ctxOf(c: {
   }
 }
 
+/** A board id from its key, scoped to the workspace on the request. */
+async function boardIdFor(ctx: ICtx, key: string): Promise<string> {
+  const rows = await ctx.db.query<{ id: string }>(
+    'SELECT id FROM board WHERE workspace_id = ? AND key = ?',
+    [ctx.workspaceId, key],
+  )
+  if (rows.length === 0) throw new ApiError(404, `board ${key} not found`)
+  return rows[0].id
+}
+
 function requireScope(ctx: ICtx, scope: string): void {
   if (!ctx.actor.scopes.includes(scope))
     throw new ApiError(403, `missing scope ${scope}`)
@@ -218,6 +228,34 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
         [ctx.workspaceId, c.req.param('id')],
       ),
     })
+  })
+
+  /**
+   * Starring is a personal opinion about attention, so it is a plain toggle
+   * on the actor rather than an op with provenance and an event: nobody needs
+   * an audit trail of who favourited what.
+   */
+  app.put('/boards/:key/star', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'write')
+    const board = await boardIdFor(ctx, c.req.param('key'))
+    await ctx.db.run(
+      `INSERT OR IGNORE INTO board_star (workspace_id, actor_id, board_id, created_at)
+       VALUES (?, ?, ?, ?)`,
+      [ctx.workspaceId, ctx.actor.id, board, now()],
+    )
+    return c.json({ ok: true, starred: true })
+  })
+
+  app.delete('/boards/:key/star', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'write')
+    const board = await boardIdFor(ctx, c.req.param('key'))
+    await ctx.db.run(
+      'DELETE FROM board_star WHERE actor_id = ? AND board_id = ?',
+      [ctx.actor.id, board],
+    )
+    return c.json({ ok: true, starred: false })
   })
 
   app.post('/rules/write', async (c) => {

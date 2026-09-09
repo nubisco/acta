@@ -331,6 +331,16 @@ CREATE TABLE IF NOT EXISTS external_link (
 );
 CREATE INDEX IF NOT EXISTS idx_external_link_item ON external_link(item_id);
 
+-- Starred boards, per person rather than per workspace: a favourite is an
+-- opinion about your own attention, not a property of the board.
+CREATE TABLE IF NOT EXISTS board_star (
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  actor_id TEXT NOT NULL REFERENCES actor(id),
+  board_id TEXT NOT NULL REFERENCES board(id),
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (actor_id, board_id)
+);
+
 -- Full-text search over items, comments, docs (mvp F7).
 CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
   kind, ref, title, body, board_key, tokenize = 'unicode61'

@@ -226,6 +226,12 @@ export const api = {
       body: JSON.stringify({ ops }),
     }),
 
+  starBoard: (key: string, starred: boolean) =>
+    req<{ ok: boolean; starred: boolean }>(
+      `/boards/${encodeURIComponent(key)}/star`,
+      { method: starred ? 'PUT' : 'DELETE' },
+    ),
+
   rules: () =>
     req<{
       rules: {

@@ -53,57 +53,78 @@
       </NbEmptyState>
     </div>
 
-    <NbCardGrid v-else>
-      <NbCard
-        v-for="board in boards"
-        :key="board.key"
-        :title="board.name"
-        :href="wpath(`/b/${board.key}`)"
-      >
-        <template #icon>
-          <span
-            class="home__mark"
-            :style="{ background: chartColorFor(board.key) }"
-            aria-hidden="true"
+    <template v-else>
+      <template v-for="section in sections" :key="section.title">
+        <h2 v-if="section.heading" class="type-heading-02 home__section">
+          {{ section.title }}
+        </h2>
+        <NbCardGrid>
+          <NbCard
+            v-for="board in section.boards"
+            :key="board.key"
+            :title="board.name"
+            :href="wpath(`/b/${board.key}`)"
           >
-            {{ board.key.slice(0, 2) }}
-          </span>
-        </template>
-        <div class="home__distribution">
-          <div
-            v-if="itemCount(board) > 0"
-            class="home__bar"
-            role="img"
-            :aria-label="`${itemCount(board)} items across ${board.lists.length} lists`"
-          >
-            <span
-              v-for="seg in segments(board)"
-              :key="seg.id"
-              v-nb-tooltip="{
-                header: seg.name,
-                body: `${seg.items} ${seg.items === 1 ? 'item' : 'items'}`,
-              }"
-              class="home__seg"
-              :style="{ flexGrow: seg.items, background: seg.color }"
-            />
-          </div>
-          <p class="home__caption">
-            <template v-if="itemCount(board) > 0">
-              {{ board.lists.length }} lists · {{ itemCount(board) }} items
+            <template #icon>
+              <span
+                class="home__mark"
+                :style="{ background: chartColorFor(board.key) }"
+                aria-hidden="true"
+              >
+                {{ board.key.slice(0, 2) }}
+              </span>
             </template>
-            <template v-else>No items yet</template>
-          </p>
-        </div>
-        <template #footer>
-          <NbBadge size="sm" variant="grey">
-            {{ openCount(board) }} open
-          </NbBadge>
-          <NbBadge v-if="doneCount(board) > 0" size="sm" variant="green">
-            {{ doneCount(board) }} done
-          </NbBadge>
-        </template>
-      </NbCard>
-    </NbCardGrid>
+            <div class="home__distribution">
+              <div
+                v-if="itemCount(board) > 0"
+                class="home__bar"
+                role="img"
+                :aria-label="`${itemCount(board)} items across ${board.lists.length} lists`"
+              >
+                <span
+                  v-for="seg in segments(board)"
+                  :key="seg.id"
+                  v-nb-tooltip="{
+                    header: seg.name,
+                    body: `${seg.items} ${seg.items === 1 ? 'item' : 'items'}`,
+                  }"
+                  class="home__seg"
+                  :style="{ flexGrow: seg.items, background: seg.color }"
+                />
+              </div>
+              <p class="home__caption">
+                <template v-if="itemCount(board) > 0">
+                  {{ board.lists.length }} lists · {{ itemCount(board) }} items
+                </template>
+                <template v-else>No items yet</template>
+              </p>
+            </div>
+            <template #footer>
+              <NbBadge size="sm" variant="grey">
+                {{ openCount(board) }} open
+              </NbBadge>
+              <NbBadge v-if="doneCount(board) > 0" size="sm" variant="green">
+                {{ doneCount(board) }} done
+              </NbBadge>
+              <NbButton
+                v-nb-tooltip="{
+                  body: board.starred
+                    ? 'Remove from favourites'
+                    : 'Add to favourites',
+                }"
+                class="home__star"
+                size="xs"
+                variant="ghost"
+                :icon="board.starred ? starFill : starOutline"
+                :aria-label="`${board.starred ? 'Unstar' : 'Star'} ${board.name}`"
+                :aria-pressed="Boolean(board.starred)"
+                @click.stop.prevent="toggleStar(board)"
+              />
+            </template>
+          </NbCard>
+        </NbCardGrid>
+      </template>
+    </template>
 
     <NbPanel v-if="recent.length > 0" class="home__activity">
       <h2 class="type-heading-02">Recent activity</h2>
@@ -114,16 +135,24 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useShellSlot } from '@nubisco/ui'
+import { useShellSlot, useToast } from '@nubisco/ui'
 import { api } from '@/api/client'
 import type { IEventRow, TOverviewBoard } from '@/types/api'
 import { chartColorFor, roleColor } from '@/lib/colors'
-import { useLoadState } from '@/lib/state'
+import { humanise, useLoadState } from '@/lib/state'
 import { useUiState, useWorkspace } from '@/stores/workspace'
 import ActivityList from '@/components/ActivityList.vue'
 import { wpath } from '@/lib/paths'
+// A filled star is the same glyph at a different weight, not a different
+// name. Icon props take the artwork as well as a name, so the two weights are
+// imported directly and linked at build time.
+import {
+  fill as starFill,
+  regular as starOutline,
+} from '@nubisco/ui/icons/star'
 
 const ws = useWorkspace()
+const toast = useToast()
 const ui = useUiState()
 const load = useLoadState()
 const actions = useShellSlot('topbar-right')
@@ -131,6 +160,37 @@ const actions = useShellSlot('topbar-right')
 const boards = computed(() =>
   (ws.overview.value?.boards ?? []).filter((b) => !b.archived),
 )
+
+/**
+ * Favourites first, then the rest. Only headed when there are favourites:
+ * with none, "All boards" under a heading is a section of one, which is just
+ * a heading for its own sake.
+ */
+const sections = computed(() => {
+  const starred = boards.value.filter((b) => b.starred)
+  const rest = boards.value.filter((b) => !b.starred)
+  if (starred.length === 0)
+    return [{ title: 'Boards', heading: false, boards: rest }]
+  return [
+    { title: 'Favourites', heading: true, boards: starred },
+    { title: 'All boards', heading: true, boards: rest },
+  ]
+})
+
+async function toggleStar(board: {
+  key: string
+  starred?: boolean
+}): Promise<void> {
+  const next = !board.starred
+  try {
+    await api.starBoard(board.key, next)
+    await ws.refresh()
+  } catch (err) {
+    toast.error(humanise(err), {
+      title: next ? 'Could not add to favourites' : 'Could not remove it',
+    })
+  }
+}
 const recent = ref<IEventRow[]>([])
 
 function itemCount(board: TOverviewBoard): number {
@@ -191,6 +251,18 @@ void reload()
   &__empty {
     min-height: 24rem;
     padding-block: var(--nb-spacing-24);
+  }
+
+  &__section {
+    margin-block: var(--nb-spacing-24) var(--nb-spacing-8);
+
+    &:first-of-type {
+      margin-block-start: 0;
+    }
+  }
+
+  &__star {
+    margin-inline-start: auto;
   }
 
   &__mark {
