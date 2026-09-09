@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import type { Hono } from 'hono'
 import { createApp } from '../src/app'
 import { openDb, type BunSqliteDriver } from '../src/db'
+import { JwksVerifier } from '../src/core/sso'
 
 const ISSUER = 'https://idp.test'
 
@@ -212,5 +213,40 @@ describe('external sso', () => {
       'https://acta.test/api/v1/auth/sso/callback?error=not_a_member',
     )
     expect(cb.headers.get('location')).toBe('/login?error=not_a_member')
+  })
+})
+
+describe('JwksVerifier fetch binding', () => {
+  // workerd's global fetch throws "Illegal invocation" unless `this` is the
+  // global scope, and the verifier holds fetch on the instance. Calling it as
+  // `this.fetchImpl(...)` therefore broke every SSO login in production while
+  // this suite stayed green, because bun and Node's fetch ignore `this`. No
+  // amount of mocking reproduces that, so the test asserts the invariant the
+  // runtime cares about: whatever fetch we end up with is never invoked with
+  // the verifier as its receiver.
+  it('never calls fetch with the verifier as `this`', async () => {
+    const seen: unknown[] = []
+    const verifier = new JwksVerifier(ISSUER, {
+      fetchImpl: function (this: unknown) {
+        seen.push(this)
+        return Promise.resolve(
+          new Response(JSON.stringify(jwks), {
+            headers: { 'content-type': 'application/json' },
+          }),
+        )
+      } as unknown as typeof fetch,
+    })
+
+    const token = await signToken({
+      sub: 'u1',
+      email: 'someone@example.com',
+      iss: ISSUER,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 600,
+    })
+    await verifier.verify(token)
+
+    expect(seen.length).toBeGreaterThan(0)
+    for (const receiver of seen) expect(receiver).not.toBe(verifier)
   })
 })

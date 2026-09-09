@@ -85,7 +85,14 @@ export class JwksVerifier {
   ) {
     this.issuer = issuer.replace(/\/$/, '')
     this.cacheTtlMs = opts.cacheTtlMs ?? 300_000
-    this.fetchImpl = opts.fetchImpl ?? fetch
+    // Bound, not merely stored. `this.fetchImpl(...)` below would otherwise
+    // call fetch with the verifier as `this`, and workerd refuses to run its
+    // global fetch with any `this` but globalThis: "Illegal invocation".
+    // Node and bun ignore `this` entirely, so this failed only in production,
+    // only for SSO, with the reason swallowed by a bare catch. Binding here
+    // covers an injected fetch too, which is otherwise the same trap one
+    // constructor argument away.
+    this.fetchImpl = (opts.fetchImpl ?? globalThis.fetch).bind(globalThis)
   }
 
   private async fetchJwks(): Promise<IJwkKey[]> {

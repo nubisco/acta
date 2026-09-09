@@ -81,7 +81,12 @@ export function authRoutes(sso?: ISsoRuntime): Hono<IAuthEnv> {
     let claims
     try {
       claims = await sso.verifier.verify(token)
-    } catch {
+    } catch (err) {
+      // The reason never reaches the browser (it would tell an attacker which
+      // half of the check failed), but without it in the log an SSO outage is
+      // indistinguishable from a wrong password, and we spent an evening
+      // guessing between issuer mismatch, key rotation and a bad signature.
+      console.error('sso verify failed:', (err as Error).message)
       return c.redirect('/login?error=sso_token')
     }
     const db = c.get('db')
