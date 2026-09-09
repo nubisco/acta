@@ -22,7 +22,14 @@ export interface ISqlDriver {
 }
 
 export function schemaStatements(): string[] {
-  return SCHEMA_SQL.split(';')
+  // Comments come out before the split, because the split is on `;` and a
+  // comment is the one place a semicolon can appear without ending a
+  // statement. Leaving them in meant an ordinary English sentence inside the
+  // schema could cut a CREATE TABLE in half, and only on D1: bun:sqlite hands
+  // the whole string to exec() and never splits, so every local test passed
+  // while production failed to migrate.
+  return SCHEMA_SQL.replace(/--[^\n]*/g, '')
+    .split(';')
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
     .map((s) => `${s};`)

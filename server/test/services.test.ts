@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'bun:test'
 import { contentHash, sectionMap } from '@nubisco/acta-shared'
 import { bootstrapWorkspace } from '../src/core/bootstrap'
 import type { ICtx } from '../src/core/ctx'
-import { openDb, type BunSqliteDriver } from '../src/db'
+import { openDb, schemaStatements, type BunSqliteDriver } from '../src/db'
+import { SCHEMA_SQL } from '../src/db/schema'
 import {
   AttachmentStore,
   attachmentDelete,
@@ -854,5 +855,47 @@ describe('item delete', () => {
     await itemWrite(ctx, [{ op: 'archive', op_id: 'd6', key }])
     await itemWrite(ctx, [{ op: 'delete', op_id: 'd7', key }], undefined, store)
     expect(await db.query('SELECT * FROM item_key_alias')).toHaveLength(0)
+  })
+})
+
+describe('schema statements', () => {
+  /**
+   * D1 executes the schema statement by statement, split on `;`. bun:sqlite
+   * hands the whole string to exec() and never splits, so a fault here passes
+   * every local test and only surfaces as a production migration failure.
+   */
+  it('splits into whole statements, not comment fragments', () => {
+    const statements = schemaStatements()
+    for (const statement of statements) {
+      expect(statement).toMatch(/^\s*(CREATE|PRAGMA|INSERT|ALTER|DROP)/i)
+    }
+  })
+
+  it('is not cut in half by a semicolon inside a comment', () => {
+    // The exact shape that took production down: prose in a schema comment
+    // happened to contain a semicolon.
+    const withComment = `
+CREATE TABLE IF NOT EXISTS thing (
+  id TEXT PRIMARY KEY,
+  -- nullable for now; backfilled later
+  slug TEXT
+);`
+    const split = withComment
+      .replace(/--[^\n]*/g, '')
+      .split(';')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    expect(split).toHaveLength(1)
+    expect(split[0]).toContain('slug TEXT')
+  })
+
+  it('keeps every table the schema declares', () => {
+    const declared = (
+      SCHEMA_SQL.match(/CREATE TABLE IF NOT EXISTS (\w+)/g) ?? []
+    ).length
+    const produced = schemaStatements().filter((s) =>
+      s.startsWith('CREATE TABLE'),
+    ).length
+    expect(produced).toBe(declared)
   })
 })

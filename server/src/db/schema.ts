@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS workspace (
   name TEXT NOT NULL,
   -- The URL segment this workspace is addressed by, the way an org is on
   -- GitHub. Nullable so the ALTER below can add it to databases that predate
-  -- it; bootstrap backfills those from the name.
+  -- it, and bootstrap backfills those from the name.
   slug TEXT,
   created_at INTEGER NOT NULL
 );
