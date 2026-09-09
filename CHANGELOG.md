@@ -1,3 +1,10 @@
+## [1.10.1](https://github.com/nubisco/acta/compare/v1.10.0...v1.10.1) (2026-09-09)
+
+
+### Bug Fixes
+
+* **web:** one type scale, breadcrumbs everywhere, and a consistent sidebar ([7419ac1](https://github.com/nubisco/acta/commit/7419ac1ed99374b112c7c3c46be3c41205cdd46a))
+
 # [1.10.0](https://github.com/nubisco/acta/compare/v1.9.0...v1.10.0) (2026-09-08)
 
 
