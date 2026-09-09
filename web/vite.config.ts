@@ -1,4 +1,6 @@
-import { defineConfig } from 'vite'
+// vitest's defineConfig, not vite's: the `test` block below is vitest's and
+// vite's own typing does not know about it.
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import { fonts } from '@nubisco/ui/plugins/fonts'
 import { nubiscoUI } from '@nubisco/ui/vite'
@@ -35,5 +37,14 @@ export default defineConfig({
       '/api': 'http://localhost:4460',
       '/mcp': 'http://localhost:4460',
     },
+  },
+  test: {
+    // jsdom rather than happy-dom: the components under test lean on layout
+    // and pointer APIs that happy-dom fakes less completely, and a test that
+    // passes because the environment shrugged is worse than no test.
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./test/setup.ts'],
+    include: ['test/**/*.test.ts'],
   },
 })

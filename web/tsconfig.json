@@ -13,6 +13,9 @@
     "src/**/*",
     "src/**/*.vue",
     "vite.config.ts",
+    // Tests are type-checked and linted like everything else; excluded, they
+    // would be the one place a type error could hide.
+    "test/**/*",
     // Ambient tags for the components nubiscoUI() resolves at compile time.
     // Without it every <Nb…> in a template is an unknown global and types as
     // `any`, which silently drops prop and emit checking across the app.

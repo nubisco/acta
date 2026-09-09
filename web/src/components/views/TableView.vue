@@ -143,13 +143,24 @@ const rows = computed<IRow[]>(() => {
     updated: 'updatedAt',
   }
   const field = numeric[active.key] ?? (active.key as keyof IRow)
-  return [...mapped].sort((a, b) => {
+
+  // A missing due date is an absence, not a value, so it sorts last whichever
+  // way the column points. Representing it as +Infinity and letting the
+  // direction multiplier flip it would put "no answer" at the top of a
+  // descending list, which is the least useful place for it.
+  const absent = (row: IRow) =>
+    row[field] === Number.POSITIVE_INFINITY || row[field] === ''
+  const present = mapped.filter((row) => !absent(row))
+  const missing = mapped.filter(absent)
+
+  present.sort((a, b) => {
     const left = a[field]
     const right = b[field]
     if (typeof left === 'number' && typeof right === 'number')
       return (left - right) * factor
     return String(left).localeCompare(String(right)) * factor
   })
+  return [...present, ...missing]
 })
 </script>
 
