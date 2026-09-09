@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/nubisco/acta/compare/v1.13.1...v1.14.0) (2026-09-09)
+
+
+### Features
+
+* **ui:** labels render as their own colours, repositories as chips ([799929e](https://github.com/nubisco/acta/commit/799929e92ff653f09a5071791f536065b3580cb2))
+
 ## [1.13.1](https://github.com/nubisco/acta/compare/v1.13.0...v1.13.1) (2026-09-09)
 
 
