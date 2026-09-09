@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/nubisco/acta/compare/v1.12.0...v1.13.0) (2026-09-09)
+
+
+### Features
+
+* upload and crop your own picture, in Acta ([e17a846](https://github.com/nubisco/acta/commit/e17a846f88f2eba192e451d17fa0a2501c977295))
+
 # [1.12.0](https://github.com/nubisco/acta/compare/v1.11.1...v1.12.0) (2026-09-09)
 
 
