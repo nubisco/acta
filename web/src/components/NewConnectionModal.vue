@@ -41,14 +41,52 @@
         label="Labels"
         multiple
         :options="labelOptions"
-      />
-      <NbTextInput
-        id="field-connection-repos"
-        v-model="repos"
+      >
+        <template #option="{ option }">
+          <LabelBadge :name="String(option.value)" />
+        </template>
+        <template #value="{ values }">
+          <span class="label-values">
+            <LabelBadge
+              v-for="label in values"
+              :key="String(label)"
+              :name="String(label)"
+            />
+          </span>
+        </template>
+      </NbSelect>
+      <NbField
+        v-slot="{ id }"
         label="Repositories"
-        placeholder="nubisco/acta, nubisco/ui"
-        helper="Optional. Separate several with commas. Leave empty to accept any repository this hook is added to, which the signing secret already vouches for."
-      />
+        orientation="stack"
+        hint="Optional. Type a name and press Enter to add it. Leave empty to accept any repository this hook is added to, which the signing secret already vouches for."
+      >
+        <NbSelect
+          :id="id"
+          v-model="repos"
+          multiple
+          creatable
+          :options="repoOptions"
+          placeholder="Any repository"
+          create-placeholder="owner/repo, then Enter"
+          @create="addRepo"
+        >
+          <!-- Names, not "3 selected": being able to see which repositories
+               are on the list is the whole point of the change. -->
+          <template #value="{ values }">
+            <span class="repo-values">
+              <NbBadge
+                v-for="repo in values"
+                :key="String(repo)"
+                size="sm"
+                variant="grey"
+              >
+                {{ repo }}
+              </NbBadge>
+            </span>
+          </template>
+        </NbSelect>
+      </NbField>
     </NbForm>
     <template #footer>
       <NbButton type="button" variant="secondary" @click="emit('close')">
@@ -72,6 +110,7 @@ import type { NbTextInput } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
 import { humanise } from '@/lib/state'
 import { useWorkspace } from '@/stores/workspace'
+import LabelBadge from '@/components/LabelBadge.vue'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{
@@ -86,12 +125,32 @@ const name = ref('GitHub')
 const board = ref('')
 const list = ref('')
 const labels = ref<string[]>([])
-const repos = ref('')
+// Chips rather than a comma-separated string: the names are long, a
+// single-line input hid everything but the tail, and one missed comma turned
+// two repositories into one that matches nothing.
+//
+// This is a create-as-you-type list rather than a picker of your actual
+// repositories, because listing those needs a GitHub token and this
+// integration deliberately holds none: the webhook secret is the only
+// credential involved, so there is nothing here that could touch a repo.
+const repos = ref<string[]>([])
+const knownRepos = ref<string[]>([])
 const saving = ref(false)
 const serverError = ref('')
 const nameInput = ref<InstanceType<typeof NbTextInput> | null>(null)
 
-const isDirty = computed(() => board.value !== '' || repos.value !== '')
+const isDirty = computed(() => board.value !== '' || repos.value.length > 0)
+
+const repoOptions = computed(() =>
+  knownRepos.value.map((name) => ({ label: name, value: name })),
+)
+
+function addRepo(value: string): void {
+  const name = value.trim().replace(/^https?:\/\/github\.com\//, '')
+  if (!name) return
+  if (!knownRepos.value.includes(name)) knownRepos.value.push(name)
+  if (!repos.value.includes(name)) repos.value = [...repos.value, name]
+}
 
 const boardOptions = computed(() =>
   (ws.overview.value?.boards ?? []).map((b) => ({
@@ -121,7 +180,8 @@ watch(
       board.value = ws.overview.value?.boards[0]?.key ?? ''
       list.value = ''
       labels.value = []
-      repos.value = ''
+      repos.value = []
+      knownRepos.value = []
       serverError.value = ''
       requestAnimationFrame(() => nameInput.value?.focus())
     }
@@ -152,10 +212,7 @@ async function submit(): Promise<void> {
         list: list.value || undefined,
         config: {
           labels: labels.value.length > 0 ? labels.value : undefined,
-          repos: repos.value
-            .split(',')
-            .map((r) => r.trim())
-            .filter(Boolean),
+          repos: repos.value,
         },
       },
     ])
@@ -169,3 +226,13 @@ async function submit(): Promise<void> {
   }
 }
 </script>
+
+<style scoped lang="scss">
+.repo-values {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nb-spacing-4);
+  flex-wrap: wrap;
+  min-inline-size: 0;
+}
+</style>

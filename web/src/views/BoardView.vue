@@ -34,7 +34,20 @@
             multiple
             :options="labelOptions"
             placeholder="All labels"
-          />
+          >
+            <template #option="{ option }">
+              <LabelBadge :name="String(option.value)" />
+            </template>
+            <template #value="{ values }">
+              <span class="label-values">
+                <LabelBadge
+                  v-for="name in values"
+                  :key="String(name)"
+                  :name="String(name)"
+                />
+              </span>
+            </template>
+          </NbSelect>
           <NbSelect
             id="field-filter-assignee"
             v-model="assigneeFilter"
@@ -266,6 +279,7 @@ import NewItemModal from '@/components/NewItemModal.vue'
 import CalendarView from '@/components/views/CalendarView.vue'
 import TableView from '@/components/views/TableView.vue'
 import TimelineView from '@/components/views/TimelineView.vue'
+import LabelBadge from '@/components/LabelBadge.vue'
 
 const props = defineProps<{ boardKey?: string }>()
 

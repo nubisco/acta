@@ -163,7 +163,20 @@
             multiple
             :options="it.labelOptions.value"
             @change="it.commitLabels"
-          />
+          >
+            <template #option="{ option }">
+              <LabelBadge :name="String(option.value)" />
+            </template>
+            <template #value="{ values }">
+              <span class="label-values">
+                <LabelBadge
+                  v-for="name in values"
+                  :key="String(name)"
+                  :name="String(name)"
+                />
+              </span>
+            </template>
+          </NbSelect>
         </NbField>
         <form class="inspector-new-checklist" @submit.prevent="addChecklist">
           <NbTextInput
@@ -278,6 +291,7 @@ import CommentThread from '@/components/CommentThread.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
+import LabelBadge from '@/components/LabelBadge.vue'
 
 const props = defineProps<{ itemKey: string }>()
 
