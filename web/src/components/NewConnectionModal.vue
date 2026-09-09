@@ -46,8 +46,8 @@
         id="field-connection-repos"
         v-model="repos"
         label="Repositories"
-        placeholder="owner/repo"
-        helper="Optional, comma separated. Leave empty to accept every repository this hook is added to."
+        placeholder="nubisco/acta, nubisco/ui"
+        helper="Optional. Separate several with commas. Leave empty to accept any repository this hook is added to, which the signing secret already vouches for."
       />
     </NbForm>
     <template #footer>
