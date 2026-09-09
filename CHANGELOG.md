@@ -1,3 +1,10 @@
+## [1.13.1](https://github.com/nubisco/acta/compare/v1.13.0...v1.13.1) (2026-09-09)
+
+
+### Bug Fixes
+
+* **connections:** say how to name several repositories ([2c882da](https://github.com/nubisco/acta/commit/2c882da865d6272f26825717dd9df8f76cceb162))
+
 # [1.13.0](https://github.com/nubisco/acta/compare/v1.12.0...v1.13.0) (2026-09-09)
 
 
