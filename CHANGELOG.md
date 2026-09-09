@@ -1,3 +1,12 @@
+# [1.12.0](https://github.com/nubisco/acta/compare/v1.11.1...v1.12.0) (2026-09-09)
+
+
+### Features
+
+* **activity:** a sortable table, filtered by picking faces ([2d4c5f3](https://github.com/nubisco/acta/commit/2d4c5f39dcfe182a50d3c0db56db99b03cc0fbc3))
+* **board:** table, calendar and timeline views, and a real label filter ([e4c720e](https://github.com/nubisco/acta/commit/e4c720efb1387c7fd1d7bde9ff7ac323b0828429))
+* star a board, and a favourites section on home ([10643ac](https://github.com/nubisco/acta/commit/10643acaa31770d5223795f3a6d6cd228245e5e1))
+
 ## [1.11.1](https://github.com/nubisco/acta/compare/v1.11.0...v1.11.1) (2026-09-09)
 
 
