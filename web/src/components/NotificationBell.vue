@@ -11,17 +11,19 @@
         {{ unread }}
       </NbBadge>
     </NbSidebarLink>
-    <button
-      v-else
-      type="button"
-      class="bell__row"
-      :aria-expanded="open"
-      @click="open = !open"
-    >
-      <NbIcon :name="unread > 0 ? 'bell-ringing' : 'bell'" :size="18" />
-      <span>Notifications</span>
-      <NbBadge v-if="unread > 0" variant="red" size="sm">{{ unread }}</NbBadge>
-    </button>
+    <!-- The same component Settings and Collapse sidebar use. A hand-rolled
+         button here inherited none of the sidebar's typography, which is why
+         this one row rendered in a different size and weight to every other. -->
+    <NbSidebarMenu v-else density="compact">
+      <NbSidebarMenuItem
+        label="Notifications"
+        :icon="unread > 0 ? 'bell-ringing' : 'bell'"
+        :active="open"
+        :badge="unread > 0 ? unread : undefined"
+        badge-variant="danger"
+        @click="open = !open"
+      />
+    </NbSidebarMenu>
 
     <NbPanel v-if="open" class="bell__panel">
       <header class="bell__head">
@@ -83,30 +85,6 @@ onUnmounted(() => document.removeEventListener('pointerdown', onOutside))
 <style scoped lang="scss">
 .bell {
   position: relative;
-
-  &__row {
-    display: flex;
-    align-items: center;
-    gap: var(--nb-spacing-8);
-    inline-size: 100%;
-    background: none;
-    border: 0;
-    padding: var(--nb-spacing-8);
-    border-radius: var(--nb-radius-sm, 8px);
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-    text-align: start;
-
-    &:hover {
-      background: var(--nb-c-surface-hover, rgba(255, 255, 255, 0.06));
-    }
-
-    &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
-      outline-offset: 2px;
-    }
-  }
 
   &__badge {
     margin-inline-start: auto;

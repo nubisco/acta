@@ -587,9 +587,22 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
 
   &__filters {
     display: flex;
-    gap: var(--nb-spacing-8);
+    gap: var(--nb-spacing-12);
     flex-wrap: wrap;
+    align-items: center;
     padding-block: var(--nb-spacing-8);
+
+    /* Selects size to their content, so "Open" collapsed to about four
+     * characters and the row read as cramped. A floor keeps the controls a
+     * consistent size and stops the row reflowing every time a longer label
+     * is chosen. */
+    > :deep(.nb-select) {
+      min-inline-size: 9rem;
+    }
+
+    > :deep(.nb-text-input) {
+      min-inline-size: 14rem;
+    }
   }
 
   /* Full-width and quiet: present in every column without shouting in any. */
@@ -628,7 +641,11 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
     }
   }
 
+  /* Cards are a dense list. At 16px they matched the inspector's title, which
+   * flattened the hierarchy between "the board" and "the card you opened". */
   &__card-title {
+    font-size: var(--nb-type-body-md-size);
+
     font-weight: var(--nb-type-label-lg-weight, 500);
   }
 

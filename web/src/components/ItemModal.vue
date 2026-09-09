@@ -410,6 +410,11 @@ function commitDescription(): void {
   &__title {
     flex: 1;
     min-inline-size: 0;
+
+    /* Same reason as the inspector: at 16px the title matched the body prose
+     * beneath it and read as another paragraph. */
+    font-size: var(--nb-type-heading-02-size);
+    line-height: 1.25;
   }
 
   &__section h3 {

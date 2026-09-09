@@ -153,7 +153,9 @@
     </template>
 
     <template #topbar-left>
-      <NbBreadcrumbs v-if="trail.length > 1" title="Acta">
+      <!-- The workspace leads every trail, the way an org does on GitHub, so
+           you can always see which one you are looking at. -->
+      <NbBreadcrumbs v-if="trail.length > 0" :title="namespace">
         <RouterLink
           v-for="crumb in trail.slice(0, -1)"
           :key="crumb.to ?? crumb.text"
@@ -314,28 +316,49 @@ interface ICrumb {
   to?: string
 }
 
+/**
+ * A slug segment as a heading. App.vue does not hold the docs tree, so the
+ * real title is not reachable here; turning "release-notes" into "Release
+ * notes" is honest and reads far better than the raw slug.
+ */
+function humaniseSlug(part: string): string {
+  const words = part.replace(/[-_]+/g, ' ').trim()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/** The workspace name, which leads the breadcrumb trail on every route. */
+const namespace = computed(() => ws.overview.value?.workspace.name ?? 'Acta')
+
 const trail = computed<ICrumb[]>(() => {
   if (route.meta.crumb === 'board') {
     const key = String(route.params.boardKey ?? '')
     const board = boards.value.find((b) => b.key === key)
-    return [{ text: 'Home', to: '/' }, { text: board?.name ?? key }]
+    return [{ text: 'Boards', to: '/' }, { text: board?.name ?? key }]
   }
   if (route.meta.crumb === 'docs') {
     const slug = String(route.params.slug ?? '')
     const crumbs: ICrumb[] = [{ text: 'Docs', to: '/docs' }]
-    if (slug) {
-      const parts = slug.split('/')
-      parts.forEach((part, index) => {
-        const path = parts.slice(0, index + 1).join('/')
-        crumbs.push({
-          text: part,
-          to: index < parts.length - 1 ? `/docs/${path}` : undefined,
-        })
+    const parts = slug ? slug.split('/') : []
+    parts.forEach((part, index) => {
+      const path = parts.slice(0, index + 1).join('/')
+      crumbs.push({
+        text: humaniseSlug(part),
+        to: index < parts.length - 1 ? `/docs/${path}` : undefined,
       })
-    }
-    return crumbs.length > 1 ? crumbs : []
+    })
+    return crumbs
   }
-  return []
+  // Every other route is one level deep, and still needs the namespace in
+  // front of it: Settings, Activity and Docs previously rendered no trail at
+  // all, so the topbar was simply empty.
+  const named: Record<string, string> = {
+    home: 'Home',
+    settings: 'Settings',
+    activity: 'Activity',
+    search: 'Search',
+  }
+  const name = String(route.name ?? '')
+  return named[name] ? [{ text: named[name] }] : []
 })
 
 const inspectorVisible = ref(false)

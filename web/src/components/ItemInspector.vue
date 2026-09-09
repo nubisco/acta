@@ -377,6 +377,13 @@ function commitDescription(): void {
 
 .inspector-title {
   margin-block-end: var(--nb-spacing-12);
+
+  /* The title was rendering at the same 16px as the body prose and as a card
+   * on the board, so nothing on the panel read as its heading. The class
+   * lands on the inline-edit's own element, so the size belongs here rather
+   * than on a child. */
+  font-size: var(--nb-type-heading-02-size);
+  line-height: 1.25;
 }
 
 .inspector-editor {

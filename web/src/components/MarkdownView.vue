@@ -272,6 +272,11 @@ watch(
 .md {
   line-height: 1.65;
 
+  /* Prose never set a size, so it inherited the browser's 16px and came out
+   * the same size as a card's own title. It is supporting text: body-md puts
+   * it below the title and level with the rest of the interface. */
+  font-size: var(--nb-type-body-md-size);
+
   /* User content contains things with no break opportunity: a pasted URL, a
    * stack frame, a run of x's from a load test. Without this they push past
    * the column and overlap whatever sits beside them, rather than wrapping. */
