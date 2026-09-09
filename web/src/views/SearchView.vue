@@ -78,6 +78,7 @@ import { api } from '@/api/client'
 import type { ISearchResult } from '@/types/api'
 import { useLoadState } from '@/lib/state'
 import { useInspector } from '@/stores/workspace'
+import { wpath } from '@/lib/paths'
 
 const route = useRoute()
 const router = useRouter()
@@ -146,7 +147,7 @@ function openResult(row: {
   rawRef: string
   title: string
 }): void {
-  if (row.type === 'doc') void router.push(`/docs/${row.rawRef}`)
+  if (row.type === 'doc') void router.push(wpath(`/docs/${row.rawRef}`))
   else if (row.type === 'item') inspector.open(row.rawRef)
   // Comment rows carry the item key as their title.
   else if (row.type === 'comment') inspector.open(row.title)

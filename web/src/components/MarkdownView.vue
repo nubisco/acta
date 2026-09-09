@@ -20,6 +20,7 @@ import { useDocPreview, useInspector, useWorkspace } from '@/stores/workspace'
 import { useRefCards } from '@/stores/refs'
 import { chartColorFor } from '@/lib/colors'
 import { DOC_NAV_KEY } from '@/lib/keys'
+import { wpath } from '@/lib/paths'
 
 const props = defineProps<{ source: string; wide?: boolean }>()
 
@@ -189,7 +190,7 @@ function onClick(event: MouseEvent): void {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0)
     return
   event.preventDefault()
-  if (refType === 'board') void router.push(`/b/${ref}`)
+  if (refType === 'board') void router.push(wpath(`/b/${ref}`))
   else if (refType === 'doc') {
     if (docNav) docNav(ref)
     else docPreview.open(ref)

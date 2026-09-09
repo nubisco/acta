@@ -49,6 +49,7 @@ import { humanise } from '@/lib/state'
 import { useDocPreview } from '@/stores/workspace'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
+import { wpath } from '@/lib/paths'
 
 const preview = useDocPreview()
 const { slug } = preview
@@ -78,7 +79,7 @@ watch(slug, (next) => {
 function openInDocs(): void {
   const target = slug.value
   preview.close()
-  if (target) void router.push(`/docs/${target}`)
+  if (target) void router.push(wpath(`/docs/${target}`))
 }
 </script>
 

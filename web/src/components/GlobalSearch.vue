@@ -75,6 +75,7 @@ import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import type { ISearchResult } from '@/types/api'
 import { useInspector } from '@/stores/workspace'
+import { wpath } from '@/lib/paths'
 
 const router = useRouter()
 const inspector = useInspector()
@@ -123,7 +124,7 @@ function iconFor(type: string): string {
 
 function openHit(hit: ISearchResult): void {
   open.value = false
-  if (hit.type === 'doc') void router.push(`/docs/${hit.ref}`)
+  if (hit.type === 'doc') void router.push(wpath(`/docs/${hit.ref}`))
   else if (hit.type === 'item') inspector.open(hit.ref)
   // Comment hits carry the owning item key as their title.
   else inspector.open(hit.title)

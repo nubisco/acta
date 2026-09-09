@@ -14,7 +14,29 @@
     resizable
   >
     <template #sidebar-logo>
+      <!-- The brand doubles as the workspace switcher, which is where a
+           person looks for it: the name they are trying to change is already
+           printed there. Only interactive when there is somewhere to go. -->
+      <button
+        v-if="otherWorkspaces.length > 0"
+        ref="workspaceTrigger"
+        type="button"
+        class="brand-switch"
+        :aria-expanded="workspaceMenuOpen"
+        aria-haspopup="menu"
+        @click="toggleWorkspaceMenu"
+      >
+        <NbSidebarBrand
+          title="Acta"
+          :subtitle="ws.overview.value?.workspace.name"
+        >
+          <template #icon>
+            <img class="brand-mark" src="/acta-icon.svg" alt="" />
+          </template>
+        </NbSidebarBrand>
+      </button>
       <NbSidebarBrand
+        v-else
         title="Acta"
         :subtitle="ws.overview.value?.workspace.name"
       >
@@ -22,6 +44,21 @@
           <img class="brand-mark" src="/acta-icon.svg" alt="" />
         </template>
       </NbSidebarBrand>
+      <NbMenu
+        ref="workspaceMenu"
+        v-model:open="workspaceMenuOpen"
+        size="sm"
+        :min-width="220"
+        @close="workspaceMenuOpen = false"
+      >
+        <NbMenuItem
+          v-for="workspace in ws.workspaces.value"
+          :key="workspace.id"
+          :label="workspace.name"
+          :selected="workspace.slug === ws.workspaceSlug.value"
+          @select="goToWorkspace(workspace.slug)"
+        />
+      </NbMenu>
     </template>
 
     <template #sidebar-nav>
@@ -84,7 +121,7 @@
             :label="board.name"
             :badge="openCount(board)"
             badge-variant="neutral"
-            :to="`/b/${board.key}`"
+            :to="wpath(`/b/${board.key}`)"
             :active="
               route.name === 'board' && route.params.boardKey === board.key
             "
@@ -101,9 +138,9 @@
       <template v-if="sidebarVariant === 'compact'">
         <NbSidebarLink
           v-nb-tooltip="{ body: 'Settings' }"
-          to="/settings"
+          :to="wpath('/settings')"
           :active="route.name === 'settings'"
-          @click.prevent="router.push('/settings')"
+          @click.prevent="router.push(wpath('/settings'))"
         >
           <NbIcon name="gear" :size="18" />
         </NbSidebarLink>
@@ -118,7 +155,7 @@
         <NbSidebarMenuItem
           label="Settings"
           icon="gear"
-          to="/settings"
+          :to="wpath('/settings')"
           :active="route.name === 'settings'"
         />
         <NbSidebarMenuItem
@@ -159,7 +196,7 @@
         <RouterLink
           v-for="crumb in trail.slice(0, -1)"
           :key="crumb.to ?? crumb.text"
-          :to="crumb.to ?? '/'"
+          :to="crumb.to ?? wpath('/')"
         >
           {{ crumb.text }}
         </RouterLink>
@@ -221,6 +258,7 @@ import DocPreviewModal from '@/components/DocPreviewModal.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
 import NewBoardModal from '@/components/NewBoardModal.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
+import { wpath } from '@/lib/paths'
 
 const route = useRoute()
 const router = useRouter()
@@ -257,6 +295,32 @@ const boards = computed(() =>
 
 // Collapsed-rail boards menu: opens to the right of its rail icon.
 const boardsRailTrigger = ref<{ $el: HTMLElement } | null>(null)
+const workspaceMenu = ref<InstanceType<typeof NbMenu> | null>(null)
+const workspaceTrigger = ref<HTMLElement | null>(null)
+const workspaceMenuOpen = ref(false)
+
+/** Whether switching is even possible; one workspace needs no switcher. */
+const otherWorkspaces = computed(() =>
+  ws.workspaces.value.filter((w) => w.slug !== ws.workspaceSlug.value),
+)
+
+function toggleWorkspaceMenu(): void {
+  if (workspaceMenuOpen.value) {
+    workspaceMenuOpen.value = false
+    return
+  }
+  const rect = workspaceTrigger.value?.getBoundingClientRect()
+  if (rect && workspaceMenu.value) {
+    workspaceMenu.value.setPositionXY(rect.left, rect.bottom + 4)
+  }
+  workspaceMenuOpen.value = true
+}
+
+function goToWorkspace(slug: string): void {
+  workspaceMenuOpen.value = false
+  if (slug !== ws.workspaceSlug.value) void router.push(`/${slug}`)
+}
+
 const boardsMenu = ref<InstanceType<typeof NbMenu> | null>(null)
 const boardsMenuOpen = ref(false)
 
@@ -275,7 +339,7 @@ function toggleBoardsMenu(): void {
 
 function openBoardFromMenu(key: string): void {
   boardsMenuOpen.value = false
-  void router.push(`/b/${key}`)
+  void router.push(wpath(`/b/${key}`))
 }
 
 const navEntries = computed(() => [
@@ -327,23 +391,26 @@ function humaniseSlug(part: string): string {
 }
 
 /** The workspace name, which leads the breadcrumb trail on every route. */
+// Loaded once so the switcher knows whether it has anywhere to go.
+void ws.listWorkspaces().catch(() => undefined)
+
 const namespace = computed(() => ws.overview.value?.workspace.name ?? 'Acta')
 
 const trail = computed<ICrumb[]>(() => {
   if (route.meta.crumb === 'board') {
     const key = String(route.params.boardKey ?? '')
     const board = boards.value.find((b) => b.key === key)
-    return [{ text: 'Boards', to: '/' }, { text: board?.name ?? key }]
+    return [{ text: 'Boards', to: wpath('/') }, { text: board?.name ?? key }]
   }
   if (route.meta.crumb === 'docs') {
     const slug = String(route.params.slug ?? '')
-    const crumbs: ICrumb[] = [{ text: 'Docs', to: '/docs' }]
+    const crumbs: ICrumb[] = [{ text: 'Docs', to: wpath('/docs') }]
     const parts = slug ? slug.split('/') : []
     parts.forEach((part, index) => {
       const path = parts.slice(0, index + 1).join('/')
       crumbs.push({
         text: humaniseSlug(part),
-        to: index < parts.length - 1 ? `/docs/${path}` : undefined,
+        to: index < parts.length - 1 ? wpath(`/docs/${path}`) : undefined,
       })
     })
     return crumbs
@@ -385,7 +452,7 @@ async function signOut(): Promise<void> {
 
 function onBoardCreated(key: string): void {
   ui.newBoardOpen.value = false
-  void router.push(`/b/${key}`)
+  void router.push(wpath(`/b/${key}`))
 }
 
 // Deep-linkable inspector: the open card lives in the URL as ?item=KEY, so
@@ -440,28 +507,28 @@ watch(
             label: `Board: ${b.name}`,
             icon: 'kanban',
             namespace: 'Go',
-            handler: () => void router.push(`/b/${b.key}`),
+            handler: () => void router.push(wpath(`/b/${b.key}`)),
           })),
         {
           id: 'go:docs',
           label: 'Docs',
           icon: 'book-open',
           namespace: 'Go',
-          handler: () => void router.push('/docs'),
+          handler: () => void router.push(wpath('/docs')),
         },
         {
           id: 'go:activity',
           label: 'Activity',
           icon: 'pulse',
           namespace: 'Go',
-          handler: () => void router.push('/activity'),
+          handler: () => void router.push(wpath('/activity')),
         },
         {
           id: 'go:search',
           label: 'Search',
           icon: 'magnifying-glass',
           namespace: 'Go',
-          handler: () => void router.push('/search'),
+          handler: () => void router.push(wpath('/search')),
         },
         {
           id: 'create:board',
@@ -498,6 +565,28 @@ watch(
 </script>
 
 <style scoped lang="scss">
+.brand-switch {
+  display: block;
+  inline-size: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  border-radius: var(--nb-radius-sm, 8px);
+
+  &:hover {
+    background: var(--nb-c-surface-hover, rgba(255, 255, 255, 0.06));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+    outline-offset: 2px;
+  }
+}
+
 .brand-mark {
   display: block;
   width: 28px;

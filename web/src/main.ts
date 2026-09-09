@@ -11,6 +11,7 @@ import 'unfonts.css'
 import './styles/index.scss'
 import App from './App.vue'
 import { registerActaIcons } from './lib/icons'
+import { setWorkspaceSlug } from './api/client'
 import { useWorkspace } from './stores/workspace'
 
 configureTheme({ storageKey: 'acta.theme' })
@@ -39,54 +40,102 @@ const router = createRouter({
       meta: { public: true, frameless: true, title: 'Sign in' },
     },
     {
+      // The entry point, the way CMS and Verba have one. Skips straight
+      // through when there is only one workspace to choose.
       path: '/',
-      name: 'home',
-      component: () => import('./views/HomeView.vue'),
-      meta: { title: 'Home' },
+      name: 'workspaces',
+      component: () => import('./views/WorkspacesView.vue'),
+      meta: { frameless: true, title: 'Workspaces' },
     },
     {
-      path: '/b/:boardKey',
-      name: 'board',
-      component: () => import('./views/BoardView.vue'),
-      props: true,
-      meta: { crumb: 'board' },
-    },
-    {
-      path: '/docs/:slug(.*)?',
-      name: 'docs',
-      component: () => import('./views/DocsView.vue'),
-      props: true,
-      meta: { crumb: 'docs', title: 'Docs' },
-    },
-    {
-      path: '/search',
-      name: 'search',
-      component: () => import('./views/SearchView.vue'),
-      meta: { title: 'Search' },
-    },
-    {
-      path: '/activity',
-      name: 'activity',
-      component: () => import('./views/ActivityView.vue'),
-      meta: { title: 'Activity' },
-    },
-    {
-      path: '/settings',
-      name: 'settings',
-      component: () => import('./views/SettingsView.vue'),
-      meta: { title: 'Settings' },
+      // Every real route lives under the workspace, the way a repository
+      // lives under an org on GitHub.
+      path: '/:workspace',
+      children: [
+        {
+          path: '',
+          name: 'home',
+          component: () => import('./views/HomeView.vue'),
+          meta: { title: 'Home' },
+        },
+        {
+          path: 'b/:boardKey',
+          name: 'board',
+          component: () => import('./views/BoardView.vue'),
+          props: true,
+          meta: { crumb: 'board' },
+        },
+        {
+          path: 'docs/:slug(.*)?',
+          name: 'docs',
+          component: () => import('./views/DocsView.vue'),
+          props: true,
+          meta: { crumb: 'docs', title: 'Docs' },
+        },
+        {
+          path: 'search',
+          name: 'search',
+          component: () => import('./views/SearchView.vue'),
+          meta: { title: 'Search' },
+        },
+        {
+          path: 'activity',
+          name: 'activity',
+          component: () => import('./views/ActivityView.vue'),
+          meta: { title: 'Activity' },
+        },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('./views/SettingsView.vue'),
+          meta: { title: 'Settings' },
+        },
+      ],
     },
   ],
 })
+
+/**
+ * URLs minted before workspaces existed, and anything a person has
+ * bookmarked. `/b/SU?item=SU-5` has to keep working, so an unprefixed path is
+ * sent to the same place under the workspace rather than 404ing.
+ */
+const LEGACY_PREFIXES = ['/b/', '/docs', '/search', '/activity', '/settings']
 
 router.beforeEach(async (to) => {
   dismissConfirms()
   const ws = useWorkspace()
   if (to.meta.public) return true
-  if (ws.me.value) return true
+
+  const legacy = LEGACY_PREFIXES.some(
+    (p) => to.path === p || to.path.startsWith(p),
+  )
+  if (legacy) {
+    const slug = await ws.defaultWorkspaceSlug()
+    if (slug) return `/${slug}${to.fullPath}`
+    // More than one workspace and no way to tell which this link meant, so
+    // the picker asks. The destination rides along rather than being thrown
+    // away: answering "which workspace" should not also cost you the card you
+    // were opening.
+    return { name: 'workspaces', query: { to: to.fullPath } }
+  }
+
+  // The workspace has to be set before anything asks the API for data, since
+  // every scoped call reads it.
+  const slug = String(to.params.workspace ?? '')
+  if (slug) setWorkspaceSlug(slug)
+
+  if (ws.me.value && (!slug || ws.workspaceSlug.value === slug)) return true
+
   const ok = await ws.loadMe()
   if (!ok) return { name: 'login', query: { to: to.fullPath } }
-  await ws.refresh()
+  if (!slug) return true
+
+  // Entering a workspace, or moving between two. A refresh that 404s means
+  // this session has no actor there, which is the server's way of saying it
+  // is not yours to open.
+  const entered = await ws.enterWorkspace(slug)
+  if (!entered) return { name: 'workspaces' }
   ws.connect()
   return true
 })

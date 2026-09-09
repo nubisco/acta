@@ -5,8 +5,14 @@
  */
 
 import { computed, ref } from 'vue'
-import { api, auth, subscribeEvents } from '@/api/client'
+import { api, auth, setWorkspaceSlug, subscribeEvents } from '@/api/client'
 import type { ILiveEvent, IOverview } from '@/types/api'
+
+export interface IWorkspaceSummary {
+  id: string
+  name: string
+  slug: string
+}
 
 export interface IMe {
   id: string
@@ -29,6 +35,8 @@ export interface IAppNotification {
 const overview = ref<IOverview | null>(null)
 const me = ref<IMe | null>(null)
 const connectionDown = ref(false)
+const workspaceSlug = ref('')
+const workspaces = ref<IWorkspaceSummary[]>([])
 const notifications = ref<IAppNotification[]>([])
 const listeners = new Set<(event: ILiveEvent) => void>()
 let unsubscribe: (() => void) | null = null
@@ -52,6 +60,42 @@ export function useWorkspace() {
 
   async function refresh(): Promise<void> {
     overview.value = await api.overview()
+  }
+
+  /**
+   * Open a workspace by its URL slug. Returns false when this session has no
+   * actor there, which the server reports as a 404 so that a stranger cannot
+   * learn which workspace names exist.
+   */
+  async function enterWorkspace(slug: string): Promise<boolean> {
+    setWorkspaceSlug(slug)
+    try {
+      overview.value = await api.overview()
+      workspaceSlug.value = slug
+      return true
+    } catch {
+      workspaceSlug.value = ''
+      return false
+    }
+  }
+
+  /** Every workspace this session can open, loaded once. */
+  async function listWorkspaces(): Promise<IWorkspaceSummary[]> {
+    if (workspaces.value.length === 0) {
+      workspaces.value = (await auth.workspaces()).workspaces
+    }
+    return workspaces.value
+  }
+
+  /**
+   * Where an unprefixed URL should land. One workspace is the common case and
+   * should never make anyone choose; more than one has no right answer, so
+   * the picker decides.
+   */
+  async function defaultWorkspaceSlug(): Promise<string | null> {
+    if (!me.value && !(await loadMe())) return null
+    const all = await listWorkspaces().catch(() => [])
+    return all.length === 1 ? all[0].slug : null
   }
 
   function connect(): void {
@@ -102,6 +146,11 @@ export function useWorkspace() {
     me: computed(() => me.value),
     isAdmin: computed(() => me.value?.role === 'admin'),
     connectionDown: computed(() => connectionDown.value),
+    workspaceSlug: computed(() => workspaceSlug.value),
+    workspaces: computed(() => workspaces.value),
+    enterWorkspace,
+    listWorkspaces,
+    defaultWorkspaceSlug,
     notifications: computed(() => notifications.value),
     unreadCount: computed(
       () => notifications.value.filter((n) => !n.read).length,

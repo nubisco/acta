@@ -4,7 +4,12 @@ import type { IActorCtx } from './core/ctx'
 import { bootstrapWorkspace, type IBootstrapOptions } from './core/bootstrap'
 import { mcpRoutes } from './mcp'
 import { apiRoutes } from './routes/api'
-import { authRoutes, requireAuth, type ISsoRuntime } from './routes/auth'
+import {
+  authRoutes,
+  requireAuth,
+  requireWorkspace,
+  type ISsoRuntime,
+} from './routes/auth'
 import { hookRoutes } from './routes/hooks'
 import { ingestRoutes } from './routes/ingest'
 import { JwksVerifier, type ISsoConfig } from './core/sso'
@@ -84,6 +89,15 @@ export async function createApp(
   // Provider webhooks authenticate by signature, not by session, so they
   // mount before requireAuth.
   app.route('/api/v1/hooks', hookRoutes())
+  // Workspace-scoped API: the segment names the workspace, and the middleware
+  // resolves who you are inside it. This is the path the app uses.
+  app.use('/api/v1/w/:workspace/*', requireWorkspace())
+  app.route('/api/v1/w/:workspace', apiRoutes(store))
+
+  // The same API without a workspace segment, meaning "the workspace this
+  // token was minted in". Agent tokens, the MCP server and the importers all
+  // address Acta this way, and a token is a grant on one workspace, so there
+  // is nothing for them to choose.
   app.use('/api/v1/*', requireAuth())
   app.route('/api/v1', apiRoutes(store))
 

@@ -13,6 +13,25 @@ import type {
 
 const BASE = '/api/v1'
 
+/**
+ * The workspace every call is addressed to, as a URL segment.
+ *
+ * A session identifies the person, not the place, so the workspace has to
+ * travel with the request. Holding it here rather than threading a slug
+ * through thirty call sites keeps the change to one function, and means a
+ * second tab on another workspace is just a second module instance with its
+ * own value.
+ */
+let workspaceSlug = ''
+
+export function setWorkspaceSlug(slug: string): void {
+  workspaceSlug = slug
+}
+
+export function getWorkspaceSlug(): string {
+  return workspaceSlug
+}
+
 export class ApiHttpError extends Error {
   status: number
   body: unknown
@@ -29,7 +48,13 @@ export class ApiHttpError extends Error {
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  // Signing in and listing your workspaces happen before you have chosen one,
+  // so those stay unprefixed. Everything else is scoped.
+  const scoped =
+    path.startsWith('/auth') || !workspaceSlug
+      ? `${BASE}${path}`
+      : `${BASE}/w/${encodeURIComponent(workspaceSlug)}${path}`
+  const res = await fetch(scoped, {
     credentials: 'include',
     headers: init?.body ? { 'content-type': 'application/json' } : undefined,
     ...init,
@@ -67,6 +92,12 @@ import type {
 // -- Auth -------------------------------------------------------------------
 
 export const auth = {
+  /** Every workspace this session can open. Unprefixed by design. */
+  workspaces: () =>
+    req<{
+      workspaces: { id: string; name: string; slug: string }[]
+    }>('/auth/workspaces'),
+
   me: () =>
     req<{
       id: string
@@ -295,7 +326,13 @@ export function subscribeEvents(
   handler: (event: ILiveEvent) => void,
   onHealth?: (down: boolean) => void,
 ): () => void {
-  const source = new EventSource(`${BASE}/events/stream`)
+  // The live stream is workspace-scoped like every other read; without the
+  // segment a second tab would receive the first workspace's events.
+  const source = new EventSource(
+    workspaceSlug
+      ? `${BASE}/w/${encodeURIComponent(workspaceSlug)}/events/stream`
+      : `${BASE}/events/stream`,
+  )
   source.onopen = () => onHealth?.(false)
   source.onerror = () => onHealth?.(true)
   source.onmessage = (msg) => {

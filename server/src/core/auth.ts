@@ -23,6 +23,14 @@ export function randomToken(bytes = 32): string {
 
 export interface IAuthedActor extends IActorCtx {
   tokenKind: 'session' | 'agent'
+  /**
+   * The workspace the token was minted in, and the email that identifies the
+   * person across workspaces. A session grants a person, not a place: the URL
+   * says which workspace, and the actor is resolved as (email, workspace) per
+   * request. Agent tokens have no email and stay bound to their own workspace.
+   */
+  workspaceId: string
+  email?: string
 }
 
 /** Resolve a bearer/cookie token to an actor, or null. */
@@ -42,9 +50,12 @@ export async function resolveToken(
     role: 'admin' | 'member'
     on_behalf_of: string | null
     disabled: number
+    workspace_id: string
+    email: string | null
   }>(
-    `SELECT t.kind, t.scopes, t.expires_at, t.revoked_at,
-            a.id AS actor_id, a.kind AS actor_kind, a.handle, a.role, a.on_behalf_of, a.disabled
+    `SELECT t.kind, t.scopes, t.expires_at, t.revoked_at, t.workspace_id,
+            a.id AS actor_id, a.kind AS actor_kind, a.handle, a.role, a.on_behalf_of,
+            a.disabled, a.email
        FROM auth_token t JOIN actor a ON a.id = t.actor_id
       WHERE t.token_hash = ?`,
     [hash],
@@ -61,7 +72,85 @@ export async function resolveToken(
     onBehalfOf: r.on_behalf_of ?? undefined,
     scopes: r.scopes.split(','),
     tokenKind: r.kind,
+    workspaceId: r.workspace_id,
+    email: r.email ?? undefined,
   }
+}
+
+export interface IWorkspaceRow {
+  id: string
+  name: string
+  slug: string
+}
+
+/** A workspace by its URL segment. */
+export async function workspaceBySlug(
+  db: ISqlDriver,
+  slug: string,
+): Promise<IWorkspaceRow | null> {
+  const rows = await db.query<IWorkspaceRow>(
+    'SELECT id, name, slug FROM workspace WHERE slug = ?',
+    [slug],
+  )
+  return rows[0] ?? null
+}
+
+/**
+ * The actor this token's holder is inside `workspaceId`, or null if they are
+ * not a member there.
+ *
+ * A session carries the person's email, so entering another workspace is a
+ * lookup rather than a re-login. An agent token has no email and is a grant
+ * on one workspace only, so it matches by its own workspace instead.
+ */
+export async function actorInWorkspace(
+  db: ISqlDriver,
+  authed: IAuthedActor,
+  workspaceId: string,
+): Promise<IActorCtx | null> {
+  if (authed.workspaceId === workspaceId) return authed
+  if (!authed.email) return null
+  const rows = await db.query<{
+    id: string
+    kind: 'human' | 'agent' | 'system'
+    handle: string
+    role: 'admin' | 'member'
+    on_behalf_of: string | null
+  }>(
+    `SELECT id, kind, handle, role, on_behalf_of FROM actor
+      WHERE workspace_id = ? AND lower(email) = lower(?) AND disabled = 0
+        AND kind = 'human'`,
+    [workspaceId, authed.email],
+  )
+  const row = rows[0]
+  if (!row) return null
+  return {
+    id: row.id,
+    kind: row.kind,
+    handle: row.handle,
+    role: row.role,
+    onBehalfOf: row.on_behalf_of ?? undefined,
+    // Authority is a property of membership in *this* workspace, so it comes
+    // from the row we just found rather than from the token. Being an admin
+    // somewhere else must not carry over, and neither must being merely a
+    // member elsewhere strip admin here.
+    scopes:
+      row.role === 'admin' ? ['read', 'write', 'admin'] : ['read', 'write'],
+  }
+}
+
+/** Every workspace this person can reach, for the picker. */
+export async function workspacesForEmail(
+  db: ISqlDriver,
+  email: string,
+): Promise<IWorkspaceRow[]> {
+  return db.query<IWorkspaceRow>(
+    `SELECT w.id, w.name, w.slug FROM workspace w
+       JOIN actor a ON a.workspace_id = w.id
+      WHERE lower(a.email) = lower(?) AND a.disabled = 0 AND a.kind = 'human'
+      ORDER BY w.name`,
+    [email],
+  )
 }
 
 export async function createToken(

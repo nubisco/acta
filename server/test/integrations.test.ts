@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it } from 'bun:test'
 import type { Hono } from 'hono'
 import { createApp } from '../src/app'
 import { createToken } from '../src/core/auth'
+import { setOtpSender } from '../src/routes/auth'
 import type { ICtx } from '../src/core/ctx'
 import { openDb, type BunSqliteDriver } from '../src/db'
 import { boardWrite } from '../src/services/boards'
@@ -555,3 +556,137 @@ async function tokenFor(): Promise<string> {
     'admin',
   ])
 }
+
+/**
+ * Workspace scoping. A session grants a person, not a place: the URL segment
+ * says which workspace, and the server decides what that person is inside it.
+ * The cases worth the most are the refusals.
+ */
+describe('workspace scoping', () => {
+  /** A second workspace, with its own actor rows. */
+  async function secondWorkspace(email: string | null, role = 'member') {
+    const wsId = `ws_${Math.random().toString(36).slice(2, 10)}`
+    await db.run(
+      'INSERT INTO workspace (id, name, slug, created_at) VALUES (?, ?, ?, ?)',
+      [wsId, 'Acme', 'acme', Date.now()],
+    )
+    const actorId = `act_${Math.random().toString(36).slice(2, 10)}`
+    await db.run(
+      `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
+       VALUES (?, ?, 'human', 'someone', 'Someone', ?, ?, ?)`,
+      [actorId, wsId, email, role, Date.now()],
+    )
+    return { wsId, actorId }
+  }
+
+  async function get(path: string, token: string): Promise<Response> {
+    return app.request(path, { headers: { authorization: `Bearer ${token}` } })
+  }
+
+  it('bootstrap gives the first workspace a slug from its name', async () => {
+    const rows = await db.query<{ slug: string }>('SELECT slug FROM workspace')
+    expect(rows[0].slug).toBe('nubisco')
+  })
+
+  it('serves a workspace the session belongs to', async () => {
+    const res = await get('/api/v1/w/nubisco/overview', await tokenFor())
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { boards: { key: string }[] }
+    expect(body.boards.map((b) => b.key)).toContain('SUP')
+  })
+
+  it('404s an unknown workspace', async () => {
+    const res = await get('/api/v1/w/nope/overview', await tokenFor())
+    expect(res.status).toBe(404)
+  })
+
+  it('404s a workspace the person is not a member of', async () => {
+    await secondWorkspace('someone-else@example.com')
+    const res = await get('/api/v1/w/acme/overview', await tokenFor())
+    // Deliberately not 403: whether a workspace exists is not something an
+    // outsider should be able to probe for.
+    expect(res.status).toBe(404)
+  })
+
+  it('lets one session into a second workspace it does belong to', async () => {
+    await secondWorkspace('jose@nubisco.io')
+    const token = await tokenFor()
+    expect((await get('/api/v1/w/nubisco/overview', token)).status).toBe(200)
+    // Same cookie, different workspace, no re-login.
+    expect((await get('/api/v1/w/acme/overview', token)).status).toBe(200)
+  })
+
+  it('does not carry admin from one workspace into another', async () => {
+    await secondWorkspace('jose@nubisco.io', 'member')
+    const res = await app.request('/api/v1/w/acme/ingest_tokens', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${await tokenFor()}`,
+      },
+      body: JSON.stringify({ name: 'x', board: 'SUP' }),
+    })
+    // Admin in Nubisco, a plain member in Acme: the admin-only endpoint must
+    // refuse rather than inherit authority across the boundary.
+    expect(res.status).toBe(403)
+  })
+
+  it('keeps the unprefixed API working for agent tokens', async () => {
+    const res = await get('/api/v1/overview', await tokenFor())
+    expect(res.status).toBe(200)
+  })
+
+  it('lists the workspaces a session can reach', async () => {
+    await secondWorkspace('jose@nubisco.io')
+    const res = await get('/api/v1/auth/workspaces', await tokenFor())
+    const body = (await res.json()) as { workspaces: { slug: string }[] }
+    expect(body.workspaces.map((w) => w.slug).sort()).toEqual([
+      'acme',
+      'nubisco',
+    ])
+  })
+})
+
+describe('login across workspaces', () => {
+  it('issues a code to a member of any workspace, not just the first', async () => {
+    const wsId = `ws_${Math.random().toString(36).slice(2, 10)}`
+    await db.run(
+      'INSERT INTO workspace (id, name, slug, created_at) VALUES (?, ?, ?, ?)',
+      [wsId, 'Acme', 'acme', Date.now()],
+    )
+    await db.run(
+      `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
+       VALUES (?, ?, 'human', 'ana', 'Ana', 'ana@acme.test', 'member', ?)`,
+      [`act_${Math.random().toString(36).slice(2, 10)}`, wsId, Date.now()],
+    )
+    let sent = ''
+    setOtpSender(async (_email, code) => {
+      sent = code
+    })
+    const asked = await app.request('/api/v1/auth/otp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'ana@acme.test' }),
+    })
+    expect(asked.status).toBe(200)
+    // Ana belongs only to Acme, never to the bootstrapped workspace. Scoping
+    // the lookup to one workspace would have silently sent her nothing.
+    expect(sent).toMatch(/^\d{6}$/)
+
+    const verified = await app.request('/api/v1/auth/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'ana@acme.test', code: sent }),
+    })
+    expect(verified.status).toBe(200)
+    const cookie = verified.headers.get('set-cookie') ?? ''
+    expect(cookie).toContain('acta_session=')
+
+    // And the session she gets is a session in Acme.
+    const token = cookie.split('acta_session=')[1].split(';')[0]
+    const res = await app.request('/api/v1/w/acme/overview', {
+      headers: { cookie: `acta_session=${token}` },
+    })
+    expect(res.status).toBe(200)
+  })
+})

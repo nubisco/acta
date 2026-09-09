@@ -7,6 +7,10 @@ export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS workspace (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
+  -- The URL segment this workspace is addressed by, the way an org is on
+  -- GitHub. Nullable so the ALTER below can add it to databases that predate
+  -- it; bootstrap backfills those from the name.
+  slug TEXT,
   created_at INTEGER NOT NULL
 );
 
@@ -341,6 +345,14 @@ CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
  */
 export const ADDITIVE_COLUMNS = [
   'ALTER TABLE actor ADD COLUMN avatar_url TEXT',
+  // The URL segment a workspace is addressed by, the way an org is on GitHub.
+  // Nullable because it is added to an existing table; bootstrap backfills the
+  // rows that predate it, and the unique index keeps two from colliding.
+  'ALTER TABLE workspace ADD COLUMN slug TEXT',
+  // After the column exists, never inside SCHEMA_SQL: on a fresh database the
+  // table is created before the ALTER runs, so an index declared up there
+  // would name a column that is not there yet.
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_workspace_slug ON workspace(slug)',
   // How a destination wants the payload shaped. Slack rejects our own
   // envelope, so the format lives on the webhook rather than forcing a
   // second delivery pipeline with its own retries and failure handling.

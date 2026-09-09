@@ -73,6 +73,7 @@ import { useViewCommands } from '@/lib/commands'
 import { useWorkspace } from '@/stores/workspace'
 import DocsTreeNode from '@/components/DocsTreeNode.vue'
 import NewDocModal from '@/components/NewDocModal.vue'
+import { wpath } from '@/lib/paths'
 
 const route = useRoute()
 const router = useRouter()
@@ -107,7 +108,7 @@ watch(
 const selected = computed<string | null>({
   get: () => currentSlug.value || null,
   set: (slug) => {
-    if (slug) void router.push(`/docs/${slug}`)
+    if (slug) void router.push(wpath(`/docs/${slug}`))
   },
 })
 
@@ -154,7 +155,7 @@ onScopeDispose(
 function onCreated(slug: string): void {
   creating.value = false
   void loadTree()
-  void router.push(`/docs/${slug}`)
+  void router.push(wpath(`/docs/${slug}`))
 }
 </script>
 

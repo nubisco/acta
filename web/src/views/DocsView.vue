@@ -163,6 +163,7 @@ import DocsTreePanel from '@/components/DocsTreePanel.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
+import { wpath } from '@/lib/paths'
 
 // Monaco is heavy; the diff surface loads only when a version is compared.
 const DocDiff = defineAsyncComponent(() => import('@/components/DocDiff.vue'))
@@ -175,7 +176,10 @@ const router = useRouter()
 
 // Inside the docs space a doc ref navigates for real; the quick-look modal
 // is for every other surface.
-provide(DOC_NAV_KEY, (target: string) => void router.push(`/docs/${target}`))
+provide(
+  DOC_NAV_KEY,
+  (target: string) => void router.push(wpath(`/docs/${target}`)),
+)
 
 useViewCommands('docs', [
   {

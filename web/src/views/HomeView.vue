@@ -58,7 +58,7 @@
         v-for="board in boards"
         :key="board.key"
         :title="board.name"
-        :href="`/b/${board.key}`"
+        :href="wpath(`/b/${board.key}`)"
       >
         <template #icon>
           <span
@@ -121,6 +121,7 @@ import { chartColorFor, roleColor } from '@/lib/colors'
 import { useLoadState } from '@/lib/state'
 import { useUiState, useWorkspace } from '@/stores/workspace'
 import ActivityList from '@/components/ActivityList.vue'
+import { wpath } from '@/lib/paths'
 
 const ws = useWorkspace()
 const ui = useUiState()
