@@ -5,6 +5,7 @@
     row-key="key"
     size="sm"
     aria-label="Items"
+    :sort-state="sort"
     @sort="onSort"
     @row-click="(row) => emit('open', String((row as IRow).key))"
   >
@@ -92,11 +93,25 @@ const columns = [
 
 const sort = ref<{ key: string; direction: 'asc' | 'desc' } | null>(null)
 
+/**
+ * NbDataTable is controlled: it reports the click and reflects whatever state
+ * it is given back, so the ascending/descending cycle lives here. Without
+ * feeding `sortState` back the header never shows which column is sorted and
+ * `aria-sort` stays "none".
+ */
 function onSort(state: unknown): void {
-  const next = state as { key?: string; direction?: 'asc' | 'desc' } | null
-  sort.value = next?.key
-    ? { key: next.key, direction: next.direction ?? 'asc' }
-    : null
+  const next = state as { key?: string; direction?: string } | null
+  if (!next?.key || next.direction === 'none') {
+    sort.value = null
+    return
+  }
+  const direction =
+    next.direction === 'asc' || next.direction === 'desc'
+      ? next.direction
+      : sort.value?.key === next.key && sort.value.direction === 'asc'
+        ? 'desc'
+        : 'asc'
+  sort.value = { key: next.key, direction }
 }
 
 /**

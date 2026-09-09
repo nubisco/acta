@@ -46,6 +46,14 @@ export function useLoadState(): ILoadState {
   return { state, message, run }
 }
 
+/** Full date and time, for a tooltip on a relative one. */
+export function absoluteTime(ts: number): string {
+  return new Date(ts).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+}
+
 export function relativeTime(ts: number): string {
   const diffMs = ts - Date.now()
   const minutes = Math.round(diffMs / 60_000)

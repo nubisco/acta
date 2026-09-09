@@ -550,8 +550,23 @@ export async function activityQuery(ctx: ICtx, params: TActivityQuery) {
     args.push(params.entity, params.entity)
   }
   if (params.actor) {
-    where.push('actor_id = ?')
-    args.push(params.actor)
+    // Several actors mean "any of these", so a row of avatars can filter to a
+    // few people at once rather than one at a time. A handle is accepted
+    // alongside an id because that is what a URL is likely to carry.
+    const actors = params.actor
+      .split(',')
+      .map((a) => a.trim())
+      .filter(Boolean)
+    if (actors.length > 0) {
+      const clause = actors
+        .map(
+          () =>
+            '(actor_id = ? OR actor_id IN (SELECT id FROM actor WHERE workspace_id = ? AND handle = ?))',
+        )
+        .join(' OR ')
+      where.push(`(${clause})`)
+      for (const actor of actors) args.push(actor, ctx.workspaceId, actor)
+    }
   }
   if (params.actor_kind) {
     where.push('actor_kind = ?')

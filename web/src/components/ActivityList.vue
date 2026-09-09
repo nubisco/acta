@@ -44,7 +44,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { IEventRow } from '@/types/api'
-import { relativeTime } from '@/lib/state'
+import { absoluteTime, relativeTime } from '@/lib/state'
 import { useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 
@@ -64,13 +64,6 @@ function actorName(event: IEventRow): string {
   const actor = actorsById.value.get(event.actor_id)
   if (actor) return actor.name || `@${actor.handle}`
   return event.actor_kind === 'system' ? 'Acta' : 'Someone'
-}
-
-function absoluteTime(ts: number): string {
-  return new Date(ts).toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
 }
 
 interface IDayGroup {
