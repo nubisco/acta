@@ -1,3 +1,10 @@
+## [1.11.1](https://github.com/nubisco/acta/compare/v1.11.0...v1.11.1) (2026-09-09)
+
+
+### Bug Fixes
+
+* **db:** a semicolon in a schema comment took production down ([f645fac](https://github.com/nubisco/acta/commit/f645fac7daf02d6d1f4a46447e958a523df762a1))
+
 # [1.11.0](https://github.com/nubisco/acta/compare/v1.10.1...v1.11.0) (2026-09-09)
 
 
