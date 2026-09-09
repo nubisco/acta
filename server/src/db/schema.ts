@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS actor (
   name TEXT NOT NULL,
   email TEXT,
   avatar_url TEXT,
+  -- Where the avatar came from, so a personal upload survives the next SSO
+  -- sign-in. See ADDITIVE_COLUMNS for existing databases.
+  avatar_source TEXT NOT NULL DEFAULT 'sso',
   role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
   on_behalf_of TEXT REFERENCES actor(id),
   disabled INTEGER NOT NULL DEFAULT 0,
@@ -359,6 +362,10 @@ export const ADDITIVE_COLUMNS = [
   // Nullable because it is added to an existing table; bootstrap backfills the
   // rows that predate it, and the unique index keeps two from colliding.
   'ALTER TABLE workspace ADD COLUMN slug TEXT',
+  // Where the current avatar came from. An identity provider seeds one so a
+  // new member arrives with a face, but a person who uploads their own has
+  // made a choice, and the next sign-in must not quietly undo it.
+  "ALTER TABLE actor ADD COLUMN avatar_source TEXT NOT NULL DEFAULT 'sso'",
   // After the column exists, never inside SCHEMA_SQL: on a fresh database the
   // table is created before the ALTER runs, so an index declared up there
   // would name a column that is not there yet.

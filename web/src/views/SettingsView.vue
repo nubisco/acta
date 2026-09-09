@@ -43,7 +43,17 @@
       >
         <template #cell-handle="{ row }">
           <span class="settings__member">
-            <ActorAvatar :handle="row.rawHandle" />
+            <button
+              v-if="row.canEditAvatar"
+              v-nb-tooltip="{ body: 'Change picture' }"
+              type="button"
+              class="settings__avatar-button"
+              :aria-label="`Change picture for ${row.name}`"
+              @click="openAvatar(row)"
+            >
+              <ActorAvatar :handle="row.rawHandle" />
+            </button>
+            <ActorAvatar v-else :handle="row.rawHandle" />
             <span>{{ row.handle }}</span>
           </span>
         </template>
@@ -420,6 +430,14 @@
       @close="creatingWebhook = false"
       @created="onWebhookCreated"
     />
+    <AvatarUploadModal
+      v-if="avatarTarget"
+      :open="avatarTarget !== null"
+      :actor-id="avatarTarget.id"
+      :has-avatar="avatarTarget.hasAvatar"
+      @close="avatarTarget = null"
+      @saved="avatarTarget = null"
+    />
     <NewConnectionModal
       :open="creatingConnection"
       @close="creatingConnection = false"
@@ -438,6 +456,7 @@ import { useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import NewMemberModal from '@/components/NewMemberModal.vue'
 import NewTokenModal from '@/components/NewTokenModal.vue'
+import AvatarUploadModal from '@/components/AvatarUploadModal.vue'
 import NewConnectionModal from '@/components/NewConnectionModal.vue'
 import NewWebhookModal from '@/components/NewWebhookModal.vue'
 
@@ -481,8 +500,21 @@ const actorRows = computed(() =>
     rawHandle: a.handle,
     name: a.name,
     kind: a.kind,
+    id: a.id,
+    hasAvatar: Boolean(a.avatar_url),
+    // Your own picture is yours to change; anyone else's needs admin. Agents
+    // and the system actor have no picture to set.
+    canEditAvatar:
+      a.kind === 'human' && (a.id === ws.me.value?.id || ws.isAdmin.value),
   })),
 )
+
+const avatarTarget = ref<{ id: string; hasAvatar: boolean } | null>(null)
+
+function openAvatar(row: unknown): void {
+  const actor = row as { id: string; hasAvatar: boolean }
+  avatarTarget.value = { id: actor.id, hasAvatar: actor.hasAvatar }
+}
 
 const variants = computed(() => labelVariants(ws.overview.value))
 
@@ -857,6 +889,25 @@ async function copyIngest(): Promise<void> {
 
     h2 {
       margin: 0;
+    }
+  }
+
+  &__avatar-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    line-height: 0;
+    border-radius: 50%;
+    cursor: pointer;
+
+    &:hover {
+      outline: 2px solid var(--nb-c-primary);
+      outline-offset: 1px;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline-offset: 1px;
     }
   }
 

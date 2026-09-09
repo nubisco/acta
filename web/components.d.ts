@@ -31,6 +31,7 @@ declare module 'vue' {
     NbForm: typeof import('@nubisco/ui/components/Form')['NbForm']
     NbGanttChart: typeof import('@nubisco/ui/components/Charts/GanttChart')['NbGanttChart']
     NbIcon: typeof import('@nubisco/ui/components/Icon')['NbIcon']
+    NbImageCropper: typeof import('@nubisco/ui/components/ImageCropper')['NbImageCropper']
     NbInlineEdit: typeof import('@nubisco/ui/components/InlineEdit')['NbInlineEdit']
     NbInlineLoading: typeof import('@nubisco/ui/components/InlineLoading')['NbInlineLoading']
     NbMenu: typeof import('@nubisco/ui/components/Menu')['NbMenu']

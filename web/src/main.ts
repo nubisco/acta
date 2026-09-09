@@ -25,7 +25,21 @@ const i18n = createI18n({
   legacy: false,
   locale: typeof navigator !== 'undefined' ? navigator.language : 'en',
   fallbackLocale: 'en',
-  messages: {},
+  messages: {
+    // NbImageCropper reads these from the app's catalogue but ships no
+    // defaults of its own, unlike NbUserMenu, so without them the cropper
+    // renders "common.WIDTH" at people. Fixed upstream too; this keeps the
+    // current release readable.
+    en: {
+      common: {
+        X: 'X',
+        Y: 'Y',
+        WIDTH: 'Width',
+        HEIGHT: 'Height',
+        IMAGE: 'Image',
+      },
+    },
+  },
   missingWarn: false,
   fallbackWarn: false,
 })

@@ -226,6 +226,25 @@ export const api = {
       body: JSON.stringify({ ops }),
     }),
 
+  /**
+   * Raw bytes rather than multipart: the blob is already cropped, and a body
+   * that is exactly the image keeps the server free of form parsing.
+   */
+  uploadAvatar: (actorId: string, blob: Blob) =>
+    req<{ ok: boolean; avatar_url: string }>(
+      `/members/${encodeURIComponent(actorId)}/avatar`,
+      {
+        method: 'POST',
+        headers: { 'content-type': blob.type || 'image/png' },
+        body: blob,
+      },
+    ),
+
+  removeAvatar: (actorId: string) =>
+    req<{ ok: boolean }>(`/members/${encodeURIComponent(actorId)}/avatar`, {
+      method: 'DELETE',
+    }),
+
   starBoard: (key: string, starred: boolean) =>
     req<{ ok: boolean; starred: boolean }>(
       `/boards/${encodeURIComponent(key)}/star`,

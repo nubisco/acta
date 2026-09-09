@@ -73,6 +73,9 @@ function requireScope(ctx: ICtx, scope: string): void {
     throw new ApiError(403, `missing scope ${scope}`)
 }
 
+/** Avatars are small by nature; 2 MB is generous for a cropped square. */
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024
+
 export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
   const app = new Hono<IAuthEnv>()
 
@@ -399,6 +402,92 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     return c.json({ id, handle: body.handle })
   })
 
+  /**
+   * A person's own picture. Uploaded here rather than only through an
+   * identity provider, because anything only the hosted product can do is
+   * something a self-hosted workspace can never do: the initials fallback
+   * would stop being a graceful default and become the ceiling.
+   *
+   * The bytes are already cropped by the client, so this stores what it is
+   * given rather than resizing server-side.
+   */
+  app.post('/members/:id/avatar', async (c) => {
+    const ctx = ctxOf(c)
+    const target = c.req.param('id')
+    // Your own face is yours to change; anyone else's needs admin.
+    if (target !== ctx.actor.id) requireScope(ctx, 'admin')
+    else requireScope(ctx, 'write')
+
+    const mime = c.req.header('content-type') ?? 'image/png'
+    if (!mime.startsWith('image/'))
+      throw new ApiError(415, 'avatar must be an image')
+    const bytes = new Uint8Array(await c.req.arrayBuffer())
+    if (bytes.byteLength === 0) throw new ApiError(400, 'empty upload')
+    if (bytes.byteLength > AVATAR_MAX_BYTES)
+      throw new ApiError(413, 'avatars are capped at 2 MB')
+
+    const rows = await ctx.db.query<{ avatar_url: string | null }>(
+      "SELECT avatar_url FROM actor WHERE workspace_id = ? AND id = ? AND kind = 'human'",
+      [ctx.workspaceId, target],
+    )
+    if (rows.length === 0) throw new ApiError(404, 'member not found')
+
+    const id = newId('att')
+    await store.write(id, bytes)
+    const url = `/api/v1/avatars/${id}`
+    await ctx.db.run(
+      `UPDATE actor SET avatar_url = ?, avatar_source = 'upload'
+        WHERE workspace_id = ? AND id = ?`,
+      [url, ctx.workspaceId, target],
+    )
+    // The old blob is unreachable the moment the row stops naming it, so it
+    // goes with the row rather than lingering in the bucket forever.
+    const previous = rows[0].avatar_url
+    if (previous?.startsWith('/api/v1/avatars/')) {
+      await store.remove(previous.slice('/api/v1/avatars/'.length))
+    }
+    return c.json({ ok: true, avatar_url: url })
+  })
+
+  app.delete('/members/:id/avatar', async (c) => {
+    const ctx = ctxOf(c)
+    const target = c.req.param('id')
+    if (target !== ctx.actor.id) requireScope(ctx, 'admin')
+    else requireScope(ctx, 'write')
+    const rows = await ctx.db.query<{ avatar_url: string | null }>(
+      'SELECT avatar_url FROM actor WHERE workspace_id = ? AND id = ?',
+      [ctx.workspaceId, target],
+    )
+    const previous = rows[0]?.avatar_url
+    await ctx.db.run(
+      `UPDATE actor SET avatar_url = NULL, avatar_source = 'sso'
+        WHERE workspace_id = ? AND id = ?`,
+      [ctx.workspaceId, target],
+    )
+    if (previous?.startsWith('/api/v1/avatars/')) {
+      await store.remove(previous.slice('/api/v1/avatars/'.length))
+    }
+    return c.json({ ok: true })
+  })
+
+  /**
+   * Avatars are readable by anyone signed in: they appear on every card and
+   * comment, so gating each one behind a per-member check would be a lot of
+   * work to protect something already on the screen.
+   */
+  app.get('/avatars/:id', async (c) => {
+    const bytes = await store.read(c.req.param('id'))
+    if (!bytes) return c.json({ error: 'not found' }, 404)
+    return new Response(new Uint8Array(bytes), {
+      headers: {
+        'content-type': 'image/png',
+        // Content-addressed by id: a new upload gets a new id, so this can be
+        // cached hard without anyone ever seeing a stale face.
+        'cache-control': 'public, max-age=31536000, immutable',
+      },
+    })
+  })
+
   app.patch('/members/:id', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'admin')
@@ -414,10 +503,14 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
       .parse(await c.req.json())
     if (c.req.param('id') === ctx.actor.id && body.disabled)
       throw new ApiError(400, 'you cannot disable yourself')
+    // An identity provider seeds an avatar so a new member arrives with a
+    // face, but it must not overwrite one the person chose themselves: an
+    // upload that silently reverts on the next sign-in reads as a bug.
     await ctx.db.run(
       `UPDATE actor SET role = COALESCE(?, role), name = COALESCE(?, name),
               disabled = COALESCE(?, disabled),
-              avatar_url = CASE WHEN ? THEN ? ELSE avatar_url END
+              avatar_url = CASE WHEN ? AND avatar_source != 'upload'
+                                THEN ? ELSE avatar_url END
         WHERE workspace_id = ? AND id = ? AND kind = 'human'`,
       [
         body.role ?? null,

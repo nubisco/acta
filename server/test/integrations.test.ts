@@ -690,3 +690,113 @@ describe('login across workspaces', () => {
     expect(res.status).toBe(200)
   })
 })
+
+describe('avatars', () => {
+  async function memberId(): Promise<string> {
+    const rows = await db.query<{ id: string }>(
+      "SELECT id FROM actor WHERE handle = 'jose'",
+    )
+    return rows[0].id
+  }
+
+  async function upload(id: string, token: string): Promise<Response> {
+    return app.request(`/api/v1/members/${id}/avatar`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'image/png',
+        authorization: `Bearer ${token}`,
+      },
+      body: new Uint8Array([137, 80, 78, 71, 1, 2, 3]),
+    })
+  }
+
+  it('stores an upload and serves it back', async () => {
+    const id = await memberId()
+    const token = await tokenFor()
+    const res = await upload(id, token)
+    expect(res.status).toBe(200)
+    const { avatar_url } = (await res.json()) as { avatar_url: string }
+    expect(avatar_url).toStartWith('/api/v1/avatars/')
+
+    const served = await app.request(avatar_url, {
+      headers: { authorization: `Bearer ${token}` },
+    })
+    expect(served.status).toBe(200)
+    expect(served.headers.get('content-type')).toBe('image/png')
+    expect(new Uint8Array(await served.arrayBuffer())).toHaveLength(7)
+  })
+
+  it('refuses anything that is not an image', async () => {
+    const res = await app.request(
+      `/api/v1/members/${await memberId()}/avatar`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/pdf',
+          authorization: `Bearer ${await tokenFor()}`,
+        },
+        body: new Uint8Array([1, 2, 3]),
+      },
+    )
+    expect(res.status).toBe(415)
+  })
+
+  it('does not let an identity provider overwrite a personal upload', async () => {
+    const id = await memberId()
+    const token = await tokenFor()
+    const { avatar_url } = (await (await upload(id, token)).json()) as {
+      avatar_url: string
+    }
+
+    // Platform syncing on the next sign-in.
+    await app.request(`/api/v1/members/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ avatar_url: 'https://sso.example/face.png' }),
+    })
+
+    const rows = await db.query<{ avatar_url: string; avatar_source: string }>(
+      'SELECT avatar_url, avatar_source FROM actor WHERE id = ?',
+      [id],
+    )
+    expect(rows[0].avatar_url).toBe(avatar_url)
+    expect(rows[0].avatar_source).toBe('upload')
+  })
+
+  it('does let one seed an avatar when nothing is set', async () => {
+    const id = await memberId()
+    await app.request(`/api/v1/members/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${await tokenFor()}`,
+      },
+      body: JSON.stringify({ avatar_url: 'https://sso.example/face.png' }),
+    })
+    const rows = await db.query<{ avatar_url: string }>(
+      'SELECT avatar_url FROM actor WHERE id = ?',
+      [id],
+    )
+    expect(rows[0].avatar_url).toBe('https://sso.example/face.png')
+  })
+
+  it('clearing an avatar returns to the initials fallback', async () => {
+    const id = await memberId()
+    const token = await tokenFor()
+    await upload(id, token)
+    const res = await app.request(`/api/v1/members/${id}/avatar`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${token}` },
+    })
+    expect(res.status).toBe(200)
+    const rows = await db.query<{
+      avatar_url: string | null
+      avatar_source: string
+    }>('SELECT avatar_url, avatar_source FROM actor WHERE id = ?', [id])
+    expect(rows[0].avatar_url).toBeNull()
+    expect(rows[0].avatar_source).toBe('sso')
+  })
+})
