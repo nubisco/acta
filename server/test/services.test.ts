@@ -296,6 +296,60 @@ describe('items', () => {
   })
 })
 
+describe('assignee filter', () => {
+  beforeEach(seedBoard)
+
+  // Comma separated and "any of these", matching the label filter. The board
+  // picks people by avatar, and avatars are a multi-select by nature: a row
+  // you can only choose one of is a radio group in disguise.
+  it('matches any of several handles', async () => {
+    await ctx.db.run(
+      `INSERT INTO actor (id, workspace_id, kind, handle, name, role, created_at)
+       VALUES ('act_ivan', ?, 'human', 'ivan', 'Ivan', 'member', ?)`,
+      [ctx.workspaceId, Date.now()],
+    )
+
+    await itemWrite(
+      ctx,
+      [
+        {
+          op: 'create',
+          op_id: 'a1',
+          list: 'To Do',
+          title: 'Mine',
+          assignees: ['jose'],
+        },
+        {
+          op: 'create',
+          op_id: 'a2',
+          list: 'To Do',
+          title: 'Theirs',
+          assignees: ['ivan'],
+        },
+        { op: 'create', op_id: 'a3', list: 'To Do', title: 'Nobody' },
+      ],
+      'SW',
+    )
+
+    const query = async (assignee: string) =>
+      (
+        await boardGet(ctx, {
+          board: 'SW',
+          state: 'open',
+          assignee,
+          detail: 'compact',
+          limit: 100,
+        })
+      ).items.map((i) => i.title)
+
+    expect(await query('jose')).toEqual(['Mine'])
+    expect((await query('jose,ivan')).sort()).toEqual(['Mine', 'Theirs'])
+    // Whitespace around a name is what a hand-built URL looks like, and
+    // dropping the empty segment keeps a trailing comma from matching nothing.
+    expect((await query(' jose , ivan , ')).sort()).toEqual(['Mine', 'Theirs'])
+  })
+})
+
 describe('labels', () => {
   beforeEach(seedBoard)
 

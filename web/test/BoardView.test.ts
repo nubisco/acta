@@ -8,6 +8,7 @@
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { defineComponent, ref } from 'vue'
 
 const itemWrite = vi.fn(async () => ({ results: [{ op_id: 'x', ok: true }] }))
 const boardGet = vi.fn()
@@ -23,6 +24,22 @@ vi.mock('@/api/client', () => ({
 
 vi.mock('@/lib/commands', () => ({ useViewCommands: () => undefined }))
 
+// Shell-slot outlets teleport into regions that only exist once NbShell is
+// mounted, so without this the toolbar and the side panel render nowhere and
+// every assertion about them passes against an empty wrapper. Only the
+// composable is replaced; every other export stays real.
+vi.mock('@nubisco/ui', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>
+  const Outlet = defineComponent({
+    name: 'ShellSlotOutletStub',
+    setup:
+      (_props, { slots }) =>
+      () =>
+        slots.default?.(),
+  })
+  return { ...actual, useShellSlot: () => ({ Outlet }) }
+})
+
 const overview = {
   boards: [
     {
@@ -34,8 +51,14 @@ const overview = {
       ],
     },
   ],
-  labels: [],
-  actors: [],
+  labels: [
+    { name: 'Urgent', color: 'red', board_key: null },
+    { name: 'Tech debt', color: 'yellow', board_key: 'SU' },
+  ],
+  actors: [
+    { handle: 'jose', name: 'Jose', kind: 'human' },
+    { handle: 'acta', name: 'Acta', kind: 'system' },
+  ],
 }
 
 // Shared so a test can point the panel at a card and assert the board marks
@@ -43,7 +66,11 @@ const overview = {
 // import time, after these declarations.
 const inspectorMock = {
   open: vi.fn(),
-  itemKey: { value: null as string | null },
+  close: vi.fn(),
+  // A real ref, not a plain object: the board watches this to put the filter
+  // panel away, and a watcher on a non-reactive field never fires, which made
+  // the rule look enforced when nothing was enforcing it.
+  itemKey: ref<string | null>(null),
 }
 
 vi.mock('@/stores/workspace', () => ({
@@ -100,6 +127,13 @@ async function render() {
   return view
 }
 
+/** The toolbar's single filter control. */
+function filtersButton(view: ReturnType<typeof mount>) {
+  return view
+    .findAll('.board__filters button')
+    .find((b) => b.text().includes('Filters'))!
+}
+
 /** Right-click a card by its title and return the menu entries. */
 async function openMenu(
   view: Awaited<ReturnType<typeof render>>,
@@ -118,6 +152,8 @@ describe('BoardView card menu', () => {
     itemWrite.mockClear()
     boardGet.mockClear()
     inspectorMock.itemKey.value = null
+    inspectorMock.open.mockClear()
+    inspectorMock.close.mockClear()
   })
 
   it('moving to the top actually writes a move', async () => {
@@ -197,5 +233,87 @@ describe('BoardView card menu', () => {
     const view = await render()
     expect(view.findAll('.board__card--open')).toHaveLength(0)
     expect(view.find('.board__card').attributes('aria-current')).toBeUndefined()
+  })
+
+  // Four dropdowns competing for a toolbar row is what this replaces, so the
+  // first thing worth asserting is that they are actually gone.
+  it('collapses the filter dropdowns into one Filters button', async () => {
+    const view = await render()
+    const bar = view.find('.board__filters')
+
+    expect(bar.text()).toContain('Filters')
+    expect(bar.find('#field-filter-label').exists()).toBe(false)
+    expect(bar.find('#field-filter-assignee').exists()).toBe(false)
+    expect(bar.find('#field-filter-state').exists()).toBe(false)
+    // Free-text stays on the toolbar: it is the one filter you use by typing
+    // and burying it behind a click would cost more than it saves.
+    expect(bar.find('#field-filter-text').exists()).toBe(true)
+  })
+
+  it('opens the panel on click, with labels as pills and people as avatars', async () => {
+    const view = await render()
+    expect(view.find('#board-filter-panel').exists()).toBe(false)
+
+    await filtersButton(view).trigger('click')
+    await flushPromises()
+
+    const panel = view.find('#board-filter-panel')
+    expect(panel.exists()).toBe(true)
+    expect(panel.text()).toContain('Urgent')
+    expect(panel.text()).toContain('Tech debt')
+    // The system actor is not a person and must not be offered as one.
+    expect(
+      panel.find('[aria-label="Filter by assignee"]').text(),
+    ).not.toContain('Acta')
+  })
+
+  it('filters by several labels at once and asks the server for any of them', async () => {
+    const view = await render()
+    await filtersButton(view).trigger('click')
+    await flushPromises()
+    boardGet.mockClear()
+
+    const pills = view.findAll('.filters__pill')
+    await pills[0].trigger('click')
+    await pills[1].trigger('click')
+    await flushPromises()
+
+    const [, params] = boardGet.mock.calls.at(-1) as unknown as [
+      string,
+      Record<string, string>,
+    ]
+    expect(params.label).toBe('Urgent,Tech debt')
+  })
+
+  it('counts what is filtered on the button', async () => {
+    const view = await render()
+    await filtersButton(view).trigger('click')
+    await flushPromises()
+
+    expect(filtersButton(view).text()).not.toMatch(/\d/)
+    await view.findAll('.filters__pill')[0].trigger('click')
+    await flushPromises()
+    expect(filtersButton(view).text()).toContain('1')
+  })
+
+  // One side panel, one thing in it. Enforced by a watcher rather than at each
+  // caller, so this covers the context menu and deep links too.
+  it('puts the filters away when a card opens', async () => {
+    const view = await render()
+    await filtersButton(view).trigger('click')
+    await flushPromises()
+    expect(view.find('#board-filter-panel').exists()).toBe(true)
+
+    inspectorMock.itemKey.value = 'SU-1'
+    await flushPromises()
+
+    expect(view.find('#board-filter-panel').exists()).toBe(false)
+  })
+
+  it('closes the card details when the filters open', async () => {
+    const view = await render()
+    await filtersButton(view).trigger('click')
+    await flushPromises()
+    expect(inspectorMock.close).toHaveBeenCalled()
   })
 })

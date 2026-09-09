@@ -169,11 +169,23 @@ export async function boardGet(ctx: ICtx, params: TBoardGet) {
     }
   }
   if (params.assignee) {
-    where.push(
-      `EXISTS (SELECT 1 FROM item_assignee ia JOIN actor a ON a.id = ia.actor_id
-               WHERE ia.item_id = i.id AND (a.id = ? OR a.handle = ?))`,
-    )
-    args.push(params.assignee, params.assignee)
+    // Comma separated and "any of these", exactly like `label` above. The
+    // board filters people by avatar now, and an avatar row you can only
+    // pick one of is a radio group wearing the wrong clothes.
+    const handles = params.assignee
+      .split(',')
+      .map((a) => a.trim())
+      .filter(Boolean)
+    if (handles.length > 0) {
+      const clause = handles
+        .map(() => '(a.id = ? OR a.handle = ?)')
+        .join(' OR ')
+      where.push(
+        `EXISTS (SELECT 1 FROM item_assignee ia JOIN actor a ON a.id = ia.actor_id
+                 WHERE ia.item_id = i.id AND (${clause}))`,
+      )
+      for (const handle of handles) args.push(handle, handle)
+    }
   }
   if (params.cursor) {
     where.push('i.key > ?')

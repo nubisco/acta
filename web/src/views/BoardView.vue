@@ -27,40 +27,25 @@
           aria-label="Board views"
         />
         <div class="board__filters" role="search" aria-label="Filter items">
-          <NbSelect
-            id="field-filter-label"
-            v-model="labelFilter"
+          <!-- One control instead of three. Given a toolbar's width none of
+               them could show what they held, so labels lost their colour and
+               people were limited to one at a time; the panel has room to show
+               both. The count is on the button because a collapsed filter that
+               does not say it is active is how you end up staring at a board
+               that is missing cards. -->
+          <NbButton
             size="sm"
-            multiple
-            :options="labelOptions"
-            placeholder="All labels"
+            :variant="filtersOpen || filterCount > 0 ? 'secondary' : 'ghost'"
+            icon="funnel"
+            :aria-pressed="filtersOpen"
+            aria-controls="board-filter-panel"
+            @click="toggleFilters"
           >
-            <template #option="{ option }">
-              <LabelBadge :name="String(option.value)" />
-            </template>
-            <template #value="{ values }">
-              <span class="label-values">
-                <LabelBadge
-                  v-for="name in values"
-                  :key="String(name)"
-                  :name="String(name)"
-                />
-              </span>
-            </template>
-          </NbSelect>
-          <NbSelect
-            id="field-filter-assignee"
-            v-model="assigneeFilter"
-            size="sm"
-            :options="assigneeOptions"
-            placeholder="Assignee"
-          />
-          <NbSelect
-            id="field-filter-state"
-            v-model="stateFilter"
-            size="sm"
-            :options="stateOptions"
-          />
+            Filters
+            <NbBadge v-if="filterCount > 0" size="sm" variant="primary">
+              {{ filterCount }}
+            </NbBadge>
+          </NbButton>
           <NbTextInput
             id="field-filter-text"
             v-model="textFilter"
@@ -69,6 +54,25 @@
           />
         </div>
       </div>
+    </component>
+
+    <!-- Claims the same region the card details use, and the two are mutually
+         exclusive below: one side panel, one thing in it. -->
+    <component :is="inspectorSlot.Outlet">
+      <BoardFilterPanel
+        v-if="filtersOpen"
+        id="board-filter-panel"
+        :labels="labelFilter"
+        :assignees="assigneeFilter"
+        :state="stateFilter"
+        :label-names="labelNames"
+        :active="filtersActive"
+        @update:labels="labelFilter = $event"
+        @update:assignees="assigneeFilter = $event"
+        @update:state="stateFilter = $event"
+        @clear="clearFilters"
+        @close="filtersOpen = false"
+      />
     </component>
 
     <div v-if="load.state.value === 'loading'" class="board__skeleton">
@@ -285,7 +289,7 @@ import NewItemModal from '@/components/NewItemModal.vue'
 import CalendarView from '@/components/views/CalendarView.vue'
 import TableView from '@/components/views/TableView.vue'
 import TimelineView from '@/components/views/TimelineView.vue'
-import LabelBadge from '@/components/LabelBadge.vue'
+import BoardFilterPanel from '@/components/BoardFilterPanel.vue'
 
 const props = defineProps<{ boardKey?: string }>()
 
@@ -306,11 +310,13 @@ const toast = useToast()
 const confirm = useConfirm()
 const load = useLoadState()
 const filterBar = useShellSlot('fixedbar')
+const inspectorSlot = useShellSlot('inspector')
 const topbarActions = useShellSlot('topbar-right')
 
 const items = ref<IBoardItemRow[]>([])
+const filtersOpen = ref(false)
 const labelFilter = ref<string[]>([])
-const assigneeFilter = ref('')
+const assigneeFilter = ref<string[]>([])
 const stateFilter = ref('open')
 const textFilter = ref('')
 
@@ -478,12 +484,36 @@ const boardKey = computed(() => props.boardKey ?? '')
 const boardMeta = computed(() =>
   ws.overview.value?.boards.find((b) => b.key === boardKey.value),
 )
-const filtersActive = computed(
+const filtersActive = computed(() => filterCount.value > 0)
+
+/** How many filters are narrowing the board, for the toolbar button's badge.
+ *  Each chosen label and each chosen person counts, because "3" should mean
+ *  three things are excluded rather than three controls are in use. */
+const filterCount = computed(
   () =>
-    labelFilter.value.length > 0 ||
-    assigneeFilter.value !== '' ||
-    textFilter.value !== '' ||
-    stateFilter.value !== 'open',
+    labelFilter.value.length +
+    assigneeFilter.value.length +
+    (textFilter.value !== '' ? 1 : 0) +
+    (stateFilter.value !== 'open' ? 1 : 0),
+)
+
+const labelNames = computed(() => labelOptions.value.map((o) => o.value))
+
+/** The side panel holds one thing at a time, so opening filters puts the card
+ *  details away rather than stacking underneath them. */
+function toggleFilters(): void {
+  filtersOpen.value = !filtersOpen.value
+  if (filtersOpen.value) inspector.close()
+}
+
+// The other direction, watched rather than added to each caller: cards open
+// from a click, the context menu, after creating one, and from a deep link on
+// load, and a rule enforced in four places is a rule that holds in three.
+watch(
+  () => inspector.itemKey.value,
+  (key) => {
+    if (key) filtersOpen.value = false
+  },
 )
 
 const columns = computed(() =>
@@ -510,20 +540,6 @@ const labelOptions = computed(() => [
     .map((l) => ({ label: l.name, value: l.name })),
 ])
 
-const assigneeOptions = computed(() => [
-  { label: 'Anyone', value: '' },
-  ...(ws.overview.value?.actors ?? [])
-    .filter((a) => a.kind === 'human')
-    .map((a) => ({ label: `@${a.handle}`, value: a.handle })),
-])
-
-const stateOptions = [
-  { label: 'Open', value: 'open' },
-  { label: 'Done', value: 'done' },
-  { label: 'Archived', value: 'archived' },
-  { label: 'All', value: 'all' },
-]
-
 async function loadItems(): Promise<void> {
   if (!boardKey.value) return
   const params: Record<string, string> = {
@@ -531,7 +547,8 @@ async function loadItems(): Promise<void> {
     limit: '200',
   }
   if (labelFilter.value.length > 0) params.label = labelFilter.value.join(',')
-  if (assigneeFilter.value) params.assignee = assigneeFilter.value
+  if (assigneeFilter.value.length > 0)
+    params.assignee = assigneeFilter.value.join(',')
   if (textFilter.value) params.text = textFilter.value
   const result = await load.run(api.boardGet(boardKey.value, params))
   if (result) items.value = result.items
@@ -597,7 +614,7 @@ useViewCommands('board', [
 
 function clearFilters(): void {
   labelFilter.value = []
-  assigneeFilter.value = ''
+  assigneeFilter.value = []
   textFilter.value = ''
   stateFilter.value = 'open'
 }
