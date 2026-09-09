@@ -38,13 +38,21 @@ const overview = {
   actors: [],
 }
 
+// Shared so a test can point the panel at a card and assert the board marks
+// it, the same way `overview` above is shared: vi.mock's factory runs at
+// import time, after these declarations.
+const inspectorMock = {
+  open: vi.fn(),
+  itemKey: { value: null as string | null },
+}
+
 vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({
     overview: { value: overview },
     onLive: () => () => undefined,
   }),
   useUiState: () => ({ newBoardOpen: { value: false } }),
-  useInspector: () => ({ open: vi.fn() }),
+  useInspector: () => inspectorMock,
 }))
 
 vi.mock('vue-router', () => ({
@@ -109,6 +117,7 @@ describe('BoardView card menu', () => {
   beforeEach(() => {
     itemWrite.mockClear()
     boardGet.mockClear()
+    inspectorMock.itemKey.value = null
   })
 
   it('moving to the top actually writes a move', async () => {
@@ -169,5 +178,24 @@ describe('BoardView card menu', () => {
     await flushPromises()
     const [ops] = itemWrite.mock.calls[0] as unknown as [{ op: string }[]]
     expect(ops[0].op).toBe('archive')
+  })
+
+  // The details panel gained a close button, and closing has to be visible on
+  // the board: with nothing marking the open card, the panel could have been
+  // describing any of them and there was nothing for closing to undo.
+  it('marks the card the details panel is showing, and only that one', async () => {
+    inspectorMock.itemKey.value = 'SU-1'
+    const view = await render()
+
+    const open = view.findAll('.board__card--open')
+    expect(open).toHaveLength(1)
+    expect(open[0].text()).toContain('First')
+    expect(open[0].attributes('aria-current')).toBe('true')
+  })
+
+  it('marks nothing when the details panel is closed', async () => {
+    const view = await render()
+    expect(view.findAll('.board__card--open')).toHaveLength(0)
+    expect(view.find('.board__card').attributes('aria-current')).toBeUndefined()
   })
 })

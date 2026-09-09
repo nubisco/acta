@@ -148,7 +148,13 @@
       <template #card="{ item }">
         <button
           class="board__card"
+          :class="{
+            'board__card--open': inspector.itemKey.value === item.key,
+          }"
           type="button"
+          :aria-current="
+            inspector.itemKey.value === item.key ? 'true' : undefined
+          "
           @click="inspector.open(String(item.key))"
           @dblclick="openItemModal(String(item.key))"
           @contextmenu.prevent="openCardMenu($event, String(item.key))"
@@ -724,6 +730,24 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
     &:focus-visible {
       outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
       outline-offset: 2px;
+    }
+  }
+
+  /* Which card the details panel is showing. Without it the panel could be
+     describing any of them, and "close" had nothing visible to undo. An
+     inline-start bar rather than a background tint: cards already carry
+     label colour, and a second tint underneath muddied it. */
+  &__card--open {
+    position: relative;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset-block: 0;
+      inset-inline-start: calc(var(--nb-spacing-8) * -1);
+      inline-size: 2px;
+      border-radius: 1px;
+      background: var(--nb-c-primary);
     }
   }
 

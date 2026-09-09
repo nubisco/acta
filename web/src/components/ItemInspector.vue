@@ -85,6 +85,20 @@
             :aria-label="`Delete ${it.item.value.key} permanently`"
             @click="confirmDelete"
           />
+          <!-- Opening a card was a one-way door: the panel had a way back to
+               the previous card but no way out, so the only exit was opening
+               something else. Closing clears the trail too, otherwise the
+               next card you open inherits a way "back" to one you already
+               dismissed. -->
+          <NbButton
+            v-nb-tooltip="{ body: 'Close' }"
+            size="xs"
+            variant="ghost"
+            icon="x"
+            class="inspector-close"
+            aria-label="Close the details panel"
+            @click="inspector.close()"
+          />
         </span>
       </div>
       <NbInlineEdit
@@ -376,6 +390,13 @@ function commitDescription(): void {
   align-items: center;
   gap: var(--nb-spacing-4);
   margin-inline-start: auto;
+}
+
+/* Set apart from archive and delete: close is the only one of the three that
+   does nothing to the card, and sitting flush against a danger button invites
+   the wrong click. */
+.inspector-close {
+  margin-inline-start: var(--nb-spacing-8);
 }
 
 .inspector-key {
