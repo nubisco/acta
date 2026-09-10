@@ -14,14 +14,14 @@ vi.mock('@/stores/workspace', () => ({
         labels: [
           {
             group_name: 'Type',
-            board_key: null,
+            space_key: null,
             id: '1',
             name: 'Bug',
             color: 'red',
           },
           {
             group_name: 'Type',
-            board_key: null,
+            space_key: null,
             id: '2',
             name: 'Feature',
             color: 'lime',

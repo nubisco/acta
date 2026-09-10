@@ -1,5 +1,5 @@
 /**
- * The details panel: sections, counts, and the way back to the board.
+ * The details panel: sections, counts, and the way back to the space.
  *
  * The bug that prompted this: a card with eleven comments read as having
  * none, because the comments panel sat below a very long description in a
@@ -34,7 +34,7 @@ import { useInspector, useUiState } from '@/stores/workspace'
 
 const ITEM = {
   key: 'ST-73',
-  board: 'ST',
+  space: 'ST',
   list: 'Done',
   title: 'First customer reward',
   description: 'A very long description.',
@@ -109,14 +109,14 @@ describe('ItemInspector', () => {
     expect(view.text()).not.toMatch(/Attachments\s*0/)
   })
 
-  it('goes to the board the card lives on, workspace-scoped', async () => {
+  it('goes to the space the card lives on, workspace-scoped', async () => {
     const view = await render()
     const btn = view
       .findAll('button')
-      .find((b) => b.attributes('aria-label')?.includes('on its board'))
+      .find((b) => b.attributes('aria-label')?.includes('on its space'))
     expect(btn).toBeDefined()
     await btn!.trigger('click')
-    expect(push).toHaveBeenCalledWith('/nubisco/b/ST')
+    expect(push).toHaveBeenCalledWith('/nubisco/s/ST')
   })
 
   // The pair has to behave as one control that changes size, not as two ways

@@ -77,12 +77,12 @@ describe('planTrelloImport', () => {
       [{ board: fixture('trello-stagewright.json') }],
       baseOpts(),
     )
-    const board = plan.boards[0]
+    const board = plan.spaces[0]
     expect(board.key).toBe('ST')
-    const create = board.boardOps[0]
+    const create = board.spaceOps[0]
     expect(create.op).toBe('create')
     if (create.op === 'create') expect(create.template).toBe('none')
-    const listOps = board.boardOps.filter((op) => op.op === 'list_create')
+    const listOps = board.spaceOps.filter((op) => op.op === 'list_create')
     expect(
       listOps.map((op) => (op.op === 'list_create' ? op.name : '')),
     ).toEqual([
@@ -104,7 +104,7 @@ describe('planTrelloImport', () => {
       [{ board: fixture('trello-stagewright.json'), forcedKey: 'SW' }],
       baseOpts(),
     )
-    expect(plan.boards[0].key).toBe('SW')
+    expect(plan.spaces[0].key).toBe('SW')
     expect(() =>
       planTrelloImport(
         [{ board: fixture('trello-stagewright.json'), forcedKey: 'toolong' }],
@@ -118,7 +118,7 @@ describe('planTrelloImport', () => {
       [{ board: fixture('trello-stagewright.json') }],
       baseOpts(),
     )
-    const titles = plan.boards[0].items.map((i) => i.create.title)
+    const titles = plan.spaces[0].items.map((i) => i.create.title)
     expect(titles).toEqual([
       '[SW] Fix crash on load',
       'Old idea',
@@ -128,7 +128,7 @@ describe('planTrelloImport', () => {
       'Ship v1.0',
       'Card in archived list',
     ])
-    expect(plan.boards[0].items.map((i) => i.create.op_id)).toContain(
+    expect(plan.spaces[0].items.map((i) => i.create.op_id)).toContain(
       'trello:68851e80000000000000c001',
     )
   })
@@ -163,17 +163,17 @@ describe('planTrelloImport', () => {
     expect(group && group.op === 'group_create' ? group.name : '').toBe(
       'ST Colors',
     )
-    expect(group && group.op === 'group_create' ? group.board : '').toBe('ST')
+    expect(group && group.op === 'group_create' ? group.space : '').toBe('ST')
     const colorLabel = plan.labelOps.find(
       (op) => op.op === 'label_create' && op.name === 'color-green',
     )
     expect(colorLabel).toBeDefined()
-    const crash = plan.boards[0].items.find(
+    const crash = plan.spaces[0].items.find(
       (i) => i.create.title === '[SW] Fix crash on load',
     )!
     expect(crash.create.labels).toEqual(['color-green'])
     expect(
-      plan.boards[0].skips.some(
+      plan.spaces[0].skips.some(
         (s) =>
           s.kind === 'labels' && s.reason.includes('neither name nor color'),
       ),
@@ -185,12 +185,12 @@ describe('planTrelloImport', () => {
       [{ board: fixture('trello-stagewright.json') }],
       baseOpts(),
     )
-    const submission = plan.boards[0].items.find(
+    const submission = plan.spaces[0].items.find(
       (i) => i.create.title === 'Doodloop App Store submission',
     )!
     expect(submission.create.assignees).toEqual(['jose'])
     expect(
-      plan.boards[0].skips.some(
+      plan.spaces[0].skips.some(
         (s) => s.kind === 'assignees' && s.reason.includes('ghostuser'),
       ),
     ).toBe(true)
@@ -201,7 +201,7 @@ describe('planTrelloImport', () => {
       [{ board: fixture('trello-stagewright.json') }],
       baseOpts(),
     )
-    const crash = plan.boards[0].items.find(
+    const crash = plan.spaces[0].items.find(
       (i) => i.create.title === '[SW] Fix crash on load',
     )!
     expect(crash.create.due).toBe(Date.parse('2026-09-10T09:00:00.000Z'))
@@ -216,7 +216,7 @@ describe('planTrelloImport', () => {
       [{ board: fixture('trello-stagewright.json') }],
       baseOpts(),
     )
-    const epic = plan.boards[0].items.find(
+    const epic = plan.spaces[0].items.find(
       (i) => i.create.title === 'CMS MCP epic',
     )!
     expect(epic.create.checklists!.map((c) => c.name)).toEqual([
@@ -234,7 +234,7 @@ describe('planTrelloImport', () => {
       [{ board: fixture('trello-stagewright.json') }],
       baseOpts(),
     )
-    const crash = plan.boards[0].items.find(
+    const crash = plan.spaces[0].items.find(
       (i) => i.create.title === '[SW] Fix crash on load',
     )!
     expect(crash.create.imported_meta).toEqual({
@@ -250,7 +250,7 @@ describe('planTrelloImport', () => {
       [{ board: fixture('trello-stagewright.json') }],
       baseOpts(),
     )
-    const epic = plan.boards[0].items.find(
+    const epic = plan.spaces[0].items.find(
       (i) => i.create.title === 'CMS MCP epic',
     )!
     expect(epic.comments).toHaveLength(2)
@@ -266,7 +266,7 @@ describe('planTrelloImport', () => {
       created_at: '2026-08-28T09:00:00.000Z',
     })
     // badges said 3 comments; only 2 were in the export actions.
-    const skip = plan.boards[0].skips.find((s) => s.kind === 'comments')
+    const skip = plan.spaces[0].skips.find((s) => s.kind === 'comments')
     expect(skip?.n).toBe(1)
   })
 
@@ -275,11 +275,11 @@ describe('planTrelloImport', () => {
       [{ board: fixture('trello-stagewright.json') }],
       baseOpts(),
     )
-    const oldIdea = noFlag.boards[0].items.find(
+    const oldIdea = noFlag.spaces[0].items.find(
       (i) => i.create.title === 'Old idea',
     )!
     expect(oldIdea.archive).toBe(true)
-    const ship = noFlag.boards[0].items.find(
+    const ship = noFlag.spaces[0].items.find(
       (i) => i.create.title === 'Ship v1.0',
     )!
     expect(ship.archive).toBe(false)
@@ -288,12 +288,12 @@ describe('planTrelloImport', () => {
       [{ board: fixture('trello-stagewright.json'), forcedKey: 'SW' }],
       { ...baseOpts(), doneAsArchived: new Set(['SW']) },
     )
-    const shipFlagged = flagged.boards[0].items.find(
+    const shipFlagged = flagged.spaces[0].items.find(
       (i) => i.create.title === 'Ship v1.0',
     )!
     expect(shipFlagged.archive).toBe(true)
-    expect(flagged.boards[0].counts.items_archived).toBe(2)
-    expect(flagged.boards[0].counts.items_open).toBe(5)
+    expect(flagged.spaces[0].counts.items_archived).toBe(2)
+    expect(flagged.spaces[0].counts.items_open).toBe(5)
   })
 
   it('scopes --done-as-archived to the listed boards', () => {
@@ -304,7 +304,7 @@ describe('planTrelloImport', () => {
       ],
       { ...baseOpts(), doneAsArchived: new Set(['SW']) },
     )
-    const labsDone = plan.boards[1].items.find(
+    const labsDone = plan.spaces[1].items.find(
       (i) => i.create.title === 'Graduated project',
     )!
     expect(labsDone.archive).toBe(false)
@@ -315,13 +315,13 @@ describe('planTrelloImport', () => {
       [{ board: fixture('trello-stagewright.json') }],
       baseOpts(),
     )
-    const support = plan.boards[0].items.find((i) =>
+    const support = plan.spaces[0].items.find((i) =>
       i.create.title.startsWith('[Support]'),
     )!
     expect(support.attachments).toHaveLength(2)
     expect(support.attachments[0].upload).toBe(false)
     expect(support.attachments[1].upload).toBe(true)
-    expect(plan.boards[0].counts.attachments).toBe(2)
+    expect(plan.spaces[0].counts.attachments).toBe(2)
   })
 
   it('keeps reconciliation source counts per board', () => {
@@ -329,7 +329,7 @@ describe('planTrelloImport', () => {
       [{ board: fixture('trello-stagewright.json') }],
       baseOpts(),
     )
-    expect(plan.boards[0].counts).toEqual({
+    expect(plan.spaces[0].counts).toEqual({
       lists: 6,
       items_open: 6,
       items_archived: 1,

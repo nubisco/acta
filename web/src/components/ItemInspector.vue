@@ -54,19 +54,19 @@
           reserve-space
         />
         <!-- Finding a card through search or a link drops you into this
-               panel with no sense of where the card actually lives. The board
+               panel with no sense of where the card actually lives. The space
                marks the open card, so arriving there puts it under the
                reader's eye rather than making them hunt the column. -->
         <NbButton
-          v-nb-tooltip="{ body: `Show on ${it.item.value.board}` }"
+          v-nb-tooltip="{ body: `Show on ${it.item.value.space}` }"
           size="xs"
           variant="ghost"
           icon="kanban"
-          :aria-label="`Show ${it.item.value.key} on its board`"
+          :aria-label="`Show ${it.item.value.key} on its space`"
           @click="viewOnBoard"
         />
         <!-- Archive was only ever reachable through the Status select,
-               which is why it read as missing. Same set as the board's
+               which is why it read as missing. Same set as the space's
                right-click menu, so both surfaces agree. -->
         <NbButton
           v-if="it.item.value.archived"
@@ -103,7 +103,7 @@
                something else. Closing clears the trail too, otherwise the
                next card you open inherits a way "back" to one you already
                dismissed. -->
-        <!-- Same card, more room. The panel is a column beside the board;
+        <!-- Same card, more room. The panel is a column beside the space;
                some cards want the width, and switching should not mean losing
                your place and opening it again. -->
         <NbButton
@@ -405,11 +405,11 @@ function expand(): void {
   inspector.close()
 }
 
-/** Go to the board this card lives on, leaving the panel open so the board's
+/** Go to the space this card lives on, leaving the panel open so the space's
  *  marker lands on the card the reader was already looking at. */
 function viewOnBoard(): void {
-  const board = it.item.value?.board
-  if (board) void router.push(wpath(`/b/${board}`))
+  const space = it.item.value?.space
+  if (space) void router.push(wpath(`/s/${space}`))
 }
 const confirm = useConfirm()
 
@@ -547,7 +547,7 @@ function commitDescription(): void {
   margin-block-end: var(--nb-spacing-12);
 
   /* The title was rendering at the same 16px as the body prose and as a card
-   * on the board, so nothing on the panel read as its heading. The class
+   * on the space, so nothing on the panel read as its heading. The class
    * lands on the inline-edit's own element, so the size belongs here rather
    * than on a child. */
   font-size: var(--nb-type-heading-02-size);

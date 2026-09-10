@@ -101,7 +101,7 @@ const columns = [
   { key: 'type', header: 'Type' },
   { key: 'title', header: 'Title' },
   { key: 'snippet', header: 'Match' },
-  { key: 'board', header: 'Board' },
+  { key: 'space', header: 'Space' },
 ]
 
 const rows = computed(() =>
@@ -109,7 +109,7 @@ const rows = computed(() =>
     type: r.type,
     title: r.title,
     snippet: r.snippet.replace(/<<|>>/g, ''),
-    board: r.board ?? '',
+    space: r.space ?? '',
     ref: `${r.type}:${r.ref}`,
     rawRef: r.ref,
   })),

@@ -178,17 +178,17 @@ describe('storageToMarkdown: references', () => {
     expect(result.issues.unresolvedLinks).toEqual(['page "Missing Page"'])
   })
 
-  it('maps known Trello board urls to [[board:KEY]]', () => {
+  it('maps a Trello board url to the space it became', () => {
     expect(
       md(
         '<p><a href="https://trello.com/b/PZWcHkir/stagewright">https://trello.com/b/PZWcHkir/stagewright</a></p>',
       ),
-    ).toBe('[[board:SW]]')
+    ).toBe('[[space:SW]]')
     expect(
       md(
         '<p><a href="https://trello.com/b/PZWcHkir/stagewright">the board</a></p>',
       ),
-    ).toBe('[[board:SW|the board]]')
+    ).toBe('[[space:SW|the board]]')
   })
 
   it('keeps unknown Trello board urls as links and reports them', () => {

@@ -130,7 +130,7 @@ async function enrichBoard(
     existingBoardKeys: new Set(),
     doneAsArchived: false,
   })
-  const items = plan.boards[0].items
+  const items = plan.spaces[0].items
   const keyByCard = new Map<string, string>()
   if (!dryRun) {
     const results = resultsById(
@@ -187,7 +187,7 @@ async function enrichBoard(
     archivedCreates.push({
       op: 'create',
       op_id: `trello:${card.id}`,
-      board: key,
+      space: key,
       list: listName,
       title: card.name.slice(0, 500),
       description: card.desc ? card.desc.slice(0, 100_000) : undefined,
@@ -251,7 +251,7 @@ async function enrichBoard(
       }
       report.mappings[`trello:${card.id}`] = {
         key: itemKey,
-        board: key,
+        space: key,
         archived: true,
       }
     }
@@ -380,7 +380,7 @@ export async function main(argv: string[]): Promise<number> {
   let keyByBoardName = new Map<string, string>()
   try {
     const overview = await client.overview()
-    keyByBoardName = new Map(overview.boards.map((b) => [b.name, b.key]))
+    keyByBoardName = new Map(overview.spaces.map((b) => [b.name, b.key]))
   } catch (err) {
     if (!dryRun) {
       console.error(`cannot reach the Acta server: ${String(err)}`)

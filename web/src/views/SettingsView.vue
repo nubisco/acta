@@ -79,13 +79,13 @@
     <section v-if="tab === 'labels'" class="settings__section">
       <NbPanel
         v-for="group in labelGroups"
-        :key="`${group.name}:${group.board ?? ''}`"
+        :key="`${group.name}:${group.space ?? ''}`"
         class="settings__labels"
       >
         <div class="settings__labels-head">
           <h2 class="type-heading-01">{{ group.name }}</h2>
-          <NbBadge v-if="group.board" size="sm" variant="grey">
-            {{ boardName(group.board) }}
+          <NbBadge v-if="group.space" size="sm" variant="grey">
+            {{ spaceName(group.space) }}
           </NbBadge>
           <NbBadge v-else size="sm" variant="grey">Workspace</NbBadge>
           <span class="settings__scope">
@@ -190,7 +190,7 @@
         v-if="labelGroups.length === 0"
         size="sm"
         title="No labels yet"
-        description="Labels are created on boards or through imports and can be managed here."
+        description="Labels are created on spaces or through imports and can be managed here."
       />
     </section>
 
@@ -301,7 +301,7 @@
           <NbEmptyState
             size="sm"
             title="No connections yet"
-            description="Connect a GitHub repository and its issues become tracking cards on a board of your choice."
+            description="Connect a GitHub repository and its issues become tracking cards on a space of your choice."
           >
             <template #actions>
               <NbButton
@@ -518,8 +518,8 @@ function openAvatar(row: unknown): void {
 
 const variants = computed(() => labelVariants(ws.overview.value))
 
-function boardName(key: string): string {
-  return ws.overview.value?.boards.find((b) => b.key === key)?.name ?? key
+function spaceName(key: string): string {
+  return ws.overview.value?.spaces.find((b) => b.key === key)?.name ?? key
 }
 
 interface ILabelView {
@@ -530,18 +530,18 @@ interface ILabelView {
 
 interface ILabelGroupView {
   name: string
-  board: string | null
+  space: string | null
   labels: ILabelView[]
 }
 
 const labelGroups = computed<ILabelGroupView[]>(() => {
   const groups = new Map<string, ILabelGroupView>()
   for (const label of ws.overview.value?.labels ?? []) {
-    const key = `${label.group_name}:${label.board_key ?? ''}`
+    const key = `${label.group_name}:${label.space_key ?? ''}`
     if (!groups.has(key))
       groups.set(key, {
         name: label.group_name,
-        board: label.board_key,
+        space: label.space_key,
         labels: [],
       })
     groups.get(key)!.labels.push({
@@ -574,7 +574,7 @@ const colorOptions = [
 ].map((c) => ({ label: c, value: c }))
 
 function groupKey(group: ILabelGroupView): string {
-  return `${group.name}:${group.board ?? ''}`
+  return `${group.name}:${group.space ?? ''}`
 }
 
 function toggleManage(group: ILabelGroupView): void {
@@ -754,7 +754,7 @@ async function refreshLists(): Promise<void> {
       id: c.id,
       name: c.name,
       provider: c.provider,
-      target: c.list ? `${c.board} · ${c.list}` : c.board,
+      target: c.list ? `${c.space} · ${c.list}` : c.space,
       status: !c.enabled
         ? 'Inactive'
         : c.last_error

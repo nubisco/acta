@@ -25,7 +25,7 @@
         <section class="filters__group">
           <h3 class="filters__title">Labels</h3>
           <p v-if="labelNames.length === 0" class="filters__none">
-            This board has no labels yet.
+            This space has no labels yet.
           </p>
           <!-- Pills, not a dropdown: a label's colour is half of what
                identifies it, and a list of names in a closed select shows
@@ -60,7 +60,7 @@
         <section class="filters__group">
           <h3 class="filters__title">Status</h3>
           <NbRadio
-            name="board-filter-state"
+            name="space-filter-state"
             direction="horizontal"
             :options="stateOptions"
             :model-value="state"
@@ -74,7 +74,7 @@
 
 <script setup lang="ts">
 /**
- * The board's filters, as a panel rather than a row of dropdowns.
+ * The space's filters, as a panel rather than a row of dropdowns.
  *
  * Four controls competing for the toolbar meant each was too narrow to show
  * what it held: the label select showed neither colour nor selection, and the
@@ -82,8 +82,8 @@
  * side panel they can be what they actually are, coloured pills and avatars,
  * and the toolbar goes back to one icon.
  *
- * State stays in the board. This renders it and reports changes, so there is
- * one owner of what the board is filtered by and the panel can be mounted and
+ * State stays in the space. This renders it and reports changes, so there is
+ * one owner of what the space is filtered by and the panel can be mounted and
  * unmounted freely without carrying anything.
  */
 import LabelBadge from '@/components/LabelBadge.vue'

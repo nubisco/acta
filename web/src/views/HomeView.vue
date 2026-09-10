@@ -9,9 +9,9 @@
         size="sm"
         variant="primary"
         icon="plus"
-        @click="ui.newBoardOpen.value = true"
+        @click="ui.newSpaceOpen.value = true"
       >
-        Create board
+        Create space
       </NbButton>
     </component>
 
@@ -21,14 +21,14 @@
         :key="index"
         variant="block"
         height="11rem"
-        :label="index === 1 ? 'Loading boards' : undefined"
+        :label="index === 1 ? 'Loading spaces' : undefined"
       />
     </NbCardGrid>
 
     <NbEmptyState
       v-else-if="load.state.value === 'error'"
       kind="error"
-      title="Could not load your boards"
+      title="Could not load your spaces"
       :description="load.message.value"
     >
       <template #actions>
@@ -36,18 +36,18 @@
       </template>
     </NbEmptyState>
 
-    <div v-else-if="boards.length === 0" class="home__empty">
+    <div v-else-if="spaces.length === 0" class="home__empty">
       <NbEmptyState
-        title="No boards yet"
-        description="A board holds a project's items as lists. Create the first one to start tracking work."
+        title="No spaces yet"
+        description="A space holds a project's items as lists. Create the first one to start tracking work."
       >
         <template #actions>
           <NbButton
             variant="primary"
             icon="plus"
-            @click="ui.newBoardOpen.value = true"
+            @click="ui.newSpaceOpen.value = true"
           >
-            Create board
+            Create space
           </NbButton>
         </template>
       </NbEmptyState>
@@ -60,29 +60,29 @@
         </h2>
         <NbCardGrid>
           <NbCard
-            v-for="board in section.boards"
-            :key="board.key"
-            :title="board.name"
-            :href="wpath(`/b/${board.key}`)"
+            v-for="space in section.spaces"
+            :key="space.key"
+            :title="space.name"
+            :href="wpath(`/s/${space.key}`)"
           >
             <template #icon>
               <span
                 class="home__mark"
-                :style="{ background: chartColorFor(board.key) }"
+                :style="{ background: chartColorFor(space.key) }"
                 aria-hidden="true"
               >
-                {{ board.key.slice(0, 2) }}
+                {{ space.key.slice(0, 2) }}
               </span>
             </template>
             <div class="home__distribution">
               <div
-                v-if="itemCount(board) > 0"
+                v-if="itemCount(space) > 0"
                 class="home__bar"
                 role="img"
-                :aria-label="`${itemCount(board)} items across ${board.lists.length} lists`"
+                :aria-label="`${itemCount(space)} items across ${space.lists.length} lists`"
               >
                 <span
-                  v-for="seg in segments(board)"
+                  v-for="seg in segments(space)"
                   :key="seg.id"
                   v-nb-tooltip="{
                     header: seg.name,
@@ -93,32 +93,32 @@
                 />
               </div>
               <p class="home__caption">
-                <template v-if="itemCount(board) > 0">
-                  {{ board.lists.length }} lists · {{ itemCount(board) }} items
+                <template v-if="itemCount(space) > 0">
+                  {{ space.lists.length }} lists · {{ itemCount(space) }} items
                 </template>
                 <template v-else>No items yet</template>
               </p>
             </div>
             <template #footer>
               <NbBadge size="sm" variant="grey">
-                {{ openCount(board) }} open
+                {{ openCount(space) }} open
               </NbBadge>
-              <NbBadge v-if="doneCount(board) > 0" size="sm" variant="green">
-                {{ doneCount(board) }} done
+              <NbBadge v-if="doneCount(space) > 0" size="sm" variant="green">
+                {{ doneCount(space) }} done
               </NbBadge>
               <NbButton
                 v-nb-tooltip="{
-                  body: board.starred
+                  body: space.starred
                     ? 'Remove from favourites'
                     : 'Add to favourites',
                 }"
                 class="home__star"
                 size="xs"
                 variant="ghost"
-                :icon="board.starred ? starFill : starOutline"
-                :aria-label="`${board.starred ? 'Unstar' : 'Star'} ${board.name}`"
-                :aria-pressed="Boolean(board.starred)"
-                @click.stop.prevent="toggleStar(board)"
+                :icon="space.starred ? starFill : starOutline"
+                :aria-label="`${space.starred ? 'Unstar' : 'Star'} ${space.name}`"
+                :aria-pressed="Boolean(space.starred)"
+                @click.stop.prevent="toggleStar(space)"
               />
             </template>
           </NbCard>
@@ -137,7 +137,7 @@
 import { computed, ref } from 'vue'
 import { useShellSlot, useToast } from '@nubisco/ui'
 import { api } from '@/api/client'
-import type { IEventRow, TOverviewBoard } from '@/types/api'
+import type { IEventRow, TOverviewSpace } from '@/types/api'
 import { chartColorFor, roleColor } from '@/lib/colors'
 import { humanise, useLoadState } from '@/lib/state'
 import { useUiState, useWorkspace } from '@/stores/workspace'
@@ -157,33 +157,33 @@ const ui = useUiState()
 const load = useLoadState()
 const actions = useShellSlot('topbar-right')
 
-const boards = computed(() =>
-  (ws.overview.value?.boards ?? []).filter((b) => !b.archived),
+const spaces = computed(() =>
+  (ws.overview.value?.spaces ?? []).filter((b) => !b.archived),
 )
 
 /**
  * Favourites first, then the rest. Only headed when there are favourites:
- * with none, "All boards" under a heading is a section of one, which is just
+ * with none, "All spaces" under a heading is a section of one, which is just
  * a heading for its own sake.
  */
 const sections = computed(() => {
-  const starred = boards.value.filter((b) => b.starred)
-  const rest = boards.value.filter((b) => !b.starred)
+  const starred = spaces.value.filter((b) => b.starred)
+  const rest = spaces.value.filter((b) => !b.starred)
   if (starred.length === 0)
-    return [{ title: 'Boards', heading: false, boards: rest }]
+    return [{ title: 'Spaces', heading: false, spaces: rest }]
   return [
-    { title: 'Favourites', heading: true, boards: starred },
-    { title: 'All boards', heading: true, boards: rest },
+    { title: 'Favourites', heading: true, spaces: starred },
+    { title: 'All spaces', heading: true, spaces: rest },
   ]
 })
 
-async function toggleStar(board: {
+async function toggleStar(space: {
   key: string
   starred?: boolean
 }): Promise<void> {
-  const next = !board.starred
+  const next = !space.starred
   try {
-    await api.starBoard(board.key, next)
+    await api.starSpace(space.key, next)
     await ws.refresh()
   } catch (err) {
     toast.error(humanise(err), {
@@ -193,8 +193,8 @@ async function toggleStar(board: {
 }
 const recent = ref<IEventRow[]>([])
 
-function itemCount(board: TOverviewBoard): number {
-  return board.lists.reduce((sum, l) => sum + l.items, 0)
+function itemCount(space: TOverviewSpace): number {
+  return space.lists.reduce((sum, l) => sum + l.items, 0)
 }
 
 interface IDistributionSegment {
@@ -205,8 +205,8 @@ interface IDistributionSegment {
 }
 
 /** One segment per non-empty list, colored by the list's role. */
-function segments(board: TOverviewBoard): IDistributionSegment[] {
-  return board.lists
+function segments(space: TOverviewSpace): IDistributionSegment[] {
+  return space.lists
     .filter((l) => l.items > 0)
     .map((l) => ({
       id: l.id,
@@ -216,14 +216,14 @@ function segments(board: TOverviewBoard): IDistributionSegment[] {
     }))
 }
 
-function openCount(board: TOverviewBoard): number {
-  return board.lists
+function openCount(space: TOverviewSpace): number {
+  return space.lists
     .filter((l) => l.role !== 'done')
     .reduce((sum, l) => sum + l.items, 0)
 }
 
-function doneCount(board: TOverviewBoard): number {
-  return board.lists
+function doneCount(space: TOverviewSpace): number {
+  return space.lists
     .filter((l) => l.role === 'done')
     .reduce((sum, l) => sum + l.items, 0)
 }

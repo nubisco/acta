@@ -31,7 +31,7 @@ interface ISearchHit {
   type: string
   ref: string
   title: string
-  board?: string
+  space?: string
 }
 
 function inserter(text: string): ISuggestionItem['apply'] {

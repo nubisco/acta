@@ -1,5 +1,5 @@
 /**
- * The board as a table.
+ * The space as a table.
  *
  * The sort test exists because this shipped broken and I called it verified:
  * my manual check clicked inside the header, saw the rows reorder once, and
@@ -9,12 +9,12 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import TableView from '@/components/views/TableView.vue'
-import type { IBoardItemRow } from '@/types/api'
+import type { ISpaceItemRow } from '@/types/api'
 
 const DAY = 86_400_000
 const now = 1_700_000_000_000
 
-const items: IBoardItemRow[] = [
+const items: ISpaceItemRow[] = [
   {
     key: 'SU-2',
     title: 'Bravo',

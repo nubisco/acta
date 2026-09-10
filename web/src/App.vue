@@ -74,33 +74,33 @@
         >
           <NbIcon :name="entry.icon" :size="18" />
         </NbSidebarLink>
-        <!-- The rail cannot afford a row per board (a dozen two-letter codes
-             read as noise), so boards fold behind one icon whose menu carries
+        <!-- The rail cannot afford a row per space (a dozen two-letter codes
+             read as noise), so spaces fold behind one icon whose menu carries
              what the rail cannot: full names and open counts. -->
         <NbSidebarLink
-          ref="boardsRailTrigger"
-          v-nb-tooltip="{ body: 'Boards' }"
-          :active="route.name === 'board'"
-          aria-label="Boards"
+          ref="spacesRailTrigger"
+          v-nb-tooltip="{ body: 'Spaces' }"
+          :active="route.name === 'space'"
+          aria-label="Spaces"
           aria-haspopup="menu"
-          :aria-expanded="boardsMenuOpen"
-          @click.prevent="toggleBoardsMenu"
+          :aria-expanded="spacesMenuOpen"
+          @click.prevent="toggleSpacesMenu"
         >
           <NbIcon name="kanban" :size="18" />
         </NbSidebarLink>
         <NbMenu
-          ref="boardsMenu"
-          v-model:open="boardsMenuOpen"
+          ref="spacesMenu"
+          v-model:open="spacesMenuOpen"
           size="sm"
           :min-width="220"
-          @close="boardsMenuOpen = false"
+          @close="spacesMenuOpen = false"
         >
           <NbMenuItem
-            v-for="board in boards"
-            :key="board.key"
-            :label="board.name"
-            :shortcut="String(openCount(board) ?? '')"
-            @select="openBoardFromMenu(board.key)"
+            v-for="space in spaces"
+            :key="space.key"
+            :label="space.name"
+            :shortcut="String(openCount(space) ?? '')"
+            @select="openSpaceFromMenu(space.key)"
           />
         </NbMenu>
       </template>
@@ -114,16 +114,16 @@
           :to="entry.to"
           :active="entry.active"
         />
-        <NbSidebarMenuGroup v-if="boards.length > 0" label="Boards">
+        <NbSidebarMenuGroup v-if="spaces.length > 0" label="Spaces">
           <NbSidebarMenuItem
-            v-for="board in boards"
-            :key="board.key"
-            :label="board.name"
-            :badge="openCount(board)"
+            v-for="space in spaces"
+            :key="space.key"
+            :label="space.name"
+            :badge="openCount(space)"
             badge-variant="neutral"
-            :to="wpath(`/b/${board.key}`)"
+            :to="wpath(`/s/${space.key}`)"
             :active="
-              route.name === 'board' && route.params.boardKey === board.key
+              route.name === 'space' && route.params.spaceKey === space.key
             "
           />
         </NbSidebarMenuGroup>
@@ -218,10 +218,10 @@
     </template>
   </NbShell>
 
-  <NewBoardModal
-    :open="ui.newBoardOpen.value"
-    @close="ui.newBoardOpen.value = false"
-    @created="onBoardCreated"
+  <NewSpaceModal
+    :open="ui.newSpaceOpen.value"
+    @close="ui.newSpaceOpen.value = false"
+    @created="onSpaceCreated"
   />
   <ItemModal
     v-if="ui.itemModalKey.value"
@@ -267,7 +267,7 @@ import ItemInspector from '@/components/ItemInspector.vue'
 import ItemModal from '@/components/ItemModal.vue'
 import DocPreviewModal from '@/components/DocPreviewModal.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
-import NewBoardModal from '@/components/NewBoardModal.vue'
+import NewSpaceModal from '@/components/NewSpaceModal.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 import WelcomeModal from '@/components/WelcomeModal.vue'
 import { wpath } from '@/lib/paths'
@@ -304,12 +304,12 @@ watch(
 
 /**
  * Put the person somewhere the tour can point at before starting it. Several
- * steps live on a board, and a step whose target is not on screen is dropped,
+ * steps live on a space, and a step whose target is not on screen is dropped,
  * so a tour started from the home page would silently be half a tour.
  */
 async function goToATour(): Promise<void> {
-  if (route.name !== 'board' && boards.value[0]) {
-    await router.push(wpath(`/b/${boards.value[0].key}`))
+  if (route.name !== 'space' && spaces.value[0]) {
+    await router.push(wpath(`/s/${spaces.value[0].key}`))
   }
   await nextTick()
 }
@@ -351,12 +351,12 @@ function toggleSidebar(): void {
     sidebarVariant.value === 'compact' ? 'verbose' : 'compact'
 }
 
-const boards = computed(() =>
-  (ws.overview.value?.boards ?? []).filter((b) => !b.archived),
+const spaces = computed(() =>
+  (ws.overview.value?.spaces ?? []).filter((b) => !b.archived),
 )
 
-// Collapsed-rail boards menu: opens to the right of its rail icon.
-const boardsRailTrigger = ref<{ $el: HTMLElement } | null>(null)
+// Collapsed-rail spaces menu: opens to the right of its rail icon.
+const spacesRailTrigger = ref<{ $el: HTMLElement } | null>(null)
 const workspaceMenu = ref<InstanceType<typeof NbMenu> | null>(null)
 const workspaceTrigger = ref<HTMLElement | null>(null)
 const workspaceMenuOpen = ref(false)
@@ -383,25 +383,25 @@ function goToWorkspace(slug: string): void {
   if (slug !== ws.workspaceSlug.value) void router.push(`/${slug}`)
 }
 
-const boardsMenu = ref<InstanceType<typeof NbMenu> | null>(null)
-const boardsMenuOpen = ref(false)
+const spacesMenu = ref<InstanceType<typeof NbMenu> | null>(null)
+const spacesMenuOpen = ref(false)
 
-function toggleBoardsMenu(): void {
-  if (boardsMenuOpen.value) {
-    boardsMenuOpen.value = false
+function toggleSpacesMenu(): void {
+  if (spacesMenuOpen.value) {
+    spacesMenuOpen.value = false
     return
   }
-  const el = boardsRailTrigger.value?.$el
-  if (el && boardsMenu.value) {
+  const el = spacesRailTrigger.value?.$el
+  if (el && spacesMenu.value) {
     const rect = el.getBoundingClientRect()
-    boardsMenu.value.setPositionXY(rect.right + 8, rect.top)
+    spacesMenu.value.setPositionXY(rect.right + 8, rect.top)
   }
-  boardsMenuOpen.value = true
+  spacesMenuOpen.value = true
 }
 
-function openBoardFromMenu(key: string): void {
-  boardsMenuOpen.value = false
-  void router.push(wpath(`/b/${key}`))
+function openSpaceFromMenu(key: string): void {
+  spacesMenuOpen.value = false
+  void router.push(wpath(`/s/${key}`))
 }
 
 const navEntries = computed(() => [
@@ -428,10 +428,10 @@ const navEntries = computed(() => [
   },
 ])
 
-function openCount(board: {
+function openCount(space: {
   lists: { role?: string; items: number }[]
 }): number | undefined {
-  const n = board.lists
+  const n = space.lists
     .filter((l) => l.role !== 'done')
     .reduce((sum, l) => sum + l.items, 0)
   return n > 0 ? n : undefined
@@ -459,10 +459,10 @@ void ws.listWorkspaces().catch(() => undefined)
 const namespace = computed(() => ws.overview.value?.workspace.name ?? 'Acta')
 
 const trail = computed<ICrumb[]>(() => {
-  if (route.meta.crumb === 'board') {
-    const key = String(route.params.boardKey ?? '')
-    const board = boards.value.find((b) => b.key === key)
-    return [{ text: 'Boards', to: wpath('/') }, { text: board?.name ?? key }]
+  if (route.meta.crumb === 'space') {
+    const key = String(route.params.spaceKey ?? '')
+    const space = spaces.value.find((b) => b.key === key)
+    return [{ text: 'Spaces', to: wpath('/') }, { text: space?.name ?? key }]
   }
   if (route.meta.crumb === 'docs') {
     const slug = String(route.params.slug ?? '')
@@ -512,9 +512,9 @@ async function signOut(): Promise<void> {
   void router.push({ name: 'login' })
 }
 
-function onBoardCreated(key: string): void {
-  ui.newBoardOpen.value = false
-  void router.push(wpath(`/b/${key}`))
+function onSpaceCreated(key: string): void {
+  ui.newSpaceOpen.value = false
+  void router.push(wpath(`/s/${key}`))
 }
 
 // Deep-linkable inspector: the open card lives in the URL as ?item=KEY, so
@@ -554,7 +554,7 @@ watch(
 )
 
 // Command palette: navigation + create + view controls. Registrations are
-// diffed so removed boards unregister (commands are global).
+// diffed so removed spaces unregister (commands are global).
 let registered = new Set<string>()
 watch(
   () => ws.overview.value,
@@ -562,14 +562,14 @@ watch(
     if (!overview) return
     const next = new Map(
       [
-        ...overview.boards
+        ...overview.spaces
           .filter((b) => !b.archived)
           .map((b) => ({
-            id: `board:${b.key}`,
-            label: `Board: ${b.name}`,
+            id: `space:${b.key}`,
+            label: `Space: ${b.name}`,
             icon: 'kanban',
             namespace: 'Go',
-            handler: () => void router.push(wpath(`/b/${b.key}`)),
+            handler: () => void router.push(wpath(`/s/${b.key}`)),
           })),
         {
           id: 'go:docs',
@@ -593,11 +593,11 @@ watch(
           handler: () => void router.push(wpath('/search')),
         },
         {
-          id: 'create:board',
-          label: 'Create board',
+          id: 'create:space',
+          label: 'Create space',
           icon: 'plus',
           namespace: 'Create',
-          handler: () => (ui.newBoardOpen.value = true),
+          handler: () => (ui.newSpaceOpen.value = true),
         },
         {
           id: 'sidebar:toggle',

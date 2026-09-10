@@ -4,7 +4,7 @@
  */
 
 import type {
-  TBoardOp,
+  TSpaceOp,
   TDocOp,
   TItemOp,
   TLabelOp,
@@ -70,7 +70,7 @@ export function newOpId(): string {
 
 export type {
   IOverview,
-  IBoardItemRow,
+  ISpaceItemRow,
   IItemDetail,
   IDocNode,
   IDocDetail,
@@ -80,7 +80,7 @@ export type {
 } from '@/types/api'
 import type {
   IOverview,
-  IBoardItemRow,
+  ISpaceItemRow,
   IItemDetail,
   IDocNode,
   IDocDetail,
@@ -111,7 +111,7 @@ export const auth = {
       onboarded?: boolean
     }>('/auth/me'),
 
-  markOnboarded: () =>
+  markOnspaceed: () =>
     req<{ ok: boolean }>('/auth/me/onboarded', { method: 'POST' }),
   requestOtp: (email: string) =>
     req<{ ok: boolean }>('/auth/otp', {
@@ -135,12 +135,12 @@ export const auth = {
 export const api = {
   overview: () => req<IOverview>('/overview'),
 
-  boardGet: (board: string, params: Record<string, string> = {}) =>
+  spaceGet: (space: string, params: Record<string, string> = {}) =>
     req<{
-      board: { key: string; name: string }
-      items: IBoardItemRow[]
+      space: { key: string; name: string }
+      items: ISpaceItemRow[]
       cursor?: string
-    }>(`/boards/${board}?${new URLSearchParams(params)}`),
+    }>(`/spaces/${space}?${new URLSearchParams(params)}`),
 
   itemGet: (keys: string[], include?: string[]) =>
     req<{ items: IItemDetail[] }>('/items/get', {
@@ -170,14 +170,14 @@ export const api = {
 
   // -- Writes ---------------------------------------------------------------
 
-  itemWrite: (ops: TItemOp[], defaultBoard?: string) =>
+  itemWrite: (ops: TItemOp[], defaultSpace?: string) =>
     req<{ results: TOpResult[] }>('/items/write', {
       method: 'POST',
-      body: JSON.stringify({ ops, default_board: defaultBoard }),
+      body: JSON.stringify({ ops, default_space: defaultSpace }),
     }),
 
-  boardWrite: (ops: TBoardOp[]) =>
-    req<{ results: TOpResult[] }>('/boards/write', {
+  spaceWrite: (ops: TSpaceOp[]) =>
+    req<{ results: TOpResult[] }>('/spaces/write', {
       method: 'POST',
       body: JSON.stringify({ ops }),
     }),
@@ -217,7 +217,7 @@ export const api = {
         id: string
         provider: 'github'
         name: string
-        board: string
+        space: string
         list: string | null
         enabled: boolean
         config: { labels?: string[]; repos?: string[] }
@@ -250,9 +250,9 @@ export const api = {
       method: 'DELETE',
     }),
 
-  starBoard: (key: string, starred: boolean) =>
+  starSpace: (key: string, starred: boolean) =>
     req<{ ok: boolean; starred: boolean }>(
-      `/boards/${encodeURIComponent(key)}/star`,
+      `/spaces/${encodeURIComponent(key)}/star`,
       { method: starred ? 'PUT' : 'DELETE' },
     ),
 
@@ -305,10 +305,10 @@ export const api = {
       body: JSON.stringify(patch),
     }),
 
-  createIngestToken: (name: string, board: string, list?: string) =>
+  createIngestToken: (name: string, space: string, list?: string) =>
     req<{ token: string; actor_id: string }>('/ingest_tokens', {
       method: 'POST',
-      body: JSON.stringify({ name, board, list }),
+      body: JSON.stringify({ name, space, list }),
     }),
 
   // -- Attachments ----------------------------------------------------------

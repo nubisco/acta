@@ -49,12 +49,12 @@
 
 <script setup lang="ts">
 /**
- * The board as a table. Every column sorts, which is the whole reason to
- * offer this view: a board answers "what is in flight", a table answers
+ * The space as a table. Every column sorts, which is the whole reason to
+ * offer this view: a space answers "what is in flight", a table answers
  * "what is oldest, what is due first, who has the most".
  */
 import { computed, ref } from 'vue'
-import type { IBoardItemRow } from '@/types/api'
+import type { ISpaceItemRow } from '@/types/api'
 import { relativeTime } from '@/lib/state'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 
@@ -72,7 +72,7 @@ interface IRow extends Record<string, unknown> {
 }
 
 const props = defineProps<{
-  items: IBoardItemRow[]
+  items: ISpaceItemRow[]
   variants: Map<string, string>
 }>()
 const emit = defineEmits<{ open: [key: string] }>()

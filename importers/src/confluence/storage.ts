@@ -158,7 +158,7 @@ export interface IConversionIssues {
 export interface IStorageConvertOptions {
   /** Resolve a Confluence page title to a doc slug (null = unknown page). */
   resolvePage?: (title: string) => string | null
-  /** Trello board shortlink → Acta board key ([[board:KEY]] refs). */
+  /** Trello board shortlink → Acta space key ([[space:KEY]] refs). */
   trelloBoards?: Record<string, string>
 }
 
@@ -364,7 +364,7 @@ class Renderer {
       const key = this.opts.trelloBoards?.[trello[1]]
       if (key) {
         const plain = text === href || text.toLowerCase() === key.toLowerCase()
-        return plain ? `[[board:${key}]]` : `[[board:${key}|${text}]]`
+        return plain ? `[[space:${key}]]` : `[[space:${key}|${text}]]`
       }
       this.issues.unresolvedLinks.push(`trello board ${href}`)
     }

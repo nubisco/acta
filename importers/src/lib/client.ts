@@ -6,7 +6,7 @@
  */
 
 import type {
-  TBoardOp,
+  TSpaceOp,
   TDocOp,
   TItemOp,
   TLabelOp,
@@ -40,7 +40,7 @@ export interface IOverviewList {
 
 export interface IOverview {
   workspace: { id: string; name: string }
-  boards: {
+  spaces: {
     key: string
     name: string
     archived?: boolean
@@ -48,7 +48,7 @@ export interface IOverview {
   }[]
   labels: {
     group_name: string
-    board_key: string | null
+    space_key: string | null
     id: string
     name: string
     color: string
@@ -179,8 +179,8 @@ export class ActaClient {
     return out
   }
 
-  async writeBoards(ops: TBoardOp[]): Promise<TOpResult[]> {
-    return this.writeOps('/api/v1/boards/write', ops, SMALL_OPS_PER_CALL)
+  async writeBoards(ops: TSpaceOp[]): Promise<TOpResult[]> {
+    return this.writeOps('/api/v1/spaces/write', ops, SMALL_OPS_PER_CALL)
   }
 
   async writeLabels(ops: TLabelOp[]): Promise<TOpResult[]> {

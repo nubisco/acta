@@ -46,7 +46,7 @@
         />
         <span class="global-search__title">{{ hit.title }}</span>
         <span class="global-search__hint">{{
-          hit.type === 'item' ? hit.ref : (hit.board ?? hit.type)
+          hit.type === 'item' ? hit.ref : (hit.space ?? hit.type)
         }}</span>
       </button>
       <button

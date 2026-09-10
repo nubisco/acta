@@ -20,9 +20,9 @@
  * without anything having happened.
  */
 import { computed } from 'vue'
-import type { IBoardItemRow } from '@/types/api'
+import type { ISpaceItemRow } from '@/types/api'
 
-const props = defineProps<{ items: IBoardItemRow[] }>()
+const props = defineProps<{ items: ISpaceItemRow[] }>()
 
 const dated = computed(() => props.items.filter((i) => i.due))
 const undated = computed(() => props.items.length - dated.value.length)

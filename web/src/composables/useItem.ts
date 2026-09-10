@@ -101,10 +101,10 @@ export function useItem(itemKey: Ref<string>) {
           value: link.src_id,
         })),
       ]
-      const board = ws.overview.value?.boards.find(
-        (b) => b.key === detail.board,
+      const space = ws.overview.value?.spaces.find(
+        (b) => b.key === detail.space,
       )
-      listOptions.value = (board?.lists ?? []).map((l) => ({
+      listOptions.value = (space?.lists ?? []).map((l) => ({
         label: l.name,
         value: l.name,
       }))
@@ -112,7 +112,7 @@ export function useItem(itemKey: Ref<string>) {
         .filter((a) => a.kind === 'human')
         .map((a) => ({ label: a.name, value: a.handle }))
       labelOptions.value = (ws.overview.value?.labels ?? [])
-        .filter((l) => l.board_key === null || l.board_key === detail.board)
+        .filter((l) => l.space_key === null || l.space_key === detail.space)
         .map((l) => ({ label: l.name, value: l.name }))
       viewState.value = 'ready'
     } catch (err) {

@@ -1,12 +1,12 @@
 <template>
   <NbModal
     :open="open"
-    title="New board"
+    title="New space"
     size="sm"
     :close-on-overlay="!isDirty"
     @close="onClose"
   >
-    <NbForm id="new-board-form" @submit.prevent="submit">
+    <NbForm id="new-space-form" @submit.prevent="submit">
       <NbBanner
         v-if="serverError"
         status="error"
@@ -14,7 +14,7 @@
         :title="serverError"
       />
       <NbTextInput
-        id="field-board-name"
+        id="field-space-name"
         ref="nameInput"
         v-model="name"
         label="Name"
@@ -23,7 +23,7 @@
         @blur="validateName"
       />
       <NbTextInput
-        id="field-board-key"
+        id="field-space-key"
         v-model="key"
         label="Key"
         placeholder="SW"
@@ -37,11 +37,11 @@
       </NbButton>
       <NbButton
         type="submit"
-        form="new-board-form"
+        form="new-space-form"
         variant="primary"
         :loading="saving"
       >
-        Create board
+        Create space
       </NbButton>
     </template>
   </NbModal>
@@ -97,7 +97,7 @@ watch(name, (value) => {
 })
 
 function validateName(): void {
-  errors.name = name.value.trim() ? undefined : 'Give the board a name'
+  errors.name = name.value.trim() ? undefined : 'Give the space a name'
 }
 
 function validateKey(): void {
@@ -114,7 +114,7 @@ async function submit(): Promise<void> {
   saving.value = true
   serverError.value = ''
   try {
-    const { results } = await api.boardWrite([
+    const { results } = await api.spaceWrite([
       {
         op: 'create',
         op_id: newOpId(),
@@ -124,7 +124,7 @@ async function submit(): Promise<void> {
       },
     ])
     if (!results[0].ok) {
-      serverError.value = 'That board key is already taken'
+      serverError.value = 'That space key is already taken'
       return
     }
     await ws.refresh()
@@ -142,9 +142,9 @@ function onClose(): void {
     return
   }
   void confirm({
-    title: 'Discard this board',
+    title: 'Discard this space',
     message: 'The name and key you typed will be lost.',
-    confirmLabel: 'Discard board',
+    confirmLabel: 'Discard space',
     cancelLabel: 'Keep editing',
     onConfirm: () => emit('close'),
   })

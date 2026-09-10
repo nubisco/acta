@@ -5,9 +5,9 @@
  * Trello source id, so applying the plan twice cannot duplicate anything.
  */
 
-import { BOARD_KEY_RE, slugify } from '@nubisco/acta-shared'
+import { SPACE_KEY_RE, slugify } from '@nubisco/acta-shared'
 import type {
-  TBoardOp,
+  TSpaceOp,
   TImportedMeta,
   TItemOp,
   TLabelOp,
@@ -30,7 +30,7 @@ const COMMENT_MAX = 50_000
 // ---------------------------------------------------------------------------
 // Board keys: --key flag wins; otherwise a prompt-free heuristic (uppercase
 // initials for multi-word names, first two letters for single words), unique
-// among existing + planned keys, always matching BOARD_KEY_RE.
+// among existing + planned keys, always matching SPACE_KEY_RE.
 // ---------------------------------------------------------------------------
 
 export function boardKeyFor(name: string, taken: Set<string>): string {
@@ -50,7 +50,7 @@ export function boardKeyFor(name: string, taken: Set<string>): string {
   if (!/^[A-Z]/.test(base)) base = `B${base}`.slice(0, 5)
   let key = base
   let n = 2
-  while (taken.has(key) || !BOARD_KEY_RE.test(key)) {
+  while (taken.has(key) || !SPACE_KEY_RE.test(key)) {
     key = `${base.slice(0, 4)}${n}`
     n += 1
     if (n > 99) throw new Error(`cannot derive a unique board key for ${name}`)
@@ -134,12 +134,12 @@ export interface IPlannedItem {
   checklistCount: number
 }
 
-export interface ITrelloBoardPlan {
+export interface ITrelloSpacePlan {
   sourceId: string
   file?: string
   key: string
   name: string
-  boardOps: TBoardOp[]
+  spaceOps: TSpaceOp[]
   items: IPlannedItem[]
   counts: Record<string, number>
   skips: ISkipEntry[]
@@ -148,7 +148,7 @@ export interface ITrelloBoardPlan {
 
 export interface ITrelloPlan {
   labelOps: TLabelOp[]
-  boards: ITrelloBoardPlan[]
+  spaces: ITrelloSpacePlan[]
 }
 
 // ---------------------------------------------------------------------------
@@ -184,13 +184,13 @@ export function planTrelloImport(
   const takenKeys = new Set(opts.existingBoardKeys)
   const labelOps: TLabelOp[] = []
   const plannedWorkspaceLabels = new Set<string>()
-  const boards: ITrelloBoardPlan[] = []
+  const spaces: ITrelloSpacePlan[] = []
 
   for (const input of inputs) {
     const source = input.board
     let key = input.forcedKey
     if (key) {
-      if (!BOARD_KEY_RE.test(key))
+      if (!SPACE_KEY_RE.test(key))
         throw new Error(`--key ${key} is not a valid board key (2-5 A-Z0-9)`)
       takenKeys.add(key)
     } else {
@@ -199,7 +199,7 @@ export function planTrelloImport(
 
     const skips: ISkipEntry[] = []
     const notes: string[] = []
-    const boardOps: TBoardOp[] = [
+    const spaceOps: TSpaceOp[] = [
       {
         op: 'create',
         op_id: `trello:${source.id}`,
@@ -227,10 +227,10 @@ export function planTrelloImport(
       listNameById.set(list.id, name)
       if (list.closed)
         notes.push(`Trello list "${name}" was archived; imported as open list`)
-      boardOps.push({
+      spaceOps.push({
         op: 'list_create',
         op_id: `trello:${list.id}`,
-        board: key,
+        space: key,
         name,
         role: inferListRole(list.name),
         pos: list.pos,
@@ -273,7 +273,7 @@ export function planTrelloImport(
             op: 'group_create',
             op_id: `trello:${source.id}:colors`,
             name: `${key} Colors`,
-            board: key,
+            space: key,
           })
         }
         if (!plannedBoardColors.has(name)) {
@@ -458,7 +458,7 @@ export function planTrelloImport(
         create: {
           op: 'create',
           op_id: `trello:${card.id}`,
-          board: key,
+          space: key,
           list: listName,
           title: truncate(card.name, TITLE_MAX, notes, `title of ${card.id}`),
           description: card.desc
@@ -482,12 +482,12 @@ export function planTrelloImport(
     if (doneAsArchived)
       notes.push('done-role lists imported as archived items (per flag)')
 
-    boards.push({
+    spaces.push({
       sourceId: source.id,
       file: input.file,
       key,
       name: source.name,
-      boardOps,
+      spaceOps,
       items,
       counts,
       skips,
@@ -495,5 +495,5 @@ export function planTrelloImport(
     })
   }
 
-  return { labelOps, boards }
+  return { labelOps, spaces }
 }

@@ -105,7 +105,7 @@ export function useWorkspace() {
     unsubscribe = subscribeEvents(
       (event) => {
         connectionDown.value = false
-        if (event.entity === 'board' || event.entity === 'list') void refresh()
+        if (event.entity === 'space' || event.entity === 'list') void refresh()
         if (NOTIFY_VERBS.has(event.verb) && event.actor_kind !== 'human') {
           notifications.value = [
             {
@@ -181,7 +181,7 @@ function describe(event: ILiveEvent): string {
 
 /** Cross-view UI state: inspector selection and dialogs. */
 const inspectedItemKey = ref<string | null>(null)
-const newBoardOpen = ref(false)
+const newSpaceOpen = ref(false)
 const itemModalKey = ref<string | null>(null)
 
 /**
@@ -243,10 +243,10 @@ export function useDocPreview() {
   }
 }
 
-const DENSE_ROUTES = new Set(['board', 'docs'])
+const DENSE_ROUTES = new Set(['space', 'docs'])
 
 export function useUiState() {
-  return { newBoardOpen, itemModalKey, sidebarChoice }
+  return { newSpaceOpen, itemModalKey, sidebarChoice }
 }
 
 export function sidebarDefaultFor(routeName: unknown): TSidebarVariant {

@@ -32,12 +32,12 @@
       />
       <NbSelect
         v-if="kind === 'ingest'"
-        :id="`${formId}-board`"
-        v-model="board"
-        label="Board"
-        :options="boardOptions"
-        :error="errors.board"
-        @change="errors.board = undefined"
+        :id="`${formId}-space`"
+        v-model="space"
+        label="Space"
+        :options="spaceOptions"
+        :error="errors.space"
+        @change="errors.space = undefined"
       />
     </NbForm>
     <template #footer>
@@ -69,10 +69,10 @@ const emit = defineEmits<{ close: []; created: [token: string] }>()
 const ws = useWorkspace()
 const name = ref('')
 const scopes = ref<string[]>(['read', 'write'])
-const board = ref('')
+const space = ref('')
 const saving = ref(false)
 const serverError = ref('')
-const errors = reactive<{ name?: string; board?: string }>({})
+const errors = reactive<{ name?: string; space?: string }>({})
 const nameInput = ref<InstanceType<typeof NbTextInput> | null>(null)
 
 const formId = computed(() => `new-${props.kind}-token-form`)
@@ -84,8 +84,8 @@ const scopeOptions = [
   { label: 'admin', value: 'admin' },
 ]
 
-const boardOptions = computed(() =>
-  (ws.overview.value?.boards ?? [])
+const spaceOptions = computed(() =>
+  (ws.overview.value?.spaces ?? [])
     .filter((b) => !b.archived)
     .map((b) => ({ label: b.name, value: b.key })),
 )
@@ -96,10 +96,10 @@ watch(
     if (open) {
       name.value = ''
       scopes.value = ['read', 'write']
-      board.value = ''
+      space.value = ''
       serverError.value = ''
       errors.name = undefined
-      errors.board = undefined
+      errors.space = undefined
       requestAnimationFrame(() => nameInput.value?.focus())
     }
   },
@@ -111,16 +111,16 @@ function validateName(): void {
 
 async function submit(): Promise<void> {
   validateName()
-  if (props.kind === 'ingest' && !board.value)
-    errors.board = 'Pick the board new items land on'
-  if (errors.name || errors.board) return
+  if (props.kind === 'ingest' && !space.value)
+    errors.space = 'Pick the space new items land on'
+  if (errors.name || errors.space) return
   saving.value = true
   serverError.value = ''
   try {
     const token =
       props.kind === 'agent'
         ? (await api.createAgentToken(name.value.trim(), scopes.value)).token
-        : (await api.createIngestToken(name.value.trim(), board.value)).token
+        : (await api.createIngestToken(name.value.trim(), space.value)).token
     await ws.refresh()
     emit('created', token)
   } catch (err) {

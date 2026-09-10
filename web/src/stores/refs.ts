@@ -1,7 +1,7 @@
 /**
  * Shared cache of card summaries behind [[KEY]] references, so every surface
  * that renders markdown (docs, descriptions, comments) resolves the same ref
- * to the same live chip. Requests batch across surfaces; board events over
+ * to the same live chip. Requests batch across surfaces; space events over
  * the live stream refresh whatever is cached, keeping chips dynamic.
  */
 import { reactive, ref } from 'vue'
@@ -10,7 +10,7 @@ import { useWorkspace } from '@/stores/workspace'
 
 export interface IRefCard {
   key: string
-  board: string
+  space: string
   list: string
   title: string
   done?: boolean
@@ -37,7 +37,7 @@ async function flush(): Promise<void> {
     for (const raw of items as IRefCard[]) {
       cards.set(raw.key, {
         key: raw.key,
-        board: raw.board,
+        space: raw.space,
         list: raw.list,
         title: raw.title,
         done: raw.done,

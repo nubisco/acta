@@ -39,7 +39,7 @@
 
 <script setup lang="ts">
 // The quick look Confluence gives smart links: a card mentions a page, the
-// reader peeks without losing the board. The doc still lives in its space;
+// reader peeks without losing the space. The doc still lives in its space;
 // "Open in Docs" is the door there.
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'

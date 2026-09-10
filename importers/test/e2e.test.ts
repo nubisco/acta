@@ -82,10 +82,10 @@ async function trelloOpts(): Promise<ITrelloPlanOptions> {
     memberMap: { josesilva: 'jose' },
     existingWorkspaceLabels: new Set(
       overview.labels
-        .filter((l) => l.board_key === null)
+        .filter((l) => l.space_key === null)
         .map((l) => l.name.toLowerCase()),
     ),
-    existingBoardKeys: new Set(overview.boards.map((b) => b.key)),
+    existingBoardKeys: new Set(overview.spaces.map((b) => b.key)),
     existingActorHandles: new Set(overview.actors.map((a) => a.handle)),
     doneAsArchived: new Set(['SW']),
   }
@@ -129,7 +129,7 @@ describe('trello import end to end', () => {
     expect(report.ok()).toBe(true)
 
     const overview = await client.overview()
-    const sw = overview.boards.find((b) => b.key === 'SW')!
+    const sw = overview.spaces.find((b) => b.key === 'SW')!
     expect(sw.lists.map((l) => l.name)).toEqual([
       'Backlog',
       'In Progress',
@@ -138,7 +138,7 @@ describe('trello import end to end', () => {
       'Done',
       'Old stuff',
     ])
-    expect(overview.boards.some((b) => b.key === 'LABS')).toBe(true)
+    expect(overview.spaces.some((b) => b.key === 'LABS')).toBe(true)
 
     // Key mapping recorded from op results, source ids in the report.
     const mapping = report.mappings as Record<string, { key: string }>
@@ -229,10 +229,10 @@ describe('trello import end to end', () => {
     // board-scoped.
     const infra = overview.labels.filter((l) => l.name === 'Infra')
     expect(infra).toHaveLength(1)
-    expect(infra[0].board_key).toBeNull()
+    expect(infra[0].space_key).toBeNull()
     expect(infra[0].group_name).toBe('Type')
     const colorGreen = overview.labels.find((l) => l.name === 'color-green')!
-    expect(colorGreen.board_key).toBe('SW')
+    expect(colorGreen.space_key).toBe('SW')
     expect(overview.labels.filter((l) => l.name === 'Bug')).toHaveLength(1)
   })
 
@@ -363,7 +363,7 @@ describe('trello import end to end', () => {
 
 describe('confluence import end to end', () => {
   it('builds the doc tree with converted bodies, layout and provenance report', async () => {
-    // The Trello board link target must exist for the [[board:SW]] ref.
+    // The Trello board link target must exist for the [[space:SW]] ref.
     await importTrello()
     const report = await importConfluence()
     if (!report.ok()) report.print()
@@ -413,7 +413,7 @@ describe('confluence import end to end', () => {
       body: string
     }
     expect(product.layout).toBe('wide')
-    expect(product.body).toContain('[[board:SW]]')
+    expect(product.body).toContain('[[space:SW]]')
     expect(product.body).toContain('```ts\nconst x = 1\n```')
     expect(product.body).toContain('Unmapped Confluence macro: toc')
     expect(report.unknownMacros.join(' ')).toContain('toc')

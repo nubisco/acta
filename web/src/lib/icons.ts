@@ -44,7 +44,7 @@ import * as warning from '@nubisco/ui/icons/warning'
 
 export function registerActaIcons(): void {
   registerIcons({
-    // Shell navigation and the collapsed rail's board menu (App.vue).
+    // Shell navigation and the collapsed rail's space menu (App.vue).
     house,
     'book-open': bookOpen,
     pulse,

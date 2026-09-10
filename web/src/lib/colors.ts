@@ -6,7 +6,7 @@ export function chartColorFor(seed: string): string {
 }
 
 /**
- * List-role accents, shared by board column headers and board tiles so the
+ * List-role accents, shared by space column headers and space tiles so the
  * same role always reads as the same color.
  */
 export function roleColor(role?: string): string | undefined {

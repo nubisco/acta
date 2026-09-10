@@ -13,7 +13,7 @@ import { mount } from '@vue/test-utils'
 // Only the overview call is stubbed; everything else in the client stays
 // real, because a partial mock of the module breaks MarkdownView's setup
 // silently rather than failing loudly.
-const overview = vi.fn(async () => ({ boards: [], labels: [], actors: [] }))
+const overview = vi.fn(async () => ({ spaces: [], labels: [], actors: [] }))
 vi.mock('@/api/client', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
   return {
@@ -27,7 +27,7 @@ import { useWorkspace } from '@/stores/workspace'
 
 /** Populate the store the way the app does, since `overview` is read-only. */
 async function seedActors(actors: unknown[]) {
-  overview.mockResolvedValue({ boards: [], labels: [], actors } as never)
+  overview.mockResolvedValue({ spaces: [], labels: [], actors } as never)
   await useWorkspace().refresh()
 }
 

@@ -56,11 +56,11 @@ import { humanise } from '@/lib/state'
  * Creating an item asks for nothing up front but a title and a list: every
  * other fact (labels, assignees, due, description) is set on the item once it
  * exists. `list` preselects the column whose footer opened the modal; the
- * shell's own Add item button leaves it on the board's backlog.
+ * shell's own Add item button leaves it on the space's backlog.
  */
 const props = defineProps<{
   open: boolean
-  boardKey: string
+  spaceKey: string
   lists: { name: string; role?: string }[]
   list?: string
 }>()
@@ -116,7 +116,7 @@ async function submit(): Promise<void> {
           title: title.value.trim(),
         },
       ],
-      props.boardKey,
+      props.spaceKey,
     )
     const result = results[0]
     if (!result.ok) throw new Error((result as { error: string }).error)

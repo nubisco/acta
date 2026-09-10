@@ -124,10 +124,10 @@ export async function main(argv: string[]): Promise<number> {
     const overview = await client.overview()
     existingWorkspaceLabels = new Set(
       overview.labels
-        .filter((l) => l.board_key === null)
+        .filter((l) => l.space_key === null)
         .map((l) => l.name.toLowerCase()),
     )
-    existingBoardKeys = new Set(overview.boards.map((b) => b.key))
+    existingBoardKeys = new Set(overview.spaces.map((b) => b.key))
     existingActorHandles = new Set(overview.actors.map((a) => a.handle))
   } catch (err) {
     if (!dryRun) {

@@ -54,7 +54,7 @@
               @click="collapse"
             />
             <!-- Archive was only ever reachable through the Status select,
-                 which is why it read as missing. Same set as the board's
+                 which is why it read as missing. Same set as the space's
                  right-click menu, so both surfaces agree. -->
             <NbButton
               v-if="it.item.value.archived"

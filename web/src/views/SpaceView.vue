@@ -1,5 +1,5 @@
 <template>
-  <div class="board">
+  <div class="space">
     <!-- Adding lives in the shell topbar (always present) and at the foot of
          every column (adds in place); the title is asked for in the modal, so
          the filter bar is purely filters. -->
@@ -11,7 +11,7 @@
         :aria-pressed="stateFilter === 'archived'"
         @click="toggleArchived"
       >
-        {{ stateFilter === 'archived' ? 'Back to board' : 'Archived' }}
+        {{ stateFilter === 'archived' ? 'Back to space' : 'Archived' }}
       </NbButton>
       <NbButton size="sm" variant="primary" icon="plus" @click="openNewItem()">
         Add item
@@ -19,17 +19,17 @@
     </component>
 
     <component :is="filterBar.Outlet">
-      <div class="board__bar">
+      <div class="space__bar">
         <NbTabs
           v-model="view"
-          v-nb-tour-step="'board-views'"
+          v-nb-tour-step="'space-views'"
           variant="line"
           :items="viewTabs"
-          aria-label="Board views"
+          aria-label="Space views"
         />
         <div
-          v-nb-tour-step="'board-filters'"
-          class="board__filters"
+          v-nb-tour-step="'space-filters'"
+          class="space__filters"
           role="search"
           aria-label="Filter items"
         >
@@ -37,14 +37,14 @@
                them could show what they held, so labels lost their colour and
                people were limited to one at a time; the panel has room to show
                both. The count is on the button because a collapsed filter that
-               does not say it is active is how you end up staring at a board
+               does not say it is active is how you end up staring at a space
                that is missing cards. -->
           <NbButton
             size="sm"
             :variant="filtersOpen || filterCount > 0 ? 'secondary' : 'ghost'"
             icon="funnel"
             :aria-pressed="filtersOpen"
-            aria-controls="board-filter-panel"
+            aria-controls="space-filter-panel"
             @click="toggleFilters"
           >
             Filters
@@ -56,7 +56,7 @@
             id="field-filter-text"
             v-model="textFilter"
             size="sm"
-            placeholder="Filter cards on this board..."
+            placeholder="Filter cards on this space..."
           />
         </div>
       </div>
@@ -65,9 +65,9 @@
     <!-- Claims the same region the card details use, and the two are mutually
          exclusive below: one side panel, one thing in it. -->
     <component :is="inspectorSlot.Outlet">
-      <BoardFilterPanel
+      <SpaceFilterPanel
         v-if="filtersOpen"
-        id="board-filter-panel"
+        id="space-filter-panel"
         :labels="labelFilter"
         :assignees="assigneeFilter"
         :state="stateFilter"
@@ -81,20 +81,20 @@
       />
     </component>
 
-    <div v-if="load.state.value === 'loading'" class="board__skeleton">
+    <div v-if="load.state.value === 'loading'" class="space__skeleton">
       <NbSkeleton
         v-for="index in 4"
         :key="index"
         variant="block"
         height="14rem"
-        :label="index === 1 ? 'Loading board' : undefined"
+        :label="index === 1 ? 'Loading space' : undefined"
       />
     </div>
 
     <NbEmptyState
       v-else-if="load.state.value === 'error'"
       kind="error"
-      title="Could not load this board"
+      title="Could not load this space"
       :description="load.message.value"
     >
       <template #actions>
@@ -106,7 +106,7 @@
       v-else-if="items.length === 0 && filtersActive"
       kind="no-results"
       title="Nothing matches these filters"
-      description="Items exist on this board, but none match the current filters."
+      description="Items exist on this space, but none match the current filters."
     >
       <template #actions>
         <NbButton variant="secondary" @click="clearFilters">
@@ -115,10 +115,10 @@
       </template>
     </NbEmptyState>
 
-    <div v-else-if="items.length === 0" class="board__empty">
+    <div v-else-if="items.length === 0" class="space__empty">
       <NbEmptyState
         title="No items yet"
-        description="Items move across this board's lists as work progresses."
+        description="Items move across this space's lists as work progresses."
       >
         <template #actions>
           <NbButton variant="primary" icon="plus" @click="openNewItem()">
@@ -143,13 +143,13 @@
 
     <TimelineView v-else-if="view === 'timeline'" :items="items" />
 
-    <NbBoard v-else :columns="columns" :items="boardItems" @move="onMove">
+    <NbBoard v-else :columns="columns" :items="spaceItems" @move="onMove">
       <template #column-footer="{ column }">
         <NbButton
           size="sm"
           variant="ghost"
           icon="plus"
-          class="board__col-add"
+          class="space__col-add"
           @click="openNewItem(String(column.id))"
         >
           Add item
@@ -157,11 +157,11 @@
       </template>
       <template #card="{ item }">
         <button
-          class="board__card"
+          class="space__card"
           :class="{
-            'board__card--open': inspector.itemKey.value === item.key,
+            'space__card--open': inspector.itemKey.value === item.key,
           }"
-          :data-nb-tour-step="item.id === firstCardId ? 'board-card' : null"
+          :data-nb-tour-step="item.id === firstCardId ? 'space-card' : null"
           type="button"
           :aria-current="
             inspector.itemKey.value === item.key ? 'true' : undefined
@@ -170,12 +170,12 @@
           @dblclick="openItemModal(String(item.key))"
           @contextmenu.prevent="openCardMenu($event, String(item.key))"
         >
-          <span class="board__card-title">
+          <span class="space__card-title">
             <s v-if="item.done">{{ item.title }}</s>
             <template v-else>{{ item.title }}</template>
           </span>
-          <span class="board__card-meta">
-            <span class="board__card-key">{{ item.key }}</span>
+          <span class="space__card-meta">
+            <span class="space__card-key">{{ item.key }}</span>
             <NbBadge
               v-for="label in (item.labels as string[]) ?? []"
               :key="label"
@@ -194,14 +194,14 @@
             </NbBadge>
             <span
               v-if="item.chk"
-              class="board__card-chip"
+              class="space__card-chip"
               :aria-label="`Checklist ${item.chk}`"
             >
               <NbIcon name="check-square" /> {{ item.chk }}
             </span>
             <span
               v-if="item.cmts"
-              class="board__card-chip"
+              class="space__card-chip"
               :aria-label="`${item.cmts} comments`"
             >
               <NbIcon name="chat-circle" /> {{ item.cmts }}
@@ -264,8 +264,8 @@
 
     <NewItemModal
       :open="newItemOpen"
-      :board-key="boardKey"
-      :lists="boardMeta?.lists ?? []"
+      :space-key="spaceKey"
+      :lists="spaceMeta?.lists ?? []"
       :list="newItemList"
       @close="newItemOpen = false"
       @created="onItemCreated"
@@ -284,7 +284,7 @@ import {
   type IBoardMoveEvent,
 } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
-import type { IBoardItemRow } from '@/types/api'
+import type { ISpaceItemRow } from '@/types/api'
 import { humanise, useLoadState } from '@/lib/state'
 import { useViewCommands } from '@/lib/commands'
 import { labelVariants } from '@/lib/labels'
@@ -296,9 +296,9 @@ import NewItemModal from '@/components/NewItemModal.vue'
 import CalendarView from '@/components/views/CalendarView.vue'
 import TableView from '@/components/views/TableView.vue'
 import TimelineView from '@/components/views/TimelineView.vue'
-import BoardFilterPanel from '@/components/BoardFilterPanel.vue'
+import SpaceFilterPanel from '@/components/SpaceFilterPanel.vue'
 
-const props = defineProps<{ boardKey?: string }>()
+const props = defineProps<{ spaceKey?: string }>()
 
 const route = useRoute()
 const router = useRouter()
@@ -320,7 +320,7 @@ const filterBar = useShellSlot('fixedbar')
 const inspectorSlot = useShellSlot('inspector')
 const topbarActions = useShellSlot('topbar-right')
 
-const items = ref<IBoardItemRow[]>([])
+const items = ref<ISpaceItemRow[]>([])
 const filtersOpen = ref(false)
 const labelFilter = ref<string[]>([])
 const assigneeFilter = ref<string[]>([])
@@ -330,7 +330,7 @@ const textFilter = ref('')
 /* The new-item modal, and which list it creates into: a column footer names
  * its own column, the topbar button leaves it to the modal's backlog default. */
 // --- card context menu ------------------------------------------------------
-// Right-click is how a board is worked in Trello and Jira, and it is the only
+// Right-click is how a space is worked in Trello and Jira, and it is the only
 // place with room for actions that do not deserve a permanent button.
 const cardMenu = ref<InstanceType<typeof NbMenu> | null>(null)
 const cardMenuOpen = ref(false)
@@ -487,13 +487,13 @@ async function onItemCreated(key: string): Promise<void> {
   if (key) inspector.open(key)
 }
 
-const boardKey = computed(() => props.boardKey ?? '')
-const boardMeta = computed(() =>
-  ws.overview.value?.boards.find((b) => b.key === boardKey.value),
+const spaceKey = computed(() => props.spaceKey ?? '')
+const spaceMeta = computed(() =>
+  ws.overview.value?.spaces.find((b) => b.key === spaceKey.value),
 )
 const filtersActive = computed(() => filterCount.value > 0)
 
-/** How many filters are narrowing the board, for the toolbar button's badge.
+/** How many filters are narrowing the space, for the toolbar button's badge.
  *  Each chosen label and each chosen person counts, because "3" should mean
  *  three things are excluded rather than three controls are in use. */
 const filterCount = computed(
@@ -508,9 +508,9 @@ const labelNames = computed(() => labelOptions.value.map((o) => o.value))
 
 // The tour points at a card to explain keys and the details panel, and it
 // needs one specific card rather than every card wearing the same id. Null
-// when the board is empty, which drops the step rather than anchoring it to
+// when the space is empty, which drops the step rather than anchoring it to
 // nothing.
-const firstCardId = computed(() => boardItems.value[0]?.id ?? null)
+const firstCardId = computed(() => spaceItems.value[0]?.id ?? null)
 
 /** The side panel holds one thing at a time, so opening filters puts the card
  *  details away rather than stacking underneath them. */
@@ -530,14 +530,14 @@ watch(
 )
 
 const columns = computed(() =>
-  (boardMeta.value?.lists ?? []).map((list) => ({
+  (spaceMeta.value?.lists ?? []).map((list) => ({
     id: list.name,
     label: list.name,
     color: roleColor(list.role),
   })),
 )
 
-const boardItems = computed<IBoardItem[]>(() =>
+const spaceItems = computed<IBoardItem[]>(() =>
   // Cell order is the array order, so sort by pos before handing over.
   [...items.value]
     .sort((a, b) => a.pos - b.pos)
@@ -549,12 +549,12 @@ const boardItems = computed<IBoardItem[]>(() =>
 // the same thing.
 const labelOptions = computed(() => [
   ...(ws.overview.value?.labels ?? [])
-    .filter((l) => l.board_key === null || l.board_key === boardKey.value)
+    .filter((l) => l.space_key === null || l.space_key === spaceKey.value)
     .map((l) => ({ label: l.name, value: l.name })),
 ])
 
 async function loadItems(): Promise<void> {
-  if (!boardKey.value) return
+  if (!spaceKey.value) return
   const params: Record<string, string> = {
     state: stateFilter.value,
     limit: '200',
@@ -563,11 +563,11 @@ async function loadItems(): Promise<void> {
   if (assigneeFilter.value.length > 0)
     params.assignee = assigneeFilter.value.join(',')
   if (textFilter.value) params.text = textFilter.value
-  const result = await load.run(api.boardGet(boardKey.value, params))
+  const result = await load.run(api.spaceGet(spaceKey.value, params))
   if (result) items.value = result.items
 }
 
-watch([boardKey, labelFilter, assigneeFilter, stateFilter], loadItems, {
+watch([spaceKey, labelFilter, assigneeFilter, stateFilter], loadItems, {
   immediate: true,
 })
 
@@ -581,12 +581,12 @@ onScopeDispose(
   ws.onLive((event) => {
     if (event.entity !== 'item') return
     // Someone else's change always needs a reload. Our own usually does not,
-    // because the board already shows it: a drag applies the move locally,
+    // because the space already shows it: a drag applies the move locally,
     // and reloading mid-drag would fight the pointer.
     //
     // The exception is anything that changes whether a card still belongs in
     // the current filter. Archiving from the inspector left the card sitting
-    // on the board until a manual refresh, which reads as the action having
+    // on the space until a manual refresh, which reads as the action having
     // failed.
     const changesMembership = new Set([
       'item.archived',
@@ -608,19 +608,19 @@ function toggleArchived(): void {
   stateFilter.value = stateFilter.value === 'archived' ? 'open' : 'archived'
 }
 
-useViewCommands('board', [
+useViewCommands('space', [
   {
-    id: 'board:add-card',
+    id: 'space:add-card',
     label: 'Add card',
     icon: 'plus',
-    namespace: 'Board',
+    namespace: 'Space',
     handler: () => openNewItem(),
   },
   {
-    id: 'board:toggle-archived',
+    id: 'space:toggle-archived',
     label: 'Toggle archived cards',
     icon: 'archive',
-    namespace: 'Board',
+    namespace: 'Space',
     handler: toggleArchived,
   },
 ])
@@ -637,8 +637,8 @@ function clearFilters(): void {
  * row and never renumbers the list.
  */
 function posBetween(
-  before: IBoardItemRow | undefined,
-  after: IBoardItemRow | undefined,
+  before: ISpaceItemRow | undefined,
+  after: ISpaceItemRow | undefined,
 ): number {
   if (before && after) return (before.pos + after.pos) / 2
   if (before) return before.pos + 1024
@@ -683,14 +683,14 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
 </script>
 
 <style scoped lang="scss">
-.board {
+.space {
   display: grid;
   gap: var(--nb-spacing-16);
   align-content: start;
 
-  /* Trello-parity column width: fixed-ish tracks, board scrolls
+  /* Trello-parity column width: fixed-ish tracks, space scrolls
    * horizontally instead of stretching a few columns across the screen. */
-  --nb-board-column-track: minmax(272px, 340px);
+  --nb-space-column-track: minmax(272px, 340px);
 
   &__views {
     margin-block-end: var(--nb-spacing-4);
@@ -782,7 +782,7 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
   }
 
   /* Cards are a dense list. At 16px they matched the inspector's title, which
-   * flattened the hierarchy between "the board" and "the card you opened". */
+   * flattened the hierarchy between "the space" and "the card you opened". */
   &__card-title {
     font-size: var(--nb-type-body-md-size);
 

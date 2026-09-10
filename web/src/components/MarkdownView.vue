@@ -155,8 +155,8 @@ function renderRefs(html: string): string {
       }
       if (target.startsWith('@'))
         return `<span class="md__mention" data-handle="${esc(target.slice(1))}">${esc(target)}</span>`
-      if (target.startsWith('board:'))
-        return `<a class="md__ref" data-ref-type="board" data-ref="${esc(target.slice(6))}" href="/b/${esc(target.slice(6))}">${esc(alias ?? target.slice(6))}</a>`
+      if (target.startsWith('space:'))
+        return `<a class="md__ref" data-ref-type="space" data-ref="${esc(target.slice(6))}" href="/s/${esc(target.slice(6))}">${esc(alias ?? target.slice(6))}</a>`
       if (target.startsWith('doc:'))
         return `<a class="md__ref" data-ref-type="doc" data-ref="${esc(target.slice(4))}" href="/docs/${esc(target.slice(4))}">${esc(alias ?? target.slice(4))}</a>`
       if (/^[A-Z][A-Z0-9]{1,4}-\d+$/.test(target))
@@ -236,7 +236,7 @@ const html = computed(() => {
 })
 
 /**
- * Item refs are buttons that open the inspector. Board/doc refs are real
+ * Item refs are buttons that open the inspector. Space/doc refs are real
  * links: plain left-clicks route in-app, modified clicks keep native
  * behavior (new tab, etc.).
  */
@@ -255,7 +255,7 @@ function onClick(event: MouseEvent): void {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0)
     return
   event.preventDefault()
-  if (refType === 'board') void router.push(wpath(`/b/${ref}`))
+  if (refType === 'space') void router.push(wpath(`/s/${ref}`))
   else if (refType === 'doc') {
     if (docNav) docNav(ref)
     else docPreview.open(ref)
@@ -265,7 +265,7 @@ function onClick(event: MouseEvent): void {
 /**
  * Card refs hydrate into live chips after render: the markdown pass emits a
  * bare [[KEY]] button, then the shared ref cache fills in title and state,
- * and re-fills them whenever board events land. v-html rewrites wipe the
+ * and re-fills them whenever space events land. v-html rewrites wipe the
  * patched DOM, so hydration re-runs on both the html and the cache version.
  */
 function hydrateItemRefs(): void {

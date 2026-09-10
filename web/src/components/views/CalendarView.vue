@@ -19,10 +19,10 @@
  * missing is stated rather than hidden.
  */
 import { computed } from 'vue'
-import type { IBoardItemRow } from '@/types/api'
+import type { ISpaceItemRow } from '@/types/api'
 import { chartColorFor } from '@/lib/colors'
 
-const props = defineProps<{ items: IBoardItemRow[] }>()
+const props = defineProps<{ items: ISpaceItemRow[] }>()
 const emit = defineEmits<{ open: [key: string] }>()
 
 const dated = computed(() => props.items.filter((i) => i.due))

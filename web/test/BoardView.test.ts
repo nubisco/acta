@@ -1,5 +1,5 @@
 /**
- * The board and its card context menu.
+ * The space and its card context menu.
  *
  * The menu tests exist because it shipped inert: `@select="helper(fn)"` runs
  * the helper when the event fires and throws away the closure it returns, so
@@ -11,12 +11,12 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent, ref } from 'vue'
 
 const itemWrite = vi.fn(async () => ({ results: [{ op_id: 'x', ok: true }] }))
-const boardGet = vi.fn()
+const spaceGet = vi.fn()
 
 vi.mock('@/api/client', () => ({
   api: {
     itemWrite: (...args: unknown[]) => itemWrite(...(args as [])),
-    boardGet: (...args: unknown[]) => boardGet(...(args as [])),
+    spaceGet: (...args: unknown[]) => spaceGet(...(args as [])),
   },
   newOpId: () => 'op-test',
   getWorkspaceSlug: () => 'nubisco',
@@ -41,7 +41,7 @@ vi.mock('@nubisco/ui', async (importOriginal) => {
 })
 
 const overview = {
-  boards: [
+  spaces: [
     {
       key: 'SU',
       name: 'Support',
@@ -52,8 +52,8 @@ const overview = {
     },
   ],
   labels: [
-    { name: 'Urgent', color: 'red', board_key: null },
-    { name: 'Tech debt', color: 'yellow', board_key: 'SU' },
+    { name: 'Urgent', color: 'red', space_key: null },
+    { name: 'Tech debt', color: 'yellow', space_key: 'SU' },
   ],
   actors: [
     { handle: 'jose', name: 'Jose', kind: 'human' },
@@ -61,13 +61,13 @@ const overview = {
   ],
 }
 
-// Shared so a test can point the panel at a card and assert the board marks
+// Shared so a test can point the panel at a card and assert the space marks
 // it, the same way `overview` above is shared: vi.mock's factory runs at
 // import time, after these declarations.
 const inspectorMock = {
   open: vi.fn(),
   close: vi.fn(),
-  // A real ref, not a plain object: the board watches this to put the filter
+  // A real ref, not a plain object: the space watches this to put the filter
   // panel away, and a watcher on a non-reactive field never fires, which made
   // the rule look enforced when nothing was enforcing it.
   itemKey: ref<string | null>(null),
@@ -78,12 +78,12 @@ vi.mock('@/stores/workspace', () => ({
     overview: { value: overview },
     onLive: () => () => undefined,
   }),
-  useUiState: () => ({ newBoardOpen: { value: false } }),
+  useUiState: () => ({ newSpaceOpen: { value: false } }),
   useInspector: () => inspectorMock,
 }))
 
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: {}, params: { boardKey: 'SU' } }),
+  useRoute: () => ({ query: {}, params: { spaceKey: 'SU' } }),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }))
 
@@ -115,12 +115,12 @@ const items = [
   },
 ]
 
-import BoardView from '@/views/BoardView.vue'
+import SpaceView from '@/views/SpaceView.vue'
 
 async function render() {
-  boardGet.mockResolvedValue({ items, cursor: undefined })
-  const view = mount(BoardView, {
-    props: { boardKey: 'SU' },
+  spaceGet.mockResolvedValue({ items, cursor: undefined })
+  const view = mount(SpaceView, {
+    props: { spaceKey: 'SU' },
     global: { stubs: { teleport: true } },
   })
   await flushPromises()
@@ -130,7 +130,7 @@ async function render() {
 /** The toolbar's single filter control. */
 function filtersButton(view: ReturnType<typeof mount>) {
   return view
-    .findAll('.board__filters button')
+    .findAll('.space__filters button')
     .find((b) => b.text().includes('Filters'))!
 }
 
@@ -140,17 +140,17 @@ async function openMenu(
   title: string,
 ) {
   const card = view
-    .findAll('.board__card')
+    .findAll('.space__card')
     .find((c) => c.text().includes(title))
   await card!.trigger('contextmenu')
   await view.vm.$nextTick()
   return view.findAll('.nb-menu-item')
 }
 
-describe('BoardView card menu', () => {
+describe('SpaceView card menu', () => {
   beforeEach(() => {
     itemWrite.mockClear()
-    boardGet.mockClear()
+    spaceGet.mockClear()
     inspectorMock.itemKey.value = null
     inspectorMock.open.mockClear()
     inspectorMock.close.mockClear()
@@ -217,13 +217,13 @@ describe('BoardView card menu', () => {
   })
 
   // The details panel gained a close button, and closing has to be visible on
-  // the board: with nothing marking the open card, the panel could have been
+  // the space: with nothing marking the open card, the panel could have been
   // describing any of them and there was nothing for closing to undo.
   it('marks the card the details panel is showing, and only that one', async () => {
     inspectorMock.itemKey.value = 'SU-1'
     const view = await render()
 
-    const open = view.findAll('.board__card--open')
+    const open = view.findAll('.space__card--open')
     expect(open).toHaveLength(1)
     expect(open[0].text()).toContain('First')
     expect(open[0].attributes('aria-current')).toBe('true')
@@ -231,15 +231,15 @@ describe('BoardView card menu', () => {
 
   it('marks nothing when the details panel is closed', async () => {
     const view = await render()
-    expect(view.findAll('.board__card--open')).toHaveLength(0)
-    expect(view.find('.board__card').attributes('aria-current')).toBeUndefined()
+    expect(view.findAll('.space__card--open')).toHaveLength(0)
+    expect(view.find('.space__card').attributes('aria-current')).toBeUndefined()
   })
 
   // Four dropdowns competing for a toolbar row is what this replaces, so the
   // first thing worth asserting is that they are actually gone.
   it('collapses the filter dropdowns into one Filters button', async () => {
     const view = await render()
-    const bar = view.find('.board__filters')
+    const bar = view.find('.space__filters')
 
     expect(bar.text()).toContain('Filters')
     expect(bar.find('#field-filter-label').exists()).toBe(false)
@@ -252,12 +252,12 @@ describe('BoardView card menu', () => {
 
   it('opens the panel on click, with labels as pills and people as avatars', async () => {
     const view = await render()
-    expect(view.find('#board-filter-panel').exists()).toBe(false)
+    expect(view.find('#space-filter-panel').exists()).toBe(false)
 
     await filtersButton(view).trigger('click')
     await flushPromises()
 
-    const panel = view.find('#board-filter-panel')
+    const panel = view.find('#space-filter-panel')
     expect(panel.exists()).toBe(true)
     expect(panel.text()).toContain('Urgent')
     expect(panel.text()).toContain('Tech debt')
@@ -271,14 +271,14 @@ describe('BoardView card menu', () => {
     const view = await render()
     await filtersButton(view).trigger('click')
     await flushPromises()
-    boardGet.mockClear()
+    spaceGet.mockClear()
 
     const pills = view.findAll('.filters__pill')
     await pills[0].trigger('click')
     await pills[1].trigger('click')
     await flushPromises()
 
-    const [, params] = boardGet.mock.calls.at(-1) as unknown as [
+    const [, params] = spaceGet.mock.calls.at(-1) as unknown as [
       string,
       Record<string, string>,
     ]
@@ -302,12 +302,12 @@ describe('BoardView card menu', () => {
     const view = await render()
     await filtersButton(view).trigger('click')
     await flushPromises()
-    expect(view.find('#board-filter-panel').exists()).toBe(true)
+    expect(view.find('#space-filter-panel').exists()).toBe(true)
 
     inspectorMock.itemKey.value = 'SU-1'
     await flushPromises()
 
-    expect(view.find('#board-filter-panel').exists()).toBe(false)
+    expect(view.find('#space-filter-panel').exists()).toBe(false)
   })
 
   it('closes the card details when the filters open', async () => {

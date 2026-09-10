@@ -34,7 +34,7 @@
           <div class="welcome__avatar-copy">
             <p class="welcome__hint">
               Your initials work fine. A picture makes you easier to pick out on
-              a busy board.
+              a busy space.
             </p>
             <NbFileUploader
               v-if="!file"
@@ -81,11 +81,11 @@
  * The first thing a new person sees, once.
  *
  * Kept to what genuinely cannot wait: how the app looks, and who they are on
- * a board. Everything else a workspace needs is discoverable, and a welcome
+ * a space. Everything else a workspace needs is discoverable, and a welcome
  * that collects settings nobody has an opinion on yet is a form standing
  * between someone and the product.
  *
- * "Onboarded" is recorded on the actor rather than in the browser, so this
+ * "Onspaceed" is recorded on the actor rather than in the browser, so this
  * greets a person once rather than once per device.
  */
 import { computed, ref } from 'vue'
@@ -151,7 +151,7 @@ async function finish(how: 'tour' | 'dismiss'): Promise<void> {
     }
     // Recorded even when they changed nothing: the fact worth keeping is that
     // they were asked, so we do not ask again.
-    await auth.markOnboarded()
+    await auth.markOnspaceed()
     emit('done', how === 'tour')
   } catch (err) {
     // A failed picture upload must not trap someone in the welcome. Say what

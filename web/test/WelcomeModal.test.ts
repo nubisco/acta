@@ -1,7 +1,7 @@
 /**
  * The welcome, and the one thing it must never do: ask twice.
  *
- * Onboarding is recorded on the actor rather than in the browser, so these
+ * Onspaceing is recorded on the actor rather than in the browser, so these
  * assert the call is made even when the person changed nothing, and that a
  * failed picture upload does not trap them behind a modal they cannot close.
  */
@@ -9,11 +9,11 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
 const uploadAvatar = vi.fn(async () => ({ ok: true, avatar_url: '/a.png' }))
-const markOnboarded = vi.fn(async () => ({ ok: true }))
+const markOnspaceed = vi.fn(async () => ({ ok: true }))
 
 vi.mock('@/api/client', () => ({
   api: { uploadAvatar: (...a: unknown[]) => uploadAvatar(...(a as [])) },
-  auth: { markOnboarded: () => markOnboarded() },
+  auth: { markOnspaceed: () => markOnspaceed() },
   // humanise() narrows on this, so a mock without it turns every error path
   // into a different error than the one under test.
   ApiHttpError: class ApiHttpError extends Error {
@@ -61,7 +61,7 @@ describe('WelcomeModal', () => {
   beforeEach(() => {
     uploadAvatar.mockReset()
     uploadAvatar.mockResolvedValue({ ok: true, avatar_url: '/a.png' })
-    markOnboarded.mockClear()
+    markOnspaceed.mockClear()
     setTheme.mockClear()
   })
 
@@ -76,7 +76,7 @@ describe('WelcomeModal', () => {
     await button(view, 'Skip for now').trigger('click')
     await flushPromises()
 
-    expect(markOnboarded).toHaveBeenCalledTimes(1)
+    expect(markOnspaceed).toHaveBeenCalledTimes(1)
     expect(uploadAvatar).not.toHaveBeenCalled()
     expect(view.emitted('done')?.[0]).toEqual([false])
   })
@@ -86,7 +86,7 @@ describe('WelcomeModal', () => {
     await button(view, 'Show me around').trigger('click')
     await flushPromises()
 
-    expect(markOnboarded).toHaveBeenCalledTimes(1)
+    expect(markOnspaceed).toHaveBeenCalledTimes(1)
     expect(view.emitted('done')?.[0]).toEqual([true])
   })
 
@@ -124,7 +124,7 @@ describe('WelcomeModal', () => {
     // instead of failing on the same blob forever.
     await button(view, 'Show me around').trigger('click')
     await flushPromises()
-    expect(markOnboarded).toHaveBeenCalled()
+    expect(markOnspaceed).toHaveBeenCalled()
     expect(view.emitted('done')?.[0]).toEqual([true])
     // Once, from the first press. The second got through precisely because
     // there was no longer a picture to upload.

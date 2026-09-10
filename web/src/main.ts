@@ -73,11 +73,22 @@ const router = createRouter({
           meta: { title: 'Home' },
         },
         {
-          path: 'b/:boardKey',
-          name: 'board',
-          component: () => import('./views/BoardView.vue'),
+          path: 's/:spaceKey',
+          name: 'space',
+          component: () => import('./views/SpaceView.vue'),
           props: true,
-          meta: { crumb: 'board' },
+          meta: { crumb: 'space' },
+        },
+        {
+          // Not an alias: a redirect, so the address bar ends up saying what
+          // the thing is called now. Bookmarks and anything printed before
+          // the rename still land.
+          path: 'b/:spaceKey',
+          redirect: (to) => ({
+            name: 'space',
+            params: to.params,
+            query: to.query,
+          }),
         },
         {
           path: 'docs/:slug(.*)?',
@@ -114,7 +125,14 @@ const router = createRouter({
  * bookmarked. `/b/SU?item=SU-5` has to keep working, so an unprefixed path is
  * sent to the same place under the workspace rather than 404ing.
  */
-const LEGACY_PREFIXES = ['/b/', '/docs', '/search', '/activity', '/settings']
+const LEGACY_PREFIXES = [
+  '/s/',
+  '/b/',
+  '/docs',
+  '/search',
+  '/activity',
+  '/settings',
+]
 
 router.beforeEach(async (to) => {
   dismissConfirms()

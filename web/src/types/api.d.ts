@@ -2,7 +2,7 @@
 
 export interface IOverview {
   workspace: { id: string; name: string }
-  boards: {
+  spaces: {
     key: string
     name: string
     archived?: boolean
@@ -11,7 +11,7 @@ export interface IOverview {
   }[]
   labels: {
     group_name: string
-    board_key: string | null
+    space_key: string | null
     id: string
     name: string
     color: string
@@ -26,7 +26,7 @@ export interface IOverview {
   doc_roots: { slug: string; title: string; children: number }[]
 }
 
-export type TOverviewBoard = IOverview['boards'][number]
+export type TOverviewSpace = IOverview['spaces'][number]
 
 /** Provenance carried across from a migration source. */
 export interface IImportedMeta {
@@ -47,7 +47,7 @@ export interface ICommentRow {
   imported?: IImportedMeta
 }
 
-export interface IBoardItemRow {
+export interface ISpaceItemRow {
   key: string
   title: string
   list: string
@@ -67,7 +67,7 @@ export interface IBoardItemRow {
 
 export interface IItemDetail {
   key: string
-  board: string
+  space: string
   list: string
   title: string
   description: string
@@ -137,7 +137,7 @@ export interface ISearchResult {
   ref: string
   title: string
   snippet: string
-  board?: string
+  space?: string
 }
 
 export interface ILiveEvent {

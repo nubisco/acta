@@ -22,10 +22,10 @@
         hint="Cards it creates are attributed to this name."
       />
       <NbSelect
-        id="field-connection-board"
-        v-model="board"
-        label="Board"
-        :options="boardOptions"
+        id="field-connection-space"
+        v-model="space"
+        label="Space"
+        :options="spaceOptions"
       />
       <NbSelect
         id="field-connection-list"
@@ -122,7 +122,7 @@ const emit = defineEmits<{
 const ws = useWorkspace()
 
 const name = ref('GitHub')
-const board = ref('')
+const space = ref('')
 const list = ref('')
 const labels = ref<string[]>([])
 // Chips rather than a comma-separated string: the names are long, a
@@ -139,7 +139,7 @@ const saving = ref(false)
 const serverError = ref('')
 const nameInput = ref<InstanceType<typeof NbTextInput> | null>(null)
 
-const isDirty = computed(() => board.value !== '' || repos.value.length > 0)
+const isDirty = computed(() => space.value !== '' || repos.value.length > 0)
 
 const repoOptions = computed(() =>
   knownRepos.value.map((name) => ({ label: name, value: name })),
@@ -152,23 +152,23 @@ function addRepo(value: string): void {
   if (!repos.value.includes(name)) repos.value = [...repos.value, name]
 }
 
-const boardOptions = computed(() =>
-  (ws.overview.value?.boards ?? []).map((b) => ({
+const spaceOptions = computed(() =>
+  (ws.overview.value?.spaces ?? []).map((b) => ({
     label: b.name,
     value: b.key,
   })),
 )
 
 const listOptions = computed(() => {
-  const selected = ws.overview.value?.boards.find((b) => b.key === board.value)
+  const selected = ws.overview.value?.spaces.find((b) => b.key === space.value)
   return (selected?.lists ?? []).map((l) => ({ label: l.name, value: l.name }))
 })
 
-// Only labels reachable from the chosen board: the server refuses the rest,
+// Only labels reachable from the chosen space: the server refuses the rest,
 // and offering them here would just move the error later.
 const labelOptions = computed(() =>
   (ws.overview.value?.labels ?? [])
-    .filter((l) => l.board_key === null || l.board_key === board.value)
+    .filter((l) => l.space_key === null || l.space_key === space.value)
     .map((l) => ({ label: l.name, value: l.name })),
 )
 
@@ -177,7 +177,7 @@ watch(
   (open) => {
     if (open) {
       name.value = 'GitHub'
-      board.value = ws.overview.value?.boards[0]?.key ?? ''
+      space.value = ws.overview.value?.spaces[0]?.key ?? ''
       list.value = ''
       labels.value = []
       repos.value = []
@@ -188,15 +188,15 @@ watch(
   },
 )
 
-// Changing board invalidates a list and labels picked for the previous one.
-watch(board, () => {
+// Changing space invalidates a list and labels picked for the previous one.
+watch(space, () => {
   list.value = ''
   labels.value = []
 })
 
 async function submit(): Promise<void> {
-  if (!board.value) {
-    serverError.value = 'Choose a board for incoming issues'
+  if (!space.value) {
+    serverError.value = 'Choose a space for incoming issues'
     return
   }
   saving.value = true
@@ -208,7 +208,7 @@ async function submit(): Promise<void> {
         op_id: newOpId(),
         provider: 'github',
         name: name.value.trim() || 'GitHub',
-        board: board.value,
+        space: space.value,
         list: list.value || undefined,
         config: {
           labels: labels.value.length > 0 ? labels.value : undefined,

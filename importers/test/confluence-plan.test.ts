@@ -140,7 +140,7 @@ describe('planConfluenceImport', () => {
     const stagewright = plan.pages.find((p) => p.pageId === '102')!
     expect(stagewright.op.op === 'create' && stagewright.op.layout).toBe('wide')
     expect(stagewright.op.op === 'create' && stagewright.op.body).toContain(
-      '[[board:SW]]',
+      '[[space:SW]]',
     )
     expect(stagewright.issues.unknownMacros).toEqual(['toc'])
   })

@@ -2,12 +2,12 @@ import type { IWalkthrough, IWalkthroughLabels } from '@nubisco/ui'
 
 /**
  * First-run walkthrough. Targets are `v-nb-tour-step` ids stamped in App.vue
- * and BoardView.vue; a step whose target is not on screen is dropped, which
- * is why App starts the tour from a board rather than wherever the person
+ * and SpaceView.vue; a step whose target is not on screen is dropped, which
+ * is why App starts the tour from a space rather than wherever the person
  * happened to be.
  *
  * Written for someone who already knows this kind of tool. That means it does
- * not explain what a board or a card is, and spends its steps on the places
+ * not explain what a space or a card is, and spends its steps on the places
  * Acta differs or where the equivalent thing lives under another name. It
  * names no other product: a tour that opens by comparing itself to a
  * competitor teaches the competitor, and reads as insecure besides.
@@ -21,22 +21,22 @@ export const introTour: IWalkthrough = {
   steps: [
     {
       title: 'A quick tour',
-      body: 'You already know how boards and cards work. This points out where Acta puts things, and the few places it works differently. About a minute.',
+      body: 'You already know how spaces and cards work. This points out where Acta puts things, and the few places it works differently. About a minute.',
     },
     {
-      target: 'board-views',
-      title: 'One board, four ways to look at it',
+      target: 'space-views',
+      title: 'One space, four ways to look at it',
       body: 'Columns, a sortable table, a calendar of due dates, or a timeline. Same cards and same filters throughout, so switching never means rebuilding your view.',
       placement: 'bottom',
     },
     {
-      target: 'board-card',
+      target: 'space-card',
       title: 'Every card has a key',
-      body: 'Keys like DE-1 are permanent and searchable, so a card can be referred to in a commit, a document, or a conversation. Click a card to open its details beside the board; right-click for the quick actions, including moving it to the top or bottom of its list.',
+      body: 'Keys like DE-1 are permanent and searchable, so a card can be referred to in a commit, a document, or a conversation. Click a card to open its details beside the space; right-click for the quick actions, including moving it to the top or bottom of its list.',
       placement: 'right',
     },
     {
-      target: 'board-filters',
+      target: 'space-filters',
       title: 'Filtering',
       body: 'Labels, people and status live in a panel rather than the toolbar, so labels keep their colours and you can pick several people at once. The button counts what is currently hiding cards from you.',
       placement: 'bottom',
@@ -44,7 +44,7 @@ export const introTour: IWalkthrough = {
     {
       target: 'nav-docs',
       title: 'Documents live next to the work',
-      body: 'Your knowledge base is here, in the same workspace and the same search as the boards. Pages are versioned, so you can compare any two versions and see who changed what.',
+      body: 'Your knowledge base is here, in the same workspace and the same search as the spaces. Pages are versioned, so you can compare any two versions and see who changed what.',
       placement: 'right',
     },
     {
@@ -67,7 +67,7 @@ export const introTour: IWalkthrough = {
     },
     {
       title: 'Two things worth knowing',
-      body: 'Archiving is the reversible one: a card must be archived before it can be deleted, so nothing disappears in a single click. And boards can be starred, which is what fills the favourites section on the home page.',
+      body: 'Archiving is the reversible one: a card must be archived before it can be deleted, so nothing disappears in a single click. And spaces can be starred, which is what fills the favourites section on the home page.',
     },
   ],
 }

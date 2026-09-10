@@ -8,7 +8,7 @@
 import type { TItemOp, TOpResult } from '@nubisco/acta-shared'
 import type { ActaClient } from '../lib/client'
 import type { ImportReport } from '../lib/report'
-import type { IPlannedAttachment, ITrelloBoardPlan, ITrelloPlan } from './plan'
+import type { IPlannedAttachment, ITrelloSpacePlan, ITrelloPlan } from './plan'
 
 export interface ITrelloRunOptions {
   dryRun: boolean
@@ -38,9 +38,9 @@ export function printTrelloPlan(plan: ITrelloPlan): void {
   console.log('\n== plan ==')
   if (plan.labelOps.length > 0)
     console.log(`workspace label ops: ${plan.labelOps.length}`)
-  for (const board of plan.boards) {
+  for (const board of plan.spaces) {
     console.log(`\nboard ${board.key} (${board.name})`)
-    for (const op of board.boardOps) {
+    for (const op of board.spaceOps) {
       if (op.op !== 'list_create') continue
       const items = board.items.filter((i) => i.listName === op.name)
       console.log(
@@ -52,7 +52,7 @@ export function printTrelloPlan(plan: ITrelloPlan): void {
 
 /** Board + list creation. Runs before label ops (board groups need the board). */
 async function runBoardStructure(
-  board: ITrelloBoardPlan,
+  board: ITrelloSpacePlan,
   client: ActaClient,
   report: ImportReport,
   opts: ITrelloRunOptions,
@@ -82,11 +82,11 @@ async function runBoardStructure(
   if (opts.dryRun) {
     section.created(
       'lists',
-      board.boardOps.filter((op) => op.op === 'list_create').length,
+      board.spaceOps.filter((op) => op.op === 'list_create').length,
     )
   } else {
-    const results = resultsById(await client.writeBoards(board.boardOps))
-    for (const op of board.boardOps) {
+    const results = resultsById(await client.writeBoards(board.spaceOps))
+    for (const op of board.spaceOps) {
       const result = results.get(op.op_id)
       if (op.op === 'create') {
         if (result && !result.ok)
@@ -103,7 +103,7 @@ async function runBoardStructure(
 }
 
 async function runBoardItems(
-  board: ITrelloBoardPlan,
+  board: ITrelloSpacePlan,
   client: ActaClient,
   report: ImportReport,
   opts: ITrelloRunOptions,
@@ -223,7 +223,7 @@ async function runBoardItems(
     report.mappings[`trello:${item.cardId}`] = {
       key,
       predicted: opts.dryRun || undefined,
-      board: board.key,
+      space: board.key,
       list: item.listName,
       short_link: item.shortLink,
       created_at: item.createdAt,
@@ -234,7 +234,7 @@ async function runBoardItems(
 }
 
 async function runAttachments(
-  board: ITrelloBoardPlan,
+  board: ITrelloSpacePlan,
   keyByCard: Map<string, string>,
   client: ActaClient,
   opts: ITrelloRunOptions,
@@ -350,7 +350,7 @@ export async function runTrelloImport(
 ): Promise<void> {
   // Boards and lists first: board-scoped label groups and item creates both
   // reference them.
-  for (const board of plan.boards) {
+  for (const board of plan.spaces) {
     await runBoardStructure(board, client, report, opts)
   }
   if (plan.labelOps.length > 0) {
@@ -366,7 +366,7 @@ export async function runTrelloImport(
       }
     }
   }
-  for (const board of plan.boards) {
+  for (const board of plan.spaces) {
     await runBoardItems(board, client, report, opts)
   }
 }
@@ -405,7 +405,7 @@ export async function runTrelloFixComments(
   report: ImportReport,
   opts: { dryRun: boolean },
 ): Promise<void> {
-  for (const board of plan.boards) {
+  for (const board of plan.spaces) {
     const withComments = board.items.filter((i) => i.comments.length > 0)
     if (withComments.length === 0) continue
     const section = report.section(`fix comments ${board.key} (${board.name})`)
