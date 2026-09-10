@@ -24,9 +24,10 @@ bucket_name = "acta-attachments"
 
 [vars]
 ACTA_WORKSPACE = "Nubisco"
-ACTA_ADMIN_EMAIL = "tools@nubisco.io"
-ACTA_ADMIN_HANDLE = "jose"
-ACTA_ADMIN_NAME = "José Silva"
+# No ACTA_ADMIN_* here: identity comes from platform.nubisco.io via SSO, and
+# the first person to sign in to a fresh workspace is made its admin. These
+# remain supported, and are still required, for an instance running on email
+# one-time codes alone, where there is no provider to vouch for anyone.
 
 [observability]
 enabled = true

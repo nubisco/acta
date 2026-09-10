@@ -165,6 +165,69 @@ describe('external sso', () => {
     )
   })
 
+  // An SSO-backed instance sets no ACTA_ADMIN_EMAIL, because identity belongs
+  // to the provider. Without a rule for it, the first person to sign in to a
+  // fresh install lands in a workspace with no administrator and no way to
+  // ever get one.
+  it('makes the first person through the door an admin when nothing seeded one', async () => {
+    const bare = await openDb(':memory:')
+    const noSeedApp = (await createApp(bare, {
+      // No adminEmail: the shape an SSO-only deployment ships in.
+      bootstrap: {},
+      dataDir: `/tmp/acta-sso-test-${Math.random().toString(36).slice(2)}`,
+      fetchImpl: idpFetch,
+      sso: {
+        issuer: ISSUER,
+        appId: 'acta',
+        authorizeUrl: `${ISSUER}/api/auth/sso`,
+        autoProvision: true,
+      },
+    })) as never
+
+    expect(
+      await bare.query("SELECT id FROM actor WHERE kind = 'human'"),
+    ).toHaveLength(0)
+
+    const signIn = async (email: string) => {
+      const start = await (noSeedApp as typeof app).request(
+        'https://acta.test/api/v1/auth/sso/start',
+      )
+      const state = stateCookieOf(start)
+      const token = await signToken({
+        sub: email,
+        email,
+        iss: ISSUER,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 300,
+      })
+      return (noSeedApp as typeof app).request(
+        `https://acta.test/api/v1/auth/sso/callback?token=${encodeURIComponent(token)}&state=${state.value}`,
+        { headers: { cookie: state.header } },
+      )
+    }
+
+    const first = await signIn('first@nubisco.io')
+    expect(first.status).toBe(302)
+    expect(
+      (
+        await bare.query<{ role: string }>(
+          "SELECT role FROM actor WHERE email = 'first@nubisco.io'",
+        )
+      )[0].role,
+    ).toBe('admin')
+
+    // And only into a vacuum. Once an admin exists the rule is inert, or it
+    // would be an escalation path on any established workspace.
+    await signIn('second@nubisco.io')
+    expect(
+      (
+        await bare.query<{ role: string }>(
+          "SELECT role FROM actor WHERE email = 'second@nubisco.io'",
+        )
+      )[0].role,
+    ).toBe('member')
+  })
+
   it('rejects state mismatch, bad issuer, and expired tokens', async () => {
     const start = await app.request('https://acta.test/api/v1/auth/sso/start')
     const state = stateCookieOf(start)

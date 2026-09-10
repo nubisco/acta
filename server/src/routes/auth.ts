@@ -112,6 +112,19 @@ export function authRoutes(sso?: ISsoRuntime): Hono<IAuthEnv> {
         [workspaceId, base],
       )
       const handle = clash.length > 0 ? `${base}-${id.slice(-4)}` : base
+      // An instance that delegates identity to an SSO provider seeds no admin
+      // of its own (see bootstrap), so without this the first person to sign
+      // in to a fresh install becomes a member of a workspace that has no
+      // administrator, and nothing can ever be administered. Only ever
+      // promotes into a vacuum: the moment one admin exists this is inert,
+      // so it cannot be used to escalate on an established workspace.
+      const admins = await db.query(
+        `SELECT id FROM actor
+          WHERE workspace_id = ? AND kind = 'human' AND role = 'admin'
+                AND disabled = 0 LIMIT 1`,
+        [workspaceId],
+      )
+      const firstAdmin = admins.length === 0
       await db.run(
         `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
          VALUES (?, ?, 'human', ?, ?, ?, ?, ?)`,
@@ -121,7 +134,7 @@ export function authRoutes(sso?: ISsoRuntime): Hono<IAuthEnv> {
           handle,
           claims.name ?? claims.email,
           claims.email,
-          claims.role === 'admin' ? 'admin' : 'member',
+          claims.role === 'admin' || firstAdmin ? 'admin' : 'member',
           now(),
         ],
       )
@@ -147,7 +160,9 @@ export function authRoutes(sso?: ISsoRuntime): Hono<IAuthEnv> {
         'member.provisioned',
         'actor',
         id,
-        `provisioned member @${handle} via SSO`,
+        firstAdmin
+          ? `provisioned @${handle} via SSO as the workspace's first admin`
+          : `provisioned member @${handle} via SSO`,
       )
       flushPendingEvents()
       member = { id, disabled: 0 }

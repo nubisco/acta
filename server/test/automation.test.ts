@@ -105,7 +105,7 @@ describe('webhooks', () => {
     // Recreate the app with a failing fetch.
     db = await openDb(':memory:')
     await createApp(db, {
-      bootstrap: { adminHandle: 'jose' },
+      bootstrap: { adminHandle: 'jose', adminEmail: 'jose@nubisco.io' },
       dataDir: `/tmp/acta-test-${Math.random().toString(36).slice(2)}`,
       fetchImpl: fakeFetch(false),
       webhookBackoffMs: 1,

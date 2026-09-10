@@ -79,34 +79,53 @@ export async function bootstrapWorkspace(
       'INSERT INTO workspace (id, name, slug, created_at) VALUES (?, ?, ?, ?)',
       [workspaceId, name, await uniqueSlug(db, name, workspaceId), ts],
     )
-    await db.run(
-      `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
-       VALUES (?, ?, 'human', ?, ?, ?, 'admin', ?)`,
-      [
-        adminId,
-        workspaceId,
-        opts.adminHandle ?? 'admin',
-        opts.adminName ?? 'Admin',
-        opts.adminEmail ?? null,
-        ts,
-      ],
-    )
+    // Only when there is an address to reach them at. An admin actor with a
+    // null email is a seat nobody can sit in: OTP finds people by email and
+    // SSO matches on it, so a seeded admin without one locks the workspace
+    // into having an administrator that no human can ever be. Instances that
+    // delegate identity to an SSO provider leave this unset and get their
+    // administrator from the first person through the door instead; see
+    // `firstAdmin` in the SSO callback.
+    if (opts.adminEmail) {
+      await db.run(
+        `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
+         VALUES (?, ?, 'human', ?, ?, ?, 'admin', ?)`,
+        [
+          adminId,
+          workspaceId,
+          opts.adminHandle ?? 'admin',
+          opts.adminName ?? 'Admin',
+          opts.adminEmail,
+          ts,
+        ],
+      )
+    }
+    const systemId = newId('act')
     await db.run(
       `INSERT INTO actor (id, workspace_id, kind, handle, name, role, created_at)
        VALUES (?, ?, 'system', 'acta', 'Acta', 'member', ?)`,
-      [newId('act'), workspaceId, ts],
+      [systemId, workspaceId, ts],
     )
-    const seedCtx: ICtx = {
-      db,
-      workspaceId,
-      actor: {
-        id: adminId,
-        kind: 'human',
-        handle: opts.adminHandle ?? 'admin',
-        role: 'admin',
-        scopes: ['read', 'write', 'admin'],
-      },
-    }
+    // Attributed to whoever exists. Without an adminEmail there is no admin
+    // actor to credit the default labels to, and crediting them to an id that
+    // was never inserted is a foreign key away from failing the whole
+    // bootstrap.
+    const seeder = opts.adminEmail
+      ? {
+          id: adminId,
+          kind: 'human' as const,
+          handle: opts.adminHandle ?? 'admin',
+          role: 'admin' as const,
+          scopes: ['read', 'write', 'admin'],
+        }
+      : {
+          id: systemId,
+          kind: 'system' as const,
+          handle: 'acta',
+          role: 'member' as const,
+          scopes: ['read', 'write', 'admin'],
+        }
+    const seedCtx: ICtx = { db, workspaceId, actor: seeder }
     await seedDefaultLabels(seedCtx)
   })
   return workspaceId
