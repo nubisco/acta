@@ -260,6 +260,7 @@ import { introTour, tourLabels } from '@/lib/tour'
 import {
   sidebarDefaultFor,
   useInspector,
+  useSpaceFilters,
   useUiState,
   useWorkspace,
 } from '@/stores/workspace'
@@ -491,20 +492,33 @@ const trail = computed<ICrumb[]>(() => {
 })
 
 const inspectorVisible = ref(false)
-// The inspector only stays open while it has an item; an empty-but-open
-// inspector is dead space. The docs tree lives in the docs view itself.
-watch(inspector.itemKey, (key) => {
-  inspectorVisible.value = key !== null
+const spaceFilters = useSpaceFilters()
+
+/**
+ * The side panel is open while it has something to show. That used to mean a
+ * card and nothing else, so the filter panel rendered into a region the shell
+ * had never opened: in the DOM, inert and invisible.
+ */
+const panelHasContent = computed(
+  () => inspector.itemKey.value !== null || spaceFilters.open.value,
+)
+watch(panelHasContent, (has) => (inspectorVisible.value = has), {
+  immediate: true,
 })
 watch(
   () => route.name,
   () => {
+    // Filters belong to the space you were looking at, so leaving takes them
+    // with you; a card stays, because it can be deep-linked from anywhere.
+    spaceFilters.open.value = false
     if (!inspector.itemKey.value) inspectorVisible.value = false
   },
-  { immediate: true },
 )
+// Closing the panel from the shell's own control closes whatever it held.
 watch(inspectorVisible, (visible) => {
-  if (!visible) inspector.close()
+  if (visible) return
+  inspector.close()
+  spaceFilters.open.value = false
 })
 
 async function signOut(): Promise<void> {

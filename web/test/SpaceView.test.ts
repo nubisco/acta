@@ -64,6 +64,10 @@ const overview = {
 // Shared so a test can point the panel at a card and assert the space marks
 // it, the same way `overview` above is shared: vi.mock's factory runs at
 // import time, after these declarations.
+// Shared with the shell in the real app, which is what decides whether the
+// side panel is open at all.
+const filtersOpen = ref(false)
+
 const inspectorMock = {
   open: vi.fn(),
   close: vi.fn(),
@@ -80,6 +84,7 @@ vi.mock('@/stores/workspace', () => ({
   }),
   useUiState: () => ({ newSpaceOpen: { value: false } }),
   useInspector: () => inspectorMock,
+  useSpaceFilters: () => ({ open: filtersOpen }),
 }))
 
 vi.mock('vue-router', () => ({
@@ -154,6 +159,8 @@ describe('SpaceView card menu', () => {
     inspectorMock.itemKey.value = null
     inspectorMock.open.mockClear()
     inspectorMock.close.mockClear()
+    // Module state in the real app too, so it persists unless reset.
+    filtersOpen.value = false
   })
 
   it('moving to the top actually writes a move', async () => {

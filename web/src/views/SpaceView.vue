@@ -289,7 +289,12 @@ import { humanise, useLoadState } from '@/lib/state'
 import { useViewCommands } from '@/lib/commands'
 import { labelVariants } from '@/lib/labels'
 import { roleColor } from '@/lib/colors'
-import { useInspector, useUiState, useWorkspace } from '@/stores/workspace'
+import {
+  useInspector,
+  useSpaceFilters,
+  useUiState,
+  useWorkspace,
+} from '@/stores/workspace'
 import type { NbMenu } from '@nubisco/ui'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import NewItemModal from '@/components/NewItemModal.vue'
@@ -321,7 +326,7 @@ const inspectorSlot = useShellSlot('inspector')
 const topbarActions = useShellSlot('topbar-right')
 
 const items = ref<ISpaceItemRow[]>([])
-const filtersOpen = ref(false)
+const filtersOpen = useSpaceFilters().open
 const labelFilter = ref<string[]>([])
 const assigneeFilter = ref<string[]>([])
 const stateFilter = ref('open')

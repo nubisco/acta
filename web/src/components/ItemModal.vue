@@ -42,6 +42,14 @@
             {{ it.lifecycle.value.text }}
           </NbBadge>
           <span class="item-modal__actions">
+            <NbInlineLoading
+              :status="it.save.status.value"
+              label="Saving"
+              finished-label="Saved"
+              error-label="Not saved"
+              :dwell="1200"
+              reserve-space
+            />
             <!-- Back to the side panel, on the same card. The pair reads as
                  one control that toggles size rather than two ways to open a
                  card that happen to look alike. -->
@@ -87,6 +95,90 @@
               @click="confirmDelete"
             />
           </span>
+        </div>
+
+        <!-- The card's own data, at the top of the card, the way every tool
+             that shows a card in a window puts it. In a right-hand column it
+             competed with the conversation for the eye and left the widest
+             part of the modal holding a comment box. -->
+        <div class="item-modal__props">
+          <NbField v-slot="{ id }" label="Status" orientation="stack">
+            <NbSelect
+              :id="id"
+              v-model="it.draft.status"
+              size="sm"
+              :options="[...ITEM_STATUS_OPTIONS]"
+              @change="it.commitStatus"
+            />
+          </NbField>
+          <NbField v-slot="{ id }" label="List" orientation="stack">
+            <NbSelect
+              :id="id"
+              v-model="it.draft.list"
+              size="sm"
+              :options="it.listOptions.value"
+              @change="it.commitList"
+            />
+          </NbField>
+          <NbField v-slot="{ id }" label="Due" orientation="stack">
+            <NbDatePicker
+              :id="id"
+              v-model="it.draft.due"
+              size="sm"
+              @change="it.commitDue"
+            />
+          </NbField>
+          <NbField v-slot="{ id }" label="Assignees" orientation="stack">
+            <NbSelect
+              :id="id"
+              v-model="it.draft.assignees"
+              size="sm"
+              multiple
+              :options="it.assigneeOptions.value"
+              @change="it.commitAssignees"
+            >
+              <template #option="{ option }">
+                <ActorChip :handle="String(option.value)" />
+              </template>
+              <template #value="{ values }">
+                <span class="assignee-values">
+                  <ActorChip
+                    v-for="handle in values"
+                    :key="String(handle)"
+                    :handle="String(handle)"
+                  />
+                </span>
+              </template>
+            </NbSelect>
+          </NbField>
+          <NbField v-slot="{ id }" label="Labels" orientation="stack">
+            <NbSelect
+              :id="id"
+              v-model="it.draft.labels"
+              size="sm"
+              multiple
+              :options="it.labelOptions.value"
+              @change="it.commitLabels"
+            >
+              <template #option="{ option }">
+                <LabelBadge :name="String(option.value)" />
+              </template>
+              <template #value="{ values }">
+                <span class="label-values">
+                  <LabelBadge
+                    v-for="name in values"
+                    :key="String(name)"
+                    :name="String(name)"
+                  />
+                </span>
+              </template>
+            </NbSelect>
+          </NbField>
+          <NbDefinitionList
+            v-if="it.linkFacts.value.length > 0"
+            :items="it.linkFacts.value"
+            layout="stacked"
+          />
         </div>
 
         <ProvenanceNote
@@ -187,7 +279,12 @@
             @changed="it.load"
           />
         </section>
+      </div>
 
+      <!-- The conversation gets the column. It is the part of a card that
+           grows without limit, so it is the part that needs its own scroll
+           rather than a strip under everything else. -->
+      <aside class="item-modal__conversation" aria-label="Comments">
         <section class="item-modal__section">
           <h3>Comments</h3>
           <CommentThread
@@ -197,94 +294,6 @@
             @submit="it.addComment"
           />
         </section>
-      </div>
-
-      <aside class="item-modal__aside" aria-label="Item properties">
-        <NbInlineLoading
-          :status="it.save.status.value"
-          label="Saving"
-          finished-label="Saved"
-          error-label="Not saved"
-          :dwell="1200"
-          reserve-space
-        />
-        <NbField v-slot="{ id }" label="Status" orientation="stack">
-          <NbSelect
-            :id="id"
-            v-model="it.draft.status"
-            size="sm"
-            :options="[...ITEM_STATUS_OPTIONS]"
-            @change="it.commitStatus"
-          />
-        </NbField>
-        <NbField v-slot="{ id }" label="List" orientation="stack">
-          <NbSelect
-            :id="id"
-            v-model="it.draft.list"
-            size="sm"
-            :options="it.listOptions.value"
-            @change="it.commitList"
-          />
-        </NbField>
-        <NbField v-slot="{ id }" label="Due" orientation="stack">
-          <NbDatePicker
-            :id="id"
-            v-model="it.draft.due"
-            size="sm"
-            @change="it.commitDue"
-          />
-        </NbField>
-        <NbField v-slot="{ id }" label="Assignees" orientation="stack">
-          <NbSelect
-            :id="id"
-            v-model="it.draft.assignees"
-            size="sm"
-            multiple
-            :options="it.assigneeOptions.value"
-            @change="it.commitAssignees"
-          >
-            <template #option="{ option }">
-              <ActorChip :handle="String(option.value)" />
-            </template>
-            <template #value="{ values }">
-              <span class="assignee-values">
-                <ActorChip
-                  v-for="handle in values"
-                  :key="String(handle)"
-                  :handle="String(handle)"
-                />
-              </span>
-            </template>
-          </NbSelect>
-        </NbField>
-        <NbField v-slot="{ id }" label="Labels" orientation="stack">
-          <NbSelect
-            :id="id"
-            v-model="it.draft.labels"
-            size="sm"
-            multiple
-            :options="it.labelOptions.value"
-            @change="it.commitLabels"
-          >
-            <template #option="{ option }">
-              <LabelBadge :name="String(option.value)" />
-            </template>
-            <template #value="{ values }">
-              <span class="label-values">
-                <LabelBadge
-                  v-for="name in values"
-                  :key="String(name)"
-                  :name="String(name)"
-                />
-              </span>
-            </template>
-          </NbSelect>
-        </NbField>
-        <NbDefinitionList
-          v-if="it.linkFacts.value.length > 0"
-          :items="it.linkFacts.value"
-          layout="stacked"
-        />
       </aside>
     </div>
   </NbModal>
@@ -386,9 +395,39 @@ function commitDescription(): void {
 <style scoped lang="scss">
 .item-modal {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 16rem;
+  /* The conversation gets a real column now, not a 16rem strip: it is the
+     part of a card that grows without limit. The card's own fields moved to
+     the top of the main column, where they are read once rather than
+     competing with the thread for attention. */
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
   gap: var(--nb-spacing-24);
   align-items: start;
+
+  @media (max-inline-size: 60rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Fields flow across the top instead of stacking down a sidebar. Each keeps
+     a floor so a label like "Assignees" never wraps to its own line, and they
+     wrap as a group when the modal is narrow. */
+  &__props {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: var(--nb-spacing-8) var(--nb-spacing-16);
+    align-items: start;
+    padding-block-end: var(--nb-spacing-12);
+    border-block-end: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
+  }
+
+  &__conversation {
+    display: grid;
+    gap: var(--nb-spacing-8);
+    min-inline-size: 0;
+    /* Its own scroll, so a long thread does not push the card's own data off
+       the top of the window. */
+    max-block-size: min(70vh, 44rem);
+    overflow-y: auto;
+  }
 
   &__loading {
     display: grid;
@@ -525,29 +564,8 @@ function commitDescription(): void {
     }
   }
 
-  &__aside {
-    display: grid;
-    gap: var(--nb-spacing-8);
-    border-inline-start: 1px solid var(--nb-c-border);
-    padding-inline-start: var(--nb-spacing-16);
-  }
-
-  &__avatars,
-  &__chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--nb-spacing-4);
-  }
-
   @media (max-width: 42rem) {
     grid-template-columns: 1fr;
-
-    &__aside {
-      border-inline-start: 0;
-      padding-inline-start: 0;
-      border-block-start: 1px solid var(--nb-c-border);
-      padding-block-start: var(--nb-spacing-16);
-    }
   }
 }
 
