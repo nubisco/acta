@@ -7,6 +7,7 @@
 import {
   ADDITIVE_COLUMNS,
   FTS_COLUMN_RENAME,
+  LINK_REBUILD,
   REINDEX_FTS,
   RENAMES,
   SCHEMA_SQL,
@@ -86,6 +87,7 @@ export class BunSqliteDriver implements ISqlDriver {
         if (!renameAlreadyApplied(err)) throw err
       }
     }
+    this.rebuildLinkTable()
     this.renameFtsColumn()
     this.db.exec(SCHEMA_SQL)
     for (const statement of ADDITIVE_COLUMNS) {
@@ -95,6 +97,18 @@ export class BunSqliteDriver implements ISqlDriver {
         if (!String(err).includes('duplicate column')) throw err
       }
     }
+  }
+
+  /** See LINK_REBUILD: a CHECK constraint cannot be altered in place. */
+  private rebuildLinkTable(): void {
+    let needed: boolean
+    try {
+      needed = this.db.query(LINK_REBUILD.detect).all().length > 0
+    } catch {
+      return // No link table yet; the schema below creates it correctly.
+    }
+    if (!needed) return
+    for (const step of LINK_REBUILD.steps) this.db.exec(step)
   }
 
   /** FTS5 has no RENAME COLUMN, so the index is rebuilt from the rows. */
@@ -196,6 +210,7 @@ export class D1Driver implements ISqlDriver {
         if (!renameAlreadyApplied(err)) throw err
       }
     }
+    await this.rebuildLinkTable()
     await this.renameFtsColumn()
     for (const statement of schemaStatements()) {
       if (statement.startsWith('PRAGMA')) continue
@@ -217,6 +232,19 @@ export class D1Driver implements ISqlDriver {
       }
     }
     this.migrated = true
+  }
+
+  /** See LINK_REBUILD: a CHECK constraint cannot be altered in place. */
+  private async rebuildLinkTable(): Promise<void> {
+    let needed: boolean
+    try {
+      const res = await this.db.prepare(LINK_REBUILD.detect).all()
+      needed = (res.results?.length ?? 0) > 0
+    } catch {
+      return // No link table yet; the schema below creates it correctly.
+    }
+    if (!needed) return
+    for (const step of LINK_REBUILD.steps) await this.db.prepare(step).run()
   }
 
   /** FTS5 has no RENAME COLUMN, so the index is rebuilt from the rows. */

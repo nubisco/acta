@@ -388,7 +388,6 @@ export const RENAMES = [
   // Values, not just identifiers. A rename that moves the columns and leaves
   // the rows saying "board" produces an activity feed and a set of links that
   // quietly stop matching anything the code now asks for.
-  "UPDATE link SET ref_type = 'space' WHERE ref_type = 'board'",
   "UPDATE event SET entity = 'space' WHERE entity = 'board'",
   "UPDATE event SET verb = 'space' || substr(verb, 6) WHERE verb LIKE 'board.%'",
   // Only the leading noun of a summary the server itself wrote ("created
@@ -412,6 +411,38 @@ export const RENAMES = [
  * there, since dropping and rebuilding a search index on every boot would be
  * an expensive way to change nothing.
  */
+/**
+ * The link table is REBUILT, not updated.
+ *
+ * Its CHECK constraint lists the permitted ref_types and still says 'board',
+ * so an UPDATE to 'space' is refused by the table itself, and SQLite cannot
+ * alter a CHECK in place. Guarded on the old constraint still being there,
+ * because dropping and recreating a table on every boot would leave a window,
+ * however brief, where a request could find no link table at all.
+ */
+export const LINK_REBUILD = {
+  /** Truthy while the table still permits 'board' rather than 'space'. */
+  detect: `SELECT 1 AS needed FROM sqlite_master
+             WHERE type = 'table' AND name = 'link' AND sql LIKE '%''board''%'`,
+  steps: [
+    `CREATE TABLE link_rebuild (
+       workspace_id TEXT NOT NULL REFERENCES workspace(id),
+       src_kind TEXT NOT NULL CHECK (src_kind IN ('item', 'doc', 'comment')),
+       src_id TEXT NOT NULL,
+       ref_type TEXT NOT NULL CHECK (ref_type IN ('item', 'space', 'doc', 'actor', 'query')),
+       target TEXT NOT NULL,
+       PRIMARY KEY (src_kind, src_id, ref_type, target)
+     )`,
+    `INSERT OR IGNORE INTO link_rebuild (workspace_id, src_kind, src_id, ref_type, target)
+       SELECT workspace_id, src_kind, src_id,
+              CASE ref_type WHEN 'board' THEN 'space' ELSE ref_type END,
+              target
+         FROM link`,
+    'DROP TABLE link',
+    'ALTER TABLE link_rebuild RENAME TO link',
+  ],
+}
+
 export const FTS_COLUMN_RENAME = {
   detect: 'SELECT space_key FROM fts LIMIT 1',
   drop: 'DROP TABLE IF EXISTS fts',

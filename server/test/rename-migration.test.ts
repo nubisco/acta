@@ -11,6 +11,7 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import { unlinkSync } from 'node:fs'
 import { openDb, type BunSqliteDriver } from '../src/db'
+import { LINK_REBUILD } from '../src/db/schema'
 
 const paths: string[] = []
 afterEach(() => {
@@ -60,8 +61,11 @@ async function legacyDb(): Promise<string> {
     CREATE TABLE board_star (workspace_id TEXT NOT NULL, actor_id TEXT NOT NULL,
       board_id TEXT NOT NULL REFERENCES board(id), created_at INTEGER NOT NULL,
       PRIMARY KEY (actor_id, board_id));
+    -- With the CHECK constraint production actually has. Without it the
+    -- fixture cannot catch an UPDATE that the real table would refuse.
     CREATE TABLE link (workspace_id TEXT NOT NULL, src_kind TEXT NOT NULL, src_id TEXT NOT NULL,
-      ref_type TEXT NOT NULL, target TEXT NOT NULL, PRIMARY KEY (src_kind, src_id, ref_type, target));
+      ref_type TEXT NOT NULL CHECK (ref_type IN ('item', 'board', 'doc', 'actor', 'query')),
+      target TEXT NOT NULL, PRIMARY KEY (src_kind, src_id, ref_type, target));
     CREATE TABLE event (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, actor_id TEXT NOT NULL,
       verb TEXT NOT NULL, entity TEXT NOT NULL, entity_id TEXT NOT NULL, summary TEXT NOT NULL,
       created_at INTEGER NOT NULL);
@@ -183,5 +187,32 @@ describe('board -> space migration', () => {
     expect(
       await db.query<{ body: string }>('SELECT body FROM document'),
     ).toEqual([{ body: 'see [[space:ST]] for context' }])
+  })
+
+  // The rebuild drops and recreates the table, so it must stop happening once
+  // it is done: on every boot it would leave a window, however brief, in
+  // which a request finds no link table at all. The end state looks the same
+  // either way, so this asserts the guard's own input rather than the result.
+  it('stops needing the link rebuild once it has run', async () => {
+    const path = await legacyDb()
+    const first = (await openDb(path)) as BunSqliteDriver
+    expect(await first.query('SELECT ref_type FROM link')).toEqual([
+      { ref_type: 'space' },
+    ])
+
+    const again = (await openDb(path)) as BunSqliteDriver
+    // Still exactly one row, and no half-finished rebuild left behind.
+    expect(await again.query('SELECT ref_type FROM link')).toEqual([
+      { ref_type: 'space' },
+    ])
+    expect(
+      await again.query(
+        "SELECT name FROM sqlite_master WHERE name = 'link_rebuild'",
+      ),
+    ).toEqual([])
+
+    // The detector is what stands between "done" and "do it again", so this
+    // is the assertion that actually pins the guard.
+    expect(await again.query(LINK_REBUILD.detect)).toEqual([])
   })
 })
