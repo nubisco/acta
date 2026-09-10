@@ -33,6 +33,7 @@ import * as pencilSimple from '@nubisco/ui/icons/pencil-simple'
 import * as plus from '@nubisco/ui/icons/plus'
 import * as pulse from '@nubisco/ui/icons/pulse'
 import * as quotes from '@nubisco/ui/icons/quotes'
+import * as robot from '@nubisco/ui/icons/robot'
 import * as sidebarSimple from '@nubisco/ui/icons/sidebar-simple'
 import * as textB from '@nubisco/ui/icons/text-b'
 import * as textHThree from '@nubisco/ui/icons/text-h-three'
@@ -40,6 +41,7 @@ import * as textHTwo from '@nubisco/ui/icons/text-h-two'
 import * as textItalic from '@nubisco/ui/icons/text-italic'
 import * as textStrikethrough from '@nubisco/ui/icons/text-strikethrough'
 import * as trash from '@nubisco/ui/icons/trash'
+import * as user from '@nubisco/ui/icons/user'
 import * as warning from '@nubisco/ui/icons/warning'
 
 export function registerActaIcons(): void {
@@ -67,6 +69,9 @@ export function registerActaIcons(): void {
     info,
     'caret-down': caretDown,
     'check-square': checkSquare,
+    // The @ typeahead's rows, one icon per kind of actor.
+    user,
+    robot,
     // Search results, by hit kind.
     'file-text': fileText,
     'chat-circle': chatCircle,

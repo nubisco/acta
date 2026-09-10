@@ -144,7 +144,18 @@
 
     <TimelineView v-else-if="view === 'timeline'" :items="items" />
 
-    <NbBoard v-else :columns="columns" :items="spaceItems" @move="onMove">
+    <!-- Columns are capped rather than sharing the width equally. With two
+         lists, `1fr` each gave every card half the screen and a space with
+         six columns looked nothing like a space with two. A cap means the
+         board reads the same either way, and the surplus goes to showing
+         MORE of the board rather than to inflating what is already there. -->
+    <NbBoard
+      v-else
+      class="space__board"
+      :columns="columns"
+      :items="spaceItems"
+      @move="onMove"
+    >
       <template #column-footer="{ column }">
         <NbButton
           size="sm"
@@ -734,6 +745,14 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
     padding-block: var(--nb-spacing-24);
   }
 
+  /* The library's default track is minmax(200px, 1fr). The floor is right;
+     the ceiling is what makes two columns swallow the window. Set as the
+     library's own token so making columns resizable upstream overrides this
+     rather than fighting it. */
+  &__board {
+    --nb-board-column-track: minmax(17rem, 22rem);
+  }
+
   &__card {
     background: none;
     border: 0;
@@ -745,6 +764,10 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
     width: 100%;
     color: inherit;
     font: inherit;
+    /* A grid item's default min-width is auto, so it refuses to shrink below
+       its content and a long title pushes the card wider than its column
+       instead of wrapping inside it. */
+    min-inline-size: 0;
 
     &:focus-visible {
       outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
@@ -776,6 +799,12 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
     font-size: var(--nb-type-body-md-size);
 
     font-weight: var(--nb-type-label-lg-weight, 500);
+    /* Wraps to as many lines as it needs. A card is as wide as its column,
+       never wider, so the column is what decides the width and the title
+       follows it. `anywhere` because an unbroken token (a URL, a long key)
+       has no space to break at and would otherwise still push the card out. */
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
   }
 
   &__card-meta {

@@ -161,7 +161,7 @@
               @change="it.commitLabels"
             >
               <template #option="{ option }">
-                <LabelBadge :name="String(option.value)" />
+                <LabelBadge :name="String(option.value)" size="md" />
               </template>
               <template #value="{ values }">
                 <span class="label-values">
@@ -169,6 +169,7 @@
                     v-for="name in values"
                     :key="String(name)"
                     :name="String(name)"
+                    size="md"
                   />
                 </span>
               </template>

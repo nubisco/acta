@@ -1,5 +1,5 @@
 <template>
-  <NbBadge size="sm" :variant="variant">{{ name }}</NbBadge>
+  <NbBadge :size="size" :variant="variant">{{ name }}</NbBadge>
 </template>
 
 <script setup lang="ts">
@@ -15,7 +15,19 @@ import { computed } from 'vue'
 import { labelVariants } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'
 
-const props = defineProps<{ name: string }>()
+const props = withDefaults(
+  defineProps<{
+    name: string
+    /**
+     * `sm` on a card, where labels sit in a dense meta row beside the key.
+     * `md` wherever the label IS the content: a select's value and its
+     * options have the full width of the field and were rendering the
+     * smallest pill in the set into it.
+     */
+    size?: 'sm' | 'md'
+  }>(),
+  { size: 'sm' },
+)
 
 const ws = useWorkspace()
 const variant = computed(

@@ -26,8 +26,18 @@ import { BubbleMenu, Editor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
+import Table from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableCell from '@tiptap/extension-table-cell'
+import TableHeader from '@tiptap/extension-table-header'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
-import { RefTypeahead, SlashMenu } from '@/components/editor/suggestions'
+import {
+  MentionTypeahead,
+  RefTypeahead,
+  SlashMenu,
+} from '@/components/editor/suggestions'
 
 const props = defineProps<{
   modelValue: string
@@ -55,18 +65,29 @@ const editor = new Editor({
       codeBlock: {},
     }),
     Link.configure({ openOnClick: false }),
+    // The reader renders GFM tables and task lists. Without the matching
+    // nodes here the editor did not merely fail to CREATE them: opening a
+    // document that contained one and saving dropped it, because a node the
+    // schema does not know is a node the serializer cannot write back.
+    Table.configure({ resizable: true }),
+    TableRow,
+    TableHeader,
+    TableCell,
+    TaskList,
+    TaskItem.configure({ nested: true }),
     Placeholder.configure({
       placeholder: props.placeholder ?? 'Type here...',
     }),
     Markdown.configure({
       html: false,
       linkify: true,
-      breaks: false,
+      breaks: true,
       transformPastedText: true,
     }),
     // `[[` searches docs and cards; `/` opens the insert menu. Both write
     // plain enhanced-markdown, keeping editor and reader byte-compatible.
     RefTypeahead,
+    MentionTypeahead,
     SlashMenu,
   ],
   onBlur: () => emit('blur'),

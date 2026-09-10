@@ -45,7 +45,6 @@ declare module 'vue' {
     NbRadio: typeof import('@nubisco/ui/components/Radio')['NbRadio']
     NbSelect: typeof import('@nubisco/ui/components/Select')['NbSelect']
     NbShell: typeof import('@nubisco/ui/components/Shell')['NbShell']
-    NbShellPanel: typeof import('@nubisco/ui/components/ShellPanel')['NbShellPanel']
     NbSidebarBrand: typeof import('@nubisco/ui/components/SidebarBrand')['NbSidebarBrand']
     NbSidebarLink: typeof import('@nubisco/ui/components/SidebarLink')['NbSidebarLink']
     NbSidebarMenu: typeof import('@nubisco/ui/components/SidebarMenu')['NbSidebarMenu']

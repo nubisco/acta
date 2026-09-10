@@ -17,6 +17,7 @@ import Suggestion, { type SuggestionOptions } from '@tiptap/suggestion'
 import { VueRenderer } from '@tiptap/vue-3'
 import tippy, { type Instance } from 'tippy.js'
 import { api } from '@/api/client'
+import { useWorkspace } from '@/stores/workspace'
 import SuggestionList from '@/components/editor/SuggestionList.vue'
 
 export interface ISuggestionItem {
@@ -217,6 +218,65 @@ export const RefTypeahead = Extension.create({
           return text.length <= 64 && !text.includes(']]')
         },
         items: ({ query }) => refItems(query),
+        command: applyCommand,
+        render: makeRender(),
+      }),
+    ]
+  },
+})
+
+/**
+ * People, on `@`.
+ *
+ * A mention is stored as `@handle`, but nobody knows every handle in a
+ * workspace, and typing one you half-remember produces a mention that
+ * resolves to nobody. Offering the list turns recall into recognition.
+ *
+ * Read from the workspace overview rather than the search index: it is
+ * already loaded, it is small, and it is the same list the rest of the app
+ * shows people from.
+ */
+function mentionItems(query: string): ISuggestionItem[] {
+  const q = query.trim().toLowerCase()
+  return (useWorkspace().overview.value?.actors ?? [])
+    .filter((a) => a.kind !== 'system')
+    .filter(
+      (a) =>
+        !q ||
+        a.handle.toLowerCase().includes(q) ||
+        a.name.toLowerCase().includes(q),
+    )
+    .slice(0, 8)
+    .map((a) => ({
+      id: `actor:${a.handle}`,
+      label: a.name,
+      icon: a.kind === 'agent' ? 'robot' : 'user',
+      hint: `@${a.handle}`,
+      apply: inserter(`@${a.handle} `),
+    }))
+}
+
+export const MentionTypeahead = Extension.create({
+  name: 'mentionTypeahead',
+  addProseMirrorPlugins() {
+    return [
+      Suggestion<ISuggestionItem>({
+        editor: this.editor,
+        char: '@',
+        pluginKey: new PluginKey('mentionTypeahead'),
+        // An email address in prose contains an @ with no space before it;
+        // only a mention starts one. startOfLine is false so it can follow
+        // text, and the allow below is what keeps it off addresses.
+        allow: ({ state, range }) => {
+          const before = state.doc.textBetween(
+            Math.max(0, range.from - 1),
+            range.from,
+            '\n',
+            '\n',
+          )
+          return before === '' || /\s/.test(before)
+        },
+        items: ({ query }) => mentionItems(query),
         command: applyCommand,
         render: makeRender(),
       }),
