@@ -42,6 +42,17 @@
             {{ it.lifecycle.value.text }}
           </NbBadge>
           <span class="item-modal__actions">
+            <!-- Back to the side panel, on the same card. The pair reads as
+                 one control that toggles size rather than two ways to open a
+                 card that happen to look alike. -->
+            <NbButton
+              v-nb-tooltip="{ body: 'Show in the side panel' }"
+              size="xs"
+              variant="ghost"
+              icon="arrows-in-simple"
+              :aria-label="`Show ${it.item.value.key} in the side panel`"
+              @click="collapse"
+            />
             <!-- Archive was only ever reachable through the Status select,
                  which is why it read as missing. Same set as the board's
                  right-click menu, so both surfaces agree. -->
@@ -301,7 +312,7 @@ import { computed, ref, toRef, watch } from 'vue'
 import { useConfirm } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
 import { labelVariants } from '@/lib/labels'
-import { useWorkspace } from '@/stores/workspace'
+import { useWorkspace, useInspector } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import ActorChip from '@/components/ActorChip.vue'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'
@@ -319,6 +330,16 @@ const ws = useWorkspace()
 const it = useItem(toRef(props, 'itemKey'))
 const variants = computed(() => labelVariants(ws.overview.value))
 const confirm = useConfirm()
+const inspector = useInspector()
+
+/** Hand this card back to the side panel. Closing the modal and opening the
+ *  panel on the same key, so the pair behaves as one control that changes the
+ *  card's size rather than two separate ways to open it. */
+function collapse(): void {
+  const key = it.item.value?.key
+  emit('close')
+  if (key) inspector.open(key)
+}
 
 const newChecklist = ref('')
 

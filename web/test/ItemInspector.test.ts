@@ -30,6 +30,7 @@ vi.mock('@/api/client', () => ({
 // them, and a partial mock silently breaks its setup rather than failing
 // loudly, which cost more time than it saved.
 import ItemInspector from '@/components/ItemInspector.vue'
+import { useInspector, useUiState } from '@/stores/workspace'
 
 const ITEM = {
   key: 'ST-73',
@@ -62,20 +63,34 @@ async function render() {
 describe('ItemInspector', () => {
   beforeEach(() => {
     push.mockClear()
+    useUiState().itemModalKey.value = null
+    useInspector().open('ST-73')
     itemGet.mockReset()
     itemGet.mockResolvedValue({ items: [{ ...ITEM }] })
   })
 
-  // The whole point: eleven comments must be visible as eleven from the
-  // header, whether or not the section happens to be open.
-  it('says how many comments there are without being opened', async () => {
+  // The whole point. Comments are not behind a disclosure at all, and the
+  // heading carries the count, so eleven comments can never again read as
+  // none.
+  it('shows comments as a section of their own, with the count', async () => {
     const view = await render()
-    const header = view
-      .findAll('.nb-accordion-item, [class*="accordion"]')
-      .map((w) => w.text())
-      .join(' ')
-    expect(header).toContain('Comments')
-    expect(header).toContain('11')
+    const headings = view
+      .findAll('.inspector-section__title')
+      .map((h) => h.text())
+    expect(headings.some((h) => h.includes('Comments'))).toBe(true)
+    expect(headings.some((h) => h.includes('11'))).toBe(true)
+  })
+
+  // Description and comments are what a card IS. Behind a disclosure, every
+  // card would open showing nothing.
+  it('keeps description and comments out of the accordion', async () => {
+    const view = await render()
+    const accordion = view.find('.nb-accordion')
+    const inside = accordion.exists() ? accordion.text() : ''
+    expect(inside).not.toContain('A very long description.')
+    expect(inside).not.toContain('comment 0')
+    expect(view.text()).toContain('A very long description.')
+    expect(view.text()).toContain('comment 0')
   })
 
   it('renders every comment, not a truncated few', async () => {
@@ -102,5 +117,22 @@ describe('ItemInspector', () => {
     expect(btn).toBeDefined()
     await btn!.trigger('click')
     expect(push).toHaveBeenCalledWith('/nubisco/b/ST')
+  })
+
+  // The pair has to behave as one control that changes size, not as two ways
+  // to open a card: leaving both showing the same card is a state nobody
+  // asked for.
+  it('hands the card to the full-size view and closes itself', async () => {
+    const view = await render()
+    const btn = view
+      .findAll('button')
+      .find((b) => b.attributes('aria-label')?.includes('full size'))
+    expect(btn).toBeDefined()
+    await btn!.trigger('click')
+
+    // Real stores, so this asserts the actual handover rather than that two
+    // mocks were called.
+    expect(useUiState().itemModalKey.value).toBe('ST-73')
+    expect(useInspector().itemKey.value).toBeNull()
   })
 })

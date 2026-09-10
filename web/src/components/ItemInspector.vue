@@ -102,6 +102,17 @@
                something else. Closing clears the trail too, otherwise the
                next card you open inherits a way "back" to one you already
                dismissed. -->
+          <!-- Same card, more room. The panel is a column beside the board;
+               some cards want the width, and switching should not mean losing
+               your place and opening it again. -->
+          <NbButton
+            v-nb-tooltip="{ body: 'Open full size' }"
+            size="xs"
+            variant="ghost"
+            icon="arrows-out-simple"
+            :aria-label="`Open ${it.item.value.key} full size`"
+            @click="expand"
+          />
           <NbButton
             v-nb-tooltip="{ body: 'Close' }"
             size="xs"
@@ -227,41 +238,40 @@
            Stacked as panels, a long description pushed comments so far down
            the panel that a card with eleven of them read as having none; the
            counts in each header say what is there without opening it. -->
-      <NbAccordion v-model="openSections" multiple flush size="sm">
-        <NbAccordionItem
-          id="description"
-          title="Description"
-          :meta="it.draft.description.trim() ? undefined : 'empty'"
+      <!-- Always visible. The description is what the card IS; putting it
+           behind a disclosure means every card opens showing nothing. -->
+      <div class="inspector-section">
+        <h3 class="inspector-section__title">Description</h3>
+        <MarkdownEditor
+          v-if="editingDescription"
+          v-model="it.draft.description"
+          placeholder="Describe this item..."
+          class="inspector-editor"
+          autofocus
+          @blur="commitDescription"
+        />
+        <div
+          v-else-if="it.draft.description.trim()"
+          class="inspector-description"
+          role="button"
+          tabindex="0"
+          aria-label="Description. Press Enter to edit."
+          @click="editingDescription = true"
+          @keydown.enter.prevent="editingDescription = true"
         >
-          <MarkdownEditor
-            v-if="editingDescription"
-            v-model="it.draft.description"
-            placeholder="Describe this item..."
-            class="inspector-editor"
-            autofocus
-            @blur="commitDescription"
-          />
-          <div
-            v-else-if="it.draft.description.trim()"
-            class="inspector-description"
-            role="button"
-            tabindex="0"
-            aria-label="Description. Press Enter to edit."
-            @click="editingDescription = true"
-            @keydown.enter.prevent="editingDescription = true"
-          >
-            <MarkdownView :source="it.draft.description" />
-          </div>
-          <button
-            v-else
-            type="button"
-            class="inspector-description-empty"
-            @click="editingDescription = true"
-          >
-            Add a description...
-          </button>
-        </NbAccordionItem>
+          <MarkdownView :source="it.draft.description" />
+        </div>
+        <button
+          v-else
+          type="button"
+          class="inspector-description-empty"
+          @click="editingDescription = true"
+        >
+          Add a description...
+        </button>
+      </div>
 
+      <NbAccordion v-model="openSections" multiple flush size="sm">
         <NbAccordionItem
           v-for="checklist in it.item.value.checklists ?? []"
           :id="`checklist:${checklist.name}`"
@@ -306,19 +316,6 @@
         </NbAccordionItem>
 
         <NbAccordionItem
-          id="comments"
-          title="Comments"
-          :meta="countLabel(it.item.value.comments)"
-        >
-          <CommentThread
-            v-model="it.commentDraft.value"
-            :comments="it.item.value.comments ?? []"
-            :commenting="it.commenting.value"
-            @submit="it.addComment"
-          />
-        </NbAccordionItem>
-
-        <NbAccordionItem
           v-if="it.linkFacts.value.length > 0"
           id="links"
           title="Links"
@@ -327,6 +324,25 @@
           <NbDefinitionList :items="it.linkFacts.value" layout="stacked" />
         </NbAccordionItem>
       </NbAccordion>
+      <!-- Always visible, and last. Burying the conversation behind a
+           disclosure is the fault this whole change exists to fix. -->
+      <div class="inspector-section">
+        <h3 class="inspector-section__title">
+          Comments
+          <span
+            v-if="countLabel(it.item.value.comments)"
+            class="inspector-section__count"
+          >
+            {{ countLabel(it.item.value.comments) }}
+          </span>
+        </h3>
+        <CommentThread
+          v-model="it.commentDraft.value"
+          :comments="it.item.value.comments ?? []"
+          :commenting="it.commenting.value"
+          @submit="it.addComment"
+        />
+      </div>
     </NbShellPanel>
   </div>
 </template>
@@ -336,7 +352,7 @@ import { ref, toRef, watch } from 'vue'
 import { useConfirm } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
 import { useRouter } from 'vue-router'
-import { useInspector } from '@/stores/workspace'
+import { useInspector, useUiState } from '@/stores/workspace'
 import { wpath } from '@/lib/paths'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'
 import ActorChip from '@/components/ActorChip.vue'
@@ -359,6 +375,7 @@ const props = defineProps<{ itemKey: string }>()
 const it = useItem(toRef(props, 'itemKey'))
 const inspector = useInspector()
 const router = useRouter()
+const ui = useUiState()
 
 /**
  * Which sections are open, shared by every card opened this session.
@@ -373,6 +390,15 @@ const openSections = moduleOpenSections
  *  Showing "0" would be noise on the many cards that have no attachments. */
 function countLabel(list: unknown[] | undefined): string | undefined {
   return list && list.length > 0 ? String(list.length) : undefined
+}
+
+/** Hand this card to the full-size view. The panel closes, because the two
+ *  showing the same card at once is a choice nobody asked to make. */
+function expand(): void {
+  const key = it.item.value?.key
+  if (!key) return
+  ui.itemModalKey.value = key
+  inspector.close()
 }
 
 /** Go to the board this card lives on, leaving the panel open so the board's
