@@ -12,6 +12,16 @@ import type { IPlannedAttachment, ITrelloBoardPlan, ITrelloPlan } from './plan'
 
 export interface ITrelloRunOptions {
   dryRun: boolean
+  /**
+   * Import anyway when comments are known to be missing, recording them as
+   * skips rather than failing.
+   *
+   * The default is to fail, because a silently incomplete import is worse
+   * than none: the cards look right, so nobody goes looking. Importing from a
+   * saved export is the honest use for this, where the missing comments are
+   * simply not in the file and no amount of retrying will produce them.
+   */
+  allowMissingComments?: boolean
   /** Present only when TRELLO_KEY/TRELLO_TOKEN were provided. */
   downloadAttachment?: (
     att: IPlannedAttachment,
@@ -52,6 +62,22 @@ async function runBoardStructure(
   for (const skip of board.skips)
     section.skipped(skip.kind, skip.id, skip.reason, skip.n ?? 1)
   for (const note of board.notes) section.note(note)
+
+  // A skipped comment is lost data, not a tolerated omission, and the report
+  // counts a skip toward the total so the run still ended "OK" while cards
+  // arrived with their conversations missing. Since the fetcher now asks each
+  // short card directly, reaching here means we genuinely could not get them,
+  // which is worth failing over rather than printing in a wall of output.
+  const lostComments = board.skips
+    .filter((skip) => skip.kind === 'comments')
+    .reduce((sum, skip) => sum + (skip.n ?? 1), 0)
+  if (lostComments > 0 && !opts.allowMissingComments) {
+    report.errors.push(
+      `board ${board.key}: ${lostComments} comment(s) could not be read from Trello. ` +
+        `Re-run once the API is reachable, or pass --allow-missing-comments to ` +
+        `accept the loss deliberately.`,
+    )
+  }
 
   if (opts.dryRun) {
     section.created(

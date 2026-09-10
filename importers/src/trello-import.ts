@@ -48,6 +48,7 @@ function usage(): void {
   console.error(
     'usage: bun src/trello-import.ts --files <board.json ...> [--map member-map.json]\n' +
       '         [--dry-run] [--done-as-archived [KEYS]] [--key KEY=board.json ...]\n' +
+      '         [--allow-missing-comments]\n' +
       '         [--fetch <boardIdOrShortLink> ...] [--fix-comments]\n' +
       '         [--out import-report.json]\n' +
       'env: ACTA_URL, ACTA_TOKEN, TRELLO_KEY, TRELLO_TOKEN',
@@ -88,6 +89,7 @@ export async function main(argv: string[]): Promise<number> {
   }
   const dryRun = hasFlag(args, 'dry-run')
   const fixComments = hasFlag(args, 'fix-comments')
+  const allowMissingComments = hasFlag(args, 'allow-missing-comments')
   const outPath = flagValue(args, 'out') ?? 'import-report.json'
   const keyAssignments = parseKeyAssignments(flagValues(args, 'key'))
   const doneValues = flagValues(args, 'done-as-archived').flatMap((v) =>
@@ -177,6 +179,7 @@ export async function main(argv: string[]): Promise<number> {
     if (dryRun) printTrelloPlan(plan)
     await runTrelloImport(plan, client, report, {
       dryRun,
+      allowMissingComments,
       downloadAttachment: creds
         ? (att) => downloadTrelloAttachment(att.url, creds)
         : undefined,

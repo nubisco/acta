@@ -100,7 +100,14 @@ async function importTrello(): Promise<ImportReport> {
     await trelloOpts(),
   )
   const report = new ImportReport('trello-import', false)
-  await runTrelloImport(plan, client, report, { dryRun: false })
+  // The fixture models an export whose action window dropped a comment, which
+  // now fails a run unless the loss is accepted deliberately. These tests are
+  // about everything else, so they accept it; the test below covers the
+  // refusal itself.
+  await runTrelloImport(plan, client, report, {
+    dryRun: false,
+    allowMissingComments: true,
+  })
   return report
 }
 
@@ -229,6 +236,22 @@ describe('trello import end to end', () => {
     expect(overview.labels.filter((l) => l.name === 'Bug')).toHaveLength(1)
   })
 
+  // The fault this exists to prevent: the migration lost comments on cards
+  // whose conversations fell outside the board's action window, and reported
+  // OK, because the report counted a skip toward the total. Cards looked
+  // right, so nobody went looking.
+  it('refuses to import when comments are known to be missing', async () => {
+    const plan = planTrelloImport(
+      [{ board: fixtureBoard('trello-stagewright.json'), forcedKey: 'SW' }],
+      await trelloOpts(),
+    )
+    const report = new ImportReport('trello-import', true)
+    await runTrelloImport(plan, client, report, { dryRun: true })
+
+    expect(report.ok()).toBe(false)
+    expect(report.errors.join(' ')).toContain('comment(s) could not be read')
+  })
+
   it('is idempotent when re-run (same op ids, no duplicates)', async () => {
     const first = await importTrello()
     expect(first.ok()).toBe(true)
@@ -327,7 +350,10 @@ describe('trello import end to end', () => {
       },
     )
     const report = new ImportReport('trello-import', true)
-    await runTrelloImport(plan, throwingClient, report, { dryRun: true })
+    await runTrelloImport(plan, throwingClient, report, {
+      dryRun: true,
+      allowMissingComments: true,
+    })
     expect(report.ok()).toBe(true)
     expect(
       (await db.query<{ n: number }>('SELECT COUNT(*) AS n FROM item'))[0].n,
