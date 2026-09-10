@@ -1,19 +1,43 @@
 <template>
-  <!-- Sanitized: markdown-it renders with html disabled; only our own
-       extension transforms emit markup. -->
-  <!-- eslint-disable vue/no-v-html -->
-  <div
-    ref="rootEl"
-    class="md"
-    :class="{ 'md--wide': wide }"
-    @click="onClick"
-    v-html="html"
-  />
-  <!-- eslint-enable vue/no-v-html -->
+  <div class="md-wrap">
+    <!-- Sanitized: markdown-it renders with html disabled; only our own
+         extension transforms emit markup. -->
+    <!-- eslint-disable vue/no-v-html -->
+    <div
+      ref="rootEl"
+      class="md"
+      :class="{ 'md--wide': wide, 'md--clamped': clampedNow }"
+      :style="clampedNow ? { maxBlockSize: `${clamp}rem` } : undefined"
+      @click="onClick"
+      v-html="html"
+    />
+    <!-- eslint-enable vue/no-v-html -->
+
+    <!-- Only when the content actually overflows. A "Show more" under three
+         lines of text is a button that lies about there being more. -->
+    <button
+      v-if="clamp && overflows"
+      type="button"
+      class="md-wrap__toggle"
+      :aria-expanded="!clampedNow"
+      @click="expanded = !expanded"
+    >
+      <NbIcon :name="clampedNow ? 'caret-down' : 'caret-up'" :size="14" />
+      {{ clampedNow ? 'Show more' : 'Show less' }}
+    </button>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, nextTick, ref, watch } from 'vue'
+import {
+  computed,
+  inject,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue'
 import MarkdownIt from 'markdown-it'
 import { useRouter } from 'vue-router'
 import { useDocPreview, useInspector, useWorkspace } from '@/stores/workspace'
@@ -22,7 +46,17 @@ import { chartColorFor } from '@/lib/colors'
 import { DOC_NAV_KEY } from '@/lib/keys'
 import { wpath } from '@/lib/paths'
 
-const props = defineProps<{ source: string; wide?: boolean }>()
+const props = defineProps<{
+  source: string
+  wide?: boolean
+  /**
+   * Collapse to this many rem and fade the cut, with a toggle underneath.
+   * Omitted, the block renders at its natural height, which is right for a
+   * document but wrong for a card whose description runs to a page and
+   * pushes the conversation off the screen.
+   */
+  clamp?: number
+}>()
 
 const router = useRouter()
 const inspector = useInspector()
@@ -30,6 +64,37 @@ const docPreview = useDocPreview()
 const refCards = useRefCards()
 const ws = useWorkspace()
 const rootEl = ref<HTMLElement | null>(null)
+
+const expanded = ref(false)
+const overflows = ref(false)
+/** Clamped only while there is a clamp, it is not expanded, and the content
+ *  genuinely exceeds it. */
+const clampedNow = computed(
+  () => !!props.clamp && !expanded.value && overflows.value,
+)
+
+/**
+ * Measured, not estimated. Character counts and line counts both lie: a table
+ * or an image is one "line" and half a screen tall, and the same markdown is
+ * a different height in the panel than in the modal.
+ */
+async function measure(): Promise<void> {
+  if (!props.clamp) {
+    overflows.value = false
+    return
+  }
+  // Measure unclamped, or the max-height we applied last time is what gets
+  // measured and the block latches to "overflowing" forever.
+  const wasExpanded = expanded.value
+  expanded.value = true
+  await nextTick()
+  const el = rootEl.value
+  const limit =
+    props.clamp *
+    parseFloat(getComputedStyle(document.documentElement).fontSize || '16')
+  overflows.value = !!el && el.scrollHeight > limit + 1
+  expanded.value = wasExpanded
+}
 // Surfaces that ARE the docs space navigate on doc refs; everywhere else a
 // doc ref opens the quick-look modal so the reader keeps their context.
 const docNav = inject(DOC_NAV_KEY, null)
@@ -264,12 +329,63 @@ watch(
     void nextTick(() => {
       hydrateItemRefs()
       hydrateMentions()
+      void measure()
     }),
   { immediate: true, flush: 'post' },
 )
+
+// A narrower column wraps to more lines, so the same text can start or stop
+// overflowing without the text itself changing.
+onMounted(() => {
+  if (!props.clamp || typeof ResizeObserver === 'undefined') return
+  const el = rootEl.value
+  if (!el) return
+  const ro = new ResizeObserver(() => void measure())
+  ro.observe(el)
+  onBeforeUnmount(() => ro.disconnect())
+})
 </script>
 
 <style scoped lang="scss">
+.md-wrap {
+  min-inline-size: 0;
+
+  &__toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--nb-spacing-4);
+    inline-size: 100%;
+    margin-block-start: var(--nb-spacing-4);
+    padding-block: var(--nb-spacing-8);
+    background: none;
+    border: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
+    border-radius: var(--nb-radius-sm, 4px);
+    color: var(--nb-c-text-subtle);
+    font: inherit;
+    font-size: var(--nb-type-body-sm-size);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--nb-c-text);
+      background: var(--nb-c-surface-hover, transparent);
+    }
+
+    &:focus-visible {
+      outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline-offset: 2px;
+    }
+  }
+}
+
+.md--clamped {
+  overflow: hidden;
+  /* Faded rather than cut: a hard edge mid-sentence reads as a rendering
+     fault, where a fade reads as "there is more". The mask is on the block
+     itself so it follows whatever background it happens to sit on. */
+  mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+}
+
 .md {
   line-height: 1.65;
 

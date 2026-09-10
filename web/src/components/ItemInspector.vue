@@ -241,7 +241,10 @@
       <!-- Always visible. The description is what the card IS; putting it
            behind a disclosure means every card opens showing nothing. -->
       <div class="inspector-section">
-        <h3 class="inspector-section__title">Description</h3>
+        <h3 class="inspector-section__title">
+          <NbIcon name="text-align-left" :size="15" />
+          Description
+        </h3>
         <MarkdownEditor
           v-if="editingDescription"
           v-model="it.draft.description"
@@ -259,7 +262,7 @@
           @click="editingDescription = true"
           @keydown.enter.prevent="editingDescription = true"
         >
-          <MarkdownView :source="it.draft.description" />
+          <MarkdownView :source="it.draft.description" :clamp="18" />
         </div>
         <button
           v-else
@@ -328,6 +331,7 @@
            disclosure is the fault this whole change exists to fix. -->
       <div class="inspector-section">
         <h3 class="inspector-section__title">
+          <NbIcon name="chat-circle" :size="15" />
           Comments
           <span
             v-if="countLabel(it.item.value.comments)"

@@ -120,7 +120,7 @@
             @click="editDescription"
             @keydown.enter.prevent="editDescription"
           >
-            <MarkdownView :source="it.draft.description" />
+            <MarkdownView :source="it.draft.description" :clamp="28" />
           </div>
           <button
             v-else
