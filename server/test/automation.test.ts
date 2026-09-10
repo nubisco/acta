@@ -4,7 +4,7 @@ import { createApp } from '../src/app'
 import { createToken } from '../src/core/auth'
 import type { ICtx } from '../src/core/ctx'
 import { openDb, type BunSqliteDriver } from '../src/db'
-import { boardWrite } from '../src/services/boards'
+import { spaceWrite } from '../src/services/spaces'
 import { itemWrite } from '../src/services/items'
 import { ruleWrite } from '../src/services/rules'
 import { signPayload, webhookWrite } from '../src/services/webhooks'
@@ -52,7 +52,7 @@ beforeEach(async () => {
       scopes: ['read', 'write', 'admin'],
     },
   }
-  await boardWrite(ctx, [
+  await spaceWrite(ctx, [
     {
       op: 'create',
       op_id: 'b1',
@@ -129,7 +129,7 @@ describe('webhooks', () => {
         scopes: ['read', 'write', 'admin'],
       },
     }
-    await boardWrite(failCtx, [
+    await spaceWrite(failCtx, [
       { op: 'create', op_id: 'b1', key: 'SW', name: 'S', template: 'kanban6' },
     ])
     await webhookWrite(failCtx, [
@@ -171,7 +171,7 @@ describe('rules', () => {
         op_id: 'r1',
         name: 'route stagewright tickets',
         trigger: 'item.created',
-        condition: 'board=SUP label=Bug',
+        condition: 'space=SUP label=Bug',
         action: { kind: 'move_item', list: 'In Progress' },
         enabled: true,
       },
@@ -231,7 +231,7 @@ describe('ingest', () => {
       },
       body: JSON.stringify({
         name: 'Contact form',
-        board: 'SUP',
+        space: 'SUP',
         list: 'Backlog',
       }),
     })

@@ -53,7 +53,7 @@ async function handleRequest(
         capabilities: { tools: {} },
         serverInfo: { name: 'acta', version: '0.1.0' },
         instructions:
-          'Acta manages kanban boards and markdown documents. Start with workspace_overview to orient. All writes are batch ops with client op_ids: they are idempotent and safe to retry. Prefer patch_section/append for document edits and updated_since/since cursors for delta reads.',
+          'Acta manages kanban spaces and markdown documents. Start with workspace_overview to orient. All writes are batch ops with client op_ids: they are idempotent and safe to retry. Prefer patch_section/append for document edits and updated_since/since cursors for delta reads.',
       })
     case 'ping':
       return rpcResult(id, {})

@@ -5,9 +5,9 @@
  */
 
 import { z } from 'zod'
-import { BOARD_KEY_RE, DOC_SLUG_RE, ITEM_KEY_RE } from './keys'
+import { SPACE_KEY_RE, DOC_SLUG_RE, ITEM_KEY_RE } from './keys'
 
-export const zBoardKey = z.string().regex(BOARD_KEY_RE)
+export const zSpaceKey = z.string().regex(SPACE_KEY_RE)
 export const zItemKey = z.string().regex(ITEM_KEY_RE)
 export const zDocSlug = z.string().regex(DOC_SLUG_RE)
 export const zOpId = z.string().min(1).max(200)
@@ -57,7 +57,7 @@ const itemFields = {
 export const zItemCreateOp = z.object({
   op: z.literal('create'),
   op_id: zOpId,
-  board: zBoardKey.optional(),
+  space: zSpaceKey.optional(),
   list: z.string().min(1),
   title: itemFields.title,
   description: itemFields.description.optional(),
@@ -92,7 +92,7 @@ export const zItemMoveOp = z.object({
   op: z.literal('move'),
   op_id: zOpId,
   key: zItemKey,
-  board: zBoardKey.optional(),
+  space: zSpaceKey.optional(),
   list: z.string().min(1),
   pos: z.number().optional(),
 })
@@ -192,19 +192,19 @@ export const zItemOp = z.discriminatedUnion('op', [
 export type TItemOp = z.infer<typeof zItemOp>
 
 export const zItemWrite = z.object({
-  default_board: zBoardKey.optional(),
+  default_space: zSpaceKey.optional(),
   ops: z.array(zItemOp).min(1).max(100),
 })
 
 // --------------------------------------------------------------------------
-// board_write ops
+// space_write ops
 // --------------------------------------------------------------------------
 
-export const zBoardOp = z.discriminatedUnion('op', [
+export const zSpaceOp = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('create'),
     op_id: zOpId,
-    key: zBoardKey,
+    key: zSpaceKey,
     name: z.string().min(1).max(200),
     description: z.string().max(10_000).optional(),
     template: z.enum(['kanban6', 'none']).default('kanban6'),
@@ -212,15 +212,15 @@ export const zBoardOp = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('update'),
     op_id: zOpId,
-    key: zBoardKey,
+    key: zSpaceKey,
     name: z.string().min(1).max(200).optional(),
     description: z.string().max(10_000).optional(),
   }),
-  z.object({ op: z.literal('archive'), op_id: zOpId, key: zBoardKey }),
+  z.object({ op: z.literal('archive'), op_id: zOpId, key: zSpaceKey }),
   z.object({
     op: z.literal('list_create'),
     op_id: zOpId,
-    board: zBoardKey,
+    space: zSpaceKey,
     name: z.string().min(1).max(200),
     role: zListRole.default('none'),
     pos: z.number().optional(),
@@ -228,7 +228,7 @@ export const zBoardOp = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('list_update'),
     op_id: zOpId,
-    board: zBoardKey,
+    space: zSpaceKey,
     list: z.string().min(1),
     name: z.string().min(1).max(200).optional(),
     role: zListRole.optional(),
@@ -237,13 +237,13 @@ export const zBoardOp = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('list_archive'),
     op_id: zOpId,
-    board: zBoardKey,
+    space: zSpaceKey,
     list: z.string().min(1),
   }),
 ])
-export type TBoardOp = z.infer<typeof zBoardOp>
+export type TSpaceOp = z.infer<typeof zSpaceOp>
 
-export const zBoardWrite = z.object({ ops: z.array(zBoardOp).min(1).max(50) })
+export const zSpaceWrite = z.object({ ops: z.array(zSpaceOp).min(1).max(50) })
 
 // --------------------------------------------------------------------------
 // doc_write ops
@@ -259,7 +259,7 @@ export const zDocOp = z.discriminatedUnion('op', [
     body: z.string().max(500_000).default(''),
     layout: z.enum(['default', 'wide']).default('default'),
     tags: z.array(z.string()).max(20).default([]),
-    board: zBoardKey.optional(),
+    space: zSpaceKey.optional(),
     imported_meta: zImportedMeta.optional(),
   }),
   z.object({
@@ -338,7 +338,7 @@ export const zLabelOp = z.discriminatedUnion('op', [
     op: z.literal('group_create'),
     op_id: zOpId,
     name: z.string().min(1).max(100),
-    board: zBoardKey.optional(),
+    space: zSpaceKey.optional(),
   }),
   z.object({
     op: z.literal('label_create'),
@@ -374,8 +374,8 @@ export const zLabelWrite = z.object({ ops: z.array(zLabelOp).min(1).max(50) })
 // Reads
 // --------------------------------------------------------------------------
 
-export const zBoardGet = z.object({
-  board: zBoardKey,
+export const zSpaceGet = z.object({
+  space: zSpaceKey,
   list: z.string().optional(),
   label: z.string().optional(),
   assignee: z.string().optional(),
@@ -399,7 +399,7 @@ export const zItemGet = z.object({
 export const zSearch = z.object({
   query: z.string().min(1).max(500),
   types: z.array(z.enum(['item', 'doc', 'comment'])).optional(),
-  board: zBoardKey.optional(),
+  space: zSpaceKey.optional(),
   limit: z.number().int().min(1).max(50).default(20),
 })
 
@@ -418,7 +418,7 @@ export const zActivityQuery = z.object({
 // --------------------------------------------------------------------------
 
 export const zIngest = z.object({
-  board: zBoardKey.optional(),
+  space: zSpaceKey.optional(),
   list: z.string().optional(),
   title: z.string().min(1).max(500),
   description: z.string().max(100_000).optional(),

@@ -2,8 +2,8 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import {
   zActivityQuery,
-  zBoardGet,
-  zBoardWrite,
+  zSpaceGet,
+  zSpaceWrite,
   zDocSlug,
   zDocWrite,
   zItemGet,
@@ -14,13 +14,13 @@ import {
 import { ApiError, type ICtx } from '../core/ctx'
 import { createToken } from '../core/auth'
 import { emitEvent, flushPendingEvents, onEvent } from '../core/events'
-import { boardWrite } from '../services/boards'
+import { spaceWrite } from '../services/spaces'
 import { docWrite } from '../services/docs'
 import { itemWrite } from '../services/items'
 import { labelWrite } from '../services/labels'
 import {
   activityQuery,
-  boardGet,
+  spaceGet,
   docGet,
   docTree,
   itemGet,
@@ -58,13 +58,13 @@ function ctxOf(c: {
   }
 }
 
-/** A board id from its key, scoped to the workspace on the request. */
-async function boardIdFor(ctx: ICtx, key: string): Promise<string> {
+/** A space id from its key, scoped to the workspace on the request. */
+async function spaceIdFor(ctx: ICtx, key: string): Promise<string> {
   const rows = await ctx.db.query<{ id: string }>(
-    'SELECT id FROM board WHERE workspace_id = ? AND key = ?',
+    'SELECT id FROM space WHERE workspace_id = ? AND key = ?',
     [ctx.workspaceId, key],
   )
-  if (rows.length === 0) throw new ApiError(404, `board ${key} not found`)
+  if (rows.length === 0) throw new ApiError(404, `space ${key} not found`)
   return rows[0].id
 }
 
@@ -96,16 +96,16 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
   // Reads -------------------------------------------------------------------
   app.get('/overview', async (c) => c.json(await workspaceOverview(ctxOf(c))))
 
-  app.get('/boards/:key', async (c) => {
-    const params = zBoardGet.parse({
-      board: c.req.param('key'),
+  app.get('/spaces/:key', async (c) => {
+    const params = zSpaceGet.parse({
+      space: c.req.param('key'),
       ...c.req.query(),
       updated_since: c.req.query('updated_since')
         ? Number(c.req.query('updated_since'))
         : undefined,
       limit: c.req.query('limit') ? Number(c.req.query('limit')) : undefined,
     })
-    return c.json(await boardGet(ctxOf(c), params))
+    return c.json(await spaceGet(ctxOf(c), params))
   })
 
   app.post('/items/get', async (c) =>
@@ -141,7 +141,7 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
         zSearch.parse({
           query: c.req.query('q'),
           types: c.req.query('types')?.split(','),
-          board: c.req.query('board'),
+          space: c.req.query('space'),
           limit: c.req.query('limit')
             ? Number(c.req.query('limit'))
             : undefined,
@@ -170,15 +170,15 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     requireScope(ctx, 'write')
     const body = zItemWrite.parse(await c.req.json())
     return c.json({
-      results: await itemWrite(ctx, body.ops, body.default_board, store),
+      results: await itemWrite(ctx, body.ops, body.default_space, store),
     })
   })
 
-  app.post('/boards/write', async (c) => {
+  app.post('/spaces/write', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
-    const body = zBoardWrite.parse(await c.req.json())
-    return c.json({ results: await boardWrite(ctx, body.ops) })
+    const body = zSpaceWrite.parse(await c.req.json())
+    return c.json({ results: await spaceWrite(ctx, body.ops) })
   })
 
   app.post('/docs/write', async (c) => {
@@ -238,25 +238,25 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
    * on the actor rather than an op with provenance and an event: nobody needs
    * an audit trail of who favourited what.
    */
-  app.put('/boards/:key/star', async (c) => {
+  app.put('/spaces/:key/star', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
-    const board = await boardIdFor(ctx, c.req.param('key'))
+    const space = await spaceIdFor(ctx, c.req.param('key'))
     await ctx.db.run(
-      `INSERT OR IGNORE INTO board_star (workspace_id, actor_id, board_id, created_at)
+      `INSERT OR IGNORE INTO space_star (workspace_id, actor_id, space_id, created_at)
        VALUES (?, ?, ?, ?)`,
-      [ctx.workspaceId, ctx.actor.id, board, now()],
+      [ctx.workspaceId, ctx.actor.id, space, now()],
     )
     return c.json({ ok: true, starred: true })
   })
 
-  app.delete('/boards/:key/star', async (c) => {
+  app.delete('/spaces/:key/star', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
-    const board = await boardIdFor(ctx, c.req.param('key'))
+    const space = await spaceIdFor(ctx, c.req.param('key'))
     await ctx.db.run(
-      'DELETE FROM board_star WHERE actor_id = ? AND board_id = ?',
-      [ctx.actor.id, board],
+      'DELETE FROM space_star WHERE actor_id = ? AND space_id = ?',
+      [ctx.actor.id, space],
     )
     return c.json({ ok: true, starred: false })
   })

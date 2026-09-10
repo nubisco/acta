@@ -10,13 +10,13 @@ import {
   attachmentUpload,
   UPLOAD_MAX_BYTES,
 } from '../src/services/attachments'
-import { boardWrite } from '../src/services/boards'
+import { spaceWrite } from '../src/services/spaces'
 import { docWrite } from '../src/services/docs'
 import { itemWrite } from '../src/services/items'
 import { labelWrite } from '../src/services/labels'
 import {
   activityQuery,
-  boardGet,
+  spaceGet,
   docGet,
   docTree,
   itemGet,
@@ -49,8 +49,8 @@ beforeEach(async () => {
   }
 })
 
-async function seedBoard(): Promise<void> {
-  const results = await boardWrite(ctx, [
+async function seedSpace(): Promise<void> {
+  const results = await spaceWrite(ctx, [
     {
       op: 'create',
       op_id: 'b1',
@@ -62,12 +62,12 @@ async function seedBoard(): Promise<void> {
   expect(results[0].ok).toBe(true)
 }
 
-describe('boards', () => {
-  it('creates a kanban6 board', async () => {
-    await seedBoard()
+describe('spaces', () => {
+  it('creates a kanban6 space', async () => {
+    await seedSpace()
     const overview = await workspaceOverview(ctx)
-    const board = overview.boards.find((b) => b.key === 'SW')
-    expect(board?.lists.map((l) => l.name)).toEqual([
+    const space = overview.spaces.find((b) => b.key === 'SW')
+    expect(space?.lists.map((l) => l.name)).toEqual([
       'Backlog',
       'To Do',
       'In Progress',
@@ -78,8 +78,8 @@ describe('boards', () => {
   })
 
   it('is idempotent per op_id', async () => {
-    await seedBoard()
-    const replay = await boardWrite(ctx, [
+    await seedSpace()
+    const replay = await spaceWrite(ctx, [
       {
         op: 'create',
         op_id: 'b1',
@@ -89,7 +89,7 @@ describe('boards', () => {
       },
     ])
     expect(replay[0].ok).toBe(true)
-    const dup = await boardWrite(ctx, [
+    const dup = await spaceWrite(ctx, [
       {
         op: 'create',
         op_id: 'b2',
@@ -103,7 +103,7 @@ describe('boards', () => {
 })
 
 describe('items', () => {
-  beforeEach(seedBoard)
+  beforeEach(seedSpace)
 
   it('creates, moves, labels, comments, checks off in one batch', async () => {
     const results = await itemWrite(
@@ -201,8 +201,8 @@ describe('items', () => {
     expect(a[0]).toEqual(b[0])
     expect(
       (
-        await boardGet(ctx, {
-          board: 'SW',
+        await spaceGet(ctx, {
+          space: 'SW',
           state: 'open',
           detail: 'compact',
           limit: 100,
@@ -211,8 +211,8 @@ describe('items', () => {
     ).toHaveLength(1)
   })
 
-  it('keeps the old key as an alias across board moves', async () => {
-    await boardWrite(ctx, [
+  it('keeps the old key as an alias across space moves', async () => {
+    await spaceWrite(ctx, [
       {
         op: 'create',
         op_id: 'b2',
@@ -227,7 +227,7 @@ describe('items', () => {
       'SW',
     )
     const moved = await itemWrite(ctx, [
-      { op: 'move', op_id: 'i2', key: 'SW-1', board: 'SUP', list: 'Backlog' },
+      { op: 'move', op_id: 'i2', key: 'SW-1', space: 'SUP', list: 'Backlog' },
     ])
     expect(moved[0].ok).toBe(true)
     expect((moved[0] as { key: string }).key).toBe('SUP-1')
@@ -235,9 +235,9 @@ describe('items', () => {
     expect((viaAlias.items[0] as { key: string }).key).toBe('SUP-1')
   })
 
-  it('filters board_get by list, label, and state', async () => {
+  it('filters space_get by list, label, and state', async () => {
     await labelWrite(ctx, [
-      { op: 'group_create', op_id: 'l1', name: 'Components', board: 'SW' },
+      { op: 'group_create', op_id: 'l1', name: 'Components', space: 'SW' },
       {
         op: 'label_create',
         op_id: 'l2',
@@ -264,8 +264,8 @@ describe('items', () => {
     )
     expect(
       (
-        await boardGet(ctx, {
-          board: 'SW',
+        await spaceGet(ctx, {
+          space: 'SW',
           state: 'open',
           detail: 'compact',
           limit: 100,
@@ -274,8 +274,8 @@ describe('items', () => {
     ).toHaveLength(2)
     expect(
       (
-        await boardGet(ctx, {
-          board: 'SW',
+        await spaceGet(ctx, {
+          space: 'SW',
           state: 'open',
           label: 'engine',
           detail: 'compact',
@@ -285,8 +285,8 @@ describe('items', () => {
     ).toHaveLength(1)
     expect(
       (
-        await boardGet(ctx, {
-          board: 'SW',
+        await spaceGet(ctx, {
+          space: 'SW',
           state: 'archived',
           detail: 'compact',
           limit: 100,
@@ -297,9 +297,9 @@ describe('items', () => {
 })
 
 describe('assignee filter', () => {
-  beforeEach(seedBoard)
+  beforeEach(seedSpace)
 
-  // Comma separated and "any of these", matching the label filter. The board
+  // Comma separated and "any of these", matching the label filter. The space
   // picks people by avatar, and avatars are a multi-select by nature: a row
   // you can only choose one of is a radio group in disguise.
   it('matches any of several handles', async () => {
@@ -333,8 +333,8 @@ describe('assignee filter', () => {
 
     const query = async (assignee: string) =>
       (
-        await boardGet(ctx, {
-          board: 'SW',
+        await spaceGet(ctx, {
+          space: 'SW',
           state: 'open',
           assignee,
           detail: 'compact',
@@ -351,11 +351,11 @@ describe('assignee filter', () => {
 })
 
 describe('labels', () => {
-  beforeEach(seedBoard)
+  beforeEach(seedSpace)
 
   it('merges labels and reassigns items', async () => {
     await labelWrite(ctx, [
-      { op: 'group_create', op_id: 'g1', name: 'Extra', board: 'SW' },
+      { op: 'group_create', op_id: 'g1', name: 'Extra', space: 'SW' },
       {
         op: 'label_create',
         op_id: 'g2',
@@ -636,14 +636,14 @@ describe('docs', () => {
 })
 
 describe('item provenance', () => {
-  beforeEach(seedBoard)
+  beforeEach(seedSpace)
 
   it('accepts imported_meta on create, comment, and set_meta', async () => {
     const created = await itemWrite(ctx, [
       {
         op: 'create',
         op_id: 'i1',
-        board: 'SW',
+        space: 'SW',
         list: 'To Do',
         title: 'Migrated card',
         imported_meta: {
@@ -698,7 +698,7 @@ describe('item provenance', () => {
 })
 
 describe('attachments', () => {
-  beforeEach(seedBoard)
+  beforeEach(seedSpace)
 
   it('uploads raw bytes and deletes, blob included', async () => {
     const blobs = new Map<string, Uint8Array>()
@@ -708,7 +708,7 @@ describe('attachments', () => {
       delete: async (id) => void blobs.delete(id),
     })
     const created = await itemWrite(ctx, [
-      { op: 'create', op_id: 'a1', board: 'SW', list: 'To Do', title: 'Card' },
+      { op: 'create', op_id: 'a1', space: 'SW', list: 'To Do', title: 'Card' },
     ])
     const key = (created[0] as { key: string }).key
 
@@ -742,7 +742,7 @@ describe('attachments', () => {
       get: async () => null,
     })
     const created = await itemWrite(ctx, [
-      { op: 'create', op_id: 'a2', board: 'SW', list: 'To Do', title: 'Card' },
+      { op: 'create', op_id: 'a2', space: 'SW', list: 'To Do', title: 'Card' },
     ])
     const key = (created[0] as { key: string }).key
     expect(
@@ -757,7 +757,7 @@ describe('attachments', () => {
 })
 
 describe('search and activity', () => {
-  beforeEach(seedBoard)
+  beforeEach(seedSpace)
 
   it('finds items, docs, and comments', async () => {
     await itemWrite(
@@ -818,7 +818,7 @@ describe('search and activity', () => {
 })
 
 describe('item delete', () => {
-  beforeEach(seedBoard)
+  beforeEach(seedSpace)
 
   /** A card with everything hanging off it, plus a stored blob. */
   async function fullCard() {
@@ -832,7 +832,7 @@ describe('item delete', () => {
       {
         op: 'create',
         op_id: 'd1',
-        board: 'SW',
+        space: 'SW',
         list: 'To Do',
         title: 'Doomed pineapple',
         description: 'Body text.',
@@ -954,8 +954,8 @@ CREATE TABLE IF NOT EXISTS thing (
   })
 })
 
-describe('board label filter', () => {
-  beforeEach(seedBoard)
+describe('space label filter', () => {
+  beforeEach(seedSpace)
 
   it('matches any of several labels, not all of them', async () => {
     await labelWrite(ctx, [
@@ -986,7 +986,7 @@ describe('board label filter', () => {
       {
         op: 'create',
         op_id: 'f1',
-        board: 'SW',
+        space: 'SW',
         list: 'To Do',
         title: 'A bug',
         labels: ['bug'],
@@ -994,7 +994,7 @@ describe('board label filter', () => {
       {
         op: 'create',
         op_id: 'f2',
-        board: 'SW',
+        space: 'SW',
         list: 'To Do',
         title: 'A feature',
         labels: ['feature'],
@@ -1002,15 +1002,15 @@ describe('board label filter', () => {
       {
         op: 'create',
         op_id: 'f3',
-        board: 'SW',
+        space: 'SW',
         list: 'To Do',
         title: 'A chore',
         labels: ['chore'],
       },
     ])
 
-    const one = await boardGet(ctx, {
-      board: 'SW',
+    const one = await spaceGet(ctx, {
+      space: 'SW',
       state: 'open',
       detail: 'compact',
       limit: 50,
@@ -1018,8 +1018,8 @@ describe('board label filter', () => {
     })
     expect(one.items.map((i) => i.title)).toEqual(['A bug'])
 
-    const two = await boardGet(ctx, {
-      board: 'SW',
+    const two = await spaceGet(ctx, {
+      space: 'SW',
       state: 'open',
       detail: 'compact',
       limit: 50,

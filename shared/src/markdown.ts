@@ -165,15 +165,15 @@ export function applySectionEdit(
 }
 
 // ---------------------------------------------------------------------------
-// Cross-references: [[SW-142]], [[board:DOOD]], [[doc:manual/vision|label]],
+// Cross-references: [[SW-142]], [[space:DOOD]], [[doc:manual/vision|label]],
 // [[@handle]], and embeds ![[query: ...]]. Code spans and fences are skipped.
 // ---------------------------------------------------------------------------
 
-export type TRefType = 'item' | 'board' | 'doc' | 'actor' | 'query'
+export type TRefType = 'item' | 'space' | 'doc' | 'actor' | 'query'
 
 export interface IRef {
   type: TRefType
-  /** Item key, board key, doc slug, actor handle, or raw query string. */
+  /** Item key, space key, doc slug, actor handle, or raw query string. */
   target: string
   alias?: string
   /** Character offset of the reference in the body. */
@@ -206,9 +206,9 @@ export function extractRefs(body: string): IRef[] {
     const [targetPart, alias] = splitAlias(inner)
     if (targetPart.startsWith('@')) {
       refs.push({ type: 'actor', target: targetPart.slice(1), offset, raw })
-    } else if (targetPart.startsWith('board:')) {
+    } else if (targetPart.startsWith('space:')) {
       refs.push({
-        type: 'board',
+        type: 'space',
         target: targetPart.slice(6),
         alias,
         offset,
@@ -240,14 +240,14 @@ function splitAlias(inner: string): [string, string | undefined] {
 // ---------------------------------------------------------------------------
 
 export interface IEmbedQuery {
-  board?: string
+  space?: string
   list?: string
   label?: string
   assignee?: string
   state?: 'open' | 'done' | 'archived'
 }
 
-const EMBED_KEYS = new Set(['board', 'list', 'label', 'assignee', 'state'])
+const EMBED_KEYS = new Set(['space', 'list', 'label', 'assignee', 'state'])
 
 export function parseEmbedQuery(query: string): IEmbedQuery | null {
   const out: Record<string, string> = {}

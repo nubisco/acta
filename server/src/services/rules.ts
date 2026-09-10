@@ -17,7 +17,7 @@ import { matchesPattern } from './webhooks'
 export const zRuleAction = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('move_item'),
-    board: z.string().optional(),
+    space: z.string().optional(),
     list: z.string().min(1),
   }),
   z.object({ kind: z.literal('apply_label'), label: z.string().min(1) }),
@@ -154,19 +154,19 @@ async function itemMatches(
   condition: IEmbedQuery,
 ): Promise<boolean> {
   const rows = await db.query<{
-    board_key: string
+    space_key: string
     list_name: string
     completed: number
     archived: number
   }>(
-    `SELECT b.key AS board_key, l.name AS list_name, i.completed, i.archived
-       FROM item i JOIN board b ON b.id = i.board_id JOIN list l ON l.id = i.list_id
+    `SELECT b.key AS space_key, l.name AS list_name, i.completed, i.archived
+       FROM item i JOIN space b ON b.id = i.space_id JOIN list l ON l.id = i.list_id
       WHERE i.workspace_id = ? AND i.id = ?`,
     [workspaceId, itemId],
   )
   if (rows.length === 0) return false
   const item = rows[0]
-  if (condition.board && condition.board !== item.board_key) return false
+  if (condition.space && condition.space !== item.space_key) return false
   if (
     condition.list &&
     condition.list.toLowerCase() !== item.list_name.toLowerCase()
@@ -284,7 +284,7 @@ async function executeRule(
           op: 'move',
           op_id: opId,
           key,
-          board: action.board,
+          space: action.space,
           list: action.list,
         },
       ])

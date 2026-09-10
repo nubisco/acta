@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS otp_challenge (
   created_at INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS board (
+CREATE TABLE IF NOT EXISTS space (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
   key TEXT NOT NULL,
@@ -70,19 +70,19 @@ CREATE TABLE IF NOT EXISTS board (
 CREATE TABLE IF NOT EXISTS list (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
-  board_id TEXT NOT NULL REFERENCES board(id),
+  space_id TEXT NOT NULL REFERENCES space(id),
   name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'none'
     CHECK (role IN ('backlog', 'active', 'blocked', 'review', 'done', 'inbox', 'none')),
   pos REAL NOT NULL,
   archived INTEGER NOT NULL DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS idx_list_board ON list(board_id, pos);
+CREATE INDEX IF NOT EXISTS idx_list_space ON list(space_id, pos);
 
 CREATE TABLE IF NOT EXISTS item (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
-  board_id TEXT NOT NULL REFERENCES board(id),
+  space_id TEXT NOT NULL REFERENCES space(id),
   list_id TEXT NOT NULL REFERENCES list(id),
   key TEXT NOT NULL,
   title TEXT NOT NULL,
@@ -99,9 +99,9 @@ CREATE TABLE IF NOT EXISTS item (
   UNIQUE (workspace_id, key)
 );
 CREATE INDEX IF NOT EXISTS idx_item_list ON item(list_id, pos);
-CREATE INDEX IF NOT EXISTS idx_item_board ON item(board_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_item_space ON item(space_id, updated_at);
 
--- Old keys keep resolving after cross-board moves (design-spec §1).
+-- Old keys keep resolving after cross-space moves (design-spec §1).
 CREATE TABLE IF NOT EXISTS item_key_alias (
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
   key TEXT NOT NULL,
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS item_key_alias (
 CREATE TABLE IF NOT EXISTS label_group (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
-  board_id TEXT REFERENCES board(id),
+  space_id TEXT REFERENCES space(id),
   name TEXT NOT NULL
 );
 
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS document (
   slug TEXT NOT NULL,
   title TEXT NOT NULL,
   parent_id TEXT REFERENCES document(id),
-  board_id TEXT REFERENCES board(id),
+  space_id TEXT REFERENCES space(id),
   pos REAL NOT NULL,
   body TEXT NOT NULL DEFAULT '',
   layout TEXT NOT NULL DEFAULT 'default' CHECK (layout IN ('default', 'wide')),
@@ -213,7 +213,7 @@ CREATE TABLE IF NOT EXISTS link (
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
   src_kind TEXT NOT NULL CHECK (src_kind IN ('item', 'doc', 'comment')),
   src_id TEXT NOT NULL,
-  ref_type TEXT NOT NULL CHECK (ref_type IN ('item', 'board', 'doc', 'actor', 'query')),
+  ref_type TEXT NOT NULL CHECK (ref_type IN ('item', 'space', 'doc', 'actor', 'query')),
   target TEXT NOT NULL,
   PRIMARY KEY (src_kind, src_id, ref_type, target)
 );
@@ -271,7 +271,7 @@ CREATE TABLE IF NOT EXISTS ingest_token (
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
   token_hash TEXT NOT NULL UNIQUE,
   actor_id TEXT NOT NULL REFERENCES actor(id),
-  board_id TEXT NOT NULL REFERENCES board(id),
+  space_id TEXT NOT NULL REFERENCES space(id),
   list_id TEXT REFERENCES list(id),
   created_at INTEGER NOT NULL
 );
@@ -311,7 +311,7 @@ CREATE TABLE IF NOT EXISTS connection (
   name TEXT NOT NULL,
   secret TEXT NOT NULL,
   actor_id TEXT NOT NULL REFERENCES actor(id),
-  board_id TEXT NOT NULL REFERENCES board(id),
+  space_id TEXT NOT NULL REFERENCES space(id),
   list_id TEXT REFERENCES list(id),
   config TEXT NOT NULL DEFAULT '{}',
   enabled INTEGER NOT NULL DEFAULT 1,
@@ -334,21 +334,104 @@ CREATE TABLE IF NOT EXISTS external_link (
 );
 CREATE INDEX IF NOT EXISTS idx_external_link_item ON external_link(item_id);
 
--- Starred boards, per person rather than per workspace: a favourite is an
--- opinion about your own attention, not a property of the board.
-CREATE TABLE IF NOT EXISTS board_star (
+-- Starred spaces, per person rather than per workspace: a favourite is an
+-- opinion about your own attention, not a property of the space.
+CREATE TABLE IF NOT EXISTS space_star (
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
   actor_id TEXT NOT NULL REFERENCES actor(id),
-  board_id TEXT NOT NULL REFERENCES board(id),
+  space_id TEXT NOT NULL REFERENCES space(id),
   created_at INTEGER NOT NULL,
-  PRIMARY KEY (actor_id, board_id)
+  PRIMARY KEY (actor_id, space_id)
 );
 
 -- Full-text search over items, comments, docs (mvp F7).
 CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
-  kind, ref, title, body, board_key, tokenize = 'unicode61'
+  kind, ref, title, body, space_key, tokenize = 'unicode61'
 );
 `
+
+/**
+ * One-way renames applied before the schema is created, for databases that
+ * predate a name change.
+ *
+ * These run FIRST and exactly once each. CREATE TABLE IF NOT EXISTS cannot do
+ * this job: on a database that still has `space`, it would happily create an
+ * empty `space` beside it and every read would come back empty against a
+ * table holding a thousand rows.
+ *
+ * Each statement is idempotent by failure: once applied, re-running raises
+ * "no such table" or "no such column", which the drivers treat as "already
+ * done". That is the same bargain ADDITIVE_COLUMNS makes with "duplicate
+ * column", and it is why the list is append-only and order matters. The table
+ * rename comes before the column renames that reference it.
+ *
+ * Renaming the table also rewrites the REFERENCES clauses pointing at it, so
+ * the foreign keys follow without being restated.
+ */
+export const RENAMES = [
+  // board -> space. The container is the space; Board, Table, Calendar and
+  // Timeline are views OF it, so the old name called the container after one
+  // of its own views.
+  //
+  // These deliberately name the OLD identifiers. A blanket rename across the
+  // codebase turned them into no-ops once already (ALTER TABLE space RENAME
+  // TO space), which migrated nothing and reported success.
+  'ALTER TABLE board RENAME TO space',
+  'ALTER TABLE board_star RENAME TO space_star',
+  'ALTER TABLE list RENAME COLUMN board_id TO space_id',
+  'ALTER TABLE item RENAME COLUMN board_id TO space_id',
+  'ALTER TABLE label_group RENAME COLUMN board_id TO space_id',
+  'ALTER TABLE document RENAME COLUMN board_id TO space_id',
+  'ALTER TABLE ingest_token RENAME COLUMN board_id TO space_id',
+  'ALTER TABLE connection RENAME COLUMN board_id TO space_id',
+  'ALTER TABLE space_star RENAME COLUMN board_id TO space_id',
+  // Values, not just identifiers. A rename that moves the columns and leaves
+  // the rows saying "board" produces an activity feed and a set of links that
+  // quietly stop matching anything the code now asks for.
+  "UPDATE link SET ref_type = 'space' WHERE ref_type = 'board'",
+  "UPDATE event SET entity = 'space' WHERE entity = 'board'",
+  "UPDATE event SET verb = 'space' || substr(verb, 6) WHERE verb LIKE 'board.%'",
+  // Only the leading noun of a summary the server itself wrote ("created
+  // board ST (Stagewright)"). A blanket replace would reach into names and
+  // titles that legitimately contain the word.
+  "UPDATE event SET summary = 'created space' || substr(summary, 14) WHERE summary LIKE 'created board %'",
+  "UPDATE event SET summary = 'archived space' || substr(summary, 15) WHERE summary LIKE 'archived board %'",
+  // Markdown references written as [[board:KEY]] resolve on the prefix, so
+  // they stop resolving the moment the prefix changes.
+  "UPDATE document SET body = replace(body, '[[board:', '[[space:') WHERE body LIKE '%[[board:%'",
+  "UPDATE item SET description = replace(description, '[[board:', '[[space:') WHERE description LIKE '%[[board:%'",
+  "UPDATE comment SET body = replace(body, '[[board:', '[[space:') WHERE body LIKE '%[[board:%'",
+  "UPDATE doc_comment SET body = replace(body, '[[board:', '[[space:') WHERE body LIKE '%[[board:%'",
+]
+
+/**
+ * Rebuilds that cannot be expressed as a rename.
+ *
+ * FTS5 has no RENAME COLUMN, so a column rename means dropping the index and
+ * reindexing from the rows it covers. Guarded on the old column still being
+ * there, since dropping and rebuilding a search index on every boot would be
+ * an expensive way to change nothing.
+ */
+export const FTS_COLUMN_RENAME = {
+  detect: 'SELECT space_key FROM fts LIMIT 1',
+  drop: 'DROP TABLE IF EXISTS fts',
+  create: `CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
+  kind, ref, title, body, space_key, tokenize = 'unicode61'
+)`,
+}
+
+/** Repopulates a freshly rebuilt FTS index from the rows it covers. */
+export const REINDEX_FTS = [
+  `INSERT INTO fts (kind, ref, title, body, space_key)
+     SELECT 'item', i.key, i.title, i.description, s.key
+       FROM item i JOIN space s ON s.id = i.space_id`,
+  `INSERT INTO fts (kind, ref, title, body, space_key)
+     SELECT 'doc', d.slug, d.title, d.body, '' FROM document d`,
+  `INSERT INTO fts (kind, ref, title, body, space_key)
+     SELECT 'comment', c.id, '', c.body, s.key
+       FROM comment c JOIN item i ON i.id = c.item_id
+       JOIN space s ON s.id = i.space_id`,
+]
 
 /**
  * Columns added after a table already shipped. CREATE IF NOT EXISTS is a

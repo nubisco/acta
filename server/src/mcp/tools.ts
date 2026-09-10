@@ -7,8 +7,8 @@
 import { z } from 'zod'
 import {
   zActivityQuery,
-  zBoardGet,
-  zBoardWrite,
+  zSpaceGet,
+  zSpaceWrite,
   zDocSlug,
   zDocWrite,
   zItemGet,
@@ -22,7 +22,7 @@ import {
   zAttachmentAdd,
   type AttachmentStore,
 } from '../services/attachments'
-import { boardWrite } from '../services/boards'
+import { spaceWrite } from '../services/spaces'
 import { docWrite } from '../services/docs'
 import { itemWrite } from '../services/items'
 import { labelWrite } from '../services/labels'
@@ -30,7 +30,7 @@ import { ruleList, ruleWrite, zRuleWrite } from '../services/rules'
 import { webhookList, webhookWrite, zWebhookWrite } from '../services/webhooks'
 import {
   activityQuery,
-  boardGet,
+  spaceGet,
   docGet,
   docTree,
   itemGet,
@@ -62,44 +62,44 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'workspace_overview',
     description:
-      'One-call bootstrap: workspace name, all boards with their lists and item counts, label groups, members (humans and agents), and doc tree roots. Call this first; no other read is needed to orient.',
+      'One-call bootstrap: workspace name, all spaces with their lists and item counts, label groups, members (humans and agents), and doc tree roots. Call this first; no other read is needed to orient.',
     schema: z.object({}),
     handler: (ctx) => workspaceOverview(ctx),
   },
   {
-    name: 'board_get',
+    name: 'space_get',
     description:
-      'Items of one board, compact rows by default (key, title, list, labels, assignees, comment count, checklist progress, rev, updated). Filter by list, label, assignee, state (open|done|archived|all), free text, or updated_since for delta reads. detail=full adds descriptions. Never read a whole board to change one item; use item_write directly.',
-    schema: zBoardGet,
-    handler: (ctx, args) => boardGet(ctx, args as z.infer<typeof zBoardGet>),
+      'Items of one space, compact rows by default (key, title, list, labels, assignees, comment count, checklist progress, rev, updated). Filter by list, label, assignee, state (open|done|archived|all), free text, or updated_since for delta reads. detail=full adds descriptions. Never read a whole space to change one item; use item_write directly.',
+    schema: zSpaceGet,
+    handler: (ctx, args) => spaceGet(ctx, args as z.infer<typeof zSpaceGet>),
   },
   {
     name: 'item_get',
     description:
-      'Full detail for up to 50 items by key in one call: description, comments, checklists, links (backlinks included), attachments; add "activity" to include the audit tail. Old keys from cross-board moves resolve automatically.',
+      'Full detail for up to 50 items by key in one call: description, comments, checklists, links (backlinks included), attachments; add "activity" to include the audit tail. Old keys from cross-space moves resolve automatically.',
     schema: zItemGet,
     handler: (ctx, args) => itemGet(ctx, args as z.infer<typeof zItemGet>),
   },
   {
     name: 'item_write',
     description:
-      'Batch item mutations, transactional per op, idempotent via op_id (safe to retry). Ops: create (with labels/assignees/checklists inline), update (optional if_rev optimistic lock), move (cross-board moves re-key and alias), comment, checklist_set, label, assign, archive, restore, complete, reopen, delete (permanent, refused unless the item is archived first). Up to 100 ops per call; returns {op_id, ok, key, rev} per op.',
+      'Batch item mutations, transactional per op, idempotent via op_id (safe to retry). Ops: create (with labels/assignees/checklists inline), update (optional if_rev optimistic lock), move (cross-space moves re-key and alias), comment, checklist_set, label, assign, archive, restore, complete, reopen, delete (permanent, refused unless the item is archived first). Up to 100 ops per call; returns {op_id, ok, key, rev} per op.',
     schema: zItemWrite,
     write: true,
     handler: async (ctx, args) => {
       const body = args as z.infer<typeof zItemWrite>
-      return { results: await itemWrite(ctx, body.ops, body.default_board) }
+      return { results: await itemWrite(ctx, body.ops, body.default_space) }
     },
   },
   {
-    name: 'board_write',
+    name: 'space_write',
     description:
-      'Batch board/list mutations, idempotent via op_id. Ops: create (template kanban6 seeds the standard six lists), update, archive, list_create, list_update (rename/role/pos), list_archive (refuses if open items remain).',
-    schema: zBoardWrite,
+      'Batch space/list mutations, idempotent via op_id. Ops: create (template kanban6 seeds the standard six lists), update, archive, list_create, list_update (rename/role/pos), list_archive (refuses if open items remain).',
+    schema: zSpaceWrite,
     write: true,
     handler: async (ctx, args) => {
-      const body = args as z.infer<typeof zBoardWrite>
-      return { results: await boardWrite(ctx, body.ops) }
+      const body = args as z.infer<typeof zSpaceWrite>
+      return { results: await spaceWrite(ctx, body.ops) }
     },
   },
   {
@@ -139,7 +139,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'search',
     description:
-      'Unified full-text search across item titles/descriptions, comments, and documents. Returns type, key/slug, title, snippet. Filter by types or board.',
+      'Unified full-text search across item titles/descriptions, comments, and documents. Returns type, key/slug, title, snippet. Filter by types or space.',
     schema: zSearch,
     handler: (ctx, args) => search(ctx, args as z.infer<typeof zSearch>),
   },
@@ -154,7 +154,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'label_write',
     description:
-      'Batch label management, idempotent via op_id. Ops: group_create (workspace-wide or board-scoped), label_create, label_update, label_merge (folds one label into another and reassigns all items), label_delete.',
+      'Batch label management, idempotent via op_id. Ops: group_create (workspace-wide or space-scoped), label_create, label_update, label_merge (folds one label into another and reassigns all items), label_delete.',
     schema: zLabelWrite,
     write: true,
     handler: async (ctx, args) => {
@@ -179,7 +179,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'rule_write',
     description:
-      'Manage automation rules (fixed catalog), idempotent via op_id. Ops: create {trigger: event pattern, condition?: embed-query grammar (board=X list=Y label=Z assignee=H state=open|done|archived), action: move_item|apply_label|assign|comment|complete|call_webhook}, update (name/enabled), delete. Rule actions are attributed to the system actor with caused_by chaining and never re-trigger rules. Every op response includes the current rule list.',
+      'Manage automation rules (fixed catalog), idempotent via op_id. Ops: create {trigger: event pattern, condition?: embed-query grammar (space=X list=Y label=Z assignee=H state=open|done|archived), action: move_item|apply_label|assign|comment|complete|call_webhook}, update (name/enabled), delete. Rule actions are attributed to the system actor with caused_by chaining and never re-trigger rules. Every op response includes the current rule list.',
     schema: zRuleWrite,
     write: true,
     handler: async (ctx, args) => {
@@ -217,7 +217,7 @@ export function createMcpTools(store: AttachmentStore): IMcpTool[] {
               results: await itemWrite(
                 ctx,
                 body.ops,
-                body.default_board,
+                body.default_space,
                 store,
               ),
             }

@@ -1,6 +1,6 @@
 /**
  * Export (mvp F13): a human-readable second backup. Docs become a markdown
- * directory tree mirroring slugs; boards become JSONL; labels/actors JSON;
+ * directory tree mirroring slugs; spaces become JSONL; labels/actors JSON;
  * attachments are copied by id. Usage:
  *   bun src/cli/export.ts [--data ./data] [--out ./export]
  */
@@ -46,17 +46,17 @@ for (const doc of docs) {
   writeFileSync(path, serializeFrontmatter({ frontmatter, body: doc.body }))
 }
 
-// Boards → JSONL ------------------------------------------------------------
-const boards = await db.query<{
+// Spaces → JSONL ------------------------------------------------------------
+const spaces = await db.query<{
   id: string
   key: string
   name: string
   description: string
   archived: number
-}>('SELECT id, key, name, description, archived FROM board')
-mkdirSync(join(outDir, 'boards'), { recursive: true })
+}>('SELECT id, key, name, description, archived FROM space')
+mkdirSync(join(outDir, 'spaces'), { recursive: true })
 let itemTotal = 0
-for (const board of boards) {
+for (const space of spaces) {
   const lists = await db.query<{
     id: string
     name: string
@@ -64,8 +64,8 @@ for (const board of boards) {
     pos: number
     archived: number
   }>(
-    'SELECT id, name, role, pos, archived FROM list WHERE board_id = ? ORDER BY pos',
-    [board.id],
+    'SELECT id, name, role, pos, archived FROM list WHERE space_id = ? ORDER BY pos',
+    [space.id],
   )
   const items = await db.query<{
     id: string
@@ -79,14 +79,14 @@ for (const board of boards) {
     archived: number
     created_at: number
     updated_at: number
-  }>('SELECT * FROM item WHERE board_id = ? ORDER BY key', [board.id])
+  }>('SELECT * FROM item WHERE space_id = ? ORDER BY key', [space.id])
   const lines: string[] = [
     JSON.stringify({
-      kind: 'board',
-      key: board.key,
-      name: board.name,
-      description: board.description,
-      archived: board.archived === 1,
+      kind: 'space',
+      key: space.key,
+      name: space.name,
+      description: space.description,
+      archived: space.archived === 1,
       lists: lists.map((l) => ({
         name: l.name,
         role: l.role,
@@ -153,7 +153,7 @@ for (const board of boards) {
     )
   }
   writeFileSync(
-    join(outDir, 'boards', `${board.key}.jsonl`),
+    join(outDir, 'spaces', `${space.key}.jsonl`),
     lines.join('\n') + '\n',
   )
 }
@@ -163,8 +163,8 @@ writeFileSync(
   join(outDir, 'labels.json'),
   JSON.stringify(
     db.query(
-      `SELECT g.name AS group_name, b.key AS board_key, l.name, l.color
-         FROM label l JOIN label_group g ON g.id = l.group_id LEFT JOIN board b ON b.id = g.board_id`,
+      `SELECT g.name AS group_name, b.key AS space_key, l.name, l.color
+         FROM label l JOIN label_group g ON g.id = l.group_id LEFT JOIN space b ON b.id = g.space_id`,
     ),
     null,
     2,
@@ -185,5 +185,5 @@ if (existsSync(join(dataDir, 'attachments'))) {
 }
 
 console.log(
-  `exported ${docs.length} docs, ${boards.length} boards, ${itemTotal} items to ${outDir}`,
+  `exported ${docs.length} docs, ${spaces.length} spaces, ${itemTotal} items to ${outDir}`,
 )

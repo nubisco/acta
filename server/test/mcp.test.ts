@@ -75,10 +75,10 @@ describe('mcp endpoint', () => {
     const names = list.result.tools.map((t: { name: string }) => t.name)
     expect(names).toEqual([
       'workspace_overview',
-      'board_get',
+      'space_get',
       'item_get',
       'item_write',
-      'board_write',
+      'space_write',
       'doc_tree',
       'doc_get',
       'doc_write',
@@ -95,7 +95,7 @@ describe('mcp endpoint', () => {
   })
 
   it('runs the support-triage scenario in two calls with agent attribution', async () => {
-    await call('board_write', {
+    await call('space_write', {
       ops: [
         {
           op: 'create',
@@ -107,7 +107,7 @@ describe('mcp endpoint', () => {
       ],
     })
     await call('item_write', {
-      default_board: 'SUP',
+      default_space: 'SUP',
       ops: [
         {
           op: 'create',
@@ -124,11 +124,11 @@ describe('mcp endpoint', () => {
       ],
     })
 
-    // Call 1: read the board.
-    const board = await call('board_get', { board: 'SUP', state: 'open' })
-    expect(board.data.items).toHaveLength(2)
+    // Call 1: read the space.
+    const space = await call('space_get', { space: 'SUP', state: 'open' })
+    expect(space.data.items).toHaveLength(2)
     // The compact response stays cheap (economy guard).
-    expect(board.raw.length).toBeLessThan(1200)
+    expect(space.raw.length).toBeLessThan(1200)
 
     // Call 2: triage both in one batch.
     const triage = await call('item_write', {
@@ -205,7 +205,7 @@ describe('mcp endpoint', () => {
     )
     const readonly = await createToken(db, ws, readerId, 'agent', ['read'])
     const result = await call(
-      'board_write',
+      'space_write',
       {
         ops: [
           { op: 'create', op_id: 'x', key: 'XX', name: 'X', template: 'none' },

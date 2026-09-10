@@ -1,6 +1,6 @@
 /**
  * Inbound provider connections: something outside Acta pushes an event and a
- * card appears on a board.
+ * card appears on a space.
  *
  * This is deliberately not the same mechanism as `ingest_token`. There, the
  * URL *is* the credential, which suits a form handler we control. A provider
@@ -41,7 +41,7 @@ export const zConnectionOp = z.discriminatedUnion('op', [
     op_id: z.string().min(1).max(200),
     provider: z.enum(CONNECTION_PROVIDERS),
     name: z.string().min(1).max(100),
-    board: z.string().min(2).max(5),
+    space: z.string().min(2).max(5),
     list: z.string().optional(),
     config: zConnectionConfig.optional(),
   }),
@@ -76,12 +76,12 @@ function newSecret(): string {
     .join('')
 }
 
-async function resolveBoard(ctx: ICtx, key: string): Promise<string> {
+async function resolveSpace(ctx: ICtx, key: string): Promise<string> {
   const rows = await ctx.db.query<{ id: string }>(
-    'SELECT id FROM board WHERE workspace_id = ? AND key = ?',
+    'SELECT id FROM space WHERE workspace_id = ? AND key = ?',
     [ctx.workspaceId, key],
   )
-  if (rows.length === 0) throw new ApiError(404, `board ${key} not found`)
+  if (rows.length === 0) throw new ApiError(404, `space ${key} not found`)
   return rows[0].id
 }
 
@@ -92,32 +92,32 @@ async function resolveBoard(ctx: ICtx, key: string): Promise<string> {
  */
 async function assertLabelsExist(
   ctx: ICtx,
-  boardId: string,
+  spaceId: string,
   labels: string[] | undefined,
 ): Promise<void> {
   for (const name of labels ?? []) {
-    // Board scoping lives on the group, not the label: a label is reachable
-    // from this board when its group is global or belongs to this board.
+    // Space scoping lives on the group, not the label: a label is reachable
+    // from this space when its group is global or belongs to this space.
     const rows = await ctx.db.query<{ id: string }>(
       `SELECT l.id FROM label l JOIN label_group g ON g.id = l.group_id
         WHERE l.workspace_id = ? AND lower(l.name) = lower(?)
-          AND (g.board_id IS NULL OR g.board_id = ?)`,
-      [ctx.workspaceId, name, boardId],
+          AND (g.space_id IS NULL OR g.space_id = ?)`,
+      [ctx.workspaceId, name, spaceId],
     )
     if (rows.length === 0)
-      throw new ApiError(404, `label ${name} not found on this board`)
+      throw new ApiError(404, `label ${name} not found on this space`)
   }
 }
 
 async function resolveList(
   ctx: ICtx,
-  boardId: string,
+  spaceId: string,
   name: string | undefined,
 ): Promise<string | null> {
   if (!name) return null
   const rows = await ctx.db.query<{ id: string }>(
-    'SELECT id FROM list WHERE board_id = ? AND lower(name) = lower(?)',
-    [boardId, name],
+    'SELECT id FROM list WHERE space_id = ? AND lower(name) = lower(?)',
+    [spaceId, name],
   )
   if (rows.length === 0) throw new ApiError(404, `list ${name} not found`)
   return rows[0].id
@@ -130,9 +130,9 @@ export async function connectionWrite(ctx: ICtx, ops: TConnectionOp[]) {
       await withOp(ctx, op.op_id, async () => {
         switch (op.op) {
           case 'create': {
-            const boardId = await resolveBoard(ctx, op.board)
-            const listId = await resolveList(ctx, boardId, op.list)
-            await assertLabelsExist(ctx, boardId, op.config?.labels)
+            const spaceId = await resolveSpace(ctx, op.space)
+            const listId = await resolveList(ctx, spaceId, op.list)
+            await assertLabelsExist(ctx, spaceId, op.config?.labels)
             const id = newId('con')
             const secret = newSecret()
             // The connection's own actor. Named after the connection so the
@@ -149,7 +149,7 @@ export async function connectionWrite(ctx: ICtx, ops: TConnectionOp[]) {
               [actorId, ctx.workspaceId, handle, op.name, now()],
             )
             await ctx.db.run(
-              `INSERT INTO connection (id, workspace_id, provider, name, secret, actor_id, board_id, list_id, config, created_at)
+              `INSERT INTO connection (id, workspace_id, provider, name, secret, actor_id, space_id, list_id, config, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 id,
@@ -158,7 +158,7 @@ export async function connectionWrite(ctx: ICtx, ops: TConnectionOp[]) {
                 op.name,
                 secret,
                 actorId,
-                boardId,
+                spaceId,
                 listId,
                 JSON.stringify(op.config ?? {}),
                 now(),
@@ -169,13 +169,13 @@ export async function connectionWrite(ctx: ICtx, ops: TConnectionOp[]) {
               'connection.created',
               'connection',
               id,
-              `connected ${op.provider} to ${op.board}`,
+              `connected ${op.provider} to ${op.space}`,
             )
             return { id, secret }
           }
           case 'update': {
-            const rows = await ctx.db.query<{ id: string; board_id: string }>(
-              'SELECT id, board_id FROM connection WHERE workspace_id = ? AND id = ?',
+            const rows = await ctx.db.query<{ id: string; space_id: string }>(
+              'SELECT id, space_id FROM connection WHERE workspace_id = ? AND id = ?',
               [ctx.workspaceId, op.id],
             )
             if (rows.length === 0)
@@ -183,8 +183,8 @@ export async function connectionWrite(ctx: ICtx, ops: TConnectionOp[]) {
             const listId =
               op.list === undefined
                 ? undefined
-                : await resolveList(ctx, rows[0].board_id, op.list)
-            await assertLabelsExist(ctx, rows[0].board_id, op.config?.labels)
+                : await resolveList(ctx, rows[0].space_id, op.list)
+            await assertLabelsExist(ctx, rows[0].space_id, op.config?.labels)
             await ctx.db.run(
               `UPDATE connection
                   SET name = COALESCE(?, name),
@@ -235,7 +235,7 @@ export interface IConnectionView {
   id: string
   provider: TConnectionProvider
   name: string
-  board: string
+  space: string
   list: string | null
   enabled: boolean
   config: TConnectionConfig
@@ -250,17 +250,17 @@ export async function connectionList(
     id: string
     provider: TConnectionProvider
     name: string
-    board_key: string
+    space_key: string
     list_name: string | null
     enabled: number
     config: string
     last_event_at: number | null
     last_error: string | null
   }>(
-    `SELECT c.id, c.provider, c.name, b.key AS board_key, l.name AS list_name,
+    `SELECT c.id, c.provider, c.name, b.key AS space_key, l.name AS list_name,
             c.enabled, c.config, c.last_event_at, c.last_error
        FROM connection c
-       JOIN board b ON b.id = c.board_id
+       JOIN space b ON b.id = c.space_id
        LEFT JOIN list l ON l.id = c.list_id
       WHERE c.workspace_id = ?
       ORDER BY c.created_at`,
@@ -271,7 +271,7 @@ export async function connectionList(
       id: r.id,
       provider: r.provider,
       name: r.name,
-      board: r.board_key,
+      space: r.space_key,
       list: r.list_name,
       enabled: r.enabled === 1,
       config: JSON.parse(r.config) as TConnectionConfig,

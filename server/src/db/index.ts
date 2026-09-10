@@ -4,7 +4,13 @@
  * service layer only ever sees ISqlDriver.
  */
 
-import { ADDITIVE_COLUMNS, SCHEMA_SQL } from './schema'
+import {
+  ADDITIVE_COLUMNS,
+  FTS_COLUMN_RENAME,
+  REINDEX_FTS,
+  RENAMES,
+  SCHEMA_SQL,
+} from './schema'
 
 export interface ISqlDriver {
   query<T = Record<string, unknown>>(
@@ -19,6 +25,17 @@ export interface ISqlDriver {
   transaction<T>(fn: () => Promise<T>): Promise<T>
   /** False when FTS5 is unavailable (search falls back to LIKE). */
   readonly supportsFts: boolean
+}
+
+/**
+ * A rename that has already been applied fails with "no such table" or "no
+ * such column", which means it is done rather than broken. Anything else is a
+ * real fault and must not be swallowed, or a half-migrated database would
+ * boot looking healthy.
+ */
+function renameAlreadyApplied(err: unknown): boolean {
+  const text = String(err)
+  return text.includes('no such table') || text.includes('no such column')
 }
 
 export function schemaStatements(): string[] {
@@ -60,6 +77,16 @@ export class BunSqliteDriver implements ISqlDriver {
   }
 
   migrate(): void {
+    // Before the schema, or CREATE IF NOT EXISTS would make an empty `space`
+    // beside a `space` holding every row.
+    for (const statement of RENAMES) {
+      try {
+        this.db.exec(statement)
+      } catch (err) {
+        if (!renameAlreadyApplied(err)) throw err
+      }
+    }
+    this.renameFtsColumn()
     this.db.exec(SCHEMA_SQL)
     for (const statement of ADDITIVE_COLUMNS) {
       try {
@@ -68,6 +95,27 @@ export class BunSqliteDriver implements ISqlDriver {
         if (!String(err).includes('duplicate column')) throw err
       }
     }
+  }
+
+  /** FTS5 has no RENAME COLUMN, so the index is rebuilt from the rows. */
+  private renameFtsColumn(): void {
+    try {
+      this.db.query(FTS_COLUMN_RENAME.detect).all()
+      return // Already the new shape.
+    } catch {
+      // Falls through: either the old column, or no fts table at all.
+    }
+    try {
+      this.db.exec(FTS_COLUMN_RENAME.drop)
+      this.db.exec(FTS_COLUMN_RENAME.create)
+      this.reindexFts()
+    } catch {
+      // No FTS5 in this build; search falls back to LIKE.
+    }
+  }
+
+  private reindexFts(): void {
+    for (const statement of REINDEX_FTS) this.db.exec(statement)
   }
 
   query<T = Record<string, unknown>>(
@@ -139,6 +187,16 @@ export class D1Driver implements ISqlDriver {
   /** Idempotent, lazy: runs once per isolate. */
   async migrate(): Promise<void> {
     if (this.migrated) return
+    // Before the schema, or CREATE IF NOT EXISTS would make an empty `space`
+    // beside a `space` holding every row.
+    for (const statement of RENAMES) {
+      try {
+        await this.db.prepare(statement).run()
+      } catch (err) {
+        if (!renameAlreadyApplied(err)) throw err
+      }
+    }
+    await this.renameFtsColumn()
     for (const statement of schemaStatements()) {
       if (statement.startsWith('PRAGMA')) continue
       try {
@@ -159,6 +217,25 @@ export class D1Driver implements ISqlDriver {
       }
     }
     this.migrated = true
+  }
+
+  /** FTS5 has no RENAME COLUMN, so the index is rebuilt from the rows. */
+  private async renameFtsColumn(): Promise<void> {
+    try {
+      await this.db.prepare(FTS_COLUMN_RENAME.detect).all()
+      return // Already the new shape.
+    } catch {
+      // Falls through: either the old column, or no fts table at all.
+    }
+    try {
+      await this.db.prepare(FTS_COLUMN_RENAME.drop).run()
+      await this.db.prepare(FTS_COLUMN_RENAME.create).run()
+      for (const statement of REINDEX_FTS) {
+        await this.db.prepare(statement).run()
+      }
+    } catch {
+      this.supportsFts = false
+    }
   }
 
   async query<T = Record<string, unknown>>(

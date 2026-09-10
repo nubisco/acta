@@ -13,7 +13,7 @@ import { withOp } from '../core/ops'
 import type { AttachmentStore } from './attachments'
 import {
   actorByRef,
-  boardByKey,
+  spaceByKey,
   itemByKey,
   labelByRef,
   listByRef,
@@ -24,14 +24,14 @@ import {
 export async function itemWrite(
   ctx: ICtx,
   ops: TItemOp[],
-  defaultBoard?: string,
+  defaultSpace?: string,
   store?: AttachmentStore,
 ): Promise<TOpResult[]> {
   const results: TOpResult[] = []
   for (const op of ops) {
     results.push(
       await withOp(ctx, op.op_id, () =>
-        applyItemOp(ctx, op, defaultBoard, store),
+        applyItemOp(ctx, op, defaultSpace, store),
       ),
     )
   }
@@ -63,15 +63,15 @@ async function syncItemFts(ctx: ICtx, itemId: string): Promise<void> {
     key: string
     title: string
     description: string
-    board_key: string
+    space_key: string
   }>(
-    `SELECT i.key, i.title, i.description, b.key AS board_key
-       FROM item i JOIN board b ON b.id = i.board_id WHERE i.id = ?`,
+    `SELECT i.key, i.title, i.description, b.key AS space_key
+       FROM item i JOIN space b ON b.id = i.space_id WHERE i.id = ?`,
     [itemId],
   )
   if (rows.length > 0) {
     const r = rows[0]
-    await ftsUpsert(ctx, 'item', r.key, r.title, r.description, r.board_key)
+    await ftsUpsert(ctx, 'item', r.key, r.title, r.description, r.space_key)
   }
 }
 
@@ -97,31 +97,31 @@ async function syncLinks(
 async function applyItemOp(
   ctx: ICtx,
   op: TItemOp,
-  defaultBoard?: string,
+  defaultSpace?: string,
   store?: AttachmentStore,
 ): Promise<{ key?: string; id?: string; rev?: number }> {
   const ts = now()
   switch (op.op) {
     case 'create': {
-      const boardKey = op.board ?? defaultBoard
-      if (!boardKey)
-        throw new ApiError(400, 'create requires board (or default_board)')
-      const board = await boardByKey(ctx, boardKey)
-      const list = await listByRef(ctx, board.id, op.list)
+      const spaceKey = op.space ?? defaultSpace
+      if (!spaceKey)
+        throw new ApiError(400, 'create requires space (or default_space)')
+      const space = await spaceByKey(ctx, spaceKey)
+      const list = await listByRef(ctx, space.id, op.list)
       const id = newId('itm')
-      const seq = board.next_seq
-      const key = itemKey(board.key, seq)
-      await ctx.db.run('UPDATE board SET next_seq = ? WHERE id = ?', [
+      const seq = space.next_seq
+      const key = itemKey(space.key, seq)
+      await ctx.db.run('UPDATE space SET next_seq = ? WHERE id = ?', [
         seq + 1,
-        board.id,
+        space.id,
       ])
       await ctx.db.run(
-        `INSERT INTO item (id, workspace_id, board_id, list_id, key, title, description, pos, due, created_by, created_at, updated_at, imported_meta)
+        `INSERT INTO item (id, workspace_id, space_id, list_id, key, title, description, pos, due, created_by, created_at, updated_at, imported_meta)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           ctx.workspaceId,
-          board.id,
+          space.id,
           list.id,
           key,
           op.title,
@@ -135,7 +135,7 @@ async function applyItemOp(
         ],
       )
       for (const ref of op.labels ?? []) {
-        const label = await labelByRef(ctx, ref, board.id)
+        const label = await labelByRef(ctx, ref, space.id)
         await ctx.db.run(
           'INSERT OR IGNORE INTO item_label (item_id, label_id) VALUES (?, ?)',
           [id, label.id],
@@ -198,16 +198,16 @@ async function applyItemOp(
     }
     case 'move': {
       const item = await itemByKey(ctx, op.key)
-      let boardId = item.board_id
+      let spaceId = item.space_id
       let key = item.key
-      if (op.board) {
-        const target = await boardByKey(ctx, op.board)
-        if (target.id !== item.board_id) {
-          // Cross-board move: new key, old key becomes an alias (design-spec §1).
-          boardId = target.id
+      if (op.space) {
+        const target = await spaceByKey(ctx, op.space)
+        if (target.id !== item.space_id) {
+          // Cross-space move: new key, old key becomes an alias (design-spec §1).
+          spaceId = target.id
           const seq = target.next_seq
           key = itemKey(target.key, seq)
-          await ctx.db.run('UPDATE board SET next_seq = ? WHERE id = ?', [
+          await ctx.db.run('UPDATE space SET next_seq = ? WHERE id = ?', [
             seq + 1,
             target.id,
           ])
@@ -216,12 +216,12 @@ async function applyItemOp(
             [ctx.workspaceId, item.key, item.id],
           )
           await ctx.db.run(
-            'UPDATE item SET board_id = ?, key = ? WHERE id = ?',
-            [boardId, key, item.id],
+            'UPDATE item SET space_id = ?, key = ? WHERE id = ?',
+            [spaceId, key, item.id],
           )
         }
       }
-      const list = await listByRef(ctx, boardId, op.list)
+      const list = await listByRef(ctx, spaceId, op.list)
       const rev = await bumpRev(ctx, item)
       await ctx.db.run('UPDATE item SET list_id = ?, pos = ? WHERE id = ?', [
         list.id,
@@ -357,14 +357,14 @@ async function applyItemOp(
     case 'label': {
       const item = await itemByKey(ctx, op.key)
       for (const ref of op.add ?? []) {
-        const label = await labelByRef(ctx, ref, item.board_id)
+        const label = await labelByRef(ctx, ref, item.space_id)
         await ctx.db.run(
           'INSERT OR IGNORE INTO item_label (item_id, label_id) VALUES (?, ?)',
           [item.id, label.id],
         )
       }
       for (const ref of op.remove ?? []) {
-        const label = await labelByRef(ctx, ref, item.board_id)
+        const label = await labelByRef(ctx, ref, item.space_id)
         await ctx.db.run(
           'DELETE FROM item_label WHERE item_id = ? AND label_id = ?',
           [item.id, label.id],
@@ -484,7 +484,7 @@ async function applyItemOp(
     }
     case 'delete': {
       const item = await itemByKey(ctx, op.key)
-      // Archive is the reversible action and the way work leaves a board.
+      // Archive is the reversible action and the way work leaves a space.
       // Requiring it first means nothing is destroyed by a single click, and
       // that whoever deletes has already seen the card out of their way.
       if (item.archived !== 1) {

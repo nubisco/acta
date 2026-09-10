@@ -13,7 +13,7 @@ import { createToken } from '../src/core/auth'
 import { setOtpSender } from '../src/routes/auth'
 import type { ICtx } from '../src/core/ctx'
 import { openDb, type BunSqliteDriver } from '../src/db'
-import { boardWrite } from '../src/services/boards'
+import { spaceWrite } from '../src/services/spaces'
 import { itemWrite } from '../src/services/items'
 import { connectionWrite } from '../src/services/connections'
 import { webhookWrite } from '../src/services/webhooks'
@@ -67,7 +67,7 @@ beforeEach(async () => {
       scopes: ['read', 'write', 'admin'],
     },
   }
-  await boardWrite(ctx, [
+  await spaceWrite(ctx, [
     {
       op: 'create',
       op_id: 'b1',
@@ -107,7 +107,7 @@ async function makeConnection(config?: Record<string, unknown>) {
       op_id: `c-${Math.random()}`,
       provider: 'github',
       name: 'GitHub',
-      board: 'SUP',
+      space: 'SUP',
       list: 'Backlog',
       config,
     },
@@ -453,7 +453,7 @@ describe('ingest attachments', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${await tokenFor()}`,
       },
-      body: JSON.stringify({ name: 'Contact form', board: 'SUP' }),
+      body: JSON.stringify({ name: 'Contact form', space: 'SUP' }),
     })
     const { token } = (await created.json()) as { token: string }
 
@@ -496,7 +496,7 @@ describe('ingest attachments', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${await tokenFor()}`,
       },
-      body: JSON.stringify({ name: 'Contact form labels', board: 'SUP' }),
+      body: JSON.stringify({ name: 'Contact form labels', space: 'SUP' }),
     })
     const { token } = (await created.json()) as { token: string }
     const res = await app.request(`/api/v1/ingest/${token}`, {
@@ -528,7 +528,7 @@ describe('ingest attachments', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${await tokenFor()}`,
       },
-      body: JSON.stringify({ name: 'Contact form 2', board: 'SUP' }),
+      body: JSON.stringify({ name: 'Contact form 2', space: 'SUP' }),
     })
     const { token } = (await created.json()) as { token: string }
     const res = await app.request(`/api/v1/ingest/${token}`, {
@@ -591,8 +591,8 @@ describe('workspace scoping', () => {
   it('serves a workspace the session belongs to', async () => {
     const res = await get('/api/v1/w/nubisco/overview', await tokenFor())
     expect(res.status).toBe(200)
-    const body = (await res.json()) as { boards: { key: string }[] }
-    expect(body.boards.map((b) => b.key)).toContain('SUP')
+    const body = (await res.json()) as { spaces: { key: string }[] }
+    expect(body.spaces.map((b) => b.key)).toContain('SUP')
   })
 
   it('404s an unknown workspace', async () => {
@@ -624,7 +624,7 @@ describe('workspace scoping', () => {
         'content-type': 'application/json',
         authorization: `Bearer ${await tokenFor()}`,
       },
-      body: JSON.stringify({ name: 'x', board: 'SUP' }),
+      body: JSON.stringify({ name: 'x', space: 'SUP' }),
     })
     // Admin in Nubisco, a plain member in Acme: the admin-only endpoint must
     // refuse rather than inherit authority across the boundary.

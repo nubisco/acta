@@ -1,14 +1,14 @@
 /**
- * Human keys (design-spec §1): boards have 2-5 uppercase-letter keys (SW),
- * items have per-board sequential keys (SW-142), docs have path slugs.
+ * Human keys (design-spec §1): spaces have 2-5 uppercase-letter keys (SW),
+ * items have per-space sequential keys (SW-142), docs have path slugs.
  */
 
-export const BOARD_KEY_RE = /^[A-Z][A-Z0-9]{1,4}$/
+export const SPACE_KEY_RE = /^[A-Z][A-Z0-9]{1,4}$/
 export const ITEM_KEY_RE = /^([A-Z][A-Z0-9]{1,4})-(\d+)$/
 export const DOC_SLUG_RE = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/
 
-export function isBoardKey(value: string): boolean {
-  return BOARD_KEY_RE.test(value)
+export function isSpaceKey(value: string): boolean {
+  return SPACE_KEY_RE.test(value)
 }
 
 export function isItemKey(value: string): boolean {
@@ -17,14 +17,14 @@ export function isItemKey(value: string): boolean {
 
 export function parseItemKey(
   value: string,
-): { board: string; seq: number } | null {
+): { space: string; seq: number } | null {
   const m = ITEM_KEY_RE.exec(value)
   if (!m) return null
-  return { board: m[1], seq: Number(m[2]) }
+  return { space: m[1], seq: Number(m[2]) }
 }
 
-export function itemKey(board: string, seq: number): string {
-  return `${board}-${seq}`
+export function itemKey(space: string, seq: number): string {
+  return `${space}-${seq}`
 }
 
 export function isDocSlug(value: string): boolean {

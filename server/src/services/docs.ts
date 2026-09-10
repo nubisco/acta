@@ -11,7 +11,7 @@ import { ApiError, now } from '../core/ctx'
 import { emitEvent } from '../core/events'
 import { ftsDelete, ftsUpsert } from '../core/fts'
 import { withOp } from '../core/ops'
-import { boardByKey, docBySlug, type IDocRow } from '../core/store'
+import { spaceByKey, docBySlug, type IDocRow } from '../core/store'
 import type { AttachmentStore } from './attachments'
 
 export async function docWrite(
@@ -81,14 +81,14 @@ async function applyDocOp(
       if (existing.length > 0)
         throw new ApiError(409, `doc ${op.slug} already exists`)
       const parent = op.parent ? await docBySlug(ctx, op.parent) : null
-      const board = op.board ? await boardByKey(ctx, op.board) : null
+      const space = op.space ? await spaceByKey(ctx, op.space) : null
       const id = newId('doc')
       const siblings = await ctx.db.query<{ m: number | null }>(
         'SELECT MAX(pos) AS m FROM document WHERE workspace_id = ? AND parent_id IS ?',
         [ctx.workspaceId, parent?.id ?? null],
       )
       await ctx.db.run(
-        `INSERT INTO document (id, workspace_id, slug, title, parent_id, board_id, pos, body, layout, tags, created_at, updated_at, imported_meta)
+        `INSERT INTO document (id, workspace_id, slug, title, parent_id, space_id, pos, body, layout, tags, created_at, updated_at, imported_meta)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
@@ -96,7 +96,7 @@ async function applyDocOp(
           op.slug,
           op.title,
           parent?.id ?? null,
-          board?.id ?? null,
+          space?.id ?? null,
           (siblings[0]?.m ?? 0) + 1024,
           op.body,
           op.layout,

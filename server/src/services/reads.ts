@@ -6,15 +6,15 @@
 import type { z } from 'zod'
 import type {
   zActivityQuery,
-  zBoardGet,
+  zSpaceGet,
   zItemGet,
   zSearch,
 } from '@nubisco/acta-shared'
 import type { ICtx } from '../core/ctx'
-import { docBySlug, boardByKey, itemByKey, type IItemRow } from '../core/store'
+import { docBySlug, spaceByKey, itemByKey, type IItemRow } from '../core/store'
 import { sectionMap } from '@nubisco/acta-shared'
 
-type TBoardGet = z.infer<typeof zBoardGet>
+type TSpaceGet = z.infer<typeof zSpaceGet>
 type TItemGet = z.infer<typeof zItemGet>
 type TSearch = z.infer<typeof zSearch>
 type TActivityQuery = z.infer<typeof zActivityQuery>
@@ -42,7 +42,7 @@ export async function workspaceOverview(ctx: ICtx) {
       [ctx.workspaceId],
     )
   )[0]
-  const boards = await ctx.db.query<{
+  const spaces = await ctx.db.query<{
     key: string
     name: string
     archived: number
@@ -50,33 +50,33 @@ export async function workspaceOverview(ctx: ICtx) {
     starred: number
   }>(
     `SELECT b.id, b.key, b.name, b.archived,
-            EXISTS (SELECT 1 FROM board_star s
-                     WHERE s.board_id = b.id AND s.actor_id = ?) AS starred
-       FROM board b WHERE b.workspace_id = ? ORDER BY b.key`,
+            EXISTS (SELECT 1 FROM space_star s
+                     WHERE s.space_id = b.id AND s.actor_id = ?) AS starred
+       FROM space b WHERE b.workspace_id = ? ORDER BY b.key`,
     [ctx.actor.id, ctx.workspaceId],
   )
   const lists = await ctx.db.query<{
-    board_id: string
+    space_id: string
     id: string
     name: string
     role: string
     items: number
   }>(
-    `SELECT l.board_id, l.id, l.name, l.role,
+    `SELECT l.space_id, l.id, l.name, l.role,
             (SELECT COUNT(*) FROM item i WHERE i.list_id = l.id AND i.archived = 0) AS items
-       FROM list l WHERE l.workspace_id = ? AND l.archived = 0 ORDER BY l.board_id, l.pos`,
+       FROM list l WHERE l.workspace_id = ? AND l.archived = 0 ORDER BY l.space_id, l.pos`,
     [ctx.workspaceId],
   )
   const labels = await ctx.db.query<{
     group_name: string
-    board_key: string | null
+    space_key: string | null
     id: string
     name: string
     color: string
   }>(
-    `SELECT g.name AS group_name, b.key AS board_key, l.id, l.name, l.color
+    `SELECT g.name AS group_name, b.key AS space_key, l.id, l.name, l.color
        FROM label l JOIN label_group g ON g.id = l.group_id
-       LEFT JOIN board b ON b.id = g.board_id
+       LEFT JOIN space b ON b.id = g.space_id
       WHERE l.workspace_id = ? ORDER BY g.name, l.name`,
     [ctx.workspaceId],
   )
@@ -103,13 +103,13 @@ export async function workspaceOverview(ctx: ICtx) {
   )
   return {
     workspace: { id: ws.id, name: ws.name },
-    boards: boards.map((b) => ({
+    spaces: spaces.map((b) => ({
       key: b.key,
       name: b.name,
       archived: b.archived === 1 || undefined,
       starred: b.starred === 1 || undefined,
       lists: lists
-        .filter((l) => l.board_id === b.id)
+        .filter((l) => l.space_id === b.id)
         .map((l) => ({
           id: l.id,
           name: l.name,
@@ -124,13 +124,13 @@ export async function workspaceOverview(ctx: ICtx) {
 }
 
 // --------------------------------------------------------------------------
-// board_get
+// space_get
 // --------------------------------------------------------------------------
 
-export async function boardGet(ctx: ICtx, params: TBoardGet) {
-  const board = await boardByKey(ctx, params.board)
-  const where: string[] = ['i.board_id = ?']
-  const args: unknown[] = [board.id]
+export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
+  const space = await spaceByKey(ctx, params.space)
+  const where: string[] = ['i.space_id = ?']
+  const args: unknown[] = [space.id]
 
   if (params.state === 'open') where.push('i.archived = 0')
   else if (params.state === 'archived') where.push('i.archived = 1')
@@ -170,7 +170,7 @@ export async function boardGet(ctx: ICtx, params: TBoardGet) {
   }
   if (params.assignee) {
     // Comma separated and "any of these", exactly like `label` above. The
-    // board filters people by avatar now, and an avatar row you can only
+    // space filters people by avatar now, and an avatar row you can only
     // pick one of is a radio group wearing the wrong clothes.
     const handles = params.assignee
       .split(',')
@@ -237,7 +237,7 @@ export async function boardGet(ctx: ICtx, params: TBoardGet) {
   }))
 
   return {
-    board: { key: board.key, name: board.name },
+    space: { key: space.key, name: space.name },
     items,
     cursor: rows.length > params.limit ? page[page.length - 1].key : undefined,
   }
@@ -254,10 +254,10 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
   const items = []
   for (const key of params.keys) {
     const item = await itemByKey(ctx, key)
-    const boardKey = (
+    const spaceKey = (
       await ctx.db.query<{ key: string }>(
-        'SELECT key FROM board WHERE id = ?',
-        [item.board_id],
+        'SELECT key FROM space WHERE id = ?',
+        [item.space_id],
       )
     )[0].key
     const listName = (
@@ -281,7 +281,7 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
 
     const out: Record<string, unknown> = {
       key: item.key,
-      board: boardKey,
+      space: spaceKey,
       list: listName,
       title: item.title,
       description: item.description,
@@ -528,18 +528,18 @@ export async function search(ctx: ICtx, params: TSearch) {
   const args: unknown[] = [match]
   let filter = `kind IN (${types.map(() => '?').join(',')})`
   args.push(...types)
-  if (params.board) {
-    filter += ' AND board_key = ?'
-    args.push(params.board)
+  if (params.space) {
+    filter += ' AND space_key = ?'
+    args.push(params.space)
   }
   const rows = await ctx.db.query<{
     kind: string
     ref: string
     title: string
     snippet: string
-    board_key: string
+    space_key: string
   }>(
-    `SELECT kind, ref, title, board_key, snippet(fts, 3, '<<', '>>', '...', 12) AS snippet
+    `SELECT kind, ref, title, space_key, snippet(fts, 3, '<<', '>>', '...', 12) AS snippet
        FROM fts WHERE fts MATCH ? AND ${filter} LIMIT ?`,
     [...args, params.limit],
   )
@@ -549,7 +549,7 @@ export async function search(ctx: ICtx, params: TSearch) {
       ref: r.ref,
       title: r.title,
       snippet: r.snippet,
-      board: r.board_key || undefined,
+      space: r.space_key || undefined,
     })),
   }
 }

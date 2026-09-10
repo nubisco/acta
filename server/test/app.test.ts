@@ -23,7 +23,7 @@ describe('server skeleton', () => {
     for (const t of [
       'workspace',
       'actor',
-      'board',
+      'space',
       'list',
       'item',
       'document',

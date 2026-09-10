@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { isBoardKey, isDocSlug, parseItemKey, slugify } from '../src/keys'
+import { isSpaceKey, isDocSlug, parseItemKey, slugify } from '../src/keys'
 
 describe('keys', () => {
-  it('validates board keys', () => {
-    expect(isBoardKey('SW')).toBe(true)
-    expect(isBoardKey('DOOD')).toBe(true)
-    expect(isBoardKey('X')).toBe(false)
-    expect(isBoardKey('TOOLONG')).toBe(false)
-    expect(isBoardKey('sw')).toBe(false)
+  it('validates space keys', () => {
+    expect(isSpaceKey('SW')).toBe(true)
+    expect(isSpaceKey('DOOD')).toBe(true)
+    expect(isSpaceKey('X')).toBe(false)
+    expect(isSpaceKey('TOOLONG')).toBe(false)
+    expect(isSpaceKey('sw')).toBe(false)
   })
 
   it('parses item keys', () => {
-    expect(parseItemKey('SW-142')).toEqual({ board: 'SW', seq: 142 })
+    expect(parseItemKey('SW-142')).toEqual({ space: 'SW', seq: 142 })
     expect(parseItemKey('SW142')).toBeNull()
   })
 

@@ -78,21 +78,21 @@ describe('frontmatter', () => {
 describe('extractRefs', () => {
   it('extracts all reference kinds and skips code', () => {
     const body = [
-      'See [[SW-142]] and [[board:DOOD]] and [[doc:manual/vision|the vision]].',
+      'See [[SW-142]] and [[space:DOOD]] and [[doc:manual/vision|the vision]].',
       'Ping [[@josesilva]].',
       '`[[SW-1]]` is code, and so is:',
       '```',
       '[[SW-2]]',
       '```',
-      '![[query: board=SUP state=open]]',
+      '![[query: space=SUP state=open]]',
     ].join('\n')
     const refs = extractRefs(body)
     expect(refs.map((r) => [r.type, r.target])).toEqual([
       ['item', 'SW-142'],
-      ['board', 'DOOD'],
+      ['space', 'DOOD'],
       ['doc', 'manual/vision'],
       ['actor', 'josesilva'],
-      ['query', 'board=SUP state=open'],
+      ['query', 'space=SUP state=open'],
     ])
     expect(refs[2].alias).toBe('the vision')
   })
@@ -100,8 +100,8 @@ describe('extractRefs', () => {
 
 describe('parseEmbedQuery', () => {
   it('accepts the fixed grammar only', () => {
-    expect(parseEmbedQuery('board=SUP state=open')).toEqual({
-      board: 'SUP',
+    expect(parseEmbedQuery('space=SUP state=open')).toEqual({
+      space: 'SUP',
       state: 'open',
     })
     expect(parseEmbedQuery('bogus=1')).toBeNull()

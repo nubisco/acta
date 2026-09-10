@@ -1,9 +1,9 @@
-import { newId, type TBoardOp, type TOpResult } from '@nubisco/acta-shared'
+import { newId, type TSpaceOp, type TOpResult } from '@nubisco/acta-shared'
 import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
 import { emitEvent } from '../core/events'
 import { withOp } from '../core/ops'
-import { boardByKey, listByRef, tailPos } from '../core/store'
+import { spaceByKey, listByRef, tailPos } from '../core/store'
 
 const KANBAN6: { name: string; role: string }[] = [
   { name: 'Backlog', role: 'backlog' },
@@ -14,40 +14,40 @@ const KANBAN6: { name: string; role: string }[] = [
   { name: 'Done', role: 'done' },
 ]
 
-export async function boardWrite(
+export async function spaceWrite(
   ctx: ICtx,
-  ops: TBoardOp[],
+  ops: TSpaceOp[],
 ): Promise<TOpResult[]> {
   const results: TOpResult[] = []
   for (const op of ops) {
-    results.push(await withOp(ctx, op.op_id, () => applyBoardOp(ctx, op)))
+    results.push(await withOp(ctx, op.op_id, () => applySpaceOp(ctx, op)))
   }
   return results
 }
 
-async function applyBoardOp(
+async function applySpaceOp(
   ctx: ICtx,
-  op: TBoardOp,
+  op: TSpaceOp,
 ): Promise<{ key?: string; id?: string }> {
   const ts = now()
   switch (op.op) {
     case 'create': {
       const existing = await ctx.db.query(
-        'SELECT id FROM board WHERE workspace_id = ? AND key = ?',
+        'SELECT id FROM space WHERE workspace_id = ? AND key = ?',
         [ctx.workspaceId, op.key],
       )
       if (existing.length > 0)
-        throw new ApiError(409, `board ${op.key} already exists`)
+        throw new ApiError(409, `space ${op.key} already exists`)
       const id = newId('brd')
       await ctx.db.run(
-        `INSERT INTO board (id, workspace_id, key, name, description, created_at, updated_at)
+        `INSERT INTO space (id, workspace_id, key, name, description, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [id, ctx.workspaceId, op.key, op.name, op.description ?? '', ts, ts],
       )
       if (op.template === 'kanban6') {
         for (const [i, l] of KANBAN6.entries()) {
           await ctx.db.run(
-            `INSERT INTO list (id, workspace_id, board_id, name, role, pos)
+            `INSERT INTO list (id, workspace_id, space_id, name, role, pos)
              VALUES (?, ?, ?, ?, ?, ?)`,
             [newId('lst'), ctx.workspaceId, id, l.name, l.role, (i + 1) * 1024],
           )
@@ -55,63 +55,63 @@ async function applyBoardOp(
       }
       await emitEvent(
         ctx,
-        'board.created',
-        'board',
+        'space.created',
+        'space',
         id,
-        `created board ${op.key} (${op.name})`,
+        `created space ${op.key} (${op.name})`,
       )
       return { key: op.key, id }
     }
     case 'update': {
-      const board = await boardByKey(ctx, op.key)
+      const space = await spaceByKey(ctx, op.key)
       await ctx.db.run(
-        'UPDATE board SET name = COALESCE(?, name), description = COALESCE(?, description), updated_at = ? WHERE id = ?',
-        [op.name ?? null, op.description ?? null, ts, board.id],
+        'UPDATE space SET name = COALESCE(?, name), description = COALESCE(?, description), updated_at = ? WHERE id = ?',
+        [op.name ?? null, op.description ?? null, ts, space.id],
       )
       await emitEvent(
         ctx,
-        'board.updated',
-        'board',
-        board.id,
-        `updated board ${op.key}`,
+        'space.updated',
+        'space',
+        space.id,
+        `updated space ${op.key}`,
       )
-      return { key: op.key, id: board.id }
+      return { key: op.key, id: space.id }
     }
     case 'archive': {
-      const board = await boardByKey(ctx, op.key)
+      const space = await spaceByKey(ctx, op.key)
       await ctx.db.run(
-        'UPDATE board SET archived = 1, updated_at = ? WHERE id = ?',
-        [ts, board.id],
+        'UPDATE space SET archived = 1, updated_at = ? WHERE id = ?',
+        [ts, space.id],
       )
       await emitEvent(
         ctx,
-        'board.archived',
-        'board',
-        board.id,
-        `archived board ${op.key}`,
+        'space.archived',
+        'space',
+        space.id,
+        `archived space ${op.key}`,
       )
-      return { key: op.key, id: board.id }
+      return { key: op.key, id: space.id }
     }
     case 'list_create': {
-      const board = await boardByKey(ctx, op.board)
+      const space = await spaceByKey(ctx, op.space)
       const id = newId('lst')
-      const pos = op.pos ?? (await tailPos(ctx, 'list', 'board_id', board.id))
+      const pos = op.pos ?? (await tailPos(ctx, 'list', 'space_id', space.id))
       await ctx.db.run(
-        'INSERT INTO list (id, workspace_id, board_id, name, role, pos) VALUES (?, ?, ?, ?, ?, ?)',
-        [id, ctx.workspaceId, board.id, op.name, op.role, pos],
+        'INSERT INTO list (id, workspace_id, space_id, name, role, pos) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, ctx.workspaceId, space.id, op.name, op.role, pos],
       )
       await emitEvent(
         ctx,
         'list.created',
         'list',
         id,
-        `created list ${op.name} on ${op.board}`,
+        `created list ${op.name} on ${op.space}`,
       )
       return { id }
     }
     case 'list_update': {
-      const board = await boardByKey(ctx, op.board)
-      const list = await listByRef(ctx, board.id, op.list)
+      const space = await spaceByKey(ctx, op.space)
+      const list = await listByRef(ctx, space.id, op.list)
       await ctx.db.run(
         'UPDATE list SET name = COALESCE(?, name), role = COALESCE(?, role), pos = COALESCE(?, pos) WHERE id = ?',
         [op.name ?? null, op.role ?? null, op.pos ?? null, list.id],
@@ -121,13 +121,13 @@ async function applyBoardOp(
         'list.updated',
         'list',
         list.id,
-        `updated list ${list.name} on ${op.board}`,
+        `updated list ${list.name} on ${op.space}`,
       )
       return { id: list.id }
     }
     case 'list_archive': {
-      const board = await boardByKey(ctx, op.board)
-      const list = await listByRef(ctx, board.id, op.list)
+      const space = await spaceByKey(ctx, op.space)
+      const list = await listByRef(ctx, space.id, op.list)
       const open = await ctx.db.query<{ n: number }>(
         'SELECT COUNT(*) AS n FROM item WHERE list_id = ? AND archived = 0',
         [list.id],
@@ -143,7 +143,7 @@ async function applyBoardOp(
         'list.archived',
         'list',
         list.id,
-        `archived list ${list.name} on ${op.board}`,
+        `archived list ${list.name} on ${op.space}`,
       )
       return { id: list.id }
     }

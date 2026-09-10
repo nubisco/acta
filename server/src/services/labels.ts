@@ -3,7 +3,7 @@ import type { ICtx } from '../core/ctx'
 import { ApiError } from '../core/ctx'
 import { emitEvent } from '../core/events'
 import { withOp } from '../core/ops'
-import { boardByKey, labelByRef } from '../core/store'
+import { spaceByKey, labelByRef } from '../core/store'
 
 export async function labelWrite(
   ctx: ICtx,
@@ -29,11 +29,11 @@ async function groupByName(ctx: ICtx, name: string): Promise<{ id: string }> {
 async function applyLabelOp(ctx: ICtx, op: TLabelOp): Promise<{ id?: string }> {
   switch (op.op) {
     case 'group_create': {
-      const board = op.board ? await boardByKey(ctx, op.board) : null
+      const space = op.space ? await spaceByKey(ctx, op.space) : null
       const id = newId('lgr')
       await ctx.db.run(
-        'INSERT INTO label_group (id, workspace_id, board_id, name) VALUES (?, ?, ?, ?)',
-        [id, ctx.workspaceId, board?.id ?? null, op.name],
+        'INSERT INTO label_group (id, workspace_id, space_id, name) VALUES (?, ?, ?, ?)',
+        [id, ctx.workspaceId, space?.id ?? null, op.name],
       )
       await emitEvent(
         ctx,
@@ -116,7 +116,7 @@ async function applyLabelOp(ctx: ICtx, op: TLabelOp): Promise<{ id?: string }> {
 export async function seedDefaultLabels(ctx: ICtx): Promise<void> {
   const groupId = newId('lgr')
   await ctx.db.run(
-    'INSERT INTO label_group (id, workspace_id, board_id, name) VALUES (?, ?, NULL, ?)',
+    'INSERT INTO label_group (id, workspace_id, space_id, name) VALUES (?, ?, NULL, ?)',
     [groupId, ctx.workspaceId, 'Type'],
   )
   const taxonomy: [string, string][] = [

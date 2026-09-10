@@ -7,13 +7,13 @@ export async function ftsUpsert(
   ref: string,
   title: string,
   body: string,
-  boardKey = '',
+  spaceKey = '',
 ): Promise<void> {
   if (!ctx.db.supportsFts) return
   await ctx.db.run('DELETE FROM fts WHERE kind = ? AND ref = ?', [kind, ref])
   await ctx.db.run(
-    'INSERT INTO fts (kind, ref, title, body, board_key) VALUES (?, ?, ?, ?, ?)',
-    [kind, ref, title, body, boardKey],
+    'INSERT INTO fts (kind, ref, title, body, space_key) VALUES (?, ?, ?, ?, ?)',
+    [kind, ref, title, body, spaceKey],
   )
 }
 

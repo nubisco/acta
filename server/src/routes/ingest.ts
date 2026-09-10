@@ -30,11 +30,11 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
       id: string
       workspace_id: string
       actor_id: string
-      board_id: string
+      space_id: string
       list_id: string | null
       handle: string
     }>(
-      `SELECT t.id, t.workspace_id, t.actor_id, t.board_id, t.list_id, a.handle
+      `SELECT t.id, t.workspace_id, t.actor_id, t.space_id, t.list_id, a.handle
          FROM ingest_token t JOIN actor a ON a.id = t.actor_id
         WHERE t.token_hash = ? AND a.disabled = 0`,
       [tokenHash],
@@ -49,9 +49,9 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
       return c.json({ error: 'validation', detail: String(err) }, 400)
     }
 
-    const board = (
-      await db.query<{ key: string }>('SELECT key FROM board WHERE id = ?', [
-        token.board_id,
+    const space = (
+      await db.query<{ key: string }>('SELECT key FROM space WHERE id = ?', [
+        token.space_id,
       ])
     )[0]
     const list =
@@ -63,8 +63,8 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
       )[0]?.name ??
       (
         await db.query<{ name: string }>(
-          `SELECT name FROM list WHERE board_id = ? AND archived = 0 ORDER BY CASE role WHEN 'inbox' THEN 0 WHEN 'backlog' THEN 1 ELSE 2 END, pos LIMIT 1`,
-          [token.board_id],
+          `SELECT name FROM list WHERE space_id = ? AND archived = 0 ORDER BY CASE role WHEN 'inbox' THEN 0 WHEN 'backlog' THEN 1 ELSE 2 END, pos LIMIT 1`,
+          [token.space_id],
         )
       )[0]?.name
 
@@ -97,7 +97,7 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
         {
           op: 'create',
           op_id: `ingest:${newId('itm')}`,
-          board: body.board ?? board.key,
+          space: body.space ?? space.key,
           list: list ?? 'Backlog',
           title: body.title,
           description,
@@ -172,7 +172,7 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
 /** Admin management of ingest tokens (REST only). */
 export const zIngestTokenCreate = z.object({
   name: z.string().min(1).max(100),
-  board: z.string().min(2).max(5),
+  space: z.string().min(2).max(5),
   list: z.string().optional(),
 })
 
@@ -180,17 +180,17 @@ export async function createIngestToken(
   ctx: ICtx,
   input: z.infer<typeof zIngestTokenCreate>,
 ): Promise<{ token: string; actor_id: string }> {
-  const board = await ctx.db.query<{ id: string }>(
-    'SELECT id FROM board WHERE workspace_id = ? AND key = ?',
-    [ctx.workspaceId, input.board],
+  const space = await ctx.db.query<{ id: string }>(
+    'SELECT id FROM space WHERE workspace_id = ? AND key = ?',
+    [ctx.workspaceId, input.space],
   )
-  if (board.length === 0)
-    throw new ApiError(404, `board ${input.board} not found`)
+  if (space.length === 0)
+    throw new ApiError(404, `space ${input.space} not found`)
   let listId: string | null = null
   if (input.list) {
     const list = await ctx.db.query<{ id: string }>(
-      'SELECT id FROM list WHERE board_id = ? AND lower(name) = lower(?)',
-      [board[0].id, input.list],
+      'SELECT id FROM list WHERE space_id = ? AND lower(name) = lower(?)',
+      [space[0].id, input.list],
     )
     if (list.length === 0)
       throw new ApiError(404, `list ${input.list} not found`)
@@ -207,27 +207,27 @@ export async function createIngestToken(
   )
   // The raw ingest token doubles as a bearer credential hash source; it is
   // stored only hashed, same as auth tokens.
-  const raw = await createIngestSecret(ctx, actorId, board[0].id, listId)
+  const raw = await createIngestSecret(ctx, actorId, space[0].id, listId)
   return { token: raw, actor_id: actorId }
 }
 
 async function createIngestSecret(
   ctx: ICtx,
   actorId: string,
-  boardId: string,
+  spaceId: string,
   listId: string | null,
 ): Promise<string> {
   const raw = crypto
     .getRandomValues(new Uint8Array(24))
     .reduce((s, b) => s + b.toString(16).padStart(2, '0'), '')
   await ctx.db.run(
-    'INSERT INTO ingest_token (id, workspace_id, token_hash, actor_id, board_id, list_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO ingest_token (id, workspace_id, token_hash, actor_id, space_id, list_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [
       newId('act'),
       ctx.workspaceId,
       await sha256Hex(raw),
       actorId,
-      boardId,
+      spaceId,
       listId,
       now(),
     ],

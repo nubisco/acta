@@ -35,9 +35,9 @@ interface IConnectionRow {
   provider: string
   secret: string
   actor_id: string
-  board_key: string
+  space_key: string
   list_name: string | null
-  board_id: string
+  space_id: string
   config: string
   handle: string
 }
@@ -83,7 +83,7 @@ export async function verifyGithubSignature(
 
 /**
  * The list a new card lands in: the connection's configured list, else the
- * board's inbox or backlog, else whatever comes first. Same precedence the
+ * space's inbox or backlog, else whatever comes first. Same precedence the
  * ingest route uses, so both inbound paths behave alike.
  */
 async function landingList(
@@ -92,10 +92,10 @@ async function landingList(
 ): Promise<string> {
   if (connection.list_name) return connection.list_name
   const rows = await db.query<{ name: string }>(
-    `SELECT name FROM list WHERE board_id = ? AND archived = 0
+    `SELECT name FROM list WHERE space_id = ? AND archived = 0
       ORDER BY CASE role WHEN 'inbox' THEN 0 WHEN 'backlog' THEN 1 ELSE 2 END, pos
       LIMIT 1`,
-    [connection.board_id],
+    [connection.space_id],
   )
   return rows[0]?.name ?? 'Backlog'
 }
@@ -168,10 +168,10 @@ export function hookRoutes(): Hono<IHookEnv> {
     const db = c.get('db')
     const rows = await db.query<IConnectionRow>(
       `SELECT c.id, c.workspace_id, c.provider, c.secret, c.actor_id,
-              c.board_id, c.config, b.key AS board_key, l.name AS list_name,
+              c.space_id, c.config, b.key AS space_key, l.name AS list_name,
               a.handle
          FROM connection c
-         JOIN board b ON b.id = c.board_id
+         JOIN space b ON b.id = c.space_id
          JOIN actor a ON a.id = c.actor_id
          LEFT JOIN list l ON l.id = c.list_id
         WHERE c.id = ? AND c.provider = 'github' AND c.enabled = 1`,
@@ -261,7 +261,7 @@ export function hookRoutes(): Hono<IHookEnv> {
           {
             op: 'create',
             op_id: `github:${delivery}`,
-            board: connection.board_key,
+            space: connection.space_key,
             list: await landingList(db, connection),
             title: issue.title?.slice(0, 500) || `Issue #${issue.number}`,
             description: issueDescription(payload),

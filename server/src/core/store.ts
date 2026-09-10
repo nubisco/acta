@@ -6,7 +6,7 @@
 import type { ICtx } from './ctx'
 import { ApiError } from './ctx'
 
-export interface IBoardRow {
+export interface ISpaceRow {
   id: string
   key: string
   name: string
@@ -17,7 +17,7 @@ export interface IBoardRow {
 
 export interface IListRow {
   id: string
-  board_id: string
+  space_id: string
   name: string
   role: string
   pos: number
@@ -26,7 +26,7 @@ export interface IListRow {
 
 export interface IItemRow {
   id: string
-  board_id: string
+  space_id: string
   list_id: string
   key: string
   title: string
@@ -47,7 +47,7 @@ export interface IDocRow {
   slug: string
   title: string
   parent_id: string | null
-  board_id: string | null
+  space_id: string | null
   pos: number
   body: string
   layout: string
@@ -59,31 +59,31 @@ export interface IDocRow {
   imported_meta: string | null
 }
 
-export async function boardByKey(ctx: ICtx, key: string): Promise<IBoardRow> {
-  const rows = await ctx.db.query<IBoardRow>(
-    'SELECT * FROM board WHERE workspace_id = ? AND key = ?',
+export async function spaceByKey(ctx: ICtx, key: string): Promise<ISpaceRow> {
+  const rows = await ctx.db.query<ISpaceRow>(
+    'SELECT * FROM space WHERE workspace_id = ? AND key = ?',
     [ctx.workspaceId, key],
   )
-  if (rows.length === 0) throw new ApiError(404, `board ${key} not found`)
+  if (rows.length === 0) throw new ApiError(404, `space ${key} not found`)
   return rows[0]
 }
 
-/** Lists are addressed by name (case-insensitive) or id within a board. */
+/** Lists are addressed by name (case-insensitive) or id within a space. */
 export async function listByRef(
   ctx: ICtx,
-  boardId: string,
+  spaceId: string,
   ref: string,
 ): Promise<IListRow> {
   const rows = await ctx.db.query<IListRow>(
-    `SELECT * FROM list WHERE workspace_id = ? AND board_id = ? AND archived = 0
+    `SELECT * FROM list WHERE workspace_id = ? AND space_id = ? AND archived = 0
        AND (id = ? OR lower(name) = lower(?)) LIMIT 1`,
-    [ctx.workspaceId, boardId, ref, ref],
+    [ctx.workspaceId, spaceId, ref, ref],
   )
   if (rows.length === 0) throw new ApiError(404, `list ${ref} not found`)
   return rows[0]
 }
 
-/** Items resolve by key, following key aliases from cross-board moves. */
+/** Items resolve by key, following key aliases from cross-space moves. */
 export async function itemByKey(ctx: ICtx, key: string): Promise<IItemRow> {
   const rows = await ctx.db.query<IItemRow>(
     'SELECT * FROM item WHERE workspace_id = ? AND key = ?',
@@ -128,9 +128,9 @@ export async function actorByRef(
 export async function labelByRef(
   ctx: ICtx,
   ref: string,
-  boardId?: string,
+  spaceId?: string,
 ): Promise<{ id: string; name: string; group_id: string }> {
-  // Accept a label id or a name; names resolve board-local first, then
+  // Accept a label id or a name; names resolve space-local first, then
   // workspace groups.
   const byId = await ctx.db.query<{
     id: string
@@ -141,16 +141,16 @@ export async function labelByRef(
     ref,
   ])
   if (byId.length > 0) return byId[0]
-  // With a board context, prefer that board's labels over workspace ones and
-  // hide other boards' labels; without one, any unique name resolves.
-  const byName = await (boardId
+  // With a space context, prefer that space's labels over workspace ones and
+  // hide other spaces' labels; without one, any unique name resolves.
+  const byName = await (spaceId
     ? ctx.db.query<{ id: string; name: string; group_id: string }>(
         `SELECT l.id, l.name, l.group_id FROM label l
            JOIN label_group g ON g.id = l.group_id
           WHERE l.workspace_id = ? AND lower(l.name) = lower(?)
-            AND (g.board_id IS NULL OR g.board_id = ?)
-          ORDER BY g.board_id IS NULL`,
-        [ctx.workspaceId, ref, boardId],
+            AND (g.space_id IS NULL OR g.space_id = ?)
+          ORDER BY g.space_id IS NULL`,
+        [ctx.workspaceId, ref, spaceId],
       )
     : ctx.db.query<{ id: string; name: string; group_id: string }>(
         `SELECT l.id, l.name, l.group_id FROM label l
