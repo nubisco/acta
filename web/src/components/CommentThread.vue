@@ -21,7 +21,12 @@
           >
             imported
           </NbBadge>
-          <NbAiLabel v-if="comment.agent" />
+          <!-- Never on an imported comment. The import runs as an agent, so
+               every migrated comment claimed to be written by an AI when it
+               was written by a person years before Acta existed. The author
+               shown is the original one, and the "imported" badge already
+               says where it came from. -->
+          <NbAiLabel v-if="comment.agent && !comment.imported?.author" />
           <time :datetime="timestampIso(comment)">
             {{ timestampLabel(comment) }}
           </time>
@@ -155,7 +160,6 @@ const draft = computed({
 
   &__body {
     padding: var(--nb-spacing-8) var(--nb-spacing-12);
-    margin-inline-start: calc(24px + var(--nb-spacing-8));
     border-radius: var(--nb-radius-sm, 8px);
     background: var(--nb-c-surface-sunken, rgb(128 128 128 / 8%));
   }

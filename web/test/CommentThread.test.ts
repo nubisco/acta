@@ -85,4 +85,24 @@ describe('CommentThread', () => {
     expect(avatar.props('handle')).toBe('ivan')
     expect(avatar.props('name')).toBeUndefined()
   })
+
+  // The import runs as an agent, so every migrated comment claimed to have
+  // been written by an AI when it was written by a person, years before Acta
+  // existed.
+  it('does not call an imported comment AI-written', () => {
+    const view = render([
+      {
+        ...BASE,
+        agent: true,
+        imported: { source: 'trello', author: 'Ivan Marjanovic' },
+      },
+    ])
+    expect(view.html()).not.toContain('nb-ai-label')
+    expect(view.text()).toContain('imported')
+  })
+
+  it('still labels a genuinely agent-written comment', () => {
+    const view = render([{ ...BASE, agent: true }])
+    expect(view.html()).toContain('nb-ai-label')
+  })
 })

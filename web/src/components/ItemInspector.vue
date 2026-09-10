@@ -22,331 +22,336 @@
 
   <div v-else-if="it.item.value" class="nb-inspector">
     <!-- No panel wrapper. A panel titled "Details" around content that is
-           already a titled stack of sections put a frame and a heading around
-           the whole card, which is not a section of anything. The save
-           indicator moves in beside the card's own controls. -->
-    <div class="inspector-head">
-      <NbButton
-        v-if="inspector.trail.value.length > 0"
-        v-nb-tooltip="{ body: `Back to ${inspector.trail.value.at(-1)}` }"
-        size="xs"
-        variant="ghost"
-        icon="arrow-left"
-        :aria-label="`Back to ${inspector.trail.value.at(-1)}`"
-        @click="inspector.back()"
-      />
-      <span class="inspector-key">{{ it.item.value.key }}</span>
-      <NbBadge
-        v-if="it.lifecycle.value"
-        :variant="it.lifecycle.value.variant"
-        :dot="it.lifecycle.value.dot"
-        size="md"
-      >
-        {{ it.lifecycle.value.text }}
-      </NbBadge>
-      <span class="inspector-actions">
-        <NbInlineLoading
-          :status="it.save.status.value"
-          label="Saving"
-          finished-label="Saved"
-          error-label="Not saved"
-          :dwell="1200"
-          reserve-space
+         already a titled stack of sections put a frame and a heading around
+         the whole card, which is not a section of anything, and the save
+         indicator moves in beside the card's own controls.
+         The inset the panel used to provide comes back on this column: the
+         .nb-inspector pattern's own padding is a gutter meant to sit BETWEEN
+         stacked panels, so without one the content ran to both edges. -->
+    <div class="inspector">
+      <div class="inspector-head">
+        <NbButton
+          v-if="inspector.trail.value.length > 0"
+          v-nb-tooltip="{ body: `Back to ${inspector.trail.value.at(-1)}` }"
+          size="xs"
+          variant="ghost"
+          icon="arrow-left"
+          :aria-label="`Back to ${inspector.trail.value.at(-1)}`"
+          @click="inspector.back()"
         />
-        <!-- Finding a card through search or a link drops you into this
+        <span class="inspector-key">{{ it.item.value.key }}</span>
+        <NbBadge
+          v-if="it.lifecycle.value"
+          :variant="it.lifecycle.value.variant"
+          :dot="it.lifecycle.value.dot"
+          size="md"
+        >
+          {{ it.lifecycle.value.text }}
+        </NbBadge>
+        <span class="inspector-actions">
+          <NbInlineLoading
+            :status="it.save.status.value"
+            label="Saving"
+            finished-label="Saved"
+            error-label="Not saved"
+            :dwell="1200"
+            reserve-space
+          />
+          <!-- Finding a card through search or a link drops you into this
                panel with no sense of where the card actually lives. The space
                marks the open card, so arriving there puts it under the
                reader's eye rather than making them hunt the column. -->
-        <NbButton
-          v-nb-tooltip="{ body: `Show on ${it.item.value.space}` }"
-          size="xs"
-          variant="ghost"
-          icon="kanban"
-          :aria-label="`Show ${it.item.value.key} on its space`"
-          @click="viewOnBoard"
-        />
-        <!-- Archive was only ever reachable through the Status select,
+          <NbButton
+            v-nb-tooltip="{ body: `Show on ${it.item.value.space}` }"
+            size="xs"
+            variant="ghost"
+            icon="kanban"
+            :aria-label="`Show ${it.item.value.key} on its space`"
+            @click="viewOnBoard"
+          />
+          <!-- Archive was only ever reachable through the Status select,
                which is why it read as missing. Same set as the space's
                right-click menu, so both surfaces agree. -->
-        <NbButton
-          v-if="it.item.value.archived"
-          v-nb-tooltip="{ body: 'Restore to its list' }"
-          size="xs"
-          variant="secondary"
-          icon="arrow-counter-clockwise"
-          :aria-label="`Restore ${it.item.value.key}`"
-          @click="it.toggle('restore')"
-        />
-        <NbButton
-          v-else
-          v-nb-tooltip="{ body: 'Archive this card' }"
-          size="xs"
-          variant="ghost"
-          icon="archive"
-          :aria-label="`Archive ${it.item.value.key}`"
-          @click="it.toggle('archive')"
-        />
-        <!-- Delete only on an archived card: archive is the reversible
+          <NbButton
+            v-if="it.item.value.archived"
+            v-nb-tooltip="{ body: 'Restore to its list' }"
+            size="xs"
+            variant="secondary"
+            icon="arrow-counter-clockwise"
+            :aria-label="`Restore ${it.item.value.key}`"
+            @click="it.toggle('restore')"
+          />
+          <NbButton
+            v-else
+            v-nb-tooltip="{ body: 'Archive this card' }"
+            size="xs"
+            variant="ghost"
+            icon="archive"
+            :aria-label="`Archive ${it.item.value.key}`"
+            @click="it.toggle('archive')"
+          />
+          <!-- Delete only on an archived card: archive is the reversible
                action, and the server refuses a delete before it. -->
-        <NbButton
-          v-if="it.item.value.archived"
-          v-nb-tooltip="{ body: 'Delete permanently' }"
-          size="xs"
-          variant="danger"
-          outlined
-          icon="trash"
-          :aria-label="`Delete ${it.item.value.key} permanently`"
-          @click="confirmDelete"
-        />
-        <!-- Opening a card was a one-way door: the panel had a way back to
+          <NbButton
+            v-if="it.item.value.archived"
+            v-nb-tooltip="{ body: 'Delete permanently' }"
+            size="xs"
+            variant="danger"
+            outlined
+            icon="trash"
+            :aria-label="`Delete ${it.item.value.key} permanently`"
+            @click="confirmDelete"
+          />
+          <!-- Opening a card was a one-way door: the panel had a way back to
                the previous card but no way out, so the only exit was opening
                something else. Closing clears the trail too, otherwise the
                next card you open inherits a way "back" to one you already
                dismissed. -->
-        <!-- Same card, more room. The panel is a column beside the space;
+          <!-- Same card, more room. The panel is a column beside the space;
                some cards want the width, and switching should not mean losing
                your place and opening it again. -->
-        <NbButton
-          v-nb-tooltip="{ body: 'Open full size' }"
-          size="xs"
-          variant="ghost"
-          icon="arrows-out-simple"
-          :aria-label="`Open ${it.item.value.key} full size`"
-          @click="expand"
-        />
-        <NbButton
-          v-nb-tooltip="{ body: 'Close' }"
-          size="xs"
-          variant="ghost"
-          icon="x"
-          class="inspector-close"
-          aria-label="Close the details panel"
-          @click="inspector.close()"
-        />
-      </span>
-    </div>
-    <NbInlineEdit
-      v-model="it.draft.title"
-      label="Item title"
-      size="lg"
-      class="inspector-title"
-      @commit="it.commitTitle"
-    />
-    <ProvenanceNote
-      v-if="it.item.value.imported"
-      :imported="it.item.value.imported"
-      class="inspector-provenance"
-    />
-    <NbBanner
-      v-if="it.saveError.value"
-      status="error"
-      variant="inline"
-      :title="it.saveError.value"
-    />
-    <div class="inspector-fields">
-      <NbField v-slot="{ id }" label="Status">
-        <NbSelect
-          :id="id"
-          v-model="it.draft.status"
-          size="sm"
-          :options="[...ITEM_STATUS_OPTIONS]"
-          @change="it.commitStatus"
-        />
-      </NbField>
-      <NbField v-slot="{ id }" label="List">
-        <NbSelect
-          :id="id"
-          v-model="it.draft.list"
-          size="sm"
-          :options="it.listOptions.value"
-          @change="it.commitList"
-        />
-      </NbField>
-      <NbField v-slot="{ id }" label="Due">
-        <NbDatePicker
-          :id="id"
-          v-model="it.draft.due"
-          size="sm"
-          @change="it.commitDue"
-        />
-      </NbField>
-      <NbField v-slot="{ id }" label="Assignees">
-        <NbSelect
-          :id="id"
-          v-model="it.draft.assignees"
-          size="sm"
-          multiple
-          :options="it.assigneeOptions.value"
-          @change="it.commitAssignees"
-        >
-          <template #option="{ option }">
-            <ActorChip :handle="String(option.value)" />
-          </template>
-          <template #value="{ values }">
-            <span class="assignee-values">
-              <ActorChip
-                v-for="handle in values"
-                :key="String(handle)"
-                :handle="String(handle)"
-              />
-            </span>
-          </template>
-        </NbSelect>
-      </NbField>
-      <NbField v-slot="{ id }" label="Labels">
-        <NbSelect
-          :id="id"
-          v-model="it.draft.labels"
-          size="sm"
-          multiple
-          :options="it.labelOptions.value"
-          @change="it.commitLabels"
-        >
-          <template #option="{ option }">
-            <LabelBadge :name="String(option.value)" />
-          </template>
-          <template #value="{ values }">
-            <span class="label-values">
-              <LabelBadge
-                v-for="name in values"
-                :key="String(name)"
-                :name="String(name)"
-              />
-            </span>
-          </template>
-        </NbSelect>
-      </NbField>
-      <form class="inspector-new-checklist" @submit.prevent="addChecklist">
-        <NbTextInput
-          id="field-inspector-new-checklist"
-          v-model="newChecklist"
-          size="sm"
-          placeholder="Add a checklist..."
-          aria-label="New checklist name"
-        />
-        <NbButton
-          type="submit"
-          size="xs"
-          variant="secondary"
-          :disabled="!newChecklist.trim()"
-        >
-          Add
-        </NbButton>
-      </form>
-    </div>
+          <NbButton
+            v-nb-tooltip="{ body: 'Open full size' }"
+            size="xs"
+            variant="ghost"
+            icon="arrows-out-simple"
+            :aria-label="`Open ${it.item.value.key} full size`"
+            @click="expand"
+          />
+          <NbButton
+            v-nb-tooltip="{ body: 'Close' }"
+            size="xs"
+            variant="ghost"
+            icon="x"
+            class="inspector-close"
+            aria-label="Close the details panel"
+            @click="inspector.close()"
+          />
+        </span>
+      </div>
+      <NbInlineEdit
+        v-model="it.draft.title"
+        label="Item title"
+        size="lg"
+        class="inspector-title"
+        @commit="it.commitTitle"
+      />
+      <ProvenanceNote
+        v-if="it.item.value.imported"
+        :imported="it.item.value.imported"
+        class="inspector-provenance"
+      />
+      <NbBanner
+        v-if="it.saveError.value"
+        status="error"
+        variant="inline"
+        :title="it.saveError.value"
+      />
+      <div class="inspector-fields">
+        <NbField v-slot="{ id }" label="Status">
+          <NbSelect
+            :id="id"
+            v-model="it.draft.status"
+            size="sm"
+            :options="[...ITEM_STATUS_OPTIONS]"
+            @change="it.commitStatus"
+          />
+        </NbField>
+        <NbField v-slot="{ id }" label="List">
+          <NbSelect
+            :id="id"
+            v-model="it.draft.list"
+            size="sm"
+            :options="it.listOptions.value"
+            @change="it.commitList"
+          />
+        </NbField>
+        <NbField v-slot="{ id }" label="Due">
+          <NbDatePicker
+            :id="id"
+            v-model="it.draft.due"
+            size="sm"
+            @change="it.commitDue"
+          />
+        </NbField>
+        <NbField v-slot="{ id }" label="Assignees">
+          <NbSelect
+            :id="id"
+            v-model="it.draft.assignees"
+            size="sm"
+            multiple
+            :options="it.assigneeOptions.value"
+            @change="it.commitAssignees"
+          >
+            <template #option="{ option }">
+              <ActorChip :handle="String(option.value)" />
+            </template>
+            <template #value="{ values }">
+              <span class="assignee-values">
+                <ActorChip
+                  v-for="handle in values"
+                  :key="String(handle)"
+                  :handle="String(handle)"
+                />
+              </span>
+            </template>
+          </NbSelect>
+        </NbField>
+        <NbField v-slot="{ id }" label="Labels">
+          <NbSelect
+            :id="id"
+            v-model="it.draft.labels"
+            size="sm"
+            multiple
+            :options="it.labelOptions.value"
+            @change="it.commitLabels"
+          >
+            <template #option="{ option }">
+              <LabelBadge :name="String(option.value)" />
+            </template>
+            <template #value="{ values }">
+              <span class="label-values">
+                <LabelBadge
+                  v-for="name in values"
+                  :key="String(name)"
+                  :name="String(name)"
+                />
+              </span>
+            </template>
+          </NbSelect>
+        </NbField>
+        <form class="inspector-new-checklist" @submit.prevent="addChecklist">
+          <NbTextInput
+            id="field-inspector-new-checklist"
+            v-model="newChecklist"
+            size="sm"
+            placeholder="Add a checklist..."
+            aria-label="New checklist name"
+          />
+          <NbButton
+            type="submit"
+            size="xs"
+            variant="secondary"
+            :disabled="!newChecklist.trim()"
+          >
+            Add
+          </NbButton>
+        </form>
+      </div>
 
-    <!-- Everything past the core fields is a labelled, collapsible row.
+      <!-- Everything past the core fields is a labelled, collapsible row.
            Stacked as panels, a long description pushed comments so far down
            the panel that a card with eleven of them read as having none; the
            counts in each header say what is there without opening it. -->
-    <!-- Always visible. The description is what the card IS; putting it
+      <!-- Always visible. The description is what the card IS; putting it
            behind a disclosure means every card opens showing nothing. -->
-    <div class="inspector-section">
-      <h3 class="inspector-section__title">
-        <NbIcon name="text-align-left" :size="15" />
-        Description
-      </h3>
-      <MarkdownEditor
-        v-if="editingDescription"
-        v-model="it.draft.description"
-        placeholder="Describe this item..."
-        class="inspector-editor"
-        autofocus
-        @blur="commitDescription"
-      />
-      <div
-        v-else-if="it.draft.description.trim()"
-        class="inspector-description"
-        role="button"
-        tabindex="0"
-        aria-label="Description. Press Enter to edit."
-        @click="editingDescription = true"
-        @keydown.enter.prevent="editingDescription = true"
-      >
-        <MarkdownView :source="it.draft.description" :clamp="18" />
+      <div class="inspector-section">
+        <h3 class="inspector-section__title">
+          <NbIcon name="text-align-left" :size="15" />
+          Description
+        </h3>
+        <MarkdownEditor
+          v-if="editingDescription"
+          v-model="it.draft.description"
+          placeholder="Describe this item..."
+          class="inspector-editor"
+          autofocus
+          @blur="commitDescription"
+        />
+        <div
+          v-else-if="it.draft.description.trim()"
+          class="inspector-description"
+          role="button"
+          tabindex="0"
+          aria-label="Description. Press Enter to edit."
+          @click="editingDescription = true"
+          @keydown.enter.prevent="editingDescription = true"
+        >
+          <MarkdownView :source="it.draft.description" :clamp="18" />
+        </div>
+        <button
+          v-else
+          type="button"
+          class="inspector-description-empty"
+          @click="editingDescription = true"
+        >
+          Add a description...
+        </button>
       </div>
-      <button
-        v-else
-        type="button"
-        class="inspector-description-empty"
-        @click="editingDescription = true"
-      >
-        Add a description...
-      </button>
-    </div>
 
-    <NbAccordion v-model="openSections" multiple flush size="sm">
-      <NbAccordionItem
-        v-for="checklist in it.item.value.checklists ?? []"
-        :id="`checklist:${checklist.name}`"
-        :key="checklist.name"
-        :title="checklist.name"
-      >
-        <!-- In the meta slot because the header has no actions slot, and
+      <NbAccordion v-model="openSections" multiple flush size="sm">
+        <NbAccordionItem
+          v-for="checklist in it.item.value.checklists ?? []"
+          :id="`checklist:${checklist.name}`"
+          :key="checklist.name"
+          :title="checklist.name"
+        >
+          <!-- In the meta slot because the header has no actions slot, and
                .stop so removing a checklist does not also toggle the section
                it lives in. -->
-        <template #meta>
-          <span class="inspector-progress">
-            {{ checklist.items.filter((entry) => entry.done).length }}/{{
-              checklist.items.length
-            }}
-          </span>
-          <NbButton
-            size="xxs"
-            variant="ghost"
-            icon="trash-simple"
-            :aria-label="`Delete checklist ${checklist.name}`"
-            @click.stop="confirmDeleteChecklist(checklist.name)"
+          <template #meta>
+            <span class="inspector-progress">
+              {{ checklist.items.filter((entry) => entry.done).length }}/{{
+                checklist.items.length
+              }}
+            </span>
+            <NbButton
+              size="xxs"
+              variant="ghost"
+              icon="trash-simple"
+              :aria-label="`Delete checklist ${checklist.name}`"
+              @click.stop="confirmDeleteChecklist(checklist.name)"
+            />
+          </template>
+          <ChecklistBody
+            :items="checklist.items"
+            @toggle="(text, done) => it.toggleCheck(checklist.name, text, done)"
+            @add="(text) => it.addChecklistEntry(checklist.name, text)"
+            @remove="(text) => it.removeChecklistEntry(checklist.name, text)"
           />
-        </template>
-        <ChecklistBody
-          :items="checklist.items"
-          @toggle="(text, done) => it.toggleCheck(checklist.name, text, done)"
-          @add="(text) => it.addChecklistEntry(checklist.name, text)"
-          @remove="(text) => it.removeChecklistEntry(checklist.name, text)"
-        />
-      </NbAccordionItem>
+        </NbAccordionItem>
 
-      <NbAccordionItem
-        id="attachments"
-        title="Attachments"
-        :meta="countLabel(it.item.value.attachments)"
-      >
-        <AttachmentsPanel
-          :owner="{ item: it.item.value.key }"
-          :attachments="it.item.value.attachments ?? []"
-          @changed="it.load"
-        />
-      </NbAccordionItem>
-
-      <NbAccordionItem
-        v-if="it.linkFacts.value.length > 0"
-        id="links"
-        title="Links"
-        :meta="countLabel(it.linkFacts.value)"
-      >
-        <NbDefinitionList :items="it.linkFacts.value" layout="stacked" />
-      </NbAccordionItem>
-    </NbAccordion>
-    <!-- Always visible, and last. Burying the conversation behind a
-           disclosure is the fault this whole change exists to fix. -->
-    <div class="inspector-section">
-      <h3 class="inspector-section__title">
-        <NbIcon name="chat-circle" :size="15" />
-        Comments
-        <span
-          v-if="countLabel(it.item.value.comments)"
-          class="inspector-section__count"
+        <NbAccordionItem
+          id="attachments"
+          title="Attachments"
+          :meta="countLabel(it.item.value.attachments)"
         >
-          {{ countLabel(it.item.value.comments) }}
-        </span>
-      </h3>
-      <CommentThread
-        v-model="it.commentDraft.value"
-        :comments="it.item.value.comments ?? []"
-        :commenting="it.commenting.value"
-        @submit="it.addComment"
-      />
+          <AttachmentsPanel
+            :owner="{ item: it.item.value.key }"
+            :attachments="it.item.value.attachments ?? []"
+            @changed="it.load"
+          />
+        </NbAccordionItem>
+
+        <NbAccordionItem
+          v-if="it.linkFacts.value.length > 0"
+          id="links"
+          title="Links"
+          :meta="countLabel(it.linkFacts.value)"
+        >
+          <NbDefinitionList :items="it.linkFacts.value" layout="stacked" />
+        </NbAccordionItem>
+      </NbAccordion>
+      <!-- Always visible, and last. Burying the conversation behind a
+           disclosure is the fault this whole change exists to fix. -->
+      <div class="inspector-section">
+        <h3 class="inspector-section__title">
+          <NbIcon name="chat-circle" :size="15" />
+          Comments
+          <span
+            v-if="countLabel(it.item.value.comments)"
+            class="inspector-section__count"
+          >
+            {{ countLabel(it.item.value.comments) }}
+          </span>
+        </h3>
+        <CommentThread
+          v-model="it.commentDraft.value"
+          :comments="it.item.value.comments ?? []"
+          :commenting="it.commenting.value"
+          @submit="it.addComment"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -476,6 +481,19 @@ function commitDescription(): void {
   display: grid;
   gap: var(--nb-spacing-12);
   padding: var(--nb-spacing-16);
+}
+
+/* The inset the removed panel used to provide. The library's inspector
+   pattern insets PANELS from the column edge and leaves the content inset to
+   the panel itself, so a panel-less inspector has to state it: the same
+   12px/8px rhythm NbShellPanel content uses, expressed in the spacing scale
+   so it tracks the theme rather than being two numbers I picked. */
+.inspector {
+  display: grid;
+  gap: var(--nb-spacing-12);
+  padding-inline: var(--nb-spacing-12);
+  padding-block: var(--nb-spacing-8) var(--nb-spacing-24);
+  min-inline-size: 0;
 }
 
 /* These were markup without styles, so the headings rendered at the browser's
