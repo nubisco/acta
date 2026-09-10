@@ -64,10 +64,6 @@ const overview = {
 // Shared so a test can point the panel at a card and assert the space marks
 // it, the same way `overview` above is shared: vi.mock's factory runs at
 // import time, after these declarations.
-// Shared with the shell in the real app, which is what decides whether the
-// side panel is open at all.
-const filtersOpen = ref(false)
-
 const inspectorMock = {
   open: vi.fn(),
   close: vi.fn(),
@@ -84,7 +80,6 @@ vi.mock('@/stores/workspace', () => ({
   }),
   useUiState: () => ({ newSpaceOpen: { value: false } }),
   useInspector: () => inspectorMock,
-  useSpaceFilters: () => ({ open: filtersOpen }),
 }))
 
 vi.mock('vue-router', () => ({
@@ -159,8 +154,6 @@ describe('SpaceView card menu', () => {
     inspectorMock.itemKey.value = null
     inspectorMock.open.mockClear()
     inspectorMock.close.mockClear()
-    // Module state in the real app too, so it persists unless reset.
-    filtersOpen.value = false
   })
 
   it('moving to the top actually writes a move', async () => {
@@ -303,9 +296,10 @@ describe('SpaceView card menu', () => {
     expect(filtersButton(view).text()).toContain('1')
   })
 
-  // One side panel, one thing in it. Enforced by a watcher rather than at each
-  // caller, so this covers the context menu and deep links too.
-  it('puts the filters away when a card opens', async () => {
+  // Filters live in the toolbar now, not the side panel, so the two no
+  // longer compete: a card and its filters can be on screen together, which
+  // is the point of moving them.
+  it('keeps the filters open while a card is open', async () => {
     const view = await render()
     await filtersButton(view).trigger('click')
     await flushPromises()
@@ -314,13 +308,21 @@ describe('SpaceView card menu', () => {
     inspectorMock.itemKey.value = 'SU-1'
     await flushPromises()
 
-    expect(view.find('#space-filter-panel').exists()).toBe(false)
+    expect(view.find('#space-filter-panel').exists()).toBe(true)
+    expect(inspectorMock.close).not.toHaveBeenCalled()
   })
 
-  it('closes the card details when the filters open', async () => {
+  // In the view's own toolbar, not teleported into the shell's side panel,
+  // which is where it rendered inert and invisible before.
+  it('renders the filters inside the space, not the side panel', async () => {
     const view = await render()
     await filtersButton(view).trigger('click')
     await flushPromises()
-    expect(inspectorMock.close).toHaveBeenCalled()
+
+    const panel = view.find('#space-filter-panel')
+    expect(panel.exists()).toBe(true)
+    expect(view.find('.space__bar').element.parentElement).toBe(
+      panel.element.parentElement,
+    )
   })
 })

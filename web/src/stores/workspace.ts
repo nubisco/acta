@@ -182,19 +182,6 @@ function describe(event: ILiveEvent): string {
 /** Cross-view UI state: inspector selection and dialogs. */
 const inspectedItemKey = ref<string | null>(null)
 
-/**
- * Whether the side panel is showing a space's filters.
- *
- * Module state rather than SpaceView's own, because the shell decides whether
- * the panel is open at all and it only knew about cards. A filter panel
- * teleported into a drawer that nothing had opened rendered into an inert,
- * hidden region: present in the DOM, invisible on screen.
- */
-const spaceFiltersOpen = ref(false)
-
-export function useSpaceFilters() {
-  return { open: spaceFiltersOpen }
-}
 const newSpaceOpen = ref(false)
 const itemModalKey = ref<string | null>(null)
 

@@ -1,74 +1,64 @@
 <template>
-  <div class="nb-inspector">
-    <NbShellPanel title="Filters" fluid>
-      <div class="filters">
-        <div class="filters__head">
-          <NbButton
-            v-if="active"
-            size="xs"
-            variant="ghost"
-            @click="emit('clear')"
-          >
-            Clear all
-          </NbButton>
-          <NbButton
-            v-nb-tooltip="{ body: 'Close' }"
-            size="xs"
-            variant="ghost"
-            icon="x"
-            class="filters__close"
-            aria-label="Close the filters panel"
-            @click="emit('close')"
-          />
-        </div>
-
-        <section class="filters__group">
-          <h3 class="filters__title">Labels</h3>
-          <p v-if="labelNames.length === 0" class="filters__none">
-            This space has no labels yet.
-          </p>
-          <!-- Pills, not a dropdown: a label's colour is half of what
-               identifies it, and a list of names in a closed select shows
-               neither the colour nor which ones are on. -->
-          <div v-else class="filters__pills" role="group" aria-label="Labels">
-            <button
-              v-for="name in labelNames"
-              :key="name"
-              type="button"
-              class="filters__pill"
-              :class="{ 'filters__pill--on': labels.includes(name) }"
-              :aria-pressed="labels.includes(name)"
-              @click="toggleLabel(name)"
-            >
-              <LabelBadge :name="name" />
-            </button>
-          </div>
-          <p v-if="labelNames.length > 1" class="filters__hint">
-            Cards matching any of the chosen labels.
-          </p>
-        </section>
-
-        <section class="filters__group">
-          <h3 class="filters__title">People</h3>
-          <ActorFilter
-            :model-value="assignees"
-            label="Filter by assignee"
-            @update:model-value="emit('update:assignees', $event)"
-          />
-        </section>
-
-        <section class="filters__group">
-          <h3 class="filters__title">Status</h3>
-          <NbRadio
-            name="space-filter-state"
-            direction="horizontal"
-            :options="stateOptions"
-            :model-value="state"
-            @update:model-value="emit('update:state', String($event))"
-          />
-        </section>
+  <div class="filters" role="group" aria-label="Filters">
+    <!-- Rows of label + control, so the three groups read down the left edge
+         and their contents run across. In a column each group stacked and the
+         panel got tall; across the toolbar there is room to lay them out. -->
+    <div class="filters__row">
+      <span class="filters__label">Labels</span>
+      <p v-if="labelNames.length === 0" class="filters__none">
+        This space has no labels yet.
+      </p>
+      <!-- Pills, not a dropdown: a label's colour is half of what identifies
+           it, and a list of names in a closed select shows neither the colour
+           nor which ones are on. -->
+      <div v-else class="filters__pills">
+        <button
+          v-for="name in labelNames"
+          :key="name"
+          type="button"
+          class="filters__pill"
+          :class="{ 'filters__pill--on': labels.includes(name) }"
+          :aria-pressed="labels.includes(name)"
+          @click="toggleLabel(name)"
+        >
+          <LabelBadge :name="name" />
+        </button>
       </div>
-    </NbShellPanel>
+    </div>
+
+    <div class="filters__row">
+      <span class="filters__label">People</span>
+      <ActorFilter
+        :model-value="assignees"
+        label="Filter by assignee"
+        @update:model-value="emit('update:assignees', $event)"
+      />
+    </div>
+
+    <div class="filters__row">
+      <span class="filters__label">Status</span>
+      <NbRadio
+        name="space-filter-state"
+        direction="horizontal"
+        :options="stateOptions"
+        :model-value="state"
+        @update:model-value="emit('update:state', String($event))"
+      />
+    </div>
+
+    <div class="filters__foot">
+      <NbButton v-if="active" size="xs" variant="ghost" @click="emit('clear')">
+        Clear all
+      </NbButton>
+      <NbButton
+        v-nb-tooltip="{ body: 'Hide filters' }"
+        size="xs"
+        variant="ghost"
+        icon="x"
+        aria-label="Hide the filters"
+        @click="emit('close')"
+      />
+    </div>
   </div>
 </template>
 
@@ -126,27 +116,21 @@ function toggleLabel(name: string): void {
 <style scoped lang="scss">
 .filters {
   display: grid;
-  gap: var(--nb-spacing-20);
+  /* One spine for the group names, content flowing across the rest. Sized to
+     the longest label so the three rows line up without a table. */
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--nb-spacing-8) var(--nb-spacing-16);
+  align-items: baseline;
+  padding: var(--nb-spacing-12) var(--nb-spacing-16);
+  border: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
+  border-radius: var(--nb-radius-sm, 8px);
+  background: var(--nb-c-surface-sunken, transparent);
 
-  &__head {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--nb-spacing-4);
-    min-block-size: 1.5rem;
+  &__row {
+    display: contents;
   }
 
-  &__close {
-    margin-inline-start: var(--nb-spacing-8);
-  }
-
-  &__group {
-    display: grid;
-    gap: var(--nb-spacing-8);
-  }
-
-  &__title {
-    margin: 0;
+  &__label {
     font-size: var(--nb-type-label-sm-size);
     font-weight: var(--nb-type-label-sm-weight, 600);
     text-transform: uppercase;
@@ -188,11 +172,26 @@ function toggleLabel(name: string): void {
     }
   }
 
-  &__none,
-  &__hint {
+  &__none {
     margin: 0;
     font-size: var(--nb-type-body-sm-size);
     color: var(--nb-c-text-subtle);
+  }
+
+  /* Spans both columns and sits hard right, so Clear and the dismiss are
+     where the eye ends up rather than tucked under the labels. */
+  &__foot {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--nb-spacing-4);
+  }
+
+  /* Narrow: the spine costs more than it gives, so labels sit above. */
+  @media (max-inline-size: 40rem) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--nb-spacing-4);
   }
 }
 </style>

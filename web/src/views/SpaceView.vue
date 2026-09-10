@@ -60,11 +60,12 @@
           />
         </div>
       </div>
-    </component>
 
-    <!-- Claims the same region the card details use, and the two are mutually
-         exclusive below: one side panel, one thing in it. -->
-    <component :is="inspectorSlot.Outlet">
+      <!-- In place, under the toolbar, rather than in the side panel. The
+           filters need room for coloured pills and a row of faces, which is
+           more than a menu holds, and the side panel is the card you opened:
+           sharing it meant you could never see both. Here the columns shift
+           down while it is open and back up when it closes. -->
       <SpaceFilterPanel
         v-if="filtersOpen"
         id="space-filter-panel"
@@ -289,12 +290,7 @@ import { humanise, useLoadState } from '@/lib/state'
 import { useViewCommands } from '@/lib/commands'
 import { labelVariants } from '@/lib/labels'
 import { roleColor } from '@/lib/colors'
-import {
-  useInspector,
-  useSpaceFilters,
-  useUiState,
-  useWorkspace,
-} from '@/stores/workspace'
+import { useInspector, useUiState, useWorkspace } from '@/stores/workspace'
 import type { NbMenu } from '@nubisco/ui'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import NewItemModal from '@/components/NewItemModal.vue'
@@ -322,11 +318,10 @@ const toast = useToast()
 const confirm = useConfirm()
 const load = useLoadState()
 const filterBar = useShellSlot('fixedbar')
-const inspectorSlot = useShellSlot('inspector')
 const topbarActions = useShellSlot('topbar-right')
 
 const items = ref<ISpaceItemRow[]>([])
-const filtersOpen = useSpaceFilters().open
+const filtersOpen = ref(false)
 const labelFilter = ref<string[]>([])
 const assigneeFilter = ref<string[]>([])
 const stateFilter = ref('open')
@@ -517,22 +512,11 @@ const labelNames = computed(() => labelOptions.value.map((o) => o.value))
 // nothing.
 const firstCardId = computed(() => spaceItems.value[0]?.id ?? null)
 
-/** The side panel holds one thing at a time, so opening filters puts the card
- *  details away rather than stacking underneath them. */
+/** Filters open in place, under the toolbar. They no longer compete with the
+ *  side panel, so opening one does not close the other. */
 function toggleFilters(): void {
   filtersOpen.value = !filtersOpen.value
-  if (filtersOpen.value) inspector.close()
 }
-
-// The other direction, watched rather than added to each caller: cards open
-// from a click, the context menu, after creating one, and from a deep link on
-// load, and a rule enforced in four places is a rule that holds in three.
-watch(
-  () => inspector.itemKey.value,
-  (key) => {
-    if (key) filtersOpen.value = false
-  },
-)
 
 const columns = computed(() =>
   (spaceMeta.value?.lists ?? []).map((list) => ({

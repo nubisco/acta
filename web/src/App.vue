@@ -260,7 +260,6 @@ import { introTour, tourLabels } from '@/lib/tour'
 import {
   sidebarDefaultFor,
   useInspector,
-  useSpaceFilters,
   useUiState,
   useWorkspace,
 } from '@/stores/workspace'
@@ -492,33 +491,21 @@ const trail = computed<ICrumb[]>(() => {
 })
 
 const inspectorVisible = ref(false)
-const spaceFilters = useSpaceFilters()
-
-/**
- * The side panel is open while it has something to show. That used to mean a
- * card and nothing else, so the filter panel rendered into a region the shell
- * had never opened: in the DOM, inert and invisible.
- */
-const panelHasContent = computed(
-  () => inspector.itemKey.value !== null || spaceFilters.open.value,
-)
-watch(panelHasContent, (has) => (inspectorVisible.value = has), {
-  immediate: true,
+// The side panel shows a card and nothing else. Filters used to share it,
+// which meant the two could never be open together and the shell had to be
+// told which one it was holding; they live in the space's own toolbar now.
+watch(inspector.itemKey, (key) => {
+  inspectorVisible.value = key !== null
 })
 watch(
   () => route.name,
   () => {
-    // Filters belong to the space you were looking at, so leaving takes them
-    // with you; a card stays, because it can be deep-linked from anywhere.
-    spaceFilters.open.value = false
     if (!inspector.itemKey.value) inspectorVisible.value = false
   },
+  { immediate: true },
 )
-// Closing the panel from the shell's own control closes whatever it held.
 watch(inspectorVisible, (visible) => {
-  if (visible) return
-  inspector.close()
-  spaceFilters.open.value = false
+  if (!visible) inspector.close()
 })
 
 async function signOut(): Promise<void> {
