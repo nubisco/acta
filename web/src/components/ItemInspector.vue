@@ -52,6 +52,18 @@
           {{ it.lifecycle.value.text }}
         </NbBadge>
         <span class="inspector-actions">
+          <!-- Finding a card through search or a link drops you into this
+               panel with no sense of where the card actually lives. The board
+               marks the open card, so arriving there puts it under the
+               reader's eye rather than making them hunt the column. -->
+          <NbButton
+            v-nb-tooltip="{ body: `Show on ${it.item.value.board}` }"
+            size="xs"
+            variant="ghost"
+            icon="kanban"
+            :aria-label="`Show ${it.item.value.key} on its board`"
+            @click="viewOnBoard"
+          />
           <!-- Archive was only ever reachable through the Status select,
                which is why it read as missing. Same set as the board's
                right-click menu, so both surfaces agree. -->
@@ -210,85 +222,111 @@
           </NbButton>
         </form>
       </div>
-    </NbShellPanel>
 
-    <NbShellPanel title="Description" fluid>
-      <MarkdownEditor
-        v-if="editingDescription"
-        v-model="it.draft.description"
-        placeholder="Describe this item..."
-        class="inspector-editor"
-        autofocus
-        @blur="commitDescription"
-      />
-      <div
-        v-else-if="it.draft.description.trim()"
-        class="inspector-description"
-        role="button"
-        tabindex="0"
-        aria-label="Description. Press Enter to edit."
-        @click="editingDescription = true"
-        @keydown.enter.prevent="editingDescription = true"
-      >
-        <MarkdownView :source="it.draft.description" />
-      </div>
-      <button
-        v-else
-        type="button"
-        class="inspector-description-empty"
-        @click="editingDescription = true"
-      >
-        Add a description...
-      </button>
-    </NbShellPanel>
+      <!-- Everything past the core fields is a labelled, collapsible row.
+           Stacked as panels, a long description pushed comments so far down
+           the panel that a card with eleven of them read as having none; the
+           counts in each header say what is there without opening it. -->
+      <NbAccordion v-model="openSections" multiple flush size="sm">
+        <NbAccordionItem
+          id="description"
+          title="Description"
+          :meta="it.draft.description.trim() ? undefined : 'empty'"
+        >
+          <MarkdownEditor
+            v-if="editingDescription"
+            v-model="it.draft.description"
+            placeholder="Describe this item..."
+            class="inspector-editor"
+            autofocus
+            @blur="commitDescription"
+          />
+          <div
+            v-else-if="it.draft.description.trim()"
+            class="inspector-description"
+            role="button"
+            tabindex="0"
+            aria-label="Description. Press Enter to edit."
+            @click="editingDescription = true"
+            @keydown.enter.prevent="editingDescription = true"
+          >
+            <MarkdownView :source="it.draft.description" />
+          </div>
+          <button
+            v-else
+            type="button"
+            class="inspector-description-empty"
+            @click="editingDescription = true"
+          >
+            Add a description...
+          </button>
+        </NbAccordionItem>
 
-    <NbShellPanel
-      v-for="checklist in it.item.value.checklists ?? []"
-      :key="checklist.name"
-      :title="checklist.name"
-      fluid
-    >
-      <template #toolbar>
-        <span class="inspector-progress">
-          {{ checklist.items.filter((entry) => entry.done).length }}/{{
-            checklist.items.length
-          }}
-        </span>
-        <NbButton
-          size="xxs"
-          variant="ghost"
-          icon="trash-simple"
-          :aria-label="`Delete checklist ${checklist.name}`"
-          @click="confirmDeleteChecklist(checklist.name)"
-        />
-      </template>
-      <ChecklistBody
-        :items="checklist.items"
-        @toggle="(text, done) => it.toggleCheck(checklist.name, text, done)"
-        @add="(text) => it.addChecklistEntry(checklist.name, text)"
-        @remove="(text) => it.removeChecklistEntry(checklist.name, text)"
-      />
-    </NbShellPanel>
+        <NbAccordionItem
+          v-for="checklist in it.item.value.checklists ?? []"
+          :id="`checklist:${checklist.name}`"
+          :key="checklist.name"
+          :title="checklist.name"
+        >
+          <!-- In the meta slot because the header has no actions slot, and
+               .stop so removing a checklist does not also toggle the section
+               it lives in. -->
+          <template #meta>
+            <span class="inspector-progress">
+              {{ checklist.items.filter((entry) => entry.done).length }}/{{
+                checklist.items.length
+              }}
+            </span>
+            <NbButton
+              size="xxs"
+              variant="ghost"
+              icon="trash-simple"
+              :aria-label="`Delete checklist ${checklist.name}`"
+              @click.stop="confirmDeleteChecklist(checklist.name)"
+            />
+          </template>
+          <ChecklistBody
+            :items="checklist.items"
+            @toggle="(text, done) => it.toggleCheck(checklist.name, text, done)"
+            @add="(text) => it.addChecklistEntry(checklist.name, text)"
+            @remove="(text) => it.removeChecklistEntry(checklist.name, text)"
+          />
+        </NbAccordionItem>
 
-    <NbShellPanel title="Attachments" fluid>
-      <AttachmentsPanel
-        :owner="{ item: it.item.value.key }"
-        :attachments="it.item.value.attachments ?? []"
-        @changed="it.load"
-      />
-    </NbShellPanel>
+        <NbAccordionItem
+          id="attachments"
+          title="Attachments"
+          :meta="countLabel(it.item.value.attachments)"
+        >
+          <AttachmentsPanel
+            :owner="{ item: it.item.value.key }"
+            :attachments="it.item.value.attachments ?? []"
+            @changed="it.load"
+          />
+        </NbAccordionItem>
 
-    <NbShellPanel title="Comments" fill>
-      <CommentThread
-        v-model="it.commentDraft.value"
-        :comments="it.item.value.comments ?? []"
-        :commenting="it.commenting.value"
-        @submit="it.addComment"
-      />
-    </NbShellPanel>
+        <NbAccordionItem
+          id="comments"
+          title="Comments"
+          :meta="countLabel(it.item.value.comments)"
+        >
+          <CommentThread
+            v-model="it.commentDraft.value"
+            :comments="it.item.value.comments ?? []"
+            :commenting="it.commenting.value"
+            @submit="it.addComment"
+          />
+        </NbAccordionItem>
 
-    <NbShellPanel v-if="it.linkFacts.value.length > 0" title="Links" fluid>
-      <NbDefinitionList :items="it.linkFacts.value" layout="stacked" />
+        <NbAccordionItem
+          v-if="it.linkFacts.value.length > 0"
+          id="links"
+          title="Links"
+          :meta="countLabel(it.linkFacts.value)"
+        >
+          <NbDefinitionList :items="it.linkFacts.value" layout="stacked" />
+        </NbAccordionItem>
+      </NbAccordion>
     </NbShellPanel>
   </div>
 </template>
@@ -297,7 +335,9 @@
 import { ref, toRef, watch } from 'vue'
 import { useConfirm } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
+import { useRouter } from 'vue-router'
 import { useInspector } from '@/stores/workspace'
+import { wpath } from '@/lib/paths'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'
 import ActorChip from '@/components/ActorChip.vue'
 import ChecklistBody from '@/components/ChecklistBody.vue'
@@ -307,10 +347,40 @@ import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
 import LabelBadge from '@/components/LabelBadge.vue'
 
+// Outside setup, so it survives the panel unmounting between cards.
+const moduleOpenSections = ref<string[]>([
+  'description',
+  'comments',
+  'attachments',
+])
+
 const props = defineProps<{ itemKey: string }>()
 
 const it = useItem(toRef(props, 'itemKey'))
 const inspector = useInspector()
+const router = useRouter()
+
+/**
+ * Which sections are open, shared by every card opened this session.
+ *
+ * Module-level on purpose: someone who collapses the description to get at
+ * the comments means it for the next card too, and re-expanding it on every
+ * open would undo the change they just made. Reset only by a reload.
+ */
+const openSections = moduleOpenSections
+
+/** A count for an accordion header, or nothing when there is none to give.
+ *  Showing "0" would be noise on the many cards that have no attachments. */
+function countLabel(list: unknown[] | undefined): string | undefined {
+  return list && list.length > 0 ? String(list.length) : undefined
+}
+
+/** Go to the board this card lives on, leaving the panel open so the board's
+ *  marker lands on the card the reader was already looking at. */
+function viewOnBoard(): void {
+  const board = it.item.value?.board
+  if (board) void router.push(wpath(`/b/${board}`))
+}
 const confirm = useConfirm()
 
 const newChecklist = ref('')
