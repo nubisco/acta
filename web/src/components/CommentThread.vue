@@ -3,28 +3,30 @@
     <ul class="thread__list" aria-label="Comments">
       <li v-for="comment in comments" :key="comment.id">
         <div class="thread__head">
-          <template v-if="comment.imported?.author">
-            <strong>{{ comment.imported.author }}</strong>
-            <NbBadge
-              v-nb-tooltip="{
-                body: `Imported from ${comment.imported.source}`,
-              }"
-              size="sm"
-              variant="grey"
-            >
-              imported
-            </NbBadge>
-          </template>
-          <template v-else>
-            <ActorAvatar :handle="comment.by" />
-            <strong>{{ authorName(comment.by) }}</strong>
-            <NbAiLabel v-if="comment.agent" />
-          </template>
+          <!-- An avatar on every comment, imported or not. Without one the
+               imported half of a thread was a wall of identical bold names
+               and there was no way to see at a glance who said what, or
+               where one comment ended and the next began. -->
+          <ActorAvatar
+            :handle="authorHandle(comment)"
+            :name="comment.imported?.author"
+            :size="24"
+          />
+          <strong>{{ authorLabel(comment) }}</strong>
+          <NbBadge
+            v-if="comment.imported?.author"
+            v-nb-tooltip="{ body: `Imported from ${comment.imported.source}` }"
+            size="sm"
+            variant="grey"
+          >
+            imported
+          </NbBadge>
+          <NbAiLabel v-if="comment.agent" />
           <time :datetime="timestampIso(comment)">
             {{ timestampLabel(comment) }}
           </time>
         </div>
-        <MarkdownView :source="comment.body" />
+        <MarkdownView :source="comment.body" class="thread__body" />
       </li>
     </ul>
     <NbForm class="thread__composer" @submit.prevent="emit('submit')">
@@ -80,6 +82,26 @@ function authorName(handle: string): string {
   )
 }
 
+/**
+ * An imported comment carries the original author's display name and no
+ * handle. Where that name matches a member we use their handle, so the
+ * migrated half of a thread shows the same face as the half written here;
+ * otherwise the name itself keys the colour, which at least keeps one person
+ * one colour throughout.
+ */
+function authorHandle(comment: ICommentView): string {
+  const imported = comment.imported?.author
+  if (!imported) return comment.by
+  const match = ws.overview.value?.actors.find(
+    (a) => a.name.toLowerCase() === imported.toLowerCase(),
+  )
+  return match?.handle ?? imported
+}
+
+function authorLabel(comment: ICommentView): string {
+  return comment.imported?.author ?? authorName(comment.by)
+}
+
 function timestampLabel(comment: ICommentView): string {
   const original = comment.imported?.created_at
   if (original && !Number.isNaN(Date.parse(original))) {
@@ -119,7 +141,23 @@ const draft = computed({
     margin: 0;
     padding: 0;
     display: grid;
-    gap: var(--nb-spacing-12);
+    gap: var(--nb-spacing-16);
+
+    /* Each comment on its own surface. Separated only by a gap, a thread of
+       long comments ran together into one wall of prose and the sequence was
+       impossible to follow; the body is indented under the author so the
+       column of avatars is what the eye follows down the thread. */
+    > li {
+      display: grid;
+      gap: var(--nb-spacing-4);
+    }
+  }
+
+  &__body {
+    padding: var(--nb-spacing-8) var(--nb-spacing-12);
+    margin-inline-start: calc(24px + var(--nb-spacing-8));
+    border-radius: var(--nb-radius-sm, 8px);
+    background: var(--nb-c-surface-sunken, rgb(128 128 128 / 8%));
   }
 
   &__head {

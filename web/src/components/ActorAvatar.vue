@@ -2,7 +2,7 @@
   <span
     v-nb-tooltip="{
       header: displayName,
-      body: `@${props.handle}`,
+      body: handleLabel,
       tip: kindLabel,
       aria: 'label',
       focusable: true,
@@ -37,9 +37,20 @@ import { useWorkspace } from '@/stores/workspace'
 // A generic avatar belongs in @nubisco/ui eventually (no NbAvatar exists
 // yet); this is the minimal domain stand-in: initials on a deterministic
 // chart-token color, with the user info hint (name, handle, kind) on hover.
-const props = withDefaults(defineProps<{ handle: string; size?: number }>(), {
-  size: 20,
-})
+const props = withDefaults(
+  defineProps<{
+    handle: string
+    size?: number
+    /**
+     * Display name for someone who is not a member of this workspace, which
+     * is how an imported comment's author arrives: a name from another system
+     * with no handle behind it. Used for the initials and the tooltip so they
+     * do not read as a handle that does not exist.
+     */
+    name?: string
+  }>(),
+  { size: 20, name: undefined },
+)
 
 const ws = useWorkspace()
 
@@ -47,7 +58,14 @@ const actor = computed(() =>
   ws.overview.value?.actors.find((a) => a.handle === props.handle),
 )
 
-const displayName = computed(() => actor.value?.name ?? `@${props.handle}`)
+const displayName = computed(
+  () => actor.value?.name ?? props.name ?? `@${props.handle}`,
+)
+
+/** Only members have a handle worth showing; a foreign author has none. */
+const handleLabel = computed(() =>
+  actor.value || !props.name ? `@${props.handle}` : undefined,
+)
 
 const kindLabel = computed(() => {
   switch (actor.value?.kind) {
@@ -63,7 +81,7 @@ const kindLabel = computed(() => {
 })
 
 const initials = computed(() => {
-  const name = actor.value?.name ?? props.handle
+  const name = actor.value?.name ?? props.name ?? props.handle
   const parts = name.split(/\s+/).filter(Boolean)
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
   return name.slice(0, 2).toUpperCase()

@@ -257,13 +257,6 @@
             </template>
           </NbSelect>
         </NbField>
-        <div v-if="it.draft.assignees.length > 0" class="item-modal__avatars">
-          <ActorAvatar
-            v-for="handle in it.draft.assignees"
-            :key="handle"
-            :handle="handle"
-          />
-        </div>
         <NbField v-slot="{ id }" label="Labels" orientation="stack">
           <NbSelect
             :id="id"
@@ -287,16 +280,6 @@
             </template>
           </NbSelect>
         </NbField>
-        <div v-if="it.draft.labels.length > 0" class="item-modal__chips">
-          <NbBadge
-            v-for="label in it.draft.labels"
-            :key="label"
-            size="sm"
-            :variant="variants.get(label) ?? 'grey'"
-          >
-            {{ label }}
-          </NbBadge>
-        </div>
         <NbDefinitionList
           v-if="it.linkFacts.value.length > 0"
           :items="it.linkFacts.value"
@@ -308,12 +291,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef, watch } from 'vue'
+import { ref, toRef, watch } from 'vue'
 import { useConfirm } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
-import { labelVariants } from '@/lib/labels'
-import { useWorkspace, useInspector } from '@/stores/workspace'
-import ActorAvatar from '@/components/ActorAvatar.vue'
+import { useInspector } from '@/stores/workspace'
 import ActorChip from '@/components/ActorChip.vue'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'
 import ChecklistBody from '@/components/ChecklistBody.vue'
@@ -326,9 +307,7 @@ import LabelBadge from '@/components/LabelBadge.vue'
 const props = defineProps<{ open: boolean; itemKey: string }>()
 const emit = defineEmits<{ close: [] }>()
 
-const ws = useWorkspace()
 const it = useItem(toRef(props, 'itemKey'))
-const variants = computed(() => labelVariants(ws.overview.value))
 const confirm = useConfirm()
 const inspector = useInspector()
 
