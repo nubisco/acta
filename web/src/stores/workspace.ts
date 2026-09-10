@@ -22,6 +22,8 @@ export interface IMe {
   scopes: string[]
   email?: string
   name?: string
+  /** False until this person has been through the welcome, on any device. */
+  onboarded?: boolean
 }
 
 export interface IAppNotification {

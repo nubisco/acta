@@ -107,7 +107,12 @@ export const auth = {
       scopes: string[]
       email?: string
       name?: string
+      /** False until the welcome has been dismissed once, by this person. */
+      onboarded?: boolean
     }>('/auth/me'),
+
+  markOnboarded: () =>
+    req<{ ok: boolean }>('/auth/me/onboarded', { method: 'POST' }),
   requestOtp: (email: string) =>
     req<{ ok: boolean }>('/auth/otp', {
       method: 'POST',

@@ -366,6 +366,11 @@ export const ADDITIVE_COLUMNS = [
   // new member arrives with a face, but a person who uploads their own has
   // made a choice, and the next sign-in must not quietly undo it.
   "ALTER TABLE actor ADD COLUMN avatar_source TEXT NOT NULL DEFAULT 'sso'",
+  // When this person finished the welcome. Null means they have not, which is
+  // what the app asks before showing it. On the actor rather than in the
+  // browser: it is a fact about a person, and greeting someone again because
+  // they opened a second browser is how a welcome becomes an annoyance.
+  'ALTER TABLE actor ADD COLUMN onboarded_at INTEGER',
   // After the column exists, never inside SCHEMA_SQL: on a fresh database the
   // table is created before the ALTER runs, so an index declared up there
   // would name a column that is not there yet.

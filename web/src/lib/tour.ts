@@ -1,47 +1,73 @@
 import type { IWalkthrough, IWalkthroughLabels } from '@nubisco/ui'
 
 /**
- * First-run walkthrough. Targets are `v-nb-tour-step` ids stamped in
- * App.vue; steps whose target is not on screen are skipped automatically.
- * Bump `version` to show the tour again after a major shell change.
+ * First-run walkthrough. Targets are `v-nb-tour-step` ids stamped in App.vue
+ * and BoardView.vue; a step whose target is not on screen is dropped, which
+ * is why App starts the tour from a board rather than wherever the person
+ * happened to be.
+ *
+ * Written for someone who already knows this kind of tool. That means it does
+ * not explain what a board or a card is, and spends its steps on the places
+ * Acta differs or where the equivalent thing lives under another name. It
+ * names no other product: a tour that opens by comparing itself to a
+ * competitor teaches the competitor, and reads as insecure besides.
+ *
+ * Bump `version` when the content changes materially. Everyone who completed
+ * an older version sees the new one once; nobody sees the same one twice.
  */
 export const introTour: IWalkthrough = {
   id: 'acta-intro',
-  version: 1,
+  version: 2,
   steps: [
     {
-      title: 'Welcome to Acta',
-      body: 'Boards, docs and activity for your workspace, in one place. This tour takes thirty seconds.',
+      title: 'A quick tour',
+      body: 'You already know how boards and cards work. This points out where Acta puts things, and the few places it works differently. About a minute.',
     },
     {
-      target: 'nav-home',
-      title: 'Home',
-      body: 'Every board at a glance: lists, open counts, and the latest activity.',
+      target: 'board-views',
+      title: 'One board, four ways to look at it',
+      body: 'Columns, a sortable table, a calendar of due dates, or a timeline. Same cards and same filters throughout, so switching never means rebuilding your view.',
+      placement: 'bottom',
+    },
+    {
+      target: 'board-card',
+      title: 'Every card has a key',
+      body: 'Keys like DE-1 are permanent and searchable, so a card can be referred to in a commit, a document, or a conversation. Click a card to open its details beside the board; right-click for the quick actions, including moving it to the top or bottom of its list.',
       placement: 'right',
+    },
+    {
+      target: 'board-filters',
+      title: 'Filtering',
+      body: 'Labels, people and status live in a panel rather than the toolbar, so labels keep their colours and you can pick several people at once. The button counts what is currently hiding cards from you.',
+      placement: 'bottom',
     },
     {
       target: 'nav-docs',
-      title: 'Docs',
-      body: 'The knowledge base. Pages are versioned; edit in place and compare any two versions.',
-      placement: 'right',
-    },
-    {
-      target: 'nav-activity',
-      title: 'Activity',
-      body: 'Every change made by a person, an agent, or a rule lands here.',
+      title: 'Documents live next to the work',
+      body: 'Your knowledge base is here, in the same workspace and the same search as the boards. Pages are versioned, so you can compare any two versions and see who changed what.',
       placement: 'right',
     },
     {
       target: 'topbar-search',
-      title: 'Search everything',
-      body: 'Items, documents and comments, from anywhere.',
+      title: 'One search for everything',
+      body: 'Cards, documents and comments together. Press the key shortcut from anywhere rather than navigating to a search page first.',
       placement: 'bottom',
     },
     {
-      target: 'notifications',
-      title: 'Notifications',
-      body: 'Mentions and assignments reach you here.',
+      target: 'nav-activity',
+      title: 'Everything that happened',
+      body: 'Every change, whether a person, an integration or an automation made it, with the author on each entry. This is where to look when a card is not where you left it.',
       placement: 'right',
+    },
+    {
+      target: 'notifications',
+      title: 'Mentions and assignments',
+      body: 'Anything addressed to you arrives here.',
+      placement: 'right',
+    },
+    {
+      title: 'Two things worth knowing',
+      body: 'Archiving is the reversible one: a card must be archived before it can be deleted, so nothing disappears in a single click. And boards can be starred, which is what fills the favourites section on the home page.',
     },
   ],
 }

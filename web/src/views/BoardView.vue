@@ -22,11 +22,17 @@
       <div class="board__bar">
         <NbTabs
           v-model="view"
+          v-nb-tour-step="'board-views'"
           variant="line"
           :items="viewTabs"
           aria-label="Board views"
         />
-        <div class="board__filters" role="search" aria-label="Filter items">
+        <div
+          v-nb-tour-step="'board-filters'"
+          class="board__filters"
+          role="search"
+          aria-label="Filter items"
+        >
           <!-- One control instead of three. Given a toolbar's width none of
                them could show what they held, so labels lost their colour and
                people were limited to one at a time; the panel has room to show
@@ -155,6 +161,7 @@
           :class="{
             'board__card--open': inspector.itemKey.value === item.key,
           }"
+          :data-nb-tour-step="item.id === firstCardId ? 'board-card' : null"
           type="button"
           :aria-current="
             inspector.itemKey.value === item.key ? 'true' : undefined
@@ -498,6 +505,12 @@ const filterCount = computed(
 )
 
 const labelNames = computed(() => labelOptions.value.map((o) => o.value))
+
+// The tour points at a card to explain keys and the details panel, and it
+// needs one specific card rather than every card wearing the same id. Null
+// when the board is empty, which drops the step rather than anchoring it to
+// nothing.
+const firstCardId = computed(() => boardItems.value[0]?.id ?? null)
 
 /** The side panel holds one thing at a time, so opening filters puts the card
  *  details away rather than stacking underneath them. */

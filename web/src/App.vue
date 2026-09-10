@@ -231,19 +231,30 @@
   />
   <DocPreviewModal />
   <NbCommandPalette placeholder="Search Acta..." />
+  <WelcomeModal
+    v-if="welcomeOpen && ws.me.value"
+    :open="welcomeOpen"
+    :actor-id="ws.me.value.id"
+    :handle="ws.me.value.handle"
+    :name="ws.me.value.name"
+    @done="onWelcomeDone"
+  />
+  <!-- Controlled rather than auto-start: the welcome has to have been
+       answered first, or the tour spotlights the shell through a modal
+       covering it. -->
   <NbWalkthrough
     v-if="!route.meta.frameless"
     :walkthrough="introTour"
+    :controller="tour"
     :labels="tourLabels"
-    auto-start
   />
   <NbToaster />
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useCommandPalette, useTheme } from '@nubisco/ui'
+import { useCommandPalette, useTheme, useWalkthrough } from '@nubisco/ui'
 import type { NbMenu, NbShell } from '@nubisco/ui'
 import { introTour, tourLabels } from '@/lib/tour'
 import {
@@ -258,6 +269,7 @@ import DocPreviewModal from '@/components/DocPreviewModal.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
 import NewBoardModal from '@/components/NewBoardModal.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
+import WelcomeModal from '@/components/WelcomeModal.vue'
 import { wpath } from '@/lib/paths'
 
 const route = useRoute()
@@ -268,6 +280,56 @@ const ui = useUiState()
 const palette = useCommandPalette()
 const theme = useTheme()
 const shell = ref<InstanceType<typeof NbShell> | null>(null)
+const tour = useWalkthrough(introTour)
+
+const welcomeOpen = ref(false)
+
+/**
+ * The welcome comes first and the tour second, never both at once: a tour
+ * spotlighting the shell through a modal covering it shows nothing.
+ *
+ * Someone who has already been welcomed can still meet the tour, because it
+ * is version-gated: bumping the tour shows it once to everyone, which is how
+ * an existing workspace hears about a shell that has changed under them.
+ */
+watch(
+  () => ws.me.value,
+  (me) => {
+    if (!me) return
+    if (me.onboarded === false) welcomeOpen.value = true
+    else void tour.maybeAutoStart()
+  },
+  { immediate: true },
+)
+
+/**
+ * Put the person somewhere the tour can point at before starting it. Several
+ * steps live on a board, and a step whose target is not on screen is dropped,
+ * so a tour started from the home page would silently be half a tour.
+ */
+async function goToATour(): Promise<void> {
+  if (route.name !== 'board' && boards.value[0]) {
+    await router.push(wpath(`/b/${boards.value[0].key}`))
+  }
+  await nextTick()
+}
+
+async function startTour(): Promise<void> {
+  await goToATour()
+  await tour.restart()
+}
+
+async function onWelcomeDone(wantsTour: boolean): Promise<void> {
+  welcomeOpen.value = false
+  if (!wantsTour) {
+    // Recorded as skipped rather than left untouched, or the tour would
+    // ambush them on the next page load having just been declined.
+    await tour.skip()
+    return
+  }
+  await goToATour()
+  tour.start()
+}
 
 router.afterEach(() => {
   requestAnimationFrame(() => shell.value?.focusMain())
@@ -551,6 +613,16 @@ watch(
           namespace: 'View',
           handler: () =>
             theme.setTheme(theme.resolved.value === 'dark' ? 'light' : 'dark'),
+        },
+        {
+          id: 'help:tour',
+          label: 'Show me around',
+          icon: 'info',
+          namespace: 'Help',
+          // restart() rather than start(): it clears the stored record first,
+          // so asking for the tour a second time is not silently refused by
+          // the version gate that keeps it from re-appearing on its own.
+          handler: () => void startTour(),
         },
       ].map((command) => [command.id, command]),
     )

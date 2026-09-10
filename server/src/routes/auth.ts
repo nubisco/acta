@@ -295,7 +295,8 @@ export function authRoutes(sso?: ISsoRuntime): Hono<IAuthEnv> {
       await c.get('db').query<{
         email: string | null
         name: string
-      }>('SELECT email, name FROM actor WHERE id = ?', [actor.id])
+        onboarded_at: number | null
+      }>('SELECT email, name, onboarded_at FROM actor WHERE id = ?', [actor.id])
     )[0]
     return c.json({
       id: actor.id,
@@ -305,7 +306,27 @@ export function authRoutes(sso?: ISsoRuntime): Hono<IAuthEnv> {
       scopes: actor.scopes,
       email: row?.email ?? undefined,
       name: row?.name ?? undefined,
+      onboarded: row?.onboarded_at !== null && row?.onboarded_at !== undefined,
     })
+  })
+
+  /**
+   * Mark the welcome as done. Separate from the settings it collects, which
+   * each write through their own endpoint, so closing the welcome is recorded
+   * even when the person changed nothing in it: having been asked is the fact
+   * worth keeping, not what they answered.
+   *
+   * Idempotent, and never un-sets: a second call keeps the original moment.
+   */
+  app.post('/me/onboarded', requireAuth(), async (c) => {
+    const actor = c.get('actor')
+    await c
+      .get('db')
+      .run(
+        'UPDATE actor SET onboarded_at = ? WHERE id = ? AND onboarded_at IS NULL',
+        [now(), actor.id],
+      )
+    return c.json({ ok: true })
   })
 
   /**

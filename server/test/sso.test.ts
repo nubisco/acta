@@ -279,6 +279,61 @@ describe('external sso', () => {
   })
 })
 
+describe('welcome state', () => {
+  it('reports a new member as not onboarded, and records it once', async () => {
+    const start = await app.request('https://acta.test/api/v1/auth/sso/start')
+    const state = stateCookieOf(start)
+    const token = await signToken({
+      sub: 'u9',
+      email: 'ivan@nubisco.io',
+      iss: ISSUER,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 300,
+    })
+    const cb = await app.request(
+      `https://acta.test/api/v1/auth/sso/callback?token=${encodeURIComponent(token)}&state=${state.value}`,
+      { headers: { cookie: state.header } },
+    )
+    const session = /acta_session=([^;]+)/.exec(
+      cb.headers.get('set-cookie') ?? '',
+    )![1]
+    const cookie = { cookie: `acta_session=${session}` }
+
+    const before = await app.request('/api/v1/auth/me', { headers: cookie })
+    expect(((await before.json()) as { onboarded: boolean }).onboarded).toBe(
+      false,
+    )
+
+    await app.request('/api/v1/auth/me/onboarded', {
+      method: 'POST',
+      headers: cookie,
+    })
+    const after = await app.request('/api/v1/auth/me', { headers: cookie })
+    expect(((await after.json()) as { onboarded: boolean }).onboarded).toBe(
+      true,
+    )
+
+    // Idempotent, and it keeps the first moment rather than moving it, so a
+    // stray second call cannot rewrite when someone joined.
+    const first = (
+      await db.query<{ onboarded_at: number }>(
+        "SELECT onboarded_at FROM actor WHERE email = 'ivan@nubisco.io'",
+      )
+    )[0].onboarded_at
+    await app.request('/api/v1/auth/me/onboarded', {
+      method: 'POST',
+      headers: cookie,
+    })
+    expect(
+      (
+        await db.query<{ onboarded_at: number }>(
+          "SELECT onboarded_at FROM actor WHERE email = 'ivan@nubisco.io'",
+        )
+      )[0].onboarded_at,
+    ).toBe(first)
+  })
+})
+
 describe('JwksVerifier fetch binding', () => {
   // workerd's global fetch throws "Illegal invocation" unless `this` is the
   // global scope, and the verifier holds fetch on the instance. Calling it as
