@@ -404,4 +404,55 @@ describe('JwksVerifier fetch binding', () => {
     expect(seen.length).toBeGreaterThan(0)
     for (const receiver of seen) expect(receiver).not.toBe(verifier)
   })
+
+  /**
+   * The handover happens before any HTML is sent.
+   *
+   * Deciding it in the browser means serving the app, booting it, asking
+   * /auth/config and only then navigating away, so Acta's own sign-in page is
+   * always painted first. No client code removes that flash: by the time the
+   * client can decide, the page is already on screen.
+   */
+  it('redirects a signed-out visitor without serving the app', async () => {
+    const withSpa = (await createApp(await openDb(':memory:'), {
+      bootstrap: { adminEmail: 'jose@nubisco.io', adminHandle: 'jose' },
+      dataDir: `/tmp/acta-spa-${Math.random().toString(36).slice(2)}`,
+      fetchImpl: idpFetch,
+      // Like the real binding: real files only, null for a route the SPA
+      // resolves client-side. A stub that answers every path never lets a
+      // route reach the redirect at all.
+      serveAsset: (path: string) =>
+        Promise.resolve(
+          path === '/index.html'
+            ? new Response('<html>acta</html>')
+            : /\.[a-z0-9]+$/i.test(path)
+              ? new Response('asset')
+              : null,
+        ),
+      sso: {
+        issuer: ISSUER,
+        appId: 'acta',
+        authorizeUrl: `${ISSUER}/api/auth/sso`,
+        autoProvision: true,
+      },
+    })) as never
+    const request = (p: string) => (withSpa as typeof app).request(p)
+
+    for (const path of ['/', '/nubisco/s/ST', '/login']) {
+      const res = await request(path)
+      expect(res.status).toBe(302)
+      expect(res.headers.get('location')).toBe('/api/v1/auth/sso/start')
+    }
+
+    // A failed sign-in must still reach the page, or it would bounce back out
+    // to the provider and loop between the two forever.
+    const failed = await request('/login?error=sso_token')
+    expect(failed.status).toBe(200)
+    expect(await failed.text()).toContain('acta')
+
+    // Assets are served, not redirected: the app still has to load once the
+    // visitor comes back signed in.
+    const asset = await request('/assets/index.js')
+    expect(asset.status).toBe(200)
+  })
 })

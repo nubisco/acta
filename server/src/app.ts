@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { getCookie } from 'hono/cookie'
 import type { ISqlDriver } from './db'
 import type { IActorCtx } from './core/ctx'
 import { bootstrapWorkspace, type IBootstrapOptions } from './core/bootstrap'
@@ -8,6 +9,7 @@ import {
   authRoutes,
   requireAuth,
   requireWorkspace,
+  SESSION_COOKIE,
   type ISsoRuntime,
 } from './routes/auth'
 import { hookRoutes } from './routes/hooks'
@@ -93,6 +95,10 @@ export async function createApp(
         }),
       }
     : undefined
+  // One rule, read in two places: the auth routes gate the endpoints with it
+  // and the SPA fallback decides whether there is anything to show but a
+  // redirect.
+  const otpEnabled = ssoRuntime === undefined || opts.otpFallback === true
   app.route(
     '/api/v1/auth',
     authRoutes(ssoRuntime, { otpFallback: opts.otpFallback }),
@@ -121,11 +127,34 @@ export async function createApp(
   const serveAsset = opts.serveAsset
   if (serveAsset) {
     app.get('*', async (c) => {
-      const path = new URL(c.req.url).pathname
+      const url = new URL(c.req.url)
+      const path = url.pathname
       if (path.startsWith('/api/') || path === '/mcp') return c.notFound()
       if (path !== '/') {
         const asset = await serveAsset(path)
         if (asset) return asset
+      }
+
+      /**
+       * Hand a signed-out visitor to the provider here, not in the browser.
+       *
+       * Deciding this client-side means serving the app, booting it, asking
+       * /auth/config and only then navigating away, so Acta's own sign-in
+       * page is always painted first. No amount of client code removes that
+       * flash: by the time the client can decide, the page is on screen.
+       *
+       * Only where the provider is the sole way in, because otherwise there
+       * is a real choice to present. `error` is exempt or a failed sign-in
+       * would bounce straight back out and loop.
+       */
+      const signedOut = !getCookie(c as never, SESSION_COOKIE)
+      if (
+        ssoRuntime &&
+        !otpEnabled &&
+        signedOut &&
+        !url.searchParams.has('error')
+      ) {
+        return c.redirect('/api/v1/auth/sso/start', 302)
       }
       const index = await serveAsset('/index.html')
       if (!index) return c.notFound()
