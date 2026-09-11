@@ -36,8 +36,17 @@ export interface IAppOptions {
    * entrypoint passes the assets binding.
    */
   serveAsset?: (path: string) => Promise<Response | null>
-  /** External SSO configuration; local OTP stays available regardless. */
+  /**
+   * External identity provider. When set it owns sign-in, and one-time codes
+   * are off unless `otpFallback` asks for them back.
+   */
   sso?: ISsoConfig
+  /**
+   * Keep one-time codes alongside a configured provider. Off by default: a
+   * second door beside the provider lets an account it has disabled still
+   * sign in, and the default sender prints the code to the log.
+   */
+  otpFallback?: boolean
   /** Overridable for tests. */
   fetchImpl?: typeof fetch
   webhookBackoffMs?: number
@@ -84,7 +93,10 @@ export async function createApp(
         }),
       }
     : undefined
-  app.route('/api/v1/auth', authRoutes(ssoRuntime))
+  app.route(
+    '/api/v1/auth',
+    authRoutes(ssoRuntime, { otpFallback: opts.otpFallback }),
+  )
   app.route('/api/v1/ingest', ingestRoutes(store))
   // Provider webhooks authenticate by signature, not by session, so they
   // mount before requireAuth.

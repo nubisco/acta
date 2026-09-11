@@ -36,4 +36,24 @@ describe('server skeleton', () => {
       expect(tables).toContain(t)
     }
   })
+
+  // With no provider configured, codes ARE the way in. This is the
+  // self-hosted case, and the reason the code path stays rather than being
+  // deleted along with the form.
+  it('keeps one-time codes when no provider is configured', async () => {
+    const db = await openDb(':memory:')
+    const app = await createApp(db, {
+      bootstrap: { adminEmail: 'jose@nubisco.io', adminHandle: 'jose' },
+      dataDir: '/tmp/acta-test-nosso',
+    })
+    const res = await app.request('/api/v1/auth/config')
+    expect(await res.json()).toEqual({ sso: false, otp: true })
+
+    const otp = await app.request('/api/v1/auth/otp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'jose@nubisco.io' }),
+    })
+    expect(otp.status).toBe(200)
+  })
 })

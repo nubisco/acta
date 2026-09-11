@@ -33,15 +33,18 @@ import LoginView from '@/views/LoginView.vue'
 
 const assign = vi.fn()
 let ssoConfigured = true
+let otpConfigured = false
 
 beforeEach(() => {
   query.value = {}
   assign.mockClear()
   ssoConfigured = true
+  // The hosted shape: a provider owns sign-in and codes are off behind it.
+  otpConfigured = false
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => ({
-      json: async () => ({ sso: ssoConfigured, otp: true }),
+      json: async () => ({ sso: ssoConfigured, otp: otpConfigured }),
     })),
   )
   // location.href is how the handover happens; capture it rather than navigate.
@@ -75,6 +78,7 @@ describe('LoginView', () => {
 
   // Bouncing out again on a failure is an infinite round trip.
   it('stops and shows the page when sign-in failed', async () => {
+    otpConfigured = true
     query.value = { error: 'sso_token' }
     const view = await render()
     expect(assign).not.toHaveBeenCalled()
@@ -82,17 +86,39 @@ describe('LoginView', () => {
     expect(view.find('#login-email-form').exists()).toBe(true)
   })
 
-  // The way back in when the provider itself is down.
-  it('offers the code form on request', async () => {
+  // Only where the server still offers them. A ?code=1 that rendered a form
+  // posting to an endpoint returning 404 would be a door painted on a wall.
+  it('ignores a request for codes when the server has them off', async () => {
+    query.value = { code: '1' }
+    const view = await render()
+    expect(assign).toHaveBeenCalledWith('/api/v1/auth/sso/start')
+    expect(view.find('#login-email-form').exists()).toBe(false)
+  })
+
+  // The way back in when an instance deliberately keeps both.
+  it('offers the code form on request when the server allows it', async () => {
+    otpConfigured = true
     query.value = { code: '1' }
     const view = await render()
     expect(assign).not.toHaveBeenCalled()
     expect(view.find('#login-email-form').exists()).toBe(true)
   })
 
+  // A failed sign-in with codes off has nothing to fall back to, so it says
+  // what happened and offers the provider again rather than a dead form.
+  it('shows no code form on failure when codes are off', async () => {
+    query.value = { error: 'sso_token' }
+    const view = await render()
+    expect(assign).not.toHaveBeenCalled()
+    expect(view.text()).toContain('Single sign-on failed')
+    expect(view.find('#login-email-form').exists()).toBe(false)
+    expect(view.text()).toContain('Sign in with Nubisco Platform')
+  })
+
   // A self-hosted instance with no provider: codes are the only way in.
   it('never redirects when no provider is configured', async () => {
     ssoConfigured = false
+    otpConfigured = true
     const view = await render()
     expect(assign).not.toHaveBeenCalled()
     expect(view.find('#login-email-form').exists()).toBe(true)

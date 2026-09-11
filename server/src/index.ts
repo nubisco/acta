@@ -15,6 +15,7 @@ const app = await createApp(db, {
   baseUrl: process.env.ACTA_BASE_URL,
   serveAsset: WEB_DIST ? bunAssetReader(WEB_DIST) : undefined,
   sso: ssoConfigFromEnv(process.env) ?? undefined,
+  otpFallback: process.env.ACTA_OTP_FALLBACK === 'true',
   bootstrap: {
     workspaceName: process.env.ACTA_WORKSPACE ?? 'Nubisco',
     adminEmail: process.env.ACTA_ADMIN_EMAIL,

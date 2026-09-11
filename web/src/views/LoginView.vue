@@ -22,11 +22,11 @@
         <NbButton variant="primary" @click="startSso">
           Sign in with Nubisco Platform
         </NbButton>
-        <p class="login__divider">or use a one-time code</p>
+        <p v-if="otpAvailable" class="login__divider">or use a one-time code</p>
       </template>
 
       <NbForm
-        v-if="!handingOver && stage === 'email'"
+        v-if="otpAvailable && !handingOver && stage === 'email'"
         id="login-email-form"
         aria-label="Request a sign-in code"
         @submit.prevent="requestCode"
@@ -55,7 +55,7 @@
       </NbForm>
 
       <NbForm
-        v-else-if="!handingOver"
+        v-else-if="otpAvailable && !handingOver"
         id="login-code-form"
         aria-label="Enter your sign-in code"
         @submit.prevent="verify"
@@ -103,6 +103,7 @@ const code = ref('')
 const stage = ref<'email' | 'code'>('email')
 const busy = ref(false)
 const ssoAvailable = ref(false)
+const otpAvailable = ref(true)
 const ssoError = ref('')
 const formError = ref('')
 const errors = reactive<{ email?: string; code?: string }>({})
@@ -135,9 +136,12 @@ const handingOver = ref(false)
 onMounted(async () => {
   try {
     const res = await fetch('/api/v1/auth/config')
-    ssoAvailable.value = ((await res.json()) as { sso: boolean }).sso
+    const cfg = (await res.json()) as { sso: boolean; otp: boolean }
+    ssoAvailable.value = cfg.sso
+    otpAvailable.value = cfg.otp
   } catch {
     ssoAvailable.value = false
+    otpAvailable.value = true
   }
   const error = route.query.error
   if (typeof error === 'string') {
@@ -149,7 +153,13 @@ onMounted(async () => {
     }
     ssoError.value = messages[error] ?? 'Sign-in failed'
   }
-  if (ssoAvailable.value && !failed.value && !wantsCode.value) {
+  // With codes off there is nothing else here, so even a failure hands back
+  // to the provider on the next attempt rather than showing a dead form.
+  if (
+    ssoAvailable.value &&
+    !failed.value &&
+    !(wantsCode.value && otpAvailable.value)
+  ) {
     handingOver.value = true
     startSso()
   }

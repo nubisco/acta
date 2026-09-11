@@ -37,6 +37,8 @@ interface IWorkerEnv {
   ACTA_SSO_APP_ID?: string
   ACTA_SSO_AUTHORIZE_URL?: string
   ACTA_SSO_AUTO_PROVISION?: string
+  /** Keep one-time codes alongside a configured provider. Off by default. */
+  ACTA_OTP_FALLBACK?: string
   /** Public address, used to link back from outbound messages. */
   ACTA_BASE_URL?: string
 }
@@ -82,6 +84,7 @@ function getApp(env: IWorkerEnv, origin: string): Promise<Hono<IAppEnv>> {
         ssoConfigFromEnv(
           env as unknown as Record<string, string | undefined>,
         ) ?? undefined,
+      otpFallback: env.ACTA_OTP_FALLBACK === 'true',
       bootstrap: {
         workspaceName: env.ACTA_WORKSPACE ?? 'Workspace',
         adminEmail: env.ACTA_ADMIN_EMAIL,

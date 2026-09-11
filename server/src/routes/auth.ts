@@ -42,10 +42,35 @@ export interface ISsoRuntime {
 
 const SSO_STATE_COOKIE = 'acta_sso_state'
 
-export function authRoutes(sso?: ISsoRuntime): Hono<IAuthEnv> {
+export function authRoutes(
+  sso?: ISsoRuntime,
+  opts: { otpFallback?: boolean } = {},
+): Hono<IAuthEnv> {
   const app = new Hono<IAuthEnv>()
 
-  app.get('/config', (c) => c.json({ sso: sso !== undefined, otp: true }))
+  /**
+   * One-time codes are the way in when nothing else is, and a liability when
+   * something else is.
+   *
+   * A configured provider owns identity: offering a second door beside it
+   * means an account that provider has disabled can still be signed in to,
+   * and the default sender prints the code to the log, so anyone who can read
+   * the logs can sign in as anyone. So a provider turns codes OFF, and
+   * ACTA_OTP_FALLBACK=true turns them back on for whoever decides they want
+   * both.
+   *
+   * With no provider, codes are the only way in and are always on. That is
+   * the self-hosted case.
+   */
+  const otpEnabled = sso === undefined || opts.otpFallback === true
+
+  /** Codes are not merely hidden when off: the endpoints are not there. */
+  const otpGate = (c: { json: (b: unknown, s?: 200 | 404) => Response }) =>
+    otpEnabled
+      ? null
+      : c.json({ error: 'otp is disabled on this instance' }, 404)
+
+  app.get('/config', (c) => c.json({ sso: sso !== undefined, otp: otpEnabled }))
 
   app.get('/sso/start', (c) => {
     if (!sso) return c.json({ error: 'sso not configured' }, 404)
@@ -191,6 +216,8 @@ export function authRoutes(sso?: ISsoRuntime): Hono<IAuthEnv> {
   })
 
   app.post('/otp', async (c) => {
+    const gate = otpGate(c)
+    if (gate) return gate
     const body = z.object({ email: z.email() }).parse(await c.req.json())
     const db = c.get('db')
     // Across every workspace, not just one: a person may be a member of
@@ -225,6 +252,8 @@ export function authRoutes(sso?: ISsoRuntime): Hono<IAuthEnv> {
   })
 
   app.post('/verify', async (c) => {
+    const gate = otpGate(c)
+    if (gate) return gate
     const body = z
       .object({ email: z.email(), code: z.string().min(6).max(6) })
       .parse(await c.req.json())

@@ -82,9 +82,46 @@ function stateCookieOf(res: Response): { value: string; header: string } {
 }
 
 describe('external sso', () => {
-  it('advertises configuration', async () => {
+  // A configured provider owns sign-in. Codes are off, so the client knows
+  // not to offer a door that is not there.
+  it('advertises the provider, and that codes are off behind it', async () => {
     const res = await app.request('/api/v1/auth/config')
-    expect(await res.json()).toEqual({ sso: true, otp: true })
+    expect(await res.json()).toEqual({ sso: true, otp: false })
+  })
+
+  /**
+   * Not merely hidden in the UI. A second door beside the provider means an
+   * account the provider has disabled can still sign in, and the default
+   * sender prints the code to the log, so anyone who can read the logs could
+   * sign in as anyone.
+   */
+  it('refuses one-time codes while a provider is configured', async () => {
+    for (const path of ['/api/v1/auth/otp', '/api/v1/auth/verify']) {
+      const res = await app.request(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: 'jose@nubisco.io', code: '123456' }),
+      })
+      expect(res.status).toBe(404)
+    }
+  })
+
+  it('keeps codes when the instance asks for them alongside', async () => {
+    const bothDb = await openDb(':memory:')
+    const both = (await createApp(bothDb, {
+      bootstrap: { adminEmail: 'jose@nubisco.io', adminHandle: 'jose' },
+      dataDir: `/tmp/acta-otp-${Math.random().toString(36).slice(2)}`,
+      fetchImpl: idpFetch,
+      otpFallback: true,
+      sso: {
+        issuer: ISSUER,
+        appId: 'acta',
+        authorizeUrl: `${ISSUER}/api/auth/sso`,
+        autoProvision: true,
+      },
+    })) as never
+    const cfg = await (both as typeof app).request('/api/v1/auth/config')
+    expect(await cfg.json()).toEqual({ sso: true, otp: true })
   })
 
   it('redirects to the idp with app_id, redirect_uri and state', async () => {
