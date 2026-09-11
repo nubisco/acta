@@ -11,15 +11,22 @@
         :title="ssoError"
       />
 
-      <template v-if="ssoAvailable && stage === 'email'">
+      <!-- Already on the way out to the provider. Shown rather than a blank
+           panel, because a page that flashes a form and then navigates away
+           reads as a glitch. -->
+      <p v-if="handingOver" class="login__handover">
+        <NbSpinner size="sm" /> Taking you to Nubisco Platform...
+      </p>
+
+      <template v-if="!handingOver && ssoAvailable && stage === 'email'">
         <NbButton variant="primary" @click="startSso">
-          Continue with single sign-on
+          Sign in with Nubisco Platform
         </NbButton>
         <p class="login__divider">or use a one-time code</p>
       </template>
 
       <NbForm
-        v-if="stage === 'email'"
+        v-if="!handingOver && stage === 'email'"
         id="login-email-form"
         aria-label="Request a sign-in code"
         @submit.prevent="requestCode"
@@ -48,7 +55,7 @@
       </NbForm>
 
       <NbForm
-        v-else
+        v-else-if="!handingOver"
         id="login-code-form"
         aria-label="Enter your sign-in code"
         @submit.prevent="verify"
@@ -84,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useToast } from '@nubisco/ui'
 import type { NbTextInput } from '@nubisco/ui'
@@ -106,6 +113,25 @@ const router = useRouter()
 const route = useRoute()
 const ws = useWorkspace()
 
+/**
+ * Where the provider is the identity, this page is a doorway rather than a
+ * form: it hands straight over to it.
+ *
+ * Two things stop that becoming a trap. A failed sign-in comes back with
+ * ?error=, and bouncing straight out again would be an infinite round trip
+ * between here and the provider, so an error shows the page instead. And
+ * ?code=1 asks for the one-time-code form deliberately, which is the way back
+ * in when the provider itself is down: that happened, and the only reason it
+ * was recoverable was that this form existed.
+ *
+ * An instance with no provider configured never redirects at all, because
+ * codes are the only way in. That is the self-hosted case, and it is why the
+ * form stays rather than being deleted.
+ */
+const wantsCode = computed(() => route.query.code !== undefined)
+const failed = computed(() => typeof route.query.error === 'string')
+const handingOver = ref(false)
+
 onMounted(async () => {
   try {
     const res = await fetch('/api/v1/auth/config')
@@ -122,6 +148,10 @@ onMounted(async () => {
       sso_token: 'Single sign-on failed; try again',
     }
     ssoError.value = messages[error] ?? 'Sign-in failed'
+  }
+  if (ssoAvailable.value && !failed.value && !wantsCode.value) {
+    handingOver.value = true
+    startSso()
   }
 })
 
@@ -213,6 +243,16 @@ async function verify(): Promise<void> {
     font-size: var(--nb-type-body-sm-size);
     color: var(--nb-c-text-subtle);
     margin: 0;
+  }
+
+  &__handover {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--nb-spacing-8);
+    margin: 0;
+    padding-block: var(--nb-spacing-16);
+    color: var(--nb-c-text-subtle);
   }
 }
 </style>
