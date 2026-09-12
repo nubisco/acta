@@ -63,9 +63,34 @@ beforeEach(async () => {
   ])
 })
 
-async function settle(): Promise<void> {
-  // Webhook delivery is fire-and-forget; let the microtask queue drain.
-  await new Promise((r) => setTimeout(r, 20))
+/**
+ * Wait for delivery to actually finish, rather than for a fixed 20ms.
+ *
+ * Delivery is fire-and-forget with retries, so a sleep is a bet on how long
+ * that takes. The bet held on an idle machine and lost under a pre-commit
+ * hook running four packages at once, which is exactly when a flake is most
+ * expensive. Polling a condition costs nothing when it is already true.
+ */
+async function settleUntil(
+  done: () => Promise<boolean>,
+  timeoutMs = 2000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 5))
+    if (await done()) return
+    if (Date.now() > deadline) return // Let the assertion report what is missing.
+  }
+}
+
+/** Deliveries have stopped changing: every attempt made, nothing in flight. */
+async function settle(attempts = 1): Promise<void> {
+  await settleUntil(async () => {
+    const rows = await db.query<{ attempts: number }>(
+      'SELECT attempts FROM webhook_delivery',
+    )
+    return rows.length > 0 && rows.every((r) => r.attempts >= attempts)
+  })
 }
 
 describe('webhooks', () => {
@@ -145,7 +170,7 @@ describe('webhooks', () => {
       [{ op: 'create', op_id: 'i1', list: 'Backlog', title: 'T' }],
       'SW',
     )
-    await settle()
+    await settle(3)
     const log = await db.query<{
       status: number
       attempts: number

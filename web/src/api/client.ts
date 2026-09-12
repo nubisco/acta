@@ -148,6 +148,27 @@ export const api = {
       body: JSON.stringify({ keys, include }),
     }),
 
+  notifications: () =>
+    req<{
+      notifications: {
+        id: string
+        reason: 'mention' | 'assigned' | 'involved'
+        verb: string
+        summary: string
+        item_key: string | null
+        created_at: number
+        read_at: number | null
+      }[]
+      unread: number
+    }>('/notifications'),
+
+  /** No id marks everything read. */
+  notificationRead: (id?: string) =>
+    req<{ ok: boolean }>('/notifications/read', {
+      method: 'POST',
+      body: JSON.stringify(id ? { id } : {}),
+    }),
+
   docTree: () => req<{ docs: IDocNode[] }>('/docs'),
 
   docGet: (slug: string, include?: string[], atVersion?: number) =>

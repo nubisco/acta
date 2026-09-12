@@ -344,6 +344,35 @@ CREATE TABLE IF NOT EXISTS space_star (
   PRIMARY KEY (actor_id, space_id)
 );
 
+-- Who needs telling, and whether they have seen it.
+--
+-- A row per (event, recipient) rather than a flag on the event: the same
+-- comment is news to three people and already-read by a fourth, and that is
+-- state about a person, not about the event.
+--
+-- Derived at write time rather than queried at read time, because "did this
+-- concern me" depends on who was assigned and who had commented AT THAT
+-- MOMENT, which a later query cannot reconstruct.
+CREATE TABLE IF NOT EXISTS notification (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  -- Who is being told.
+  actor_id TEXT NOT NULL REFERENCES actor(id),
+  event_id TEXT NOT NULL REFERENCES event(id),
+  -- Why they are being told: 'mention', 'assigned', 'involved'.
+  reason TEXT NOT NULL CHECK (reason IN ('mention', 'assigned', 'involved')),
+  verb TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  -- The card or document to open. Null for workspace-level news.
+  item_key TEXT,
+  doc_slug TEXT,
+  created_at INTEGER NOT NULL,
+  read_at INTEGER,
+  UNIQUE (actor_id, event_id)
+);
+CREATE INDEX IF NOT EXISTS idx_notification_inbox
+  ON notification(actor_id, read_at, created_at DESC);
+
 -- Full-text search over items, comments, docs (mvp F7).
 CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
   kind, ref, title, body, space_key, tokenize = 'unicode61'

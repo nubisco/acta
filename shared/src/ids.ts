@@ -24,6 +24,7 @@ export const ID_PREFIXES = [
   'con',
   'rul',
   'evt',
+  'ntf',
 ] as const
 
 export type TIdPrefix = (typeof ID_PREFIXES)[number]

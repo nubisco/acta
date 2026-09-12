@@ -266,6 +266,8 @@ async function applyItemOp(
         'item',
         item.id,
         `commented on ${item.key}`,
+        undefined,
+        op.body,
       )
       return { key: item.key, id, rev }
     }

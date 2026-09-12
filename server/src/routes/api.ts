@@ -16,6 +16,7 @@ import { createToken } from '../core/auth'
 import { emitEvent, flushPendingEvents, onEvent } from '../core/events'
 import { spaceWrite } from '../services/spaces'
 import { docWrite } from '../services/docs'
+import { notificationList, notificationRead } from '../services/notifications'
 import { itemWrite } from '../services/items'
 import { labelWrite } from '../services/labels'
 import {
@@ -186,6 +187,17 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     requireScope(ctx, 'write')
     const body = zDocWrite.parse(await c.req.json())
     return c.json({ results: await docWrite(ctx, body.ops, store) })
+  })
+
+  // Notifications ------------------------------------------------------------
+  app.get('/notifications', async (c) =>
+    c.json(await notificationList(ctxOf(c))),
+  )
+
+  /** No id marks everything read, which is what the bell's own control does. */
+  app.post('/notifications/read', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { id?: string }
+    return c.json(await notificationRead(ctxOf(c), body.id))
   })
 
   app.post('/labels/write', async (c) => {

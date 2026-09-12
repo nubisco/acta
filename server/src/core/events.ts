@@ -1,4 +1,5 @@
 import { newId } from '@nubisco/acta-shared'
+import { notifyForEvent } from '../services/notifications'
 import { defer } from './defer'
 import type { ICtx } from './ctx'
 import { now } from './ctx'
@@ -35,6 +36,12 @@ export async function emitEvent(
   entityId: string,
   summary: string,
   payload?: unknown,
+  /**
+   * The text that was just written, when there is any, so mentions in it can
+   * be found. Only the comment and description paths have one; everything
+   * else notifies on involvement alone.
+   */
+  notifyBody?: string,
 ): Promise<IEvent> {
   const event: IEvent = {
     id: newId('evt'),
@@ -68,6 +75,15 @@ export async function emitEvent(
       event.caused_by ?? null,
     ],
   )
+  // Inside the caller's transaction on purpose: an op that rolls back must
+  // not leave someone with a notification about something that never
+  // happened. Failure here is swallowed for the opposite reason, that a bell
+  // is never worth failing a write over.
+  try {
+    await notifyForEvent(ctx, event, notifyBody)
+  } catch {
+    // Deliberately silent: see above.
+  }
   pending.push(event)
   return event
 }

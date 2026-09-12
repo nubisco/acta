@@ -5,7 +5,13 @@
  */
 
 import { computed, ref } from 'vue'
-import { api, auth, setWorkspaceSlug, subscribeEvents } from '@/api/client'
+import {
+  api,
+  auth,
+  getWorkspaceSlug,
+  setWorkspaceSlug,
+  subscribeEvents,
+} from '@/api/client'
 import type { ILiveEvent, IOverview } from '@/types/api'
 
 export interface IWorkspaceSummary {
@@ -29,7 +35,10 @@ export interface IMe {
 export interface IAppNotification {
   id: string
   title: string
-  description?: string
+  /** Why this reached you: mentioned, assigned, or already taking part. */
+  reason: 'mention' | 'assigned' | 'involved'
+  /** The card to open, when there is one. */
+  itemKey: string | null
   timestamp: string
   read: boolean
 }
@@ -43,11 +52,35 @@ const notifications = ref<IAppNotification[]>([])
 const listeners = new Set<(event: ILiveEvent) => void>()
 let unsubscribe: (() => void) | null = null
 
+/**
+ * Verbs that might have produced a notification for somebody. A superset of
+ * the server's list on purpose: this only decides whether to re-read, and
+ * the server decides who is actually told.
+ */
 const NOTIFY_VERBS = new Set([
   'comment.created',
   'item.assigned',
-  'member.provisioned',
+  'item.created',
+  'item.updated',
+  'item.archived',
+  'item.restored',
+  'item.completed',
+  'item.reopened',
+  'item.moved',
+  'doc.comment_created',
 ])
+
+/** Ids already shown as a desktop notification, so a re-read never repeats one. */
+const announced = new Set<string>()
+/**
+ * Whether the inbox has been read at all yet.
+ *
+ * Explicit rather than inferred from the inbox being empty: someone whose
+ * first load returns nothing would otherwise be treated as "still loading for
+ * the first time" forever, and their first real notification would be
+ * swallowed as history.
+ */
+let inboxLoaded = false
 
 export function useWorkspace() {
   async function loadMe(): Promise<boolean> {
@@ -106,17 +139,10 @@ export function useWorkspace() {
       (event) => {
         connectionDown.value = false
         if (event.entity === 'space' || event.entity === 'list') void refresh()
-        if (NOTIFY_VERBS.has(event.verb) && event.actor_kind !== 'human') {
-          notifications.value = [
-            {
-              id: event.id,
-              title: describe(event),
-              timestamp: new Date().toISOString(),
-              read: false,
-            },
-            ...notifications.value,
-          ].slice(0, 30)
-        }
+        // Anything might have produced a notification for this person, and
+        // the server is the one that knows. Re-reading is cheap and means
+        // the bell shows the same thing in every tab.
+        if (NOTIFY_VERBS.has(event.verb)) void loadNotifications()
         for (const listener of listeners) listener(event)
       },
       (down) => (connectionDown.value = down),
@@ -128,11 +154,84 @@ export function useWorkspace() {
     return () => listeners.delete(listener)
   }
 
-  function markAllRead(): void {
+  /**
+   * Read the inbox from the server, and raise a desktop notification for
+   * anything unread that has not been announced yet.
+   *
+   * The browser's own notification is the point of the exercise: a bell you
+   * have to be looking at to notice is a bell for people already looking.
+   */
+  async function loadNotifications(): Promise<void> {
+    const res = await api.notifications().catch(() => null)
+    if (!res) return
+    const fresh: IAppNotification[] = res.notifications.map((n) => ({
+      id: n.id,
+      title: n.summary,
+      reason: n.reason,
+      itemKey: n.item_key,
+      timestamp: new Date(n.created_at).toISOString(),
+      read: n.read_at !== null,
+    }))
+    // The first read fills the set without announcing: everything unread
+    // from before you opened the tab is history, not news.
+    const first = !inboxLoaded
+    inboxLoaded = true
+    notifications.value = fresh
+    for (const n of fresh) {
+      if (n.read || announced.has(n.id)) continue
+      announced.add(n.id)
+      if (!first) announce(n)
+    }
+  }
+
+  /** The OS-level notification, when the person has allowed them. */
+  function announce(n: IAppNotification): void {
+    if (typeof Notification === 'undefined') return
+    if (Notification.permission !== 'granted') return
+    const body =
+      n.reason === 'mention'
+        ? 'You were mentioned'
+        : n.reason === 'assigned'
+          ? 'On a card assigned to you'
+          : 'On a card you are part of'
+    const notice = new Notification(n.title, {
+      body,
+      // One notification per item replaces the last rather than stacking
+      // five of them for one busy card.
+      tag: n.itemKey ?? n.id,
+      icon: '/icons/acta-192.png',
+    })
+    notice.onclick = () => {
+      window.focus()
+      if (n.itemKey) {
+        const slug = getWorkspaceSlug()
+        window.location.href = `/${slug}/s/${n.itemKey.split('-')[0]}?item=${n.itemKey}`
+      }
+      notice.close()
+    }
+  }
+
+  /** Ask once, on a real click: browsers refuse the prompt otherwise. */
+  async function enableDesktopNotifications(): Promise<boolean> {
+    if (typeof Notification === 'undefined') return false
+    if (Notification.permission === 'granted') return true
+    if (Notification.permission === 'denied') return false
+    return (await Notification.requestPermission()) === 'granted'
+  }
+
+  async function markAllRead(): Promise<void> {
     notifications.value = notifications.value.map((n) => ({
       ...n,
       read: true,
     }))
+    await api.notificationRead().catch(() => undefined)
+  }
+
+  async function markRead(id: string): Promise<void> {
+    notifications.value = notifications.value.map((n) =>
+      n.id === id ? { ...n, read: true } : n,
+    )
+    await api.notificationRead(id).catch(() => undefined)
   }
 
   async function logout(): Promise<void> {
@@ -158,24 +257,14 @@ export function useWorkspace() {
       () => notifications.value.filter((n) => !n.read).length,
     ),
     markAllRead,
+    markRead,
+    loadNotifications,
+    enableDesktopNotifications,
     loadMe,
     refresh,
     connect,
     onLive,
     logout,
-  }
-}
-
-function describe(event: ILiveEvent): string {
-  switch (event.verb) {
-    case 'comment.created':
-      return 'An agent commented on an item'
-    case 'item.assigned':
-      return 'An item assignment changed'
-    case 'member.provisioned':
-      return 'A new member joined via single sign-on'
-    default:
-      return event.verb
   }
 }
 
