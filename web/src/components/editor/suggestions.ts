@@ -252,7 +252,11 @@ function mentionItems(query: string): ISuggestionItem[] {
       label: a.name,
       icon: a.kind === 'agent' ? 'robot' : 'user',
       hint: `@${a.handle}`,
-      apply: inserter(`@${a.handle} `),
+      // [[@handle]], not @handle. A mention is a reference: extractRefs only
+      // sees the bracketed form, the reader only renders that as a mention,
+      // and only that lands in the link table. Plain @handle is prose that
+      // looks like a mention and notifies nobody.
+      apply: inserter(`[[@${a.handle}]] `),
     }))
 }
 
