@@ -1,3 +1,10 @@
+## [1.15.1](https://github.com/nubisco/acta/compare/v1.15.0...v1.15.1) (2026-09-13)
+
+
+### Bug Fixes
+
+* **web:** use the layer system instead of tokens that never existed ([bcbf17e](https://github.com/nubisco/acta/commit/bcbf17ea5f1cc68d27c7959d5daec318e1a0f78f))
+
 # [1.15.0](https://github.com/nubisco/acta/compare/v1.14.0...v1.15.0) (2026-09-13)
 
 
