@@ -313,6 +313,22 @@
         </NbAccordionItem>
 
         <NbAccordionItem
+          id="plan"
+          title="Plan"
+          :meta="planCount(it.item.value)"
+        >
+          <DependencyPanel
+            :item-key="it.item.value.key"
+            :blocked-by="it.item.value.blocked_by ?? []"
+            :blocks="it.item.value.blocks ?? []"
+            :size="it.item.value.size"
+            :is-milestone="it.item.value.is_milestone"
+            @changed="it.load"
+            @open="(key: string) => inspector.open(key)"
+          />
+        </NbAccordionItem>
+
+        <NbAccordionItem
           id="attachments"
           title="Attachments"
           :meta="countLabel(it.item.value.attachments)"
@@ -372,6 +388,7 @@ import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
 import LabelBadge from '@/components/LabelBadge.vue'
+import DependencyPanel from '@/components/DependencyPanel.vue'
 
 // Outside setup, so it survives the panel unmounting between cards.
 const moduleOpenSections = ref<string[]>([
@@ -395,6 +412,16 @@ const ui = useUiState()
  * open would undo the change they just made. Reset only by a reload.
  */
 const openSections = moduleOpenSections
+
+/** "2 waiting, 1 blocked" is more than a header can hold; the count of edges
+ *  is enough to say whether opening it is worth it. */
+function planCount(item: {
+  blocked_by?: unknown[]
+  blocks?: unknown[]
+}): string | undefined {
+  const n = (item.blocked_by?.length ?? 0) + (item.blocks?.length ?? 0)
+  return n > 0 ? String(n) : undefined
+}
 
 /** A count for an accordion header, or nothing when there is none to give.
  *  Showing "0" would be noise on the many cards that have no attachments. */

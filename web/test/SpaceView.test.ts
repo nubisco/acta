@@ -312,17 +312,22 @@ describe('SpaceView card menu', () => {
     expect(inspectorMock.close).not.toHaveBeenCalled()
   })
 
-  // In the view's own toolbar, not teleported into the shell's side panel,
-  // which is where it rendered inert and invisible before.
-  it('renders the filters inside the space, not the side panel', async () => {
+  /**
+   * Attached to the button that opens it.
+   *
+   * It has been in two wrong places: the shell's side panel, where it
+   * displaced the card you had open and rendered inert when no card was
+   * open at all, and the toolbar row, where it was a sibling of the tabs and
+   * so drew a full-width panel beside them rather than under anything.
+   */
+  it('opens the filters in a dropdown on their own button', async () => {
     const view = await render()
     await filtersButton(view).trigger('click')
     await flushPromises()
 
     const panel = view.find('#space-filter-panel')
     expect(panel.exists()).toBe(true)
-    expect(view.find('.space__bar').element.parentElement).toBe(
-      panel.element.parentElement,
-    )
+    // Inside the menu, not loose in the view's layout.
+    expect(panel.element.closest('.nb-menu')).not.toBeNull()
   })
 })

@@ -182,6 +182,19 @@
           />
         </div>
 
+        <section class="item-modal__section">
+          <h3>Plan</h3>
+          <DependencyPanel
+            :item-key="it.item.value.key"
+            :blocked-by="it.item.value.blocked_by ?? []"
+            :blocks="it.item.value.blocks ?? []"
+            :size="it.item.value.size"
+            :is-milestone="it.item.value.is_milestone"
+            @changed="it.load"
+            @open="onOpenRelated"
+          />
+        </section>
+
         <ProvenanceNote
           v-if="it.item.value.imported"
           :imported="it.item.value.imported"
@@ -304,7 +317,7 @@
 import { ref, toRef, watch } from 'vue'
 import { useConfirm } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
-import { useInspector } from '@/stores/workspace'
+import { useInspector, useUiState } from '@/stores/workspace'
 import ActorChip from '@/components/ActorChip.vue'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'
 import ChecklistBody from '@/components/ChecklistBody.vue'
@@ -313,6 +326,7 @@ import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
 import LabelBadge from '@/components/LabelBadge.vue'
+import DependencyPanel from '@/components/DependencyPanel.vue'
 
 const props = defineProps<{ open: boolean; itemKey: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -320,6 +334,12 @@ const emit = defineEmits<{ close: [] }>()
 const it = useItem(toRef(props, 'itemKey'))
 const confirm = useConfirm()
 const inspector = useInspector()
+const ui = useUiState()
+
+/** Follow a dependency without leaving the full-size view. */
+function onOpenRelated(key: string): void {
+  ui.itemModalKey.value = key
+}
 
 /** Hand this card back to the side panel. Closing the modal and opening the
  *  panel on the same key, so the pair behaves as one control that changes the

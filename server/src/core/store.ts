@@ -40,6 +40,10 @@ export interface IItemRow {
   created_at: number
   updated_at: number
   imported_meta: string | null
+  /** Unitless estimate, for sequencing. Null means unsized. */
+  size: number | null
+  /** A checkpoint rather than a piece of work. */
+  is_milestone: number
 }
 
 export interface IDocRow {

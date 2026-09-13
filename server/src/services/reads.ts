@@ -294,7 +294,30 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
       created: item.created_at,
       updated: item.updated_at,
       imported: parseImportedMeta(item.imported_meta),
+      size: item.size ?? undefined,
+      is_milestone: item.is_milestone === 1 || undefined,
     }
+
+    // Always, not behind `include`. What a card waits on is part of what the
+    // card IS, and the sequence view was showing it while the card itself
+    // said nothing, which reads as two different sources of truth.
+    out.blocked_by = (
+      await ctx.db.query<{ key: string; title: string; completed: number }>(
+        `SELECT b.key, b.title, b.completed FROM item_dependency d
+           JOIN item b ON b.id = d.blocker_id
+          WHERE d.blocked_id = ? ORDER BY b.key`,
+        [item.id],
+      )
+    ).map((r) => ({ key: r.key, title: r.title, done: r.completed === 1 }))
+    out.blocks = (
+      await ctx.db.query<{ key: string; title: string; completed: number }>(
+        `SELECT b.key, b.title, b.completed FROM item_dependency d
+           JOIN item b ON b.id = d.blocked_id
+          WHERE d.blocker_id = ? ORDER BY b.key`,
+        [item.id],
+      )
+    ).map((r) => ({ key: r.key, title: r.title, done: r.completed === 1 }))
+
     if (include.has('comments')) {
       out.comments = (
         await ctx.db.query<{

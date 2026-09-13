@@ -40,6 +40,7 @@
                does not say it is active is how you end up staring at a space
                that is missing cards. -->
           <NbButton
+            ref="filtersButton"
             size="sm"
             :variant="filtersOpen || filterCount > 0 ? 'secondary' : 'ghost'"
             icon="funnel"
@@ -67,26 +68,6 @@
           />
         </div>
       </div>
-
-      <!-- In place, under the toolbar, rather than in the side panel. The
-           filters need room for coloured pills and a row of faces, which is
-           more than a menu holds, and the side panel is the card you opened:
-           sharing it meant you could never see both. Here the columns shift
-           down while it is open and back up when it closes. -->
-      <SpaceFilterPanel
-        v-if="filtersOpen"
-        id="space-filter-panel"
-        :labels="labelFilter"
-        :assignees="assigneeFilter"
-        :state="stateFilter"
-        :label-names="labelNames"
-        :active="filtersActive"
-        @update:labels="labelFilter = $event"
-        @update:assignees="assigneeFilter = $event"
-        @update:state="stateFilter = $event"
-        @clear="clearFilters"
-        @close="filtersOpen = false"
-      />
     </component>
 
     <div v-if="load.state.value === 'loading'" class="space__skeleton">
@@ -241,6 +222,34 @@
         </button>
       </template>
     </NbBoard>
+
+    <!-- Anchored to the button that opens it. It lived in the toolbar row
+         as a sibling of the tabs, which put a full-width panel beside them
+         rather than under anything, and it lived in the side panel before
+         that, where it displaced the card you had open. A dropdown belongs
+         to its trigger; the width is set for coloured pills and a row of
+         faces, not for menu rows. -->
+    <NbMenu
+      ref="filterMenu"
+      v-model:open="filtersOpen"
+      :min-width="420"
+      :max-width="680"
+      @close="filtersOpen = false"
+    >
+      <SpaceFilterPanel
+        id="space-filter-panel"
+        :labels="labelFilter"
+        :assignees="assigneeFilter"
+        :state="stateFilter"
+        :label-names="labelNames"
+        :active="filtersActive"
+        @update:labels="labelFilter = $event"
+        @update:assignees="assigneeFilter = $event"
+        @update:state="stateFilter = $event"
+        @clear="clearFilters"
+        @close="filtersOpen = false"
+      />
+    </NbMenu>
 
     <NbMenu
       ref="cardMenu"
@@ -539,10 +548,18 @@ const labelNames = computed(() => labelOptions.value.map((o) => o.value))
 // nothing.
 const firstCardId = computed(() => spaceItems.value[0]?.id ?? null)
 
-/** Filters open in place, under the toolbar. They no longer compete with the
- *  side panel, so opening one does not close the other. */
+const filterMenu = ref<InstanceType<typeof NbMenu> | null>(null)
+const filtersButton = ref<{ $el: HTMLElement } | null>(null)
+
+/** Opens under its own button, so the panel is attached to what opened it. */
 function toggleFilters(): void {
-  filtersOpen.value = !filtersOpen.value
+  if (filtersOpen.value) {
+    filtersOpen.value = false
+    return
+  }
+  const rect = filtersButton.value?.$el?.getBoundingClientRect()
+  if (rect) filterMenu.value?.setPosition(rect)
+  filtersOpen.value = true
 }
 
 const columns = computed(() =>

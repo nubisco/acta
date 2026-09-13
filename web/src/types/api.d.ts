@@ -65,6 +65,12 @@ export interface ISpaceItemRow {
   description?: string
 }
 
+export interface IDependencyRef {
+  key: string
+  title: string
+  done: boolean
+}
+
 export interface IItemDetail {
   key: string
   space: string
@@ -80,6 +86,13 @@ export interface IItemDetail {
   created: number
   updated: number
   imported?: IImportedMeta
+  /** Unitless estimate used by the sequence view. */
+  size?: number
+  is_milestone?: boolean
+  /** Cards that must finish before this one. */
+  blocked_by?: IDependencyRef[]
+  /** Cards waiting on this one. */
+  blocks?: IDependencyRef[]
   comments?: ICommentRow[]
   checklists?: { name: string; items: { text: string; done: boolean }[] }[]
   links?: {
