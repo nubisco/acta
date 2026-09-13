@@ -74,6 +74,11 @@ export async function sequenceGet(
             i.size, i.is_milestone
        FROM item i JOIN list l ON l.id = i.list_id
       WHERE i.space_id = ? AND i.archived = 0 AND i.completed = 0
+        -- A card sitting in a Done list is done, whether or not anything ever
+        -- ticked its completed flag. Imports routinely carry the list and not
+        -- the flag: Stagewright arrived with 157 such cards, every one of
+        -- which would otherwise have shown up as outstanding work.
+        AND l.role != 'done'
       ORDER BY i.pos`,
     [space.id],
   )

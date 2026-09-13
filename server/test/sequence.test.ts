@@ -174,4 +174,24 @@ describe('sequence', () => {
     // Two unsized cards in a chain are two steps, not zero.
     expect(critical_size).toBe(2)
   })
+
+  /**
+   * A card in a Done list is done, flag or no flag. Imports routinely carry
+   * the list and not the flag: Stagewright arrived with 157 such cards, and
+   * every one would have shown up as outstanding work.
+   */
+  it('treats a card in a done list as finished, even unflagged', async () => {
+    const [a, b] = await cards(2)
+    await dep(b, a)
+    // Moved, not completed, which is what an import produces.
+    await itemWrite(
+      ctx,
+      [{ op: 'move', op_id: 'mv', key: a, list: 'Done' }],
+      'ST',
+    )
+
+    const { nodes } = await sequenceGet(ctx, 'ST')
+    expect(nodes.map((n) => n.key)).toEqual([b])
+    expect(nodes[0].blocked_by).toEqual([])
+  })
 })
