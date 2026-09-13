@@ -10,7 +10,11 @@
           size="sm"
           label="Search"
           placeholder="Items, docs, comments..."
-        />
+        >
+          <template #leading>
+            <NbIcon name="magnifying-glass" :size="15" class="search__glyph" />
+          </template>
+        </NbTextInput>
         <NbSelect
           id="field-search-type"
           v-model="typeFilter"
@@ -179,5 +183,13 @@ function openResult(row: {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* Inside the field rather than beside it, so it reads as part of the control.
+   Muted because it labels the box; the text people type is the content. */
+.search__glyph {
+  margin-inline: var(--nb-spacing-8) 0;
+  color: var(--nb-c-text-subtle);
+  flex-shrink: 0;
 }
 </style>

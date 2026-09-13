@@ -15,7 +15,20 @@
       autocomplete="off"
       @focus="open = true"
       @keydown="onKeyDown"
-    />
+    >
+      <!-- The glyph is what says "search" before the placeholder is read, and
+           it is the one control people are meant to reach for first. -->
+      <template #leading>
+        <NbIcon name="magnifying-glass" :size="15" class="search__glyph" />
+      </template>
+      <!-- The palette's shortcut, shown on the control people already look at
+           when they want to find something. A shortcut nobody is told about
+           is a shortcut nobody uses, and this was the only place in the
+           interface that could ever mention it. -->
+      <template #trailing>
+        <kbd v-if="!query" class="search__kbd">{{ paletteChord }}</kbd>
+      </template>
+    </NbTextInput>
     <div
       v-if="open && query.trim()"
       class="global-search__panel nb-layer-2"
@@ -82,6 +95,19 @@ const inspector = useInspector()
 
 const rootEl = ref<HTMLElement | null>(null)
 const query = ref('')
+
+/**
+ * The palette's chord, in the notation of the machine it is read on.
+ *
+ * Mac writes it as a glyph and everywhere else spells it, and showing the
+ * wrong one is worse than showing none: it tells a Windows user to press a
+ * key their keyboard does not have.
+ */
+const paletteChord =
+  typeof navigator !== 'undefined' &&
+  /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
+    ? '⌘K'
+    : 'Ctrl K'
 const open = ref(false)
 const searching = ref(false)
 const hits = ref<ISearchResult[]>([])
@@ -241,5 +267,28 @@ onBeforeUnmount(() =>
     font-size: var(--nb-type-code-sm-size);
     color: var(--nb-c-text-muted);
   }
+}
+
+/* Drawn as a key rather than as text, so it reads as something to press.
+   Hidden once typing starts: by then it is in the way of the thing it was
+   advertising. */
+.search__kbd {
+  margin-inline-end: var(--nb-spacing-8);
+  padding: 0 var(--nb-spacing-4);
+  border: 1px solid var(--nb-c-border);
+  border-radius: var(--nb-radius-sm, 4px);
+  color: var(--nb-c-text-subtle);
+  font-family: var(--nb-font-family-sans);
+  font-size: var(--nb-type-body-xs-size, 0.7rem);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* Inside the field rather than beside it, so it reads as part of the control.
+   Muted because it labels the box; the text people type is the content. */
+.search__glyph {
+  margin-inline: var(--nb-spacing-8) 0;
+  color: var(--nb-c-text-subtle);
+  flex-shrink: 0;
 }
 </style>
