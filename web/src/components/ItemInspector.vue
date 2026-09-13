@@ -358,7 +358,7 @@
           Comments
           <span
             v-if="countLabel(it.item.value.comments)"
-            class="inspector-section__count"
+            class="inspector-section__count nb-layer-3"
           >
             {{ countLabel(it.item.value.comments) }}
           </span>
@@ -533,7 +533,7 @@ function commitDescription(): void {
   display: grid;
   gap: var(--nb-spacing-8);
   padding-block: var(--nb-spacing-16);
-  border-block-start: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
+  border-block-start: 1px solid var(--nb-c-border);
 
   &__title {
     display: flex;
@@ -541,7 +541,7 @@ function commitDescription(): void {
     gap: var(--nb-spacing-8);
     margin: 0;
     font-size: var(--nb-type-label-sm-size);
-    font-weight: var(--nb-type-label-sm-weight, 600);
+    font-weight: var(--nb-type-label-sm-weight);
     line-height: 1.4;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -550,10 +550,10 @@ function commitDescription(): void {
 
   &__count {
     padding-inline: var(--nb-spacing-4);
-    border-radius: var(--nb-radius-full, 999px);
-    background: var(--nb-c-surface-sunken, var(--nb-c-border));
+    border-radius: var(--nb-radius-pill);
+    background: var(--nb-c-surface);
     color: var(--nb-c-text-subtle);
-    font-size: var(--nb-type-body-xs-size, 0.75rem);
+    font-size: var(--nb-type-label-sm-size);
     letter-spacing: 0;
   }
 }
@@ -603,7 +603,7 @@ function commitDescription(): void {
 
 .inspector-editor {
   border: 1px solid var(--nb-c-primary);
-  border-radius: var(--nb-radius-sm, 8px);
+  border-radius: var(--nb-radius-sm);
   padding: var(--nb-spacing-8);
 
   :deep(.tiptap h1),
@@ -620,7 +620,7 @@ function commitDescription(): void {
 }
 
 .inspector-description {
-  border-radius: var(--nb-radius-sm, 8px);
+  border-radius: var(--nb-radius-sm);
   padding: var(--nb-spacing-4);
   margin: calc(var(--nb-spacing-4) * -1);
   cursor: text;
@@ -644,14 +644,14 @@ function commitDescription(): void {
   }
 
   &:focus-visible {
-    outline: 2px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+    outline: 2px solid var(--nb-c-focus-ring);
     outline-offset: 1px;
   }
 }
 
 .inspector-description-empty {
   border: 1px dashed var(--nb-c-border);
-  border-radius: var(--nb-radius-sm, 8px);
+  border-radius: var(--nb-radius-sm);
   background: transparent;
   padding: var(--nb-spacing-8);
   color: var(--nb-c-text-subtle);

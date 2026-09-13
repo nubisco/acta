@@ -177,7 +177,7 @@ function onCreated(slug: string): void {
 
   &__title {
     font-size: var(--nb-type-label-md-size);
-    font-weight: var(--nb-type-label-md-weight, 600);
+    font-weight: var(--nb-type-label-md-weight);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--nb-c-text-muted);

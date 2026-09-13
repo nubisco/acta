@@ -127,7 +127,7 @@ void load()
     gap: var(--nb-spacing-8);
     padding: var(--nb-spacing-12);
     border: 1px solid var(--nb-c-border);
-    border-radius: var(--nb-radius-sm, 8px);
+    border-radius: var(--nb-radius-sm);
     color: inherit;
     text-decoration: none;
 

@@ -25,7 +25,7 @@
     <template v-else-if="plan">
       <!-- The headline is the only number anyone asks for: how long is the
            road. Said once, at the top, rather than implied by the layout. -->
-      <header class="sequence__summary">
+      <header class="sequence__summary nb-layer-2">
         <span class="sequence__stat">
           <strong>{{ plan.layers }}</strong>
           {{ plan.layers === 1 ? 'step' : 'steps' }}
@@ -205,9 +205,9 @@ const steps = computed(() => {
     gap: var(--nb-spacing-16);
     flex-wrap: wrap;
     padding: var(--nb-spacing-8) var(--nb-spacing-12);
-    border: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
-    border-radius: var(--nb-radius-sm, 8px);
-    background: var(--nb-c-surface-sunken, transparent);
+    border: 1px solid var(--nb-c-border);
+    border-radius: var(--nb-radius-sm);
+    background: var(--nb-c-surface);
   }
 
   &__stat {
@@ -246,8 +246,8 @@ const steps = computed(() => {
     place-items: center;
     inline-size: 1.75rem;
     block-size: 1.75rem;
-    border-radius: var(--nb-radius-full, 999px);
-    background: var(--nb-c-layer-2, var(--nb-c-border));
+    border-radius: var(--nb-radius-pill);
+    background: var(--nb-c-layer-2);
     color: var(--nb-c-text-subtle);
     font-size: var(--nb-type-body-sm-size);
     font-weight: 600;
@@ -259,7 +259,7 @@ const steps = computed(() => {
   }
 
   &__now {
-    font-size: var(--nb-type-body-xs-size, 0.7rem);
+    font-size: var(--nb-type-label-sm-size);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--nb-c-primary);
@@ -284,7 +284,7 @@ const steps = computed(() => {
     text-align: start;
     background: var(--nb-c-surface);
     border: 1px solid var(--nb-c-border);
-    border-radius: var(--nb-radius-sm, 6px);
+    border-radius: var(--nb-radius-sm);
     color: inherit;
     font: inherit;
     cursor: pointer;
@@ -294,14 +294,14 @@ const steps = computed(() => {
     }
 
     &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline: 1px solid var(--nb-c-focus-ring);
       outline-offset: 2px;
     }
 
     /* The chain that decides the finish, marked on its edge rather than by
        tinting the card: the cards already carry label colour. */
     &--critical {
-      border-inline-start: 3px solid var(--nb-c-warning, orange);
+      border-inline-start: 3px solid var(--nb-c-warning);
     }
 
     &--milestone {
@@ -324,7 +324,7 @@ const steps = computed(() => {
 
   &__list {
     margin-inline-start: auto;
-    font-size: var(--nb-type-body-xs-size, 0.7rem);
+    font-size: var(--nb-type-label-sm-size);
     color: var(--nb-c-text-subtle);
   }
 
@@ -332,7 +332,7 @@ const steps = computed(() => {
      thing, and a card that prints its whole title buries it. */
   &__title {
     font-size: var(--nb-type-body-sm-size);
-    font-weight: var(--nb-type-label-lg-weight, 500);
+    font-weight: var(--nb-type-label-lg-weight);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -349,15 +349,15 @@ const steps = computed(() => {
 
   &__size {
     padding-inline: var(--nb-spacing-4);
-    border-radius: var(--nb-radius-full, 999px);
-    background: var(--nb-c-layer-2, var(--nb-c-border));
-    font-size: var(--nb-type-body-xs-size, 0.7rem);
+    border-radius: var(--nb-radius-pill);
+    background: var(--nb-c-layer-2);
+    font-size: var(--nb-type-label-sm-size);
     color: var(--nb-c-text-subtle);
   }
 
   &__after,
   &__unlocks {
-    font-size: var(--nb-type-body-xs-size, 0.7rem);
+    font-size: var(--nb-type-label-sm-size);
     color: var(--nb-c-text-subtle);
     overflow-wrap: anywhere;
   }

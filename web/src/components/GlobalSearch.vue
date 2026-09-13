@@ -211,15 +211,15 @@ onBeforeUnmount(() =>
     overflow-y: auto;
     padding: 4px;
     border: 1px solid var(--nb-c-border);
-    border-radius: var(--nb-radius-sm, 8px);
-    background: var(--nb-c-bg-raised, var(--nb-c-bg));
+    border-radius: var(--nb-radius-sm);
+    background: var(--nb-c-surface-raised);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   }
 
   &__note {
     margin: 0;
     padding: 8px 10px;
-    font-size: var(--nb-font-size-13, 13px);
+    font-size: var(--nb-font-size-13);
     color: var(--nb-c-text-muted);
   }
 
@@ -233,7 +233,7 @@ onBeforeUnmount(() =>
     background: none;
     color: var(--nb-c-text);
     font: inherit;
-    font-size: var(--nb-font-size-13, 13px);
+    font-size: var(--nb-font-size-13);
     text-align: start;
     cursor: pointer;
 
@@ -276,10 +276,10 @@ onBeforeUnmount(() =>
   margin-inline-end: var(--nb-spacing-8);
   padding: 0 var(--nb-spacing-4);
   border: 1px solid var(--nb-c-border);
-  border-radius: var(--nb-radius-sm, 4px);
+  border-radius: var(--nb-radius-sm);
   color: var(--nb-c-text-subtle);
   font-family: var(--nb-font-family-sans);
-  font-size: var(--nb-type-body-xs-size, 0.7rem);
+  font-size: var(--nb-type-label-sm-size);
   line-height: 1.6;
   white-space: nowrap;
 }

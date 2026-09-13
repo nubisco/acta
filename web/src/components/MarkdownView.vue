@@ -359,8 +359,8 @@ onMounted(() => {
     margin-block-start: var(--nb-spacing-4);
     padding-block: var(--nb-spacing-8);
     background: none;
-    border: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
-    border-radius: var(--nb-radius-sm, 4px);
+    border: 1px solid var(--nb-c-border);
+    border-radius: var(--nb-radius-sm);
     color: var(--nb-c-text-subtle);
     font: inherit;
     font-size: var(--nb-type-body-sm-size);
@@ -368,11 +368,11 @@ onMounted(() => {
 
     &:hover {
       color: var(--nb-c-text);
-      background: var(--nb-c-surface-hover, transparent);
+      background: var(--nb-c-surface-hover);
     }
 
     &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline: 1px solid var(--nb-c-focus-ring);
       outline-offset: 2px;
     }
   }
@@ -412,20 +412,20 @@ onMounted(() => {
   :deep(h1),
   :deep(h2),
   :deep(h3) {
-    margin-block: var(--nb-spacing-32, 2rem) var(--nb-spacing-8);
+    margin-block: var(--nb-spacing-32) var(--nb-spacing-8);
   }
 
   /* A rule is a breath, not a line squeezed between paragraphs. */
   :deep(hr) {
     border: 0;
     border-block-start: 1px solid var(--nb-c-border);
-    margin-block: var(--nb-spacing-32, 2rem);
+    margin-block: var(--nb-spacing-32);
   }
 
   :deep(pre) {
     overflow-x: auto;
     padding: var(--nb-spacing-12);
-    border-radius: var(--nb-radius-sm, 8px);
+    border-radius: var(--nb-radius-sm);
     background: var(--nb-c-surface);
     border: 1px solid var(--nb-c-border);
     font-family: var(--nb-font-family-mono);
@@ -468,7 +468,7 @@ onMounted(() => {
     padding-inline-start: calc(var(--nb-spacing-16) * 2 + 20px);
     border: 0;
     border-inline-start: 3px solid var(--callout-accent);
-    border-radius: var(--nb-radius-xs, 2px);
+    border-radius: var(--nb-radius-xs);
     background: color-mix(in srgb, var(--callout-accent) 9%, transparent);
     color: var(--nb-c-text);
 
@@ -515,12 +515,12 @@ onMounted(() => {
   :deep(.md__details) {
     margin-block: var(--nb-spacing-8);
     border: 1px solid var(--nb-c-border);
-    border-radius: var(--nb-radius-sm, 8px);
+    border-radius: var(--nb-radius-sm);
     padding: var(--nb-spacing-8);
 
     summary {
       cursor: pointer;
-      font-weight: var(--nb-type-label-lg-weight, 600);
+      font-weight: var(--nb-type-label-lg-weight);
     }
   }
 
@@ -540,7 +540,7 @@ onMounted(() => {
     font-size: var(--nb-type-code-sm-size);
 
     &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline: 1px solid var(--nb-c-focus-ring);
       outline-offset: 2px;
     }
   }
@@ -556,7 +556,7 @@ onMounted(() => {
     border: 1px solid var(--nb-c-border);
     border-block-end: 1px solid var(--nb-c-border);
     border-radius: 999px;
-    background: var(--nb-c-bg-soft, transparent);
+    background: var(--nb-c-bg-soft);
     color: var(--nb-c-text);
     vertical-align: -0.35em;
 
@@ -580,7 +580,7 @@ onMounted(() => {
       text-overflow: ellipsis;
       white-space: nowrap;
       font-family: var(--nb-font-family-sans);
-      font-size: var(--nb-font-size-13, 13px);
+      font-size: var(--nb-font-size-13);
     }
 
     &.md__ref--done .md__chip-dot {
@@ -612,7 +612,7 @@ onMounted(() => {
     gap: 5px;
     vertical-align: -0.3em;
     color: var(--nb-c-primary);
-    font-weight: var(--nb-type-label-lg-weight, 600);
+    font-weight: var(--nb-type-label-lg-weight);
 
     .md__mention-avatar {
       display: inline-flex;
@@ -625,7 +625,7 @@ onMounted(() => {
       object-fit: cover;
       flex: none;
       font-size: 8px;
-      font-weight: var(--nb-type-label-lg-weight, 600);
+      font-weight: var(--nb-type-label-lg-weight);
       color: var(--nb-c-bg);
     }
   }
@@ -635,7 +635,7 @@ onMounted(() => {
     font-size: var(--nb-type-body-sm-size);
     color: var(--nb-c-text-muted);
     border: 1px dashed var(--nb-c-border);
-    border-radius: var(--nb-radius-sm, 8px);
+    border-radius: var(--nb-radius-sm);
     padding: var(--nb-spacing-8);
   }
 }

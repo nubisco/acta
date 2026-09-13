@@ -438,7 +438,7 @@ function commitDescription(): void {
     gap: var(--nb-spacing-8) var(--nb-spacing-16);
     align-items: start;
     padding-block-end: var(--nb-spacing-12);
-    border-block-end: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
+    border-block-end: 1px solid var(--nb-c-border);
   }
 
   &__conversation {
@@ -467,7 +467,7 @@ function commitDescription(): void {
     align-items: center;
     gap: var(--nb-spacing-4);
     margin-inline-start: auto;
-    margin-block-start: var(--nb-spacing-2, 2px);
+    margin-block-start: var(--nb-spacing-2);
     flex: none;
   }
 
@@ -509,7 +509,7 @@ function commitDescription(): void {
 
   &__editor {
     border: 1px solid var(--nb-c-primary);
-    border-radius: var(--nb-radius-sm, 8px);
+    border-radius: var(--nb-radius-sm);
     padding: var(--nb-spacing-12);
 
     :deep(.tiptap h1),
@@ -526,7 +526,7 @@ function commitDescription(): void {
   }
 
   &__description {
-    border-radius: var(--nb-radius-sm, 8px);
+    border-radius: var(--nb-radius-sm);
     padding: var(--nb-spacing-4);
     margin: calc(var(--nb-spacing-4) * -1);
     cursor: text;
@@ -550,14 +550,14 @@ function commitDescription(): void {
     }
 
     &:focus-visible {
-      outline: 2px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline: 2px solid var(--nb-c-focus-ring);
       outline-offset: 1px;
     }
   }
 
   &__description-empty {
     border: 1px dashed var(--nb-c-border);
-    border-radius: var(--nb-radius-sm, 8px);
+    border-radius: var(--nb-radius-sm);
     background: transparent;
     padding: var(--nb-spacing-12);
     color: var(--nb-c-text-subtle);

@@ -102,7 +102,7 @@ const avatarUrl = computed(() =>
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  font-weight: var(--nb-type-label-lg-weight, 600);
+  font-weight: var(--nb-type-label-lg-weight);
   color: var(--nb-c-bg);
   flex: none;
   overflow: hidden;

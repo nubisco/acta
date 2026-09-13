@@ -879,7 +879,7 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
     min-inline-size: 0;
 
     &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline: 1px solid var(--nb-c-focus-ring);
       outline-offset: 2px;
     }
   }
@@ -907,7 +907,7 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
   &__card-title {
     font-size: var(--nb-type-body-md-size);
 
-    font-weight: var(--nb-type-label-lg-weight, 500);
+    font-weight: var(--nb-type-label-lg-weight);
     /* Wraps to as many lines as it needs. A card is as wide as its column,
        never wider, so the column is what decides the width and the title
        follows it. `anywhere` because an unbroken token (a URL, a long key)

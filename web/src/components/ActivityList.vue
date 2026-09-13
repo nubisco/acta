@@ -152,7 +152,7 @@ function dayLabel(ts: number): string {
   }
 
   &__actor {
-    font-weight: var(--nb-type-label-lg-weight, 600);
+    font-weight: var(--nb-type-label-lg-weight);
   }
 
   &__ai {

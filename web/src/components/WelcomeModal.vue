@@ -183,7 +183,7 @@ async function finish(how: 'tour' | 'dismiss'): Promise<void> {
   &__title {
     margin: 0;
     font-size: var(--nb-type-label-sm-size);
-    font-weight: var(--nb-type-label-sm-weight, 600);
+    font-weight: var(--nb-type-label-sm-weight);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--nb-c-text-subtle);

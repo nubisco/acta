@@ -5,7 +5,7 @@
          above it. Both directions live here: a card's place in a plan is as
          much what waits on it as what it waits for, and only one of those is
          visible from the card you are reading. -->
-    <div class="deps__links">
+    <div class="deps__links nb-layer-2">
       <div v-if="relations.length > 0" class="deps__groups">
         <section
           v-for="group in relations"
@@ -28,7 +28,11 @@
             {{ group.label }}
           </h4>
           <ul class="deps__list">
-            <li v-for="dep in group.refs" :key="dep.key" class="deps__row">
+            <li
+              v-for="dep in group.refs"
+              :key="dep.key"
+              class="deps__row nb-layer-3"
+            >
               <button
                 type="button"
                 class="deps__ref"
@@ -112,7 +116,7 @@
       </form>
     </div>
 
-    <div class="deps__estimate">
+    <div class="deps__estimate nb-layer-2">
       <NbTextInput
         :id="`field-size-${itemKey}`"
         v-model="sizeDraft"
@@ -324,14 +328,18 @@ async function commitSize(): Promise<void> {
   display: grid;
   gap: var(--nb-spacing-12);
 
-  /* The border is the answer to "where does this start and end". */
+  /* The answer to "where does this start and end" is a surface, not just a
+     border. .nb-layer-2 is the library's level for a nested panel: it rebinds
+     --nb-c-surface, --nb-c-border and --nb-c-surface-hover for everything
+     inside, so the rows below get their lift from the same system rather than
+     from a hand-picked grey. */
   &__links {
     display: grid;
     gap: var(--nb-spacing-12);
     padding: var(--nb-spacing-12);
-    border: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
-    border-radius: var(--nb-radius-sm, 8px);
-    background: var(--nb-c-surface-sunken, transparent);
+    border: 1px solid var(--nb-c-border);
+    border-radius: var(--nb-radius-md);
+    background: var(--nb-c-surface);
   }
 
   &__groups {
@@ -350,7 +358,7 @@ async function commitSize(): Promise<void> {
     gap: var(--nb-spacing-4);
     margin: 0;
     font-size: var(--nb-type-label-sm-size);
-    font-weight: var(--nb-type-label-sm-weight, 600);
+    font-weight: var(--nb-type-label-sm-weight);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--nb-c-text-subtle);
@@ -379,19 +387,20 @@ async function commitSize(): Promise<void> {
     min-inline-size: 0;
     padding: var(--nb-spacing-4) var(--nb-spacing-8);
     background: var(--nb-c-surface);
-    border: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
-    border-radius: var(--nb-radius-sm, 6px);
+    border: 1px solid var(--nb-c-border);
+    border-radius: var(--nb-radius-sm);
     text-align: start;
     font: inherit;
     color: inherit;
     cursor: pointer;
 
     &:hover {
+      background: var(--nb-c-surface-hover);
       border-color: var(--nb-c-primary);
     }
 
     &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline: 1px solid var(--nb-c-focus-ring);
       outline-offset: 1px;
     }
   }
@@ -416,7 +425,7 @@ async function commitSize(): Promise<void> {
     flex: 1;
     min-inline-size: 0;
     font-size: var(--nb-type-body-sm-size);
-    font-weight: var(--nb-type-label-lg-weight, 500);
+    font-weight: var(--nb-type-label-lg-weight);
     color: var(--nb-c-text);
     white-space: nowrap;
     overflow: hidden;
@@ -425,7 +434,7 @@ async function commitSize(): Promise<void> {
 
   &__done {
     flex: none;
-    color: var(--nb-c-success, green);
+    color: var(--nb-c-success);
   }
 
   /* Square and reachable. An xxs icon button is a 16px target sitting next to
@@ -446,7 +455,7 @@ async function commitSize(): Promise<void> {
     align-items: end;
     gap: var(--nb-spacing-4);
     padding-block-start: var(--nb-spacing-8);
-    border-block-start: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
+    border-block-start: 1px solid var(--nb-c-border);
   }
 
   &__opt {
@@ -469,8 +478,9 @@ async function commitSize(): Promise<void> {
     align-items: end;
     gap: var(--nb-spacing-8) var(--nb-spacing-16);
     padding: var(--nb-spacing-12);
-    border: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
-    border-radius: var(--nb-radius-sm, 8px);
+    border: 1px solid var(--nb-c-border);
+    border-radius: var(--nb-radius-md);
+    background: var(--nb-c-surface);
   }
 
   &__size {
@@ -480,7 +490,7 @@ async function commitSize(): Promise<void> {
   &__hint {
     grid-column: 1 / -1;
     margin: 0;
-    font-size: var(--nb-type-body-xs-size, 0.75rem);
+    font-size: var(--nb-type-label-sm-size);
     color: var(--nb-c-text-subtle);
   }
 }

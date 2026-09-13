@@ -155,7 +155,7 @@ onUnmounted(() => document.removeEventListener('pointerdown', onOutside))
     inline-size: 20rem;
     max-block-size: 24rem;
     overflow-y: auto;
-    z-index: var(--nb-zindex-dropdown, 30);
+    z-index: var(--nb-zindex-dropdown);
     display: grid;
     gap: var(--nb-spacing-8);
   }
@@ -164,7 +164,7 @@ onUnmounted(() => document.removeEventListener('pointerdown', onOutside))
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-weight: var(--nb-type-label-lg-weight, 600);
+    font-weight: var(--nb-type-label-lg-weight);
   }
 
   &__empty {
@@ -205,31 +205,31 @@ onUnmounted(() => document.removeEventListener('pointerdown', onOutside))
   padding: var(--nb-spacing-8);
   background: none;
   border: 0;
-  border-radius: var(--nb-radius-sm, 6px);
+  border-radius: var(--nb-radius-sm);
   text-align: start;
   color: inherit;
   font: inherit;
   cursor: pointer;
 
   &:hover {
-    background: var(--nb-c-surface-hover, rgb(128 128 128 / 8%));
+    background: var(--nb-c-surface-hover);
   }
 
   &:focus-visible {
-    outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+    outline: 1px solid var(--nb-c-focus-ring);
     outline-offset: -2px;
   }
 
   time {
     color: var(--nb-c-text-subtle);
-    font-size: var(--nb-type-body-xs-size, 0.75rem);
+    font-size: var(--nb-type-label-sm-size);
   }
 }
 
 /* Why it reached you, said plainly, so the list is scannable without
    reading every summary. */
 .bell__reason {
-  font-size: var(--nb-type-body-xs-size, 0.75rem);
+  font-size: var(--nb-type-label-sm-size);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;

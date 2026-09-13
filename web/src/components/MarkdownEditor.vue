@@ -178,9 +178,9 @@ const bubbleActions = [
 .md-editor__bubble {
   display: flex;
   gap: 2px;
-  padding: var(--nb-spacing-2, 2px);
-  background: var(--nb-c-layer-3, var(--nb-c-surface-raised));
-  border: 1px solid var(--nb-c-layer-border-3, var(--nb-c-border));
+  padding: var(--nb-spacing-2);
+  background: var(--nb-c-layer-3);
+  border: 1px solid var(--nb-c-layer-border-3);
   border-radius: var(--nb-radius-md);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
   z-index: var(--nb-zindex-dropdown);
@@ -204,11 +204,11 @@ const bubbleActions = [
 
   &.is-active {
     background: var(--nb-c-primary);
-    color: var(--nb-c-primary-a11y, #fff);
+    color: var(--nb-c-primary-a11y);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+    outline: 2px solid var(--nb-c-focus-ring);
     outline-offset: 1px;
   }
 }
@@ -256,7 +256,7 @@ const bubbleActions = [
     pre {
       overflow-x: auto;
       padding: var(--nb-spacing-12);
-      border-radius: var(--nb-radius-sm, 8px);
+      border-radius: var(--nb-radius-sm);
       background: var(--nb-c-surface);
       border: 1px solid var(--nb-c-border);
       font-family: var(--nb-font-family-mono);

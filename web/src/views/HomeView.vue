@@ -274,7 +274,7 @@ void reload()
     border-radius: var(--nb-radius-sm);
     font-family: var(--nb-font-family-mono);
     font-size: var(--nb-type-label-md-size);
-    font-weight: var(--nb-type-label-lg-weight, 600);
+    font-weight: var(--nb-type-label-lg-weight);
     color: var(--nb-c-bg);
   }
 

@@ -31,7 +31,7 @@
             {{ timestampLabel(comment) }}
           </time>
         </div>
-        <MarkdownView :source="comment.body" class="thread__body" />
+        <MarkdownView :source="comment.body" class="thread__body nb-layer-2" />
       </li>
     </ul>
     <NbForm class="thread__composer" @submit.prevent="emit('submit')">
@@ -160,8 +160,8 @@ const draft = computed({
 
   &__body {
     padding: var(--nb-spacing-8) var(--nb-spacing-12);
-    border-radius: var(--nb-radius-sm, 8px);
-    background: var(--nb-c-surface-sunken, rgb(128 128 128 / 8%));
+    border-radius: var(--nb-radius-sm);
+    background: var(--nb-c-surface);
   }
 
   &__head {
@@ -178,7 +178,7 @@ const draft = computed({
 
   &__editor {
     border: 1px solid var(--nb-c-border);
-    border-radius: var(--nb-radius-sm, 8px);
+    border-radius: var(--nb-radius-sm);
     padding: var(--nb-spacing-8);
 
     :deep(.tiptap) {

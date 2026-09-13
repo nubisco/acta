@@ -648,14 +648,14 @@ watch(
   font: inherit;
   text-align: start;
   cursor: pointer;
-  border-radius: var(--nb-radius-sm, 8px);
+  border-radius: var(--nb-radius-sm);
 
   &:hover {
-    background: var(--nb-c-surface-hover, rgba(255, 255, 255, 0.06));
+    background: var(--nb-c-surface-hover);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+    outline: 2px solid var(--nb-c-focus-ring);
     outline-offset: 2px;
   }
 }

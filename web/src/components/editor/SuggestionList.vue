@@ -73,14 +73,14 @@ defineExpose({ onKeyDown })
   overflow-y: auto;
   padding: 4px;
   border: 1px solid var(--nb-c-border);
-  border-radius: var(--nb-radius-sm, 8px);
-  background: var(--nb-c-bg-raised, var(--nb-c-bg));
+  border-radius: var(--nb-radius-sm);
+  background: var(--nb-c-surface-raised);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 
   &__empty {
     margin: 0;
     padding: 8px 10px;
-    font-size: var(--nb-font-size-13, 13px);
+    font-size: var(--nb-font-size-13);
     color: var(--nb-c-text-muted);
   }
 
@@ -94,7 +94,7 @@ defineExpose({ onKeyDown })
     background: none;
     color: var(--nb-c-text);
     font: inherit;
-    font-size: var(--nb-font-size-13, 13px);
+    font-size: var(--nb-font-size-13);
     text-align: start;
     cursor: pointer;
 

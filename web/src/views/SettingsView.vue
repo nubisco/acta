@@ -906,7 +906,7 @@ async function copyIngest(): Promise<void> {
     }
 
     &:focus-visible {
-      outline: 2px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline: 2px solid var(--nb-c-focus-ring);
       outline-offset: 1px;
     }
   }

@@ -85,7 +85,7 @@ function toggle(handle: string): void {
     }
 
     &:focus-visible {
-      outline-color: var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline-color: var(--nb-c-focus-ring);
     }
   }
 }

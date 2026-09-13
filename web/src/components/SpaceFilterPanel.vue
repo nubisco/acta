@@ -121,10 +121,10 @@ function toggleLabel(name: string): void {
   grid-template-columns: max-content minmax(0, 1fr);
   gap: var(--nb-spacing-8) var(--nb-spacing-16);
   align-items: baseline;
+  /* No surface of its own: this now renders inside an NbMenu, which is
+     already a popover with its own background, border and radius. Painting a
+     second box inside it was a box in a box. */
   padding: var(--nb-spacing-12) var(--nb-spacing-16);
-  border: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
-  border-radius: var(--nb-radius-sm, 8px);
-  background: var(--nb-c-surface-sunken, transparent);
 
   &__row {
     display: contents;
@@ -132,7 +132,7 @@ function toggleLabel(name: string): void {
 
   &__label {
     font-size: var(--nb-type-label-sm-size);
-    font-weight: var(--nb-type-label-sm-weight, 600);
+    font-weight: var(--nb-type-label-sm-weight);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--nb-c-text-subtle);
@@ -152,9 +152,9 @@ function toggleLabel(name: string): void {
     border: 0;
     padding: 0;
     cursor: pointer;
-    border-radius: var(--nb-radius-full, 999px);
+    border-radius: var(--nb-radius-pill);
     opacity: 0.55;
-    transition: opacity var(--nb-motion-fast, 120ms) ease;
+    transition: opacity var(--nb-animation-fast) ease;
 
     &:hover {
       opacity: 0.8;
@@ -167,7 +167,7 @@ function toggleLabel(name: string): void {
     }
 
     &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
+      outline: 1px solid var(--nb-c-focus-ring);
       outline-offset: 2px;
     }
   }
