@@ -1,3 +1,37 @@
+# [1.15.0](https://github.com/nubisco/acta/compare/v1.14.0...v1.15.0) (2026-09-13)
+
+
+### Bug Fixes
+
+* **auth:** hand over before any HTML is sent, not after the app boots ([67f856e](https://github.com/nubisco/acta/commit/67f856e310712f9ed76cc899e041528bb2400f2d))
+* **cards:** style the sections I added, drop the panel, give comments faces ([f8ae062](https://github.com/nubisco/acta/commit/f8ae0628d90981b3a7d6da77286b1c561872c92a))
+* **db:** rebuild link rather than update it, and guard the rebuild ([cf4fcc2](https://github.com/nubisco/acta/commit/cf4fcc2c6ad2ba81096522d624cbf5189de7e99c))
+* **editor:** the @ typeahead was writing prose, not a mention ([1f6b512](https://github.com/nubisco/acta/commit/1f6b5126235b38f05ac7b596363d8cde2b972651))
+* **inspector:** put back the inset the panel was providing ([8ec1115](https://github.com/nubisco/acta/commit/8ec11158ee928b81ed5176a6798cafbca1e7bc0f))
+* **sequence:** a card in a Done list is done, flag or not ([27273ec](https://github.com/nubisco/acta/commit/27273ecd5fe0d70b17d4dd71b7cb613d20ec0178))
+* **space:** open the side panel for filters, and turn the modal the right way round ([e3dd7e6](https://github.com/nubisco/acta/commit/e3dd7e6202282a654f6e6799c37f440644443cd9))
+* **sso:** bind fetch to the global scope in JwksVerifier ([51faacf](https://github.com/nubisco/acta/commit/51faacf5faa6af1e46590c45cccf7890578289e2))
+* **trello-import:** read comments per card, and refuse to lose them quietly ([b924fb3](https://github.com/nubisco/acta/commit/b924fb3a2c092f6bdc17a9bbdb7f4441dcde7e1c))
+* **web:** rebuild the card's Plan section around picking, not typing ([17b4b3b](https://github.com/nubisco/acta/commit/17b4b3b2cf299de8def0e5260d93a9adaa73a425))
+
+
+### Features
+
+* **auth:** a configured provider owns sign-in, and turns codes off ([d903b2a](https://github.com/nubisco/acta/commit/d903b2a982e39a697d3e7601a84d3bad3f2c293d))
+* **auth:** hand straight over to Platform instead of asking first ([d9e10a0](https://github.com/nubisco/acta/commit/d9e10a08095aa5b3ea4669d48e04c9910bb9c235))
+* **auth:** let the identity provider own who the administrator is ([7cf08e0](https://github.com/nubisco/acta/commit/7cf08e07c3457ed278029afa6cc6f1d4af63dedb))
+* **board:** filters as a panel, not four dropdowns in a toolbar row ([b801d1c](https://github.com/nubisco/acta/commit/b801d1c6b742b8923d055fc1e2ef673dee913854))
+* **cards:** fade long descriptions behind Show more, and mark sections ([8832dba](https://github.com/nubisco/acta/commit/8832dbadfa0d9faeb877649db364cc1168f308f7))
+* **cards:** show a card's place in the plan on the card, and dock the filters ([3eb8df6](https://github.com/nubisco/acta/commit/3eb8df63e7138bb569ab282145b49d19bba7004a))
+* **inspector:** a way out, and a mark on the card it is showing ([8de28f7](https://github.com/nubisco/acta/commit/8de28f7810c309df10dee080fd7105e5ec88f2d1))
+* **inspector:** collapsible sections, and a way back to the board ([acd0190](https://github.com/nubisco/acta/commit/acd019095112e3ed53cd35f8a27034f4729b43eb))
+* **inspector:** only the secondary blocks collapse, and a size toggle ([560ab0e](https://github.com/nubisco/acta/commit/560ab0efb18047f106b31c6c93efad9e2980099e))
+* **notifications:** tell people about their own work, and tell the browser ([b5bba60](https://github.com/nubisco/acta/commit/b5bba6041371146381b6fb778dc896921f573819))
+* **onboarding:** a welcome that asks once, and a tour written for arrivals ([bac730e](https://github.com/nubisco/acta/commit/bac730e39105845738fa8872b54d0a4c535ed3e5))
+* **search:** a magnifying glass, and the palette's shortcut where it is read ([956d7e1](https://github.com/nubisco/acta/commit/956d7e15813f0251a63457c6fdd7e7de350333d8))
+* **sequence:** plan by dependency instead of by date, plus swimlanes and sticky headers ([6ec2176](https://github.com/nubisco/acta/commit/6ec21760f7b4ea6decfe225ae56b1570c361c742))
+* **space,editor:** cap the columns, offer people on @, and stop dropping tables ([0b19da6](https://github.com/nubisco/acta/commit/0b19da6292644657239a0cbc05d277ee5e983139))
+
 # [1.14.0](https://github.com/nubisco/acta/compare/v1.13.1...v1.14.0) (2026-09-09)
 
 
