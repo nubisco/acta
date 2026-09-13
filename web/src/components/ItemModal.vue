@@ -186,6 +186,7 @@
           <h3>Plan</h3>
           <DependencyPanel
             :item-key="it.item.value.key"
+            :space="it.item.value.space"
             :blocked-by="it.item.value.blocked_by ?? []"
             :blocks="it.item.value.blocks ?? []"
             :size="it.item.value.size"

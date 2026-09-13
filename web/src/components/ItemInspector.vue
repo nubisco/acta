@@ -33,7 +33,7 @@
         <NbButton
           v-if="inspector.trail.value.length > 0"
           v-nb-tooltip="{ body: `Back to ${inspector.trail.value.at(-1)}` }"
-          size="xs"
+          size="sm"
           variant="ghost"
           icon="arrow-left"
           :aria-label="`Back to ${inspector.trail.value.at(-1)}`"
@@ -63,7 +63,7 @@
                reader's eye rather than making them hunt the column. -->
           <NbButton
             v-nb-tooltip="{ body: `Show on ${it.item.value.space}` }"
-            size="xs"
+            size="sm"
             variant="ghost"
             icon="kanban"
             :aria-label="`Show ${it.item.value.key} on its space`"
@@ -75,7 +75,7 @@
           <NbButton
             v-if="it.item.value.archived"
             v-nb-tooltip="{ body: 'Restore to its list' }"
-            size="xs"
+            size="sm"
             variant="secondary"
             icon="arrow-counter-clockwise"
             :aria-label="`Restore ${it.item.value.key}`"
@@ -84,7 +84,7 @@
           <NbButton
             v-else
             v-nb-tooltip="{ body: 'Archive this card' }"
-            size="xs"
+            size="sm"
             variant="ghost"
             icon="archive"
             :aria-label="`Archive ${it.item.value.key}`"
@@ -95,7 +95,7 @@
           <NbButton
             v-if="it.item.value.archived"
             v-nb-tooltip="{ body: 'Delete permanently' }"
-            size="xs"
+            size="sm"
             variant="danger"
             outlined
             icon="trash"
@@ -112,7 +112,7 @@
                your place and opening it again. -->
           <NbButton
             v-nb-tooltip="{ body: 'Open full size' }"
-            size="xs"
+            size="sm"
             variant="ghost"
             icon="arrows-out-simple"
             :aria-label="`Open ${it.item.value.key} full size`"
@@ -120,7 +120,7 @@
           />
           <NbButton
             v-nb-tooltip="{ body: 'Close' }"
-            size="xs"
+            size="sm"
             variant="ghost"
             icon="x"
             class="inspector-close"
@@ -319,6 +319,7 @@
         >
           <DependencyPanel
             :item-key="it.item.value.key"
+            :space="it.item.value.space"
             :blocked-by="it.item.value.blocked_by ?? []"
             :blocks="it.item.value.blocks ?? []"
             :size="it.item.value.size"

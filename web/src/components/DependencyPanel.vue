@@ -1,83 +1,125 @@
 <template>
   <div class="deps">
-    <!-- Both directions, because a card's place in a plan is as much what
-         waits on it as what it waits for, and only one of those is visible
-         from the card you are reading. -->
-    <div class="deps__group">
-      <span class="deps__label">Waits for</span>
-      <ul v-if="blockedBy.length > 0" class="deps__list">
-        <li v-for="dep in blockedBy" :key="dep.key">
-          <button
-            type="button"
-            class="deps__ref"
-            @click="emit('open', dep.key)"
-          >
-            <s v-if="dep.done">{{ dep.key }}</s>
-            <template v-else>{{ dep.key }}</template>
-            <span class="deps__title">{{ dep.title }}</span>
-          </button>
-          <NbButton
-            v-nb-tooltip="{ body: `Stop waiting for ${dep.key}` }"
-            size="xxs"
-            variant="ghost"
-            icon="x"
-            :aria-label="`Remove the dependency on ${dep.key}`"
-            @click="remove(dep.key)"
-          />
-        </li>
-      </ul>
-      <p v-else class="deps__none">Nothing. This can start now.</p>
+    <!-- A bounded block, because "what this waits on" is one fact with a start
+         and an end, and the previous version let it bleed into the fields
+         above it. Both directions live here: a card's place in a plan is as
+         much what waits on it as what it waits for, and only one of those is
+         visible from the card you are reading. -->
+    <div class="deps__links">
+      <div v-if="relations.length > 0" class="deps__groups">
+        <section
+          v-for="group in relations"
+          :key="group.kind"
+          class="deps__group"
+        >
+          <h4 class="deps__label">
+            <NbIcon
+              v-if="group.kind === 'blocked_by'"
+              name="arrow-line-left"
+              :size="13"
+              aria-hidden="true"
+            />
+            <NbIcon
+              v-else
+              name="arrow-line-right"
+              :size="13"
+              aria-hidden="true"
+            />
+            {{ group.label }}
+          </h4>
+          <ul class="deps__list">
+            <li v-for="dep in group.refs" :key="dep.key" class="deps__row">
+              <button
+                type="button"
+                class="deps__ref"
+                :aria-label="`Open ${dep.key}: ${dep.title}`"
+                @click="emit('open', dep.key)"
+              >
+                <span
+                  class="deps__key"
+                  :class="{ 'deps__key--done': dep.done }"
+                >
+                  {{ dep.key }}
+                </span>
+                <!-- The title leads. The key is the address, but nobody reads
+                     a plan by its addresses. -->
+                <span class="deps__title">{{ dep.title }}</span>
+                <NbIcon
+                  v-if="dep.done"
+                  v-nb-tooltip="{ body: 'Done' }"
+                  name="check-circle"
+                  :size="14"
+                  class="deps__done"
+                />
+              </button>
+              <NbButton
+                v-nb-tooltip="{ body: `Unlink ${dep.key}` }"
+                size="sm"
+                variant="ghost"
+                icon="x"
+                class="deps__remove"
+                :aria-label="`Remove the link to ${dep.key}`"
+                @click="remove(group.kind, dep.key)"
+              />
+            </li>
+          </ul>
+        </section>
+      </div>
 
+      <p v-else class="deps__none">
+        Not linked to anything. This can start whenever you like.
+      </p>
+
+      <!-- Pick the relation, pick the card. Typing a key meant knowing it by
+           heart and finding out it was wrong only after submitting. -->
       <form class="deps__add" @submit.prevent="add">
-        <NbTextInput
-          :id="`field-blocker-${itemKey}`"
-          v-model="draft"
+        <NbSelect
+          :id="`field-relation-${itemKey}`"
+          v-model="relation"
           size="sm"
-          placeholder="Card key, e.g. ST-41"
-          :error="error"
-          aria-label="Add a card this one waits for"
+          :options="RELATIONS"
+          aria-label="How this card relates to the one you pick"
+          class="deps__relation"
         />
+        <NbSelect
+          :id="`field-target-${itemKey}`"
+          v-model="target"
+          size="sm"
+          :options="candidates"
+          :disabled="loadingCandidates"
+          :error="error"
+          :placeholder="loadingCandidates ? 'Loading cards…' : 'Pick a card'"
+          aria-label="The card to link to"
+          class="deps__target"
+          @update:model-value="error = undefined"
+        >
+          <template #option="{ option }">
+            <span class="deps__opt">
+              <span class="deps__key">{{ option.value }}</span>
+              <span class="deps__opt-title">{{ titleOf(option) }}</span>
+            </span>
+          </template>
+        </NbSelect>
         <NbButton
           type="submit"
-          size="xs"
+          size="sm"
           variant="secondary"
           :loading="busy"
-          :disabled="!draft.trim()"
+          :disabled="!target"
         >
-          Add
+          Link
         </NbButton>
       </form>
     </div>
 
-    <!-- Read-only: an edge is owned by the card that waits, so the place to
-         remove it is there. Offering it from both ends means two controls
-         for one fact. -->
-    <div v-if="blocks.length > 0" class="deps__group">
-      <span class="deps__label">Blocks</span>
-      <ul class="deps__list">
-        <li v-for="dep in blocks" :key="dep.key">
-          <button
-            type="button"
-            class="deps__ref"
-            @click="emit('open', dep.key)"
-          >
-            <s v-if="dep.done">{{ dep.key }}</s>
-            <template v-else>{{ dep.key }}</template>
-            <span class="deps__title">{{ dep.title }}</span>
-          </button>
-        </li>
-      </ul>
-    </div>
-
-    <div class="deps__group deps__group--inline">
-      <span class="deps__label">Size</span>
+    <div class="deps__estimate">
       <NbTextInput
         :id="`field-size-${itemKey}`"
         v-model="sizeDraft"
         size="sm"
+        label="Size"
         inputmode="decimal"
         placeholder="—"
-        aria-label="Estimated size, unitless"
         class="deps__size"
         @blur="commitSize"
       />
@@ -87,6 +129,9 @@
         label="Milestone"
         @update:model-value="commitSize"
       />
+      <p class="deps__hint">
+        Size is unitless and feeds the critical path in the sequence view.
+      </p>
     </div>
   </div>
 </template>
@@ -99,13 +144,15 @@
  * nothing, which reads as two different sources of truth. This is the same
  * fact, shown where the fact is edited.
  */
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { api, newOpId } from '@/api/client'
 import { humanise } from '@/lib/state'
 import type { IDependencyRef } from '@/types/api'
 
 const props = defineProps<{
   itemKey: string
+  /** Where to look for cards to link to. */
+  space: string
   blockedBy: IDependencyRef[]
   blocks: IDependencyRef[]
   size?: number
@@ -114,11 +161,35 @@ const props = defineProps<{
 
 const emit = defineEmits<{ changed: []; open: [key: string] }>()
 
-const draft = ref('')
+type TKind = 'blocked_by' | 'blocks'
+
+/** Phrased as a sentence about this card, so the row reads left to right. */
+const RELATIONS = [
+  { label: 'is blocked by', value: 'blocked_by' },
+  { label: 'blocks', value: 'blocks' },
+]
+
+const relation = ref<TKind>('blocked_by')
+const target = ref<string | null>(null)
 const error = ref<string | undefined>(undefined)
 const busy = ref(false)
 const sizeDraft = ref('')
 const milestoneDraft = ref(false)
+
+const relations = computed(() =>
+  [
+    {
+      kind: 'blocked_by' as const,
+      label: 'Blocked by',
+      refs: props.blockedBy,
+    },
+    {
+      kind: 'blocks' as const,
+      label: 'Blocks',
+      refs: props.blocks,
+    },
+  ].filter((group) => group.refs.length > 0),
+)
 
 watch(
   () => [props.size, props.isMilestone] as const,
@@ -129,20 +200,84 @@ watch(
   { immediate: true },
 )
 
+/**
+ * Cards in the same space, minus this one and anything already linked.
+ *
+ * Same space only: a dependency across spaces is legal in the model but the
+ * sequence view is drawn per space, so an edge leaving it would be invisible
+ * exactly where it matters.
+ */
+const pool = ref<{ key: string; title: string }[]>([])
+const loadingCandidates = ref(false)
+
+const linked = computed(
+  () =>
+    new Set([
+      props.itemKey,
+      ...props.blockedBy.map((d) => d.key),
+      ...props.blocks.map((d) => d.key),
+    ]),
+)
+
+const candidates = computed(() =>
+  pool.value
+    .filter((row) => !linked.value.has(row.key))
+    .map((row) => ({ label: `${row.key}  ${row.title}`, value: row.key })),
+)
+
+/** The option slot wants the two halves apart; the label keeps them together
+    for the closed control and for typeahead inside the listbox. */
+function titleOf(option: { label: string; value: string | number }): string {
+  return option.label.slice(String(option.value).length).trim()
+}
+
+watch(
+  () => props.space,
+  async (space) => {
+    if (!space) return
+    loadingCandidates.value = true
+    try {
+      const { items } = await api.spaceGet(space, { limit: '500' })
+      pool.value = items
+        .filter((row) => !row.archived && !row.done)
+        .map((row) => ({ key: row.key, title: row.title }))
+    } catch {
+      // A picker that cannot load is not worth an error banner on a card:
+      // the list is simply empty and Link stays disabled.
+      pool.value = []
+    } finally {
+      loadingCandidates.value = false
+    }
+  },
+  { immediate: true },
+)
+
 async function add(): Promise<void> {
-  const blocker = draft.value.trim().toUpperCase()
-  if (!blocker) return
+  const other = target.value
+  if (!other) return
   busy.value = true
   error.value = undefined
+  // One op, either direction: "A blocks B" is "B is blocked by A" with the
+  // ends swapped, and the model only stores it once.
+  const [key, blocker] =
+    relation.value === 'blocked_by'
+      ? [props.itemKey, other]
+      : [other, props.itemKey]
   try {
     const { results } = await api.itemWrite([
-      { op: 'depends_on', op_id: newOpId(), key: props.itemKey, blocker },
+      { op: 'depends_on', op_id: newOpId(), key, blocker },
     ])
     const result = results[0]
-    // The server refuses a cycle and a card blocking itself. Both are worth
-    // saying plainly here rather than as a toast that outlives the form.
-    if (!result.ok) throw new Error((result as { error: string }).error)
-    draft.value = ''
+    // A refusal is not a failure: the server has already written the sentence
+    // ("ST-41 already waits on ST-33, directly or through others"), and naming
+    // the two cards is the whole value. Running it through humanise() turned
+    // it into "Something went wrong; try again", which invites a retry of
+    // something that can never succeed. humanise() stays for the transport.
+    if (!result.ok) {
+      error.value = (result as { error: string }).error
+      return
+    }
+    target.value = null
     emit('changed')
   } catch (err) {
     error.value = humanise(err)
@@ -151,10 +286,10 @@ async function add(): Promise<void> {
   }
 }
 
-async function remove(blocker: string): Promise<void> {
-  await api.itemWrite([
-    { op: 'undepend', op_id: newOpId(), key: props.itemKey, blocker },
-  ])
+async function remove(kind: TKind, other: string): Promise<void> {
+  const [key, blocker] =
+    kind === 'blocked_by' ? [props.itemKey, other] : [other, props.itemKey]
+  await api.itemWrite([{ op: 'undepend', op_id: newOpId(), key, blocker }])
   emit('changed')
 }
 
@@ -189,18 +324,31 @@ async function commitSize(): Promise<void> {
   display: grid;
   gap: var(--nb-spacing-12);
 
+  /* The border is the answer to "where does this start and end". */
+  &__links {
+    display: grid;
+    gap: var(--nb-spacing-12);
+    padding: var(--nb-spacing-12);
+    border: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
+    border-radius: var(--nb-radius-sm, 8px);
+    background: var(--nb-c-surface-sunken, transparent);
+  }
+
+  &__groups {
+    display: grid;
+    gap: var(--nb-spacing-12);
+  }
+
   &__group {
     display: grid;
     gap: var(--nb-spacing-4);
-
-    &--inline {
-      grid-template-columns: max-content max-content max-content;
-      align-items: center;
-      gap: var(--nb-spacing-8);
-    }
   }
 
   &__label {
+    display: flex;
+    align-items: center;
+    gap: var(--nb-spacing-4);
+    margin: 0;
     font-size: var(--nb-type-label-sm-size);
     font-weight: var(--nb-type-label-sm-weight, 600);
     text-transform: uppercase;
@@ -214,52 +362,76 @@ async function commitSize(): Promise<void> {
     padding: 0;
     display: grid;
     gap: var(--nb-spacing-2);
+  }
 
-    li {
-      display: flex;
-      align-items: center;
-      gap: var(--nb-spacing-4);
-      min-inline-size: 0;
-    }
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: var(--nb-spacing-4);
+    min-inline-size: 0;
   }
 
   &__ref {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--nb-spacing-8);
     flex: 1;
     min-inline-size: 0;
-    padding: var(--nb-spacing-2) var(--nb-spacing-4);
-    background: none;
-    border: 0;
-    border-radius: var(--nb-radius-sm, 4px);
+    padding: var(--nb-spacing-4) var(--nb-spacing-8);
+    background: var(--nb-c-surface);
+    border: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
+    border-radius: var(--nb-radius-sm, 6px);
     text-align: start;
     font: inherit;
-    font-family: var(--nb-font-family-mono);
-    font-size: var(--nb-type-code-sm-size);
     color: inherit;
     cursor: pointer;
 
     &:hover {
-      background: var(--nb-c-surface-hover, rgb(128 128 128 / 8%));
+      border-color: var(--nb-c-primary);
     }
 
     &:focus-visible {
       outline: 1px solid var(--nb-c-focus-ring, var(--nb-c-primary));
-      outline-offset: -1px;
+      outline-offset: 1px;
     }
   }
 
-  /* The title is why the key means anything, but the key is what is being
-     referred to, so the title gives way first. */
-  &__title {
-    font-family: var(--nb-font-family-sans);
-    font-size: var(--nb-type-body-sm-size);
+  /* Never wraps. A two-character-wide column that broke "ST-41" across two
+     lines was the single worst thing about the old version. */
+  &__key {
+    flex: none;
+    white-space: nowrap;
+    font-family: var(--nb-font-family-mono);
+    font-size: var(--nb-type-code-sm-size);
     color: var(--nb-c-text-subtle);
+
+    &--done {
+      text-decoration: line-through;
+    }
+  }
+
+  /* The prominent half: full text colour and weight, the key beside it muted.
+     Reversing those made every row look like an id with a footnote. */
+  &__title {
+    flex: 1;
+    min-inline-size: 0;
+    font-size: var(--nb-type-body-sm-size);
+    font-weight: var(--nb-type-label-lg-weight, 500);
+    color: var(--nb-c-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    min-inline-size: 0;
+  }
+
+  &__done {
+    flex: none;
+    color: var(--nb-c-success, green);
+  }
+
+  /* Square and reachable. An xxs icon button is a 16px target sitting next to
+     a 32px row, which reads as damage rather than as a control. */
+  &__remove {
+    flex: none;
   }
 
   &__none {
@@ -269,14 +441,52 @@ async function commitSize(): Promise<void> {
   }
 
   &__add {
-    display: flex;
-    align-items: start;
+    display: grid;
+    grid-template-columns: minmax(0, 9rem) minmax(0, 1fr) max-content;
+    align-items: end;
     gap: var(--nb-spacing-4);
-    margin-block-start: var(--nb-spacing-4);
+    padding-block-start: var(--nb-spacing-8);
+    border-block-start: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
+  }
+
+  &__opt {
+    display: flex;
+    align-items: baseline;
+    gap: var(--nb-spacing-8);
+    min-inline-size: 0;
+  }
+
+  &__opt-title {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__estimate {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    align-items: end;
+    gap: var(--nb-spacing-8) var(--nb-spacing-16);
+    padding: var(--nb-spacing-12);
+    border: 1px solid var(--nb-c-border-subtle, var(--nb-c-border));
+    border-radius: var(--nb-radius-sm, 8px);
   }
 
   &__size {
     inline-size: 5rem;
   }
+
+  &__hint {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: var(--nb-type-body-xs-size, 0.75rem);
+    color: var(--nb-c-text-subtle);
+  }
+}
+
+/* The checkbox sits on the input's baseline, not the label's. */
+:deep(.nb-checkbox) {
+  padding-block-end: var(--nb-spacing-4);
 }
 </style>
