@@ -17,6 +17,7 @@ import { emitEvent, flushPendingEvents, onEvent } from '../core/events'
 import { spaceWrite } from '../services/spaces'
 import { docWrite } from '../services/docs'
 import { notificationList, notificationRead } from '../services/notifications'
+import { sequenceGet } from '../services/sequence'
 import { itemWrite } from '../services/items'
 import { labelWrite } from '../services/labels'
 import {
@@ -188,6 +189,14 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     const body = zDocWrite.parse(await c.req.json())
     return c.json({ results: await docWrite(ctx, body.ops, store) })
   })
+
+  /**
+   * The plan for one space: what can start now, what waits on what, and the
+   * chain that decides the finish.
+   */
+  app.get('/spaces/:key/sequence', async (c) =>
+    c.json(await sequenceGet(ctxOf(c), c.req.param('key'))),
+  )
 
   // Notifications ------------------------------------------------------------
   app.get('/notifications', async (c) =>

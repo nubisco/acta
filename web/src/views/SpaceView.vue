@@ -52,6 +52,13 @@
               {{ filterCount }}
             </NbBadge>
           </NbButton>
+          <NbSelect
+            id="field-swimlane"
+            v-model="swimlane"
+            size="sm"
+            :options="swimlaneOptions"
+            aria-label="Group cards into swimlanes"
+          />
           <NbTextInput
             id="field-filter-text"
             v-model="textFilter"
@@ -144,6 +151,12 @@
 
     <TimelineView v-else-if="view === 'timeline'" :items="items" />
 
+    <SequenceView
+      v-else-if="view === 'sequence'"
+      :space-key="spaceKey"
+      @open="(key: string) => inspector.open(key)"
+    />
+
     <!-- Columns are capped rather than sharing the width equally. With two
          lists, `1fr` each gave every card half the screen and a space with
          six columns looked nothing like a space with two. A cap means the
@@ -153,6 +166,7 @@
       v-else
       class="space__board"
       :columns="columns"
+      :lanes="lanes"
       :items="spaceItems"
       @move="onMove"
     >
@@ -308,6 +322,7 @@ import NewItemModal from '@/components/NewItemModal.vue'
 import CalendarView from '@/components/views/CalendarView.vue'
 import TableView from '@/components/views/TableView.vue'
 import TimelineView from '@/components/views/TimelineView.vue'
+import SequenceView from '@/components/views/SequenceView.vue'
 import SpaceFilterPanel from '@/components/SpaceFilterPanel.vue'
 
 const props = defineProps<{ spaceKey?: string }>()
@@ -466,6 +481,7 @@ const viewTabs = [
   { id: 'table', label: 'Table' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'timeline', label: 'Timeline' },
+  { id: 'sequence', label: 'Sequence' },
 ]
 
 const view = computed({
@@ -537,11 +553,75 @@ const columns = computed(() =>
   })),
 )
 
+/**
+ * Swimlanes: the same columns, split into horizontal bands.
+ *
+ * A space of two hundred cards in six lists answers "what is in review" and
+ * refuses "what is Ivan carrying", because the one axis is already spent on
+ * status. A lane is the second axis, and which one matters is a question only
+ * the person looking can answer, so it is a choice rather than a setting.
+ */
+const swimlane = ref<'none' | 'assignee' | 'label'>('none')
+const swimlaneOptions = [
+  { label: 'No swimlanes', value: 'none' },
+  { label: 'By assignee', value: 'assignee' },
+  { label: 'By label', value: 'label' },
+]
+
+/** The lane a card belongs to. Null is the catch-all band. */
+function laneKeysOf(row: ISpaceItemRow): (string | null)[] {
+  if (swimlane.value === 'assignee') {
+    const who = row.assignees ?? []
+    return who.length > 0 ? who : [null]
+  }
+  if (swimlane.value === 'label') {
+    const labels = row.labels ?? []
+    return labels.length > 0 ? labels : [null]
+  }
+  return [null]
+}
+
+const lanes = computed(() => {
+  if (swimlane.value === 'none') return undefined
+  const seen = new Set<string>()
+  for (const row of items.value) {
+    for (const key of laneKeysOf(row)) if (key) seen.add(key)
+  }
+  const named = [...seen].sort((a, b) => a.localeCompare(b))
+  return [
+    ...named.map((key) => ({
+      id: key,
+      label: swimlane.value === 'assignee' ? `@${key}` : key,
+    })),
+    // Last, and only when something lands in it: a permanently empty
+    // "Unassigned" band is a row of six empty cells on every space.
+    ...(items.value.some((row) => laneKeysOf(row).includes(null))
+      ? [
+          {
+            id: null,
+            label: swimlane.value === 'assignee' ? 'Unassigned' : 'No label',
+          },
+        ]
+      : []),
+  ]
+})
+
 const spaceItems = computed<IBoardItem[]>(() =>
   // Cell order is the array order, so sort by pos before handing over.
   [...items.value]
     .sort((a, b) => a.pos - b.pos)
-    .map((row) => ({ id: row.key, columnId: row.list, ...row })),
+    // A card with two assignees belongs in both lanes, so it is emitted once
+    // per lane with an id that stays unique; the key rides along untouched so
+    // every interaction still addresses the real card.
+    .flatMap((row) =>
+      laneKeysOf(row).map((laneId) => ({
+        ...row,
+        id: laneId === null ? row.key : `${row.key}@@${laneId}`,
+        key: row.key,
+        columnId: row.list,
+        laneId,
+      })),
+    ),
 )
 
 // No "all" entry: an empty multi-select already means every label, and an
@@ -687,6 +767,12 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
   display: grid;
   gap: var(--nb-spacing-16);
   align-content: start;
+  /* The view owns the viewport's remaining height so the BOARD scrolls, not
+     the page. The library already makes column headers sticky, but sticky is
+     relative to the nearest scrolling ancestor: while the page was the
+     scroller, the headers stuck to the top of a box that was itself sliding
+     away, so a long space scrolled its own titles off screen. */
+  min-block-size: 0;
 
   /* Trello-parity column width: fixed-ish tracks, space scrolls
    * horizontally instead of stretching a few columns across the screen. */
@@ -751,6 +837,12 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
      rather than fighting it. */
   &__board {
     --nb-board-column-track: minmax(17rem, 22rem);
+    /* Its own scroller, which is what gives the sticky headers something to
+       stick to. Sized against the viewport rather than a parent, because the
+       toolbar above it grows when the filters open. */
+    max-block-size: calc(100dvh - var(--space-chrome, 13rem));
+    overflow: auto;
+    overscroll-behavior: contain;
   }
 
   &__card {

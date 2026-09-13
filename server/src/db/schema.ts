@@ -96,6 +96,11 @@ CREATE TABLE IF NOT EXISTS item (
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   imported_meta TEXT,
+  -- Unitless estimate. Null means unsized.
+  size REAL,
+  -- A checkpoint rather than a piece of work: "we can ship" rather than
+  -- something somebody does.
+  is_milestone INTEGER NOT NULL DEFAULT 0,
   UNIQUE (workspace_id, key)
 );
 CREATE INDEX IF NOT EXISTS idx_item_list ON item(list_id, pos);
@@ -344,6 +349,33 @@ CREATE TABLE IF NOT EXISTS space_star (
   PRIMARY KEY (actor_id, space_id)
 );
 
+-- "This before that."
+--
+-- A relation of its own rather than a link ref: [[ST-4]] in a description
+-- means "see also", and a plan cannot be built from prose that might be a
+-- dependency. Direction is explicit, blocker first.
+--
+-- The pair is the key, so asserting the same edge twice is the same edge.
+-- A cycle is refused at write time: a plan that contains one has no order,
+-- and the moment to say so is when it is drawn, not when it is read.
+CREATE TABLE IF NOT EXISTS item_dependency (
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  -- The card that must be done first.
+  blocker_id TEXT NOT NULL REFERENCES item(id),
+  -- The card that waits for it.
+  blocked_id TEXT NOT NULL REFERENCES item(id),
+  created_by TEXT NOT NULL REFERENCES actor(id),
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (blocker_id, blocked_id)
+);
+CREATE INDEX IF NOT EXISTS idx_dependency_blocked
+  ON item_dependency(blocked_id);
+
+-- How big a card is thought to be, for ordering and for saying how far away
+-- something is. Unitless on purpose: teams that estimate in days and teams
+-- that estimate in points both want the same arithmetic.
+-- See ADDITIVE_COLUMNS for databases that predate it.
+
 -- Who needs telling, and whether they have seen it.
 --
 -- A row per (event, recipient) rather than a flag on the event: the same
@@ -514,6 +546,11 @@ export const ADDITIVE_COLUMNS = [
   // browser: it is a fact about a person, and greeting someone again because
   // they opened a second browser is how a welcome becomes an annoyance.
   'ALTER TABLE actor ADD COLUMN onboarded_at INTEGER',
+  // Size, for sequencing. Null means unsized, which the plan treats as 1 so
+  // an unestimated card still takes a position rather than collapsing.
+  'ALTER TABLE item ADD COLUMN size REAL',
+  // A card can stand for a checkpoint rather than a piece of work.
+  'ALTER TABLE item ADD COLUMN is_milestone INTEGER NOT NULL DEFAULT 0',
   // After the column exists, never inside SCHEMA_SQL: on a fresh database the
   // table is created before the ALTER runs, so an index declared up there
   // would name a column that is not there yet.

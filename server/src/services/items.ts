@@ -21,6 +21,36 @@ import {
   type IItemRow,
 } from '../core/store'
 
+/**
+ * Can `from` be reached from `start` by following "blocks" edges?
+ *
+ * Used to refuse an edge that would close a loop. Iterative rather than
+ * recursive because a deep chain should not be able to overflow the stack,
+ * and `seen` keeps a diamond from being walked twice.
+ */
+async function reaches(
+  ctx: ICtx,
+  start: string,
+  target: string,
+): Promise<boolean> {
+  const seen = new Set<string>([start])
+  const queue = [start]
+  while (queue.length > 0) {
+    const id = queue.shift()!
+    if (id === target) return true
+    const next = await ctx.db.query<{ blocked_id: string }>(
+      'SELECT blocked_id FROM item_dependency WHERE blocker_id = ?',
+      [id],
+    )
+    for (const row of next) {
+      if (seen.has(row.blocked_id)) continue
+      seen.add(row.blocked_id)
+      queue.push(row.blocked_id)
+    }
+  }
+  return false
+}
+
 export async function itemWrite(
   ctx: ICtx,
   ops: TItemOp[],
@@ -425,6 +455,67 @@ async function applyItemOp(
         op.imported_meta ? JSON.stringify(op.imported_meta) : null,
         item.id,
       ])
+      return { key: item.key, rev: item.rev }
+    }
+    case 'depends_on': {
+      const blocked = await itemByKey(ctx, op.key)
+      const blocker = await itemByKey(ctx, op.blocker)
+      if (blocked.id === blocker.id)
+        throw new ApiError(400, 'a card cannot block itself')
+
+      // Refused here rather than when the plan is drawn. A cycle has no
+      // order, so the moment to say so is while someone is asserting the
+      // edge that would create one and can still say what they meant.
+      if (await reaches(ctx, blocked.id, blocker.id))
+        throw new ApiError(
+          409,
+          `${op.blocker} already waits on ${op.key}, directly or through others`,
+        )
+
+      await ctx.db.run(
+        `INSERT OR IGNORE INTO item_dependency
+           (workspace_id, blocker_id, blocked_id, created_by, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        [ctx.workspaceId, blocker.id, blocked.id, ctx.actor.id, now()],
+      )
+      await emitEvent(
+        ctx,
+        'item.blocked',
+        'item',
+        blocked.id,
+        `${blocked.key} now waits on ${blocker.key}`,
+      )
+      return { key: blocked.key, rev: blocked.rev }
+    }
+    case 'undepend': {
+      const blocked = await itemByKey(ctx, op.key)
+      const blocker = await itemByKey(ctx, op.blocker)
+      await ctx.db.run(
+        'DELETE FROM item_dependency WHERE blocker_id = ? AND blocked_id = ?',
+        [blocker.id, blocked.id],
+      )
+      await emitEvent(
+        ctx,
+        'item.unblocked',
+        'item',
+        blocked.id,
+        `${blocked.key} no longer waits on ${blocker.key}`,
+      )
+      return { key: blocked.key, rev: blocked.rev }
+    }
+    case 'size': {
+      const item = await itemByKey(ctx, op.key)
+      await ctx.db.run(
+        `UPDATE item SET size = ?,
+           is_milestone = CASE WHEN ? THEN ? ELSE is_milestone END
+         WHERE id = ?`,
+        [
+          op.size,
+          op.is_milestone !== undefined ? 1 : 0,
+          op.is_milestone ? 1 : 0,
+          item.id,
+        ],
+      )
       return { key: item.key, rev: item.rev }
     }
     case 'assign': {

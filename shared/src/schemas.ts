@@ -105,6 +105,31 @@ export const zItemCommentOp = z.object({
   imported_meta: zImportedMeta.optional(),
 })
 
+export const zItemDependsOp = z.object({
+  op: z.literal('depends_on'),
+  op_id: zOpId,
+  /** The card that waits. */
+  key: zItemKey,
+  /** The card that must finish first. */
+  blocker: zItemKey,
+})
+
+export const zItemUndependOp = z.object({
+  op: z.literal('undepend'),
+  op_id: zOpId,
+  key: zItemKey,
+  blocker: zItemKey,
+})
+
+export const zItemSizeOp = z.object({
+  op: z.literal('size'),
+  op_id: zOpId,
+  key: zItemKey,
+  /** Unitless. Null clears it back to unsized. */
+  size: z.number().min(0).max(1000).nullable(),
+  is_milestone: z.boolean().optional(),
+})
+
 export const zItemSetMetaOp = z.object({
   op: z.literal('set_meta'),
   op_id: zOpId,
@@ -183,6 +208,9 @@ export const zItemOp = z.discriminatedUnion('op', [
   zItemLabelOp,
   zItemAssignOp,
   zItemSetMetaOp,
+  zItemDependsOp,
+  zItemUndependOp,
+  zItemSizeOp,
   zItemDeleteOp,
   simpleItemOp('archive'),
   simpleItemOp('restore'),

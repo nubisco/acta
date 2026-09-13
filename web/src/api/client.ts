@@ -148,6 +148,27 @@ export const api = {
       body: JSON.stringify({ keys, include }),
     }),
 
+  sequence: (space: string) =>
+    req<{
+      nodes: {
+        key: string
+        title: string
+        list: string
+        status: 'open' | 'done' | 'archived'
+        assignees: string[]
+        labels: string[]
+        size: number | null
+        is_milestone: boolean
+        layer: number
+        blocked_by: string[]
+        blocks: string[]
+        critical: boolean
+        earliest_finish: number
+      }[]
+      layers: number
+      critical_size: number
+    }>(`/spaces/${encodeURIComponent(space)}/sequence`),
+
   notifications: () =>
     req<{
       notifications: {
