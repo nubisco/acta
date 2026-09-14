@@ -502,8 +502,34 @@ export async function docGet(
     }))
   }
   if (include.has('backlinks')) {
-    out.backlinks = await ctx.db.query<{ src_kind: string; src_id: string }>(
-      "SELECT src_kind, src_id FROM link WHERE workspace_id = ? AND ref_type = 'doc' AND target = ?",
+    // Resolved to something a person can read. The link table stores internal
+    // ids, and returning those unchanged put rows like
+    // "item  itm_01m2gaz92142arwky3srvkw0pd" under "Referenced by", which
+    // tells a reader nothing and is not even clickable. The label is the card
+    // key or the document title; the raw id stays for callers that want it.
+    out.backlinks = await ctx.db.query<{
+      src_kind: string
+      src_id: string
+      ref: string | null
+      label: string | null
+    }>(
+      `SELECT l.src_kind, l.src_id,
+              CASE l.src_kind
+                WHEN 'item' THEN i.key
+                WHEN 'doc' THEN d.slug
+                WHEN 'comment' THEN ci.key
+              END AS ref,
+              CASE l.src_kind
+                WHEN 'item' THEN i.title
+                WHEN 'doc' THEN d.title
+                WHEN 'comment' THEN ci.title
+              END AS label
+         FROM link l
+         LEFT JOIN item i ON l.src_kind = 'item' AND i.id = l.src_id
+         LEFT JOIN document d ON l.src_kind = 'doc' AND d.id = l.src_id
+         LEFT JOIN comment c ON l.src_kind = 'comment' AND c.id = l.src_id
+         LEFT JOIN item ci ON ci.id = c.item_id
+        WHERE l.workspace_id = ? AND l.ref_type = 'doc' AND l.target = ?`,
       [ctx.workspaceId, doc.slug],
     )
   }

@@ -46,6 +46,18 @@ export interface IAppNotification {
 const overview = ref<IOverview | null>(null)
 const me = ref<IMe | null>(null)
 const connectionDown = ref(false)
+/**
+ * Delay before "Reconnecting" is shown.
+ *
+ * EventSource drops and re-establishes on its own routinely: a proxy idle
+ * timeout, a laptop waking, a network hiccup. Each one fires onerror and is
+ * fixed within a second or two without anybody doing anything. Painting a
+ * warning callout across the top of the app for that made a perfectly healthy
+ * self-hosted instance look broken, which is the first thing a new operator
+ * sees. The banner is for a stream that is actually staying down.
+ */
+const RECONNECT_GRACE_MS = 6000
+let downTimer: ReturnType<typeof setTimeout> | null = null
 const workspaceSlug = ref('')
 const workspaces = ref<IWorkspaceSummary[]>([])
 const notifications = ref<IAppNotification[]>([])
@@ -137,6 +149,10 @@ export function useWorkspace() {
     if (unsubscribe) return
     unsubscribe = subscribeEvents(
       (event) => {
+        if (downTimer) {
+          clearTimeout(downTimer)
+          downTimer = null
+        }
         connectionDown.value = false
         if (event.entity === 'space' || event.entity === 'list') void refresh()
         // Anything might have produced a notification for this person, and
@@ -145,7 +161,20 @@ export function useWorkspace() {
         if (NOTIFY_VERBS.has(event.verb)) void loadNotifications()
         for (const listener of listeners) listener(event)
       },
-      (down) => (connectionDown.value = down),
+      (down) => {
+        if (downTimer) {
+          clearTimeout(downTimer)
+          downTimer = null
+        }
+        if (!down) {
+          connectionDown.value = false
+          return
+        }
+        downTimer = setTimeout(() => {
+          connectionDown.value = true
+          downTimer = null
+        }, RECONNECT_GRACE_MS)
+      },
     )
   }
 

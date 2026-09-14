@@ -1,1 +1,16 @@
-* @josesilva53
+# Default owner for all files
+* @joseporto
+
+# Critical automation and release configuration
+/.github/workflows/* @joseporto
+/package.json @joseporto
+
+# The schema is the sharpest edge in the codebase: a bad migration is not a
+# degraded feature, it is every request failing until a redeploy.
+/server/src/db/schema.ts @joseporto
+
+# Authentication and the MCP surface: both decide what a credential can reach.
+/server/src/core/auth.ts @joseporto
+/server/src/core/oidc.ts @joseporto
+/server/src/core/sso.ts @joseporto
+/server/src/mcp/* @joseporto

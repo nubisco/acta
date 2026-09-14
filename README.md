@@ -2,6 +2,10 @@
 
   <br />
 
+  <img src="https://raw.githubusercontent.com/nubisco/acta/master/docs/public/logo.svg" alt="Nubisco" width="96" />
+
+  <br />
+
 # Acta
 
 **Boards and docs in one self-hostable server, co-managed by humans and AI agents.**
@@ -12,6 +16,7 @@
 [![GitHub release](https://img.shields.io/github/v/release/nubisco/acta)](https://github.com/nubisco/acta/releases)
 [![license](https://img.shields.io/github/license/nubisco/acta)](LICENSE)
 [![CLA](https://img.shields.io/badge/CLA-required-0A7F5A)](docs/CLA-INDIVIDUAL.md)
+[![Docs](https://img.shields.io/website?url=https%3A%2F%2Fdocs.nubisco.io%2Facta%2F&label=docs)](https://docs.nubisco.io/acta/)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%9D%A4-db61a2)](https://github.com/sponsors/joseporto)
 
 </div>
@@ -45,6 +50,17 @@ docker compose up -d   # see docker-compose.yml; data lives in the acta-data vol
 
 The server prints one-time login codes to its log until an email sender is configured, which is fine on a laptop and unacceptable once other people use the instance. See [Install](https://docs.nubisco.io/acta/self-hosting/) and [Authentication](https://docs.nubisco.io/acta/self-hosting/authentication).
 
+## Documentation
+
+Full documentation is at **[docs.nubisco.io/acta](https://docs.nubisco.io/acta/)**:
+
+- [What Acta is](https://docs.nubisco.io/acta/guide/) and its [concepts](https://docs.nubisco.io/acta/guide/concepts)
+- [Install](https://docs.nubisco.io/acta/self-hosting/): Docker, Cloudflare Workers, or from source
+- [Configuration](https://docs.nubisco.io/acta/self-hosting/configuration) and [Authentication](https://docs.nubisco.io/acta/self-hosting/authentication): one-time codes, OpenID Connect, access tokens
+- [The MCP endpoint](https://docs.nubisco.io/acta/mcp/): [connecting a client](https://docs.nubisco.io/acta/mcp/connecting) and the [tool reference](https://docs.nubisco.io/acta/mcp/tools)
+- Migrating from [Trello](https://docs.nubisco.io/acta/migrate/trello) and [Confluence](https://docs.nubisco.io/acta/migrate/confluence)
+- [Architecture](https://docs.nubisco.io/acta/develop/) and the [data model](https://docs.nubisco.io/acta/develop/data-model)
+
 ## Development
 
 ```sh
@@ -58,6 +74,32 @@ pnpm quality:check  # test + lint + format:check + types:check
 ## Contributing
 
 Contributions are welcome under the [Individual CLA](docs/CLA-INDIVIDUAL.md); see [CONTRIBUTING.md](./CONTRIBUTING.md). Generic UI components belong in [@nubisco/ui](https://github.com/nubisco/ui), not here.
+
+## Support this project
+
+Acta is free and self-hostable, and stays that way. Building and maintaining it
+takes real work, so if it saves your team time, sponsorship is what keeps it
+going.
+
+- ❤️ [Sponsor via GitHub](https://github.com/sponsors/joseporto)
+- ⭐ Star the repository, which is how other people find it
+- 🐛 [Report a bug](https://github.com/nubisco/acta/issues/new/choose) or send a pull request
+
+If you would rather not run it yourself, or you need something built around it,
+[talk to Nubisco](https://nubisco.io).
+
+## More from Nubisco
+
+Acta is built and maintained by [**Nubisco**](https://nubisco.io), a Portuguese
+software company that builds the tools it needs and opens the ones useful to
+other people.
+
+| Project                                             | What it is                                                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| [Nubisco UI](https://docs.nubisco.io/ui/)           | The Vue 3 component library this interface is built on. Geometry-first, token-driven, accessible. |
+| [Verba](https://docs.nubisco.io/verba/)             | Self-hostable i18n collaboration: structured, reviewable, deployable translations.                |
+| [Nubisco CMS](https://docs.nubisco.io/cms/)         | A headless CMS where content is reviewed, batched into releases and published on purpose.         |
+| [OpenBridge](https://github.com/nubisco/openbridge) | Home automation bridge and its plugin ecosystem.                                                  |
 
 ## License and trademarks
 

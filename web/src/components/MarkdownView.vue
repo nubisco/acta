@@ -112,11 +112,22 @@ const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
  * callouts, :::details, [[refs]], ![[query]] placeholders, mermaid fences.
  */
 
+/**
+ * Callout keywords, and what each renders as.
+ *
+ * GitHub's set is NOTE, TIP, IMPORTANT, WARNING and CAUTION. Ours was INFO,
+ * NOTE, TIP, WARNING and DANGER, so two of the five people actually type fell
+ * through the renderer and appeared as the literal text "[!IMPORTANT]" in the
+ * middle of a blockquote. Anyone pasting from a README hit it immediately.
+ * Both spellings are accepted now; the extra two map onto styles that exist.
+ */
 const CALLOUT_TYPES: Record<string, string> = {
   INFO: 'info',
   NOTE: 'note',
   TIP: 'tip',
+  IMPORTANT: 'info',
   WARNING: 'warning',
+  CAUTION: 'danger',
   DANGER: 'danger',
 }
 
@@ -182,7 +193,7 @@ function renderCallouts(html: string): string {
   // markdown-it renders "> [!INFO] Title\n> body" as a blockquote whose first
   // paragraph starts with [!INFO]. Rewrite those blockquotes.
   return html.replace(
-    /<blockquote>\s*<p>\[!(INFO|NOTE|TIP|WARNING|DANGER)\]([^<\n]*)/g,
+    /<blockquote>\s*<p>\[!(INFO|NOTE|TIP|IMPORTANT|WARNING|CAUTION|DANGER)\]([^<\n]*)/g,
     (_m, type: string, title: string) => {
       const kind = CALLOUT_TYPES[type]
       const heading = title.trim()

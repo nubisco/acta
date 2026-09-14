@@ -4,6 +4,8 @@
 
 A space can be read five ways. They are the same cards, not five feature sets.
 
+![The board view](/media/board.jpg)
+
 **Board** is the default: lists as columns, cards in them, drag to move. Column
 headers stay put as you scroll. **Swimlanes** split the board into horizontal
 bands by assignee, label or status, which is how you see that one person holds
@@ -15,6 +17,8 @@ columns, every field visible at once.
 **Calendar** places cards with due dates. **Timeline** draws them as bars.
 Cards without dates do not appear in either, which is most of them in most
 projects, and is why the fifth view exists.
+
+![The sequence view, showing four steps and the critical path](/media/sequence.jpg)
 
 **Sequence** draws the plan as an order rather than as dates. It reads top to
 bottom in numbered steps: everything in step 1 can start now, everything in
@@ -37,6 +41,8 @@ collapse, so a long description cannot bury the comments underneath it.
 
 ### Plan
 
+![A card open beside the sequence, showing its Plan section](/media/card-plan.jpg)
+
 The **Plan** section is where a card takes its place in the sequence:
 
 - **Blocked by** and **Blocks**: pick a relation, pick a card. Cycles are
@@ -55,6 +61,8 @@ target knows it was mentioned.
 
 A tree of Markdown pages in the left rail. Every save makes a version, and you
 can read or restore an old one.
+
+![A document with a callout, a table of card references, and its backlinks](/media/documents.jpg)
 
 On top of CommonMark and GFM:
 

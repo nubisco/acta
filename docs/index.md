@@ -35,6 +35,30 @@ features:
     linkText: Migrate
 ---
 
+## The plan as an order, not a wish
+
+The view that is hardest to get from anything else: what can start now, what
+waits on what, and the chain that decides when the whole thing finishes.
+
+![The sequence view](/media/sequence.jpg)
+
+## Built by Nubisco
+
+Acta is built and maintained by **[Nubisco](https://nubisco.io)**, a Portuguese
+software company that builds tools it needs and opens the ones that are useful
+to other people.
+
+|                                                         |                                                                                                   |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **[Nubisco UI](https://docs.nubisco.io/ui/)**           | The Vue component library Acta's interface is built on. Geometry-first, token-driven, accessible. |
+| **[Verba](https://docs.nubisco.io/verba/)**             | Self-hostable i18n collaboration: structured, reviewable, deployable translations.                |
+| **[Nubisco CMS](https://docs.nubisco.io/cms/)**         | A headless CMS where content is reviewed, batched into releases and published on purpose.         |
+| **[OpenBridge](https://github.com/nubisco/openbridge)** | Home automation bridge and its plugin ecosystem.                                                  |
+
+If Acta saves your team time, [sponsoring the project](https://github.com/sponsors/joseporto)
+is what keeps it maintained. If you would rather we ran it for you, or you need
+something built around it, [talk to us](https://nubisco.io).
+
 ## Why another one of these
 
 Most project tools were designed for people, then had an API bolted on and an

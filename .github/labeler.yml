@@ -1,0 +1,64 @@
+# Configuration for actions/labeler.
+# Labels are applied to PRs based on the file paths they change.
+
+server:
+  - changed-files:
+      - any-glob-to-any-file: 'server/**'
+
+web:
+  - changed-files:
+      - any-glob-to-any-file: 'web/**'
+
+shared:
+  - changed-files:
+      - any-glob-to-any-file: 'shared/**'
+
+importers:
+  - changed-files:
+      - any-glob-to-any-file: 'importers/**'
+
+mcp:
+  - changed-files:
+      - any-glob-to-any-file: 'server/src/mcp/**'
+
+# Anything that decides what a credential can reach.
+auth:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'server/src/core/auth.ts'
+          - 'server/src/core/oidc.ts'
+          - 'server/src/core/sso.ts'
+          - 'server/src/routes/auth.ts'
+
+# Worth its own label: a bad migration takes the instance down until redeploy.
+database:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'server/src/db/**'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - '*.md'
+          - '!CHANGELOG.md'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: '.github/**'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/package.json'
+          - 'pnpm-lock.yaml'
+
+tooling:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/tsconfig*.json'
+          - '**/vite.config.ts'
+          - '**/vitest.config.ts'
+          - 'eslint.config.mjs'
+          - '.prettierrc'
+          - '.editorconfig'

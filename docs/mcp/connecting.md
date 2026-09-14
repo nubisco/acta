@@ -8,6 +8,8 @@
    choose **Read and write** or **Read only**.
 4. Copy it. It is shown once.
 
+![The Access tokens tab in Settings](/media/access-tokens.jpg)
+
 Read-only is worth considering for anything exploratory. An agent that only
 needs to answer questions about your plan has no reason to hold a token that
 can archive a card.

@@ -123,7 +123,7 @@
         size="sm"
         label="Size"
         inputmode="decimal"
-        placeholder="—"
+        placeholder="Unsized"
         class="deps__size"
         @blur="commitSize"
       />

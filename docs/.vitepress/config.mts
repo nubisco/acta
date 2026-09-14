@@ -38,6 +38,9 @@ export default defineConfig({
 
   themeConfig: {
     siteTitle: 'Acta',
+    // Acta has no mark of its own yet, so it carries the Nubisco one. Worth
+    // replacing once brand/icons has an acta/ directory like the others.
+    logo: { src: '/logo.svg', width: 24, height: 24 },
 
     nav: [
       { text: 'Guide', link: '/guide/' },
@@ -45,7 +48,7 @@ export default defineConfig({
       { text: 'MCP', link: '/mcp/' },
       { text: 'Migrate', link: '/migrate/trello' },
       {
-        text: 'Links',
+        text: 'Project',
         items: [
           { text: 'Repository', link: 'https://github.com/nubisco/acta' },
           {
@@ -56,6 +59,17 @@ export default defineConfig({
             text: 'Security policy',
             link: 'https://github.com/nubisco/acta/blob/master/SECURITY.md',
           },
+          { text: 'Sponsor', link: 'https://github.com/sponsors/joseporto' },
+        ],
+      },
+      {
+        text: 'Nubisco',
+        items: [
+          { text: 'nubisco.io', link: 'https://nubisco.io' },
+          { text: 'Nubisco UI', link: 'https://docs.nubisco.io/ui/' },
+          { text: 'Verba', link: 'https://docs.nubisco.io/verba/' },
+          { text: 'Nubisco CMS', link: 'https://docs.nubisco.io/cms/' },
+          { text: 'OpenBridge', link: 'https://github.com/nubisco/openbridge' },
         ],
       },
     ],
@@ -136,8 +150,8 @@ export default defineConfig({
 
     footer: {
       message:
-        'Released under the terms in the repository LICENSE. Contributions require a CLA.',
-      copyright: 'Nubisco',
+        'Released under the <a href="https://github.com/nubisco/acta/blob/master/LICENSE">MIT License</a>. · <a href="https://github.com/sponsors/joseporto">♥ Sponsor this project</a>',
+      copyright: 'Copyright © 2026 <a href="https://nubisco.io">Nubisco</a>',
     },
   },
 })

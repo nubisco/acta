@@ -127,7 +127,14 @@ export interface IDocDetail {
   body: string
   imported?: IImportedMeta
   sections?: { slug: string; level: number; hash: string }[]
-  backlinks?: { src_kind: string; src_id: string }[]
+  backlinks?: {
+    src_kind: string
+    src_id: string
+    /** The card key or document slug, when the source still exists. */
+    ref?: string | null
+    /** Its title. A comment borrows the title of the card it is on. */
+    label?: string | null
+  }[]
   versions?: { rev: number; created_at: number; handle: string }[]
   comments?: ICommentRow[]
 }

@@ -271,10 +271,28 @@ const versionRows = computed(() =>
   })),
 )
 
+const KIND_TERMS: Record<string, string> = {
+  item: 'Card',
+  doc: 'Document',
+  comment: 'Comment on',
+}
+
+/**
+ * Who points at this page.
+ *
+ * The server used to return internal ids and this rendered them verbatim, so
+ * the list read "item  itm_01m2gaz92142arwky3srvkw0pd". A backlink nobody can
+ * identify is not a backlink. It now shows the key and the title, and falls
+ * back to the id only when the source has been deleted out from under it.
+ */
 const backlinkFacts = computed(() =>
   (doc.value?.backlinks ?? []).map((link) => ({
-    term: link.src_kind,
-    value: link.src_id,
+    term: KIND_TERMS[link.src_kind] ?? link.src_kind,
+    value: link.ref
+      ? link.label
+        ? `${link.ref}: ${link.label}`
+        : link.ref
+      : link.src_id,
   })),
 )
 
