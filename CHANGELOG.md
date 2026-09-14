@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/nubisco/acta/compare/v1.15.1...v1.16.0) (2026-09-14)
+
+
+### Features
+
+* **auth:** standard OIDC, and access tokens that act as you ([6bd6232](https://github.com/nubisco/acta/commit/6bd6232baca65a72c56170f8375026fd599f0620))
+
 ## [1.15.1](https://github.com/nubisco/acta/compare/v1.15.0...v1.15.1) (2026-09-13)
 
 
