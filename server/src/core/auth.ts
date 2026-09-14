@@ -22,7 +22,7 @@ export function randomToken(bytes = 32): string {
 }
 
 export interface IAuthedActor extends IActorCtx {
-  tokenKind: 'session' | 'agent'
+  tokenKind: 'session' | 'agent' | 'personal'
   /**
    * The workspace the token was minted in, and the email that identifies the
    * person across workspaces. A session grants a person, not a place: the URL
@@ -40,7 +40,8 @@ export async function resolveToken(
 ): Promise<IAuthedActor | null> {
   const hash = await sha256Hex(token)
   const rows = await db.query<{
-    kind: 'session' | 'agent'
+    token_id: string
+    kind: 'session' | 'agent' | 'personal'
     scopes: string
     expires_at: number | null
     revoked_at: number | null
@@ -53,7 +54,7 @@ export async function resolveToken(
     workspace_id: string
     email: string | null
   }>(
-    `SELECT t.kind, t.scopes, t.expires_at, t.revoked_at, t.workspace_id,
+    `SELECT t.id AS token_id, t.kind, t.scopes, t.expires_at, t.revoked_at, t.workspace_id,
             a.id AS actor_id, a.kind AS actor_kind, a.handle, a.role, a.on_behalf_of,
             a.disabled, a.email
        FROM auth_token t JOIN actor a ON a.id = t.actor_id
@@ -64,6 +65,15 @@ export async function resolveToken(
   const r = rows[0]
   if (r.revoked_at !== null || r.disabled === 1) return null
   if (r.expires_at !== null && r.expires_at < now()) return null
+  // Only for tokens someone holds and may later have to judge. Stamping every
+  // session request would be a write on each page load for a fact nobody
+  // reads: a session is revoked by signing out, not by being audited.
+  if (r.kind === 'personal') {
+    await db.run('UPDATE auth_token SET last_used_at = ? WHERE id = ?', [
+      now(),
+      r.token_id,
+    ])
+  }
   return {
     id: r.actor_id,
     kind: r.actor_kind,
@@ -157,20 +167,27 @@ export async function createToken(
   db: ISqlDriver,
   workspaceId: string,
   actorId: string,
-  kind: 'session' | 'agent',
+  kind: 'session' | 'agent' | 'personal',
   scopes: string[],
   ttlMs?: number,
+  label?: string,
 ): Promise<string> {
-  const token = randomToken()
+  // Personal tokens are pasted into config files, shell history and CI
+  // settings, so they carry a prefix that secret scanners can match and a
+  // person can recognise. Sessions live in an httpOnly cookie and are never
+  // seen, so they stay bare.
+  const token =
+    kind === 'personal' ? `acta_pat_${randomToken()}` : randomToken()
   await db.run(
-    `INSERT INTO auth_token (id, workspace_id, actor_id, kind, token_hash, scopes, expires_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO auth_token (id, workspace_id, actor_id, kind, token_hash, label, scopes, expires_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       newId('act'),
       workspaceId,
       actorId,
       kind,
       await sha256Hex(token),
+      label ?? null,
       scopes.join(','),
       ttlMs ? now() + ttlMs : null,
       now(),

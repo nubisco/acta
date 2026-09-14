@@ -408,6 +408,95 @@
       </div>
     </section>
 
+    <!-- Personal access tokens. Unlike every other tab here these are not an
+         administrative setting: they belong to whoever is signed in, which is
+         why there is no isAdmin gate. -->
+    <section v-if="tab === 'tokens'" class="settings__section">
+      <NbBanner
+        v-if="freshPersonalToken"
+        status="info"
+        variant="inline"
+        title="Copy this token now; it is shown once"
+        dismissible
+        @close="freshPersonalToken = ''"
+      >
+        <NbField v-slot="{ id }" label="Token" orientation="stack">
+          <div class="settings__token">
+            <NbTextInput
+              :id="id"
+              :model-value="freshPersonalToken"
+              readonly
+              size="sm"
+            />
+            <NbButton size="sm" variant="secondary" @click="copyPersonal">
+              Copy token
+            </NbButton>
+          </div>
+        </NbField>
+      </NbBanner>
+
+      <p>
+        Access tokens let an editor, a script or an MCP client act as
+        <strong>you</strong>, with your role. Work done through one is
+        attributed to you, not to a bot. They never carry admin rights, so
+        member and token administration still takes a signed-in session.
+      </p>
+
+      <NbDataTable
+        :columns="tokenColumns"
+        :rows="tokenRows"
+        row-key="id"
+        size="sm"
+        aria-label="Access tokens"
+        :loading="tokensLoading"
+      >
+        <template #cell-actions="{ row }">
+          <NbButton
+            size="sm"
+            variant="ghost"
+            @click="revokePersonal(String(row.id))"
+          >
+            Revoke
+          </NbButton>
+        </template>
+        <template #empty>
+          <NbEmptyState
+            title="No access tokens"
+            description="Create one to use Acta from an editor, a script or an MCP client."
+          />
+        </template>
+      </NbDataTable>
+
+      <NbForm class="settings__row" @submit.prevent="createPersonal">
+        <NbTextInput
+          id="field-token-label"
+          v-model="personalLabel"
+          size="sm"
+          label="Label"
+          placeholder="laptop, Claude Code"
+        />
+        <NbSelect
+          id="field-token-scopes"
+          v-model="personalScope"
+          size="sm"
+          label="Access"
+          :options="[
+            { label: 'Read and write', value: 'write' },
+            { label: 'Read only', value: 'read' },
+          ]"
+        />
+        <NbButton
+          type="submit"
+          size="sm"
+          variant="primary"
+          :loading="creatingPersonal"
+          :disabled="!personalLabel.trim()"
+        >
+          Create token
+        </NbButton>
+      </NbForm>
+    </section>
+
     <NewMemberModal
       :open="invitingMember"
       @close="invitingMember = false"
@@ -447,9 +536,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useConfirm, useShellSlot, useToast } from '@nubisco/ui'
-import { api, newOpId as opId } from '@/api/client'
+import { api, auth, newOpId as opId } from '@/api/client'
 import { humanise } from '@/lib/state'
 import { labelVariants } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'
@@ -473,6 +562,7 @@ const tabs = [
   { id: 'webhooks', label: 'Webhooks' },
   { id: 'rules', label: 'Rules' },
   { id: 'ingest', label: 'Ingest' },
+  { id: 'tokens', label: 'Access tokens' },
 ]
 
 const invitingMember = ref(false)
@@ -825,6 +915,104 @@ async function copyToken(): Promise<void> {
 async function copy(text: string): Promise<void> {
   await navigator.clipboard.writeText(text)
   toast.success('Copied')
+}
+
+/**
+ * Personal access tokens.
+ *
+ * Loaded on demand rather than with the rest of the settings: most visits to
+ * this page never open the tab, and the list is only ever about the person
+ * looking at it.
+ */
+const personalTokens = ref<
+  {
+    id: string
+    label: string
+    scopes: string[]
+    created_at: number
+    last_used_at?: number
+  }[]
+>([])
+const tokensLoading = ref(false)
+const creatingPersonal = ref(false)
+const personalLabel = ref('')
+const personalScope = ref('write')
+const freshPersonalToken = ref('')
+
+const tokenColumns = [
+  { key: 'label', header: 'Label' },
+  { key: 'access', header: 'Access' },
+  { key: 'created', header: 'Created' },
+  { key: 'used', header: 'Last used' },
+  { key: 'actions', header: '' },
+]
+
+const tokenRows = computed(() =>
+  personalTokens.value.map((t) => ({
+    id: t.id,
+    label: t.label,
+    access: t.scopes.includes('write') ? 'Read and write' : 'Read only',
+    created: new Date(t.created_at).toLocaleDateString(),
+    // "Never" is the fact that makes an old token safe to revoke, so it is
+    // worth saying rather than leaving the cell blank.
+    used: t.last_used_at
+      ? new Date(t.last_used_at).toLocaleDateString()
+      : 'Never',
+  })),
+)
+
+async function loadPersonalTokens(): Promise<void> {
+  tokensLoading.value = true
+  try {
+    personalTokens.value = (await auth.tokens()).tokens
+  } catch (err) {
+    toast.error(humanise(err))
+  } finally {
+    tokensLoading.value = false
+  }
+}
+
+watch(
+  tab,
+  (value) => {
+    if (value === 'tokens' && personalTokens.value.length === 0) {
+      void loadPersonalTokens()
+    }
+  },
+  { immediate: true },
+)
+
+async function createPersonal(): Promise<void> {
+  const label = personalLabel.value.trim()
+  if (!label) return
+  creatingPersonal.value = true
+  try {
+    const scopes =
+      personalScope.value === 'write' ? ['read', 'write'] : ['read']
+    const created = await auth.createToken(label, scopes)
+    freshPersonalToken.value = created.token
+    personalLabel.value = ''
+    await loadPersonalTokens()
+  } catch (err) {
+    toast.error(humanise(err))
+  } finally {
+    creatingPersonal.value = false
+  }
+}
+
+async function revokePersonal(id: string): Promise<void> {
+  try {
+    await auth.revokeToken(id)
+    await loadPersonalTokens()
+    toast.success('Token revoked')
+  } catch (err) {
+    toast.error(humanise(err))
+  }
+}
+
+async function copyPersonal(): Promise<void> {
+  await navigator.clipboard.writeText(freshPersonalToken.value)
+  toast.success('Token copied')
 }
 
 async function copyIngest(): Promise<void> {

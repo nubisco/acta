@@ -36,8 +36,15 @@ CREATE TABLE IF NOT EXISTS auth_token (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
   actor_id TEXT NOT NULL REFERENCES actor(id),
-  kind TEXT NOT NULL CHECK (kind IN ('session', 'agent')),
+  -- 'session' is the browser cookie, 'agent' is an admin-minted bot identity
+  -- with an actor of its own, and 'personal' acts as the human who minted it.
+  -- See TOKEN_REBUILD for databases created before 'personal' existed.
+  kind TEXT NOT NULL CHECK (kind IN ('session', 'agent', 'personal')),
   token_hash TEXT NOT NULL UNIQUE,
+  -- How its owner recognises it in the list when deciding what to revoke.
+  -- Personal tokens only; a session has nothing to tell apart.
+  label TEXT,
+  last_used_at INTEGER,
   scopes TEXT NOT NULL DEFAULT 'read,write',
   expires_at INTEGER,
   created_at INTEGER NOT NULL,
@@ -504,6 +511,46 @@ export const LINK_REBUILD = {
   ],
 }
 
+/**
+ * auth_token.kind gained 'personal' after the table shipped, and SQLite
+ * cannot alter a CHECK in place.
+ *
+ * Same shape and same reasoning as LINK_REBUILD: guarded on the old
+ * constraint still being present, because rebuilding on every boot would
+ * leave a window, however brief, in which a request could find no auth_token
+ * table and every signed-in person would be signed out.
+ */
+export const TOKEN_REBUILD = {
+  /** Truthy while the constraint still predates 'personal'. */
+  detect: `SELECT 1 AS needed FROM sqlite_master
+             WHERE type = 'table' AND name = 'auth_token'
+               AND sql NOT LIKE '%personal%'`,
+  steps: [
+    `CREATE TABLE auth_token_rebuild (
+       id TEXT PRIMARY KEY,
+       workspace_id TEXT NOT NULL REFERENCES workspace(id),
+       actor_id TEXT NOT NULL REFERENCES actor(id),
+       kind TEXT NOT NULL CHECK (kind IN ('session', 'agent', 'personal')),
+       token_hash TEXT NOT NULL UNIQUE,
+       label TEXT,
+       last_used_at INTEGER,
+       scopes TEXT NOT NULL DEFAULT 'read,write',
+       expires_at INTEGER,
+       created_at INTEGER NOT NULL,
+       revoked_at INTEGER
+     )`,
+    // Columns named explicitly: ADDITIVE_COLUMNS may or may not have already
+    // added label and last_used_at by the time this runs, so SELECT * would
+    // produce a different arity on different databases.
+    `INSERT INTO auth_token_rebuild
+       (id, workspace_id, actor_id, kind, token_hash, scopes, expires_at, created_at, revoked_at)
+       SELECT id, workspace_id, actor_id, kind, token_hash, scopes, expires_at, created_at, revoked_at
+         FROM auth_token`,
+    'DROP TABLE auth_token',
+    'ALTER TABLE auth_token_rebuild RENAME TO auth_token',
+  ],
+}
+
 export const FTS_COLUMN_RENAME = {
   detect: 'SELECT space_key FROM fts LIMIT 1',
   drop: 'DROP TABLE IF EXISTS fts',
@@ -559,4 +606,10 @@ export const ADDITIVE_COLUMNS = [
   // envelope, so the format lives on the webhook rather than forcing a
   // second delivery pipeline with its own retries and failure handling.
   "ALTER TABLE webhook ADD COLUMN format TEXT NOT NULL DEFAULT 'generic'",
+  // Personal access tokens: the label their owner recognises them by, and
+  // when the token was last seen, which is what makes an unused one safe to
+  // revoke. The rebuild above creates both; these cover a database that
+  // already had 'personal' in its CHECK and so skips it.
+  'ALTER TABLE auth_token ADD COLUMN label TEXT',
+  'ALTER TABLE auth_token ADD COLUMN last_used_at INTEGER',
 ]

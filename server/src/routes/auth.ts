@@ -1,4 +1,4 @@
-import { Hono, type MiddlewareHandler } from 'hono'
+import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { z } from 'zod'
 import { newId } from '@nubisco/acta-shared'
@@ -15,7 +15,8 @@ import {
 } from '../core/auth'
 import { now, type IActorCtx, type ICtx } from '../core/ctx'
 import { emitEvent, flushPendingEvents } from '../core/events'
-import { JwksVerifier, type ISsoConfig } from '../core/sso'
+import { JwksVerifier, type ISsoClaims, type ISsoConfig } from '../core/sso'
+import { OidcClient, type IOidcConfig } from '../core/oidc'
 import type { ISqlDriver } from '../db'
 
 const SESSION_COOKIE = 'acta_session'
@@ -35,15 +36,139 @@ export function setOtpSender(sender: TOtpSender): void {
   otpSender = sender
 }
 
-export interface ISsoRuntime {
-  config: ISsoConfig
-  verifier: JwksVerifier
-}
+/**
+ * The two ways an external provider can sign someone in.
+ *
+ * `handover` is Acta's original contract: the provider redirects back with a
+ * signed JWT in the query. `oidc` is the standard authorization-code flow,
+ * which is what every off-the-shelf provider actually speaks. They differ
+ * only in how claims are obtained; everything after that (mapping to a
+ * member, provisioning, minting the session) is shared.
+ */
+export type TSsoRuntime =
+  | { mode: 'handover'; config: ISsoConfig; verifier: JwksVerifier }
+  | { mode: 'oidc'; config: IOidcConfig; client: OidcClient }
 
 const SSO_STATE_COOKIE = 'acta_sso_state'
+/** The PKCE verifier and nonce, which must survive the trip to the provider. */
+const OIDC_HANDSHAKE_COOKIE = 'acta_oidc_handshake'
+
+/**
+ * Everything after "who is this": map the claims to a workspace member,
+ * provision one if the instance allows it, and mint the session.
+ *
+ * Shared by both provider modes deliberately. The difference between a JWT
+ * handed over in the query and one fetched through a code exchange ends at
+ * the claims; if provisioning drifted between the two, an instance would get
+ * different roles depending on how its provider happened to be wired.
+ */
+async function signInWithClaims(
+  c: Context<IAuthEnv>,
+  claims: ISsoClaims,
+  autoProvision: boolean,
+): Promise<Response> {
+  const db = c.get('db')
+  const workspaceId = c.get('workspaceId')
+  let member = (
+    await db.query<{ id: string; disabled: number }>(
+      "SELECT id, disabled FROM actor WHERE workspace_id = ? AND email = ? AND kind = 'human'",
+      [workspaceId, claims.email],
+    )
+  )[0]
+  if (member?.disabled === 1) return c.redirect('/login?error=disabled')
+  if (!member) {
+    if (!autoProvision) return c.redirect('/login?error=not_a_member')
+    const id = newId('act')
+    const base = claims.email
+      .split('@')[0]
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/^-|-$/g, '')
+    const clash = await db.query(
+      'SELECT id FROM actor WHERE workspace_id = ? AND handle = ?',
+      [workspaceId, base],
+    )
+    const handle = clash.length > 0 ? `${base}-${id.slice(-4)}` : base
+    // An instance that delegates identity to a provider seeds no admin of its
+    // own (see bootstrap), so without this the first person to sign in to a
+    // fresh install becomes a member of a workspace that has no
+    // administrator, and nothing can ever be administered. Only ever promotes
+    // into a vacuum: the moment one admin exists this is inert, so it cannot
+    // be used to escalate on an established workspace.
+    const admins = await db.query(
+      `SELECT id FROM actor
+        WHERE workspace_id = ? AND kind = 'human' AND role = 'admin'
+              AND disabled = 0 LIMIT 1`,
+      [workspaceId],
+    )
+    const firstAdmin = admins.length === 0
+    await db.run(
+      `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
+       VALUES (?, ?, 'human', ?, ?, ?, ?, ?)`,
+      [
+        id,
+        workspaceId,
+        handle,
+        claims.name ?? claims.email,
+        claims.email,
+        claims.role === 'admin' || firstAdmin ? 'admin' : 'member',
+        now(),
+      ],
+    )
+    const system = (
+      await db.query<{ id: string; handle: string }>(
+        "SELECT id, handle FROM actor WHERE workspace_id = ? AND kind = 'system' LIMIT 1",
+        [workspaceId],
+      )
+    )[0]
+    const ctx: ICtx = {
+      db,
+      workspaceId,
+      actor: {
+        id: system.id,
+        kind: 'system',
+        handle: system.handle,
+        role: 'member',
+        scopes: ['write'],
+      },
+    }
+    await emitEvent(
+      ctx,
+      'member.provisioned',
+      'actor',
+      id,
+      firstAdmin
+        ? `provisioned @${handle} via SSO as the workspace's first admin`
+        : `provisioned member @${handle} via SSO`,
+    )
+    flushPendingEvents()
+    member = { id, disabled: 0 }
+  }
+  const memberRole = (
+    await db.query<{ role: string }>('SELECT role FROM actor WHERE id = ?', [
+      member.id,
+    ])
+  )[0].role
+  const session = await createToken(
+    db,
+    workspaceId,
+    member.id,
+    'session',
+    memberRole === 'admin' ? ['read', 'write', 'admin'] : ['read', 'write'],
+    SESSION_TTL,
+  )
+  setCookie(c, SESSION_COOKIE, session, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: SESSION_TTL / 1000,
+  })
+  return c.redirect('/', 302)
+}
 
 export function authRoutes(
-  sso?: ISsoRuntime,
+  sso?: TSsoRuntime,
   opts: { otpFallback?: boolean } = {},
 ): Hono<IAuthEnv> {
   const app = new Hono<IAuthEnv>()
@@ -70,10 +195,48 @@ export function authRoutes(
       ? null
       : c.json({ error: 'otp is disabled on this instance' }, 404)
 
-  app.get('/config', (c) => c.json({ sso: sso !== undefined, otp: otpEnabled }))
+  app.get('/config', (c) =>
+    c.json({
+      sso: sso !== undefined,
+      otp: otpEnabled,
+      // What to call the provider on the button. Hardcoding "Nubisco
+      // Platform" told every self-hosted instance to sign in with a product
+      // its users have no account on.
+      sso_label: sso?.config.label ?? 'single sign-on',
+    }),
+  )
 
-  app.get('/sso/start', (c) => {
+  /** The redirect the provider must be configured to allow, built from the
+      request so a deployment behind any hostname works without being told. */
+  const redirectUriOf = (url: string) =>
+    new URL('/api/v1/auth/sso/callback', url).toString()
+
+  app.get('/sso/start', async (c) => {
     if (!sso) return c.json({ error: 'sso not configured' }, 404)
+
+    if (sso.mode === 'oidc') {
+      let authorize
+      try {
+        authorize = await sso.client.authorizeUrl(redirectUriOf(c.req.url))
+      } catch (err) {
+        // Discovery is a network call to someone else's server, so it fails
+        // in ways a sign-in page cannot act on. Log the reason and send the
+        // person somewhere that says so.
+        console.error('oidc discovery failed:', (err as Error).message)
+        return c.redirect('/login?error=sso_discovery')
+      }
+      // The verifier never leaves this browser, which is what makes PKCE
+      // worth having: an intercepted code cannot be exchanged without it.
+      setCookie(c, OIDC_HANDSHAKE_COOKIE, JSON.stringify(authorize.handshake), {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'Lax',
+        path: '/',
+        maxAge: 600,
+      })
+      return c.redirect(authorize.url, 302)
+    }
+
     const state = randomToken(16)
     setCookie(c, SSO_STATE_COOKIE, state, {
       httpOnly: true,
@@ -84,10 +247,7 @@ export function authRoutes(
     })
     const url = new URL(sso.config.authorizeUrl)
     url.searchParams.set('app_id', sso.config.appId)
-    url.searchParams.set(
-      'redirect_uri',
-      new URL('/api/v1/auth/sso/callback', c.req.url).toString(),
-    )
+    url.searchParams.set('redirect_uri', redirectUriOf(c.req.url))
     url.searchParams.set('state', state)
     return c.redirect(url.toString(), 302)
   })
@@ -96,123 +256,61 @@ export function authRoutes(
     if (!sso) return c.json({ error: 'sso not configured' }, 404)
     const error = c.req.query('error')
     if (error) return c.redirect(`/login?error=${encodeURIComponent(error)}`)
-    const token = c.req.query('token')
-    const state = c.req.query('state')
-    const expectedState = getCookie(c, SSO_STATE_COOKIE)
-    deleteCookie(c, SSO_STATE_COOKIE, { path: '/' })
-    if (!token || !state || !expectedState || state !== expectedState) {
-      return c.redirect('/login?error=sso_state')
-    }
-    let claims
-    try {
-      claims = await sso.verifier.verify(token)
-    } catch (err) {
-      // The reason never reaches the browser (it would tell an attacker which
-      // half of the check failed), but without it in the log an SSO outage is
-      // indistinguishable from a wrong password, and we spent an evening
-      // guessing between issuer mismatch, key rotation and a bad signature.
-      console.error('sso verify failed:', (err as Error).message)
-      return c.redirect('/login?error=sso_token')
-    }
-    const db = c.get('db')
-    const workspaceId = c.get('workspaceId')
-    let member = (
-      await db.query<{ id: string; disabled: number }>(
-        "SELECT id, disabled FROM actor WHERE workspace_id = ? AND email = ? AND kind = 'human'",
-        [workspaceId, claims.email],
-      )
-    )[0]
-    if (member?.disabled === 1) return c.redirect('/login?error=disabled')
-    if (!member) {
-      if (!sso.config.autoProvision)
-        return c.redirect('/login?error=not_a_member')
-      const id = newId('act')
-      const base = claims.email
-        .split('@')[0]
-        .toLowerCase()
-        .replace(/[^a-z0-9-]+/g, '-')
-        .replace(/^-|-$/g, '')
-      const clash = await db.query(
-        'SELECT id FROM actor WHERE workspace_id = ? AND handle = ?',
-        [workspaceId, base],
-      )
-      const handle = clash.length > 0 ? `${base}-${id.slice(-4)}` : base
-      // An instance that delegates identity to an SSO provider seeds no admin
-      // of its own (see bootstrap), so without this the first person to sign
-      // in to a fresh install becomes a member of a workspace that has no
-      // administrator, and nothing can ever be administered. Only ever
-      // promotes into a vacuum: the moment one admin exists this is inert,
-      // so it cannot be used to escalate on an established workspace.
-      const admins = await db.query(
-        `SELECT id FROM actor
-          WHERE workspace_id = ? AND kind = 'human' AND role = 'admin'
-                AND disabled = 0 LIMIT 1`,
-        [workspaceId],
-      )
-      const firstAdmin = admins.length === 0
-      await db.run(
-        `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
-         VALUES (?, ?, 'human', ?, ?, ?, ?, ?)`,
-        [
-          id,
-          workspaceId,
-          handle,
-          claims.name ?? claims.email,
-          claims.email,
-          claims.role === 'admin' || firstAdmin ? 'admin' : 'member',
-          now(),
-        ],
-      )
-      const system = (
-        await db.query<{ id: string; handle: string }>(
-          "SELECT id, handle FROM actor WHERE workspace_id = ? AND kind = 'system' LIMIT 1",
-          [workspaceId],
-        )
-      )[0]
-      const ctx: ICtx = {
-        db,
-        workspaceId,
-        actor: {
-          id: system.id,
-          kind: 'system',
-          handle: system.handle,
-          role: 'member',
-          scopes: ['write'],
-        },
+
+    let claims: ISsoClaims
+    if (sso.mode === 'oidc') {
+      const raw = getCookie(c, OIDC_HANDSHAKE_COOKIE)
+      deleteCookie(c, OIDC_HANDSHAKE_COOKIE, { path: '/' })
+      const code = c.req.query('code')
+      const state = c.req.query('state')
+      if (!raw || !code || !state) return c.redirect('/login?error=sso_state')
+      let handshake
+      try {
+        handshake = JSON.parse(raw) as {
+          state: string
+          nonce: string
+          verifier: string
+        }
+      } catch {
+        return c.redirect('/login?error=sso_state')
       }
-      await emitEvent(
-        ctx,
-        'member.provisioned',
-        'actor',
-        id,
-        firstAdmin
-          ? `provisioned @${handle} via SSO as the workspace's first admin`
-          : `provisioned member @${handle} via SSO`,
-      )
-      flushPendingEvents()
-      member = { id, disabled: 0 }
+      if (state !== handshake.state) return c.redirect('/login?error=sso_state')
+      try {
+        claims = await sso.client.exchange(
+          code,
+          redirectUriOf(c.req.url),
+          handshake,
+        )
+      } catch (err) {
+        // Same reasoning as the handover path: the browser learns nothing,
+        // the log learns everything. An exchange can fail for a wrong secret,
+        // a redirect_uri the provider does not have registered, a rotated
+        // key or a replayed nonce, and they are indistinguishable from here.
+        console.error('oidc exchange failed:', (err as Error).message)
+        return c.redirect('/login?error=sso_token')
+      }
+    } else {
+      const token = c.req.query('token')
+      const state = c.req.query('state')
+      const expectedState = getCookie(c, SSO_STATE_COOKIE)
+      deleteCookie(c, SSO_STATE_COOKIE, { path: '/' })
+      if (!token || !state || !expectedState || state !== expectedState) {
+        return c.redirect('/login?error=sso_state')
+      }
+      try {
+        claims = await sso.verifier.verify(token)
+      } catch (err) {
+        // The reason never reaches the browser (it would tell an attacker which
+        // half of the check failed), but without it in the log an SSO outage is
+        // indistinguishable from a wrong password, and we spent an evening
+        // guessing between issuer mismatch, key rotation and a bad signature.
+        console.error('sso verify failed:', (err as Error).message)
+        return c.redirect('/login?error=sso_token')
+      }
     }
-    const memberRole = (
-      await db.query<{ role: string }>('SELECT role FROM actor WHERE id = ?', [
-        member.id,
-      ])
-    )[0].role
-    const session = await createToken(
-      db,
-      workspaceId,
-      member.id,
-      'session',
-      memberRole === 'admin' ? ['read', 'write', 'admin'] : ['read', 'write'],
-      SESSION_TTL,
-    )
-    setCookie(c, SESSION_COOKIE, session, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'Lax',
-      path: '/',
-      maxAge: SESSION_TTL / 1000,
-    })
-    return c.redirect('/', 302)
+
+    if (!claims.email) return c.redirect('/login?error=sso_no_email')
+    return signInWithClaims(c, claims, sso.config.autoProvision)
   })
 
   app.post('/otp', async (c) => {
@@ -347,6 +445,89 @@ export function authRoutes(
    *
    * Idempotent, and never un-sets: a second call keeps the original moment.
    */
+  /**
+   * Personal access tokens: MCP and the API as yourself.
+   *
+   * Acta already had agent tokens, but those are admin-minted and create a
+   * separate actor, so work done through one is attributed to a bot rather
+   * than to the person driving it. That is right for an autonomous agent and
+   * wrong for the ordinary case, which is someone pointing their own editor
+   * at their own workspace. These act as the person who minted them.
+   *
+   * Deliberately never admin, even for an admin. Administration (minting
+   * agent tokens, changing members) should take a browser session and a
+   * deliberate visit, not a header that lives in a config file. A personal
+   * token is for content work.
+   */
+  app.get('/me/tokens', requireAuth(), async (c) => {
+    const actor = c.get('actor')
+    const rows = await c.get('db').query<{
+      id: string
+      label: string | null
+      scopes: string
+      created_at: number
+      last_used_at: number | null
+    }>(
+      `SELECT id, label, scopes, created_at, last_used_at
+         FROM auth_token
+        WHERE actor_id = ? AND kind = 'personal' AND revoked_at IS NULL
+        ORDER BY created_at DESC`,
+      [actor.id],
+    )
+    return c.json({
+      tokens: rows.map((r) => ({
+        id: r.id,
+        label: r.label ?? 'Unnamed',
+        scopes: r.scopes.split(','),
+        created_at: r.created_at,
+        // What makes an old token safe to revoke: nobody remembers what they
+        // pasted a token into a year ago, but "never used" is decisive.
+        last_used_at: r.last_used_at ?? undefined,
+      })),
+    })
+  })
+
+  app.post('/me/tokens', requireAuth(), async (c) => {
+    const actor = c.get('actor')
+    // A token that can mint tokens cannot be contained: revoking the leaked
+    // one would achieve nothing, because whoever held it has already minted a
+    // replacement nobody has seen. Checking actor.kind does not do this, since
+    // a personal token's actor is the same human as the session's.
+    // Returned rather than thrown: these routes mount before the API's error
+    // handler, so an ApiError here surfaces as a 500.
+    if (actor.kind !== 'human' || actor.tokenKind !== 'session') {
+      return c.json({ error: 'minting a token takes a signed-in session' }, 403)
+    }
+    const body = z
+      .object({
+        label: z.string().min(1).max(100),
+        scopes: z.array(z.enum(['read', 'write'])).default(['read', 'write']),
+      })
+      .parse(await c.req.json())
+    const token = await createToken(
+      c.get('db'),
+      c.get('workspaceId'),
+      actor.id,
+      'personal',
+      // Read is implied by write; asking for write alone and silently getting
+      // less is the kind of thing that is debugged at the far end.
+      body.scopes.includes('write') ? ['read', 'write'] : ['read'],
+      undefined,
+      body.label,
+    )
+    return c.json({ token, label: body.label, scopes: body.scopes }, 201)
+  })
+
+  app.delete('/me/tokens/:id', requireAuth(), async (c) => {
+    const actor = c.get('actor')
+    await c.get('db').run(
+      `UPDATE auth_token SET revoked_at = ?
+          WHERE id = ? AND actor_id = ? AND kind = 'personal' AND revoked_at IS NULL`,
+      [now(), c.req.param('id'), actor.id],
+    )
+    return c.json({ ok: true })
+  })
+
   app.post('/me/onboarded', requireAuth(), async (c) => {
     const actor = c.get('actor')
     await c

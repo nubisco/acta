@@ -15,12 +15,12 @@
            panel, because a page that flashes a form and then navigates away
            reads as a glitch. -->
       <p v-if="handingOver" class="login__handover">
-        <NbSpinner size="sm" /> Taking you to Nubisco Platform...
+        <NbSpinner size="sm" /> Taking you to {{ ssoLabel }}...
       </p>
 
       <template v-if="!handingOver && ssoAvailable && stage === 'email'">
         <NbButton variant="primary" @click="startSso">
-          Sign in with Nubisco Platform
+          Sign in with {{ ssoLabel }}
         </NbButton>
         <p v-if="otpAvailable" class="login__divider">or use a one-time code</p>
       </template>
@@ -103,6 +103,15 @@ const code = ref('')
 const stage = ref<'email' | 'code'>('email')
 const busy = ref(false)
 const ssoAvailable = ref(false)
+/**
+ * What to call the provider.
+ *
+ * This said "Nubisco Platform" in the markup, which is correct on exactly one
+ * instance. Every self-hosted deployment was telling its users to sign in
+ * with a product they have no account on; the server now reports the name and
+ * an operator sets it with ACTA_OIDC_LABEL.
+ */
+const ssoLabel = ref('single sign-on')
 const otpAvailable = ref(true)
 const ssoError = ref('')
 const formError = ref('')
@@ -136,9 +145,14 @@ const handingOver = ref(false)
 onMounted(async () => {
   try {
     const res = await fetch('/api/v1/auth/config')
-    const cfg = (await res.json()) as { sso: boolean; otp: boolean }
+    const cfg = (await res.json()) as {
+      sso: boolean
+      otp: boolean
+      sso_label?: string
+    }
     ssoAvailable.value = cfg.sso
     otpAvailable.value = cfg.otp
+    if (cfg.sso_label) ssoLabel.value = cfg.sso_label
   } catch {
     ssoAvailable.value = false
     otpAvailable.value = true

@@ -8,6 +8,7 @@ import type { Hono } from 'hono'
 import { createApp, type IAppEnv } from './app'
 import { setDeferrer } from './core/defer'
 import { ssoConfigFromEnv } from './core/sso'
+import { oidcConfigFromEnv } from './core/oidc'
 import { D1Driver, type ID1Database } from './db'
 import type { IBlobStore } from './services/attachments'
 
@@ -37,6 +38,14 @@ interface IWorkerEnv {
   ACTA_SSO_APP_ID?: string
   ACTA_SSO_AUTHORIZE_URL?: string
   ACTA_SSO_AUTO_PROVISION?: string
+  /** Standard OpenID Connect. Preferred over the ACTA_SSO_* handover contract. */
+  ACTA_OIDC_ISSUER?: string
+  ACTA_OIDC_CLIENT_ID?: string
+  ACTA_OIDC_CLIENT_SECRET?: string
+  ACTA_OIDC_SCOPES?: string
+  ACTA_OIDC_AUTO_PROVISION?: string
+  ACTA_OIDC_LABEL?: string
+  ACTA_SSO_LABEL?: string
   /** Keep one-time codes alongside a configured provider. Off by default. */
   ACTA_OTP_FALLBACK?: string
   /** Public address, used to link back from outbound messages. */
@@ -82,6 +91,10 @@ function getApp(env: IWorkerEnv, origin: string): Promise<Hono<IAppEnv>> {
       },
       sso:
         ssoConfigFromEnv(
+          env as unknown as Record<string, string | undefined>,
+        ) ?? undefined,
+      oidc:
+        oidcConfigFromEnv(
           env as unknown as Record<string, string | undefined>,
         ) ?? undefined,
       otpFallback: env.ACTA_OTP_FALLBACK === 'true',

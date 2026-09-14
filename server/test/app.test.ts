@@ -47,7 +47,11 @@ describe('server skeleton', () => {
       dataDir: '/tmp/acta-test-nosso',
     })
     const res = await app.request('/api/v1/auth/config')
-    expect(await res.json()).toEqual({ sso: false, otp: true })
+    expect(await res.json()).toEqual({
+      sso: false,
+      otp: true,
+      sso_label: 'single sign-on',
+    })
 
     const otp = await app.request('/api/v1/auth/otp', {
       method: 'POST',

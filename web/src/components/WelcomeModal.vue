@@ -85,7 +85,7 @@
  * that collects settings nobody has an opinion on yet is a form standing
  * between someone and the product.
  *
- * "Onspaceed" is recorded on the actor rather than in the browser, so this
+ * "Onboarded" is recorded on the actor rather than in the browser, so this
  * greets a person once rather than once per device.
  */
 import { computed, ref } from 'vue'
@@ -151,7 +151,7 @@ async function finish(how: 'tour' | 'dismiss'): Promise<void> {
     }
     // Recorded even when they changed nothing: the fact worth keeping is that
     // they were asked, so we do not ask again.
-    await auth.markOnspaceed()
+    await auth.markOnboarded()
     emit('done', how === 'tour')
   } catch (err) {
     // A failed picture upload must not trap someone in the welcome. Say what

@@ -7,6 +7,16 @@ export interface IActorCtx {
   role: 'admin' | 'member'
   onBehalfOf?: string
   scopes: string[]
+  /**
+   * Which credential proved this, as opposed to who it proved.
+   *
+   * A personal access token acts as its owner, so `kind` is 'human' for both
+   * a browser session and a token pasted into a config file, and anything
+   * that must not be reachable from a pasted header has to ask this instead.
+   * Minting tokens is the case that matters: without it, a leaked token mints
+   * its own replacement and revoking the original achieves nothing.
+   */
+  tokenKind?: 'session' | 'agent' | 'personal'
 }
 
 export interface ICtx {

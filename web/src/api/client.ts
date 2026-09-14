@@ -111,8 +111,29 @@ export const auth = {
       onboarded?: boolean
     }>('/auth/me'),
 
-  markOnspaceed: () =>
+  markOnboarded: () =>
     req<{ ok: boolean }>('/auth/me/onboarded', { method: 'POST' }),
+
+  /** Personal access tokens: MCP and the API acting as you, with your role. */
+  tokens: () =>
+    req<{
+      tokens: {
+        id: string
+        label: string
+        scopes: string[]
+        created_at: number
+        last_used_at?: number
+      }[]
+    }>('/auth/me/tokens'),
+
+  createToken: (label: string, scopes: string[]) =>
+    req<{ token: string; label: string; scopes: string[] }>('/auth/me/tokens', {
+      method: 'POST',
+      body: JSON.stringify({ label, scopes }),
+    }),
+
+  revokeToken: (id: string) =>
+    req<{ ok: boolean }>(`/auth/me/tokens/${id}`, { method: 'DELETE' }),
   requestOtp: (email: string) =>
     req<{ ok: boolean }>('/auth/otp', {
       method: 'POST',

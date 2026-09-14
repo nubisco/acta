@@ -71,6 +71,7 @@ beforeEach(async () => {
       appId: 'acta',
       authorizeUrl: `${ISSUER}/api/auth/sso`,
       autoProvision: true,
+      label: 'Test IdP',
     },
   })) as never
 })
@@ -86,7 +87,11 @@ describe('external sso', () => {
   // not to offer a door that is not there.
   it('advertises the provider, and that codes are off behind it', async () => {
     const res = await app.request('/api/v1/auth/config')
-    expect(await res.json()).toEqual({ sso: true, otp: false })
+    expect(await res.json()).toEqual({
+      sso: true,
+      otp: false,
+      sso_label: 'Test IdP',
+    })
   })
 
   /**
@@ -118,10 +123,15 @@ describe('external sso', () => {
         appId: 'acta',
         authorizeUrl: `${ISSUER}/api/auth/sso`,
         autoProvision: true,
+        label: 'Test IdP',
       },
     })) as never
     const cfg = await (both as typeof app).request('/api/v1/auth/config')
-    expect(await cfg.json()).toEqual({ sso: true, otp: true })
+    expect(await cfg.json()).toEqual({
+      sso: true,
+      otp: true,
+      sso_label: 'Test IdP',
+    })
   })
 
   it('redirects to the idp with app_id, redirect_uri and state', async () => {
@@ -218,6 +228,7 @@ describe('external sso', () => {
         appId: 'acta',
         authorizeUrl: `${ISSUER}/api/auth/sso`,
         autoProvision: true,
+        label: 'Test IdP',
       },
     })) as never
 
@@ -434,6 +445,7 @@ describe('JwksVerifier fetch binding', () => {
         appId: 'acta',
         authorizeUrl: `${ISSUER}/api/auth/sso`,
         autoProvision: true,
+        label: 'Test IdP',
       },
     })) as never
     const request = (p: string) => (withSpa as typeof app).request(p)

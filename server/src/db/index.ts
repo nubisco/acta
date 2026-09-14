@@ -8,6 +8,7 @@ import {
   ADDITIVE_COLUMNS,
   FTS_COLUMN_RENAME,
   LINK_REBUILD,
+  TOKEN_REBUILD,
   REINDEX_FTS,
   RENAMES,
   SCHEMA_SQL,
@@ -88,6 +89,7 @@ export class BunSqliteDriver implements ISqlDriver {
       }
     }
     this.rebuildLinkTable()
+    this.rebuildTokenTable()
     this.renameFtsColumn()
     this.db.exec(SCHEMA_SQL)
     for (const statement of ADDITIVE_COLUMNS) {
@@ -109,6 +111,18 @@ export class BunSqliteDriver implements ISqlDriver {
     }
     if (!needed) return
     for (const step of LINK_REBUILD.steps) this.db.exec(step)
+  }
+
+  /** See TOKEN_REBUILD: auth_token.kind gained 'personal'. */
+  private rebuildTokenTable(): void {
+    let needed: boolean
+    try {
+      needed = this.db.query(TOKEN_REBUILD.detect).all().length > 0
+    } catch {
+      return // No auth_token table yet; the schema creates it correctly.
+    }
+    if (!needed) return
+    for (const step of TOKEN_REBUILD.steps) this.db.exec(step)
   }
 
   /** FTS5 has no RENAME COLUMN, so the index is rebuilt from the rows. */
@@ -211,6 +225,7 @@ export class D1Driver implements ISqlDriver {
       }
     }
     await this.rebuildLinkTable()
+    await this.rebuildTokenTable()
     await this.renameFtsColumn()
     for (const statement of schemaStatements()) {
       if (statement.startsWith('PRAGMA')) continue
@@ -245,6 +260,19 @@ export class D1Driver implements ISqlDriver {
     }
     if (!needed) return
     for (const step of LINK_REBUILD.steps) await this.db.prepare(step).run()
+  }
+
+  /** See TOKEN_REBUILD: auth_token.kind gained 'personal'. */
+  private async rebuildTokenTable(): Promise<void> {
+    let needed: boolean
+    try {
+      const res = await this.db.prepare(TOKEN_REBUILD.detect).all()
+      needed = (res.results?.length ?? 0) > 0
+    } catch {
+      return // No auth_token table yet; the schema creates it correctly.
+    }
+    if (!needed) return
+    for (const step of TOKEN_REBUILD.steps) await this.db.prepare(step).run()
   }
 
   /** FTS5 has no RENAME COLUMN, so the index is rebuilt from the rows. */

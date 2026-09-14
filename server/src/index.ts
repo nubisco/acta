@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { bunAssetReader, createApp } from './app'
 import { ssoConfigFromEnv } from './core/sso'
+import { oidcConfigFromEnv } from './core/oidc'
 import { openDb } from './db'
 
 const DATA_DIR = process.env.ACTA_DATA_DIR ?? './data'
@@ -15,6 +16,7 @@ const app = await createApp(db, {
   baseUrl: process.env.ACTA_BASE_URL,
   serveAsset: WEB_DIST ? bunAssetReader(WEB_DIST) : undefined,
   sso: ssoConfigFromEnv(process.env) ?? undefined,
+  oidc: oidcConfigFromEnv(process.env) ?? undefined,
   otpFallback: process.env.ACTA_OTP_FALLBACK === 'true',
   bootstrap: {
     workspaceName: process.env.ACTA_WORKSPACE ?? 'Nubisco',

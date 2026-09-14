@@ -18,6 +18,8 @@ export interface ISsoConfig {
   appId: string
   /** Create members on first login (the IdP gates who gets a token). */
   autoProvision: boolean
+  /** Shown on the sign-in button. */
+  label: string
 }
 
 export function ssoConfigFromEnv(
@@ -31,6 +33,7 @@ export function ssoConfigFromEnv(
     appId,
     authorizeUrl: env.ACTA_SSO_AUTHORIZE_URL ?? `${issuer}/api/auth/sso`,
     autoProvision: env.ACTA_SSO_AUTO_PROVISION !== 'false',
+    label: env.ACTA_SSO_LABEL ?? 'single sign-on',
   }
 }
 
@@ -42,6 +45,10 @@ export interface ISsoClaims {
   iat: number
   exp: number
   iss: string
+  /** OIDC id_tokens only: the client the token was minted for. */
+  aud?: string | string[]
+  /** OIDC id_tokens only: binds the token to one sign-in attempt. */
+  nonce?: string
   [key: string]: unknown
 }
 
@@ -74,6 +81,7 @@ function base64urlToUtf8(input: string): string {
 
 export class JwksVerifier {
   private readonly issuer: string
+  private readonly jwksUri: string
   private readonly cacheTtlMs: number
   private readonly fetchImpl: typeof fetch
   private jwksCache: { keys: IJwkKey[]; fetchedAt: number } | null = null
@@ -81,9 +89,20 @@ export class JwksVerifier {
 
   constructor(
     issuer: string,
-    opts: { cacheTtlMs?: number; fetchImpl?: typeof fetch } = {},
+    opts: {
+      cacheTtlMs?: number
+      fetchImpl?: typeof fetch
+      /**
+       * Where the keys actually live. The handover contract fixes this at
+       * `${issuer}/.well-known/jwks.json`, but an OIDC provider names it in
+       * its discovery document and is under no obligation to put it there:
+       * Entra and Auth0 both serve keys from a different path.
+       */
+      jwksUri?: string
+    } = {},
   ) {
     this.issuer = issuer.replace(/\/$/, '')
+    this.jwksUri = opts.jwksUri ?? `${this.issuer}/.well-known/jwks.json`
     this.cacheTtlMs = opts.cacheTtlMs ?? 300_000
     // Bound, not merely stored. `this.fetchImpl(...)` below would otherwise
     // call fetch with the verifier as `this`, and workerd refuses to run its
@@ -100,7 +119,7 @@ export class JwksVerifier {
     if (this.jwksCache && now - this.jwksCache.fetchedAt < this.cacheTtlMs) {
       return this.jwksCache.keys
     }
-    const res = await this.fetchImpl(`${this.issuer}/.well-known/jwks.json`)
+    const res = await this.fetchImpl(this.jwksUri)
     if (!res.ok) throw new Error(`Failed to fetch JWKS: ${res.status}`)
     const data = (await res.json()) as { keys: IJwkKey[] }
     this.jwksCache = { keys: data.keys, fetchedAt: now }

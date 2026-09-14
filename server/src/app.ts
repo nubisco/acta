@@ -10,11 +10,12 @@ import {
   requireAuth,
   requireWorkspace,
   SESSION_COOKIE,
-  type ISsoRuntime,
+  type TSsoRuntime,
 } from './routes/auth'
 import { hookRoutes } from './routes/hooks'
 import { ingestRoutes } from './routes/ingest'
 import { JwksVerifier, type ISsoConfig } from './core/sso'
+import { OidcClient, type IOidcConfig } from './core/oidc'
 import { AttachmentStore, type IBlobStore } from './services/attachments'
 import { startRulesEngine } from './services/rules'
 import { startWebhookDispatcher } from './services/webhooks'
@@ -43,6 +44,11 @@ export interface IAppOptions {
    * are off unless `otpFallback` asks for them back.
    */
   sso?: ISsoConfig
+  /**
+   * Standard OpenID Connect provider. Takes precedence over `sso`, which is
+   * the older JWT-handover contract that only Nubisco Platform implements.
+   */
+  oidc?: IOidcConfig
   /**
    * Keep one-time codes alongside a configured provider. Off by default: a
    * second door beside the provider lets an account it has disabled still
@@ -87,14 +93,24 @@ export async function createApp(
     c.json({ ok: true, service: 'acta', ts: Date.now() }),
   )
 
-  const ssoRuntime: ISsoRuntime | undefined = opts.sso
+  // Two provider modes, one runtime. OIDC wins when both are configured: it
+  // is the standard one, and an instance that has gone to the trouble of
+  // configuring a real provider did not mean to keep the bespoke contract.
+  const ssoRuntime: TSsoRuntime | undefined = opts.oidc
     ? {
-        config: opts.sso,
-        verifier: new JwksVerifier(opts.sso.issuer, {
-          fetchImpl: opts.fetchImpl,
-        }),
+        mode: 'oidc',
+        config: opts.oidc,
+        client: new OidcClient(opts.oidc, { fetchImpl: opts.fetchImpl }),
       }
-    : undefined
+    : opts.sso
+      ? {
+          mode: 'handover',
+          config: opts.sso,
+          verifier: new JwksVerifier(opts.sso.issuer, {
+            fetchImpl: opts.fetchImpl,
+          }),
+        }
+      : undefined
   // One rule, read in two places: the auth routes gate the endpoints with it
   // and the SPA fallback decides whether there is anything to show but a
   // redirect.

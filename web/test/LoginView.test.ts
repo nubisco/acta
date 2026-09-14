@@ -44,7 +44,11 @@ beforeEach(() => {
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => ({
-      json: async () => ({ sso: ssoConfigured, otp: otpConfigured }),
+      json: async () => ({
+        sso: ssoConfigured,
+        otp: otpConfigured,
+        sso_label: 'Acme SSO',
+      }),
     })),
   )
   // location.href is how the handover happens; capture it rather than navigate.
@@ -72,7 +76,7 @@ describe('LoginView', () => {
     const view = await render()
     expect(assign).toHaveBeenCalledWith('/api/v1/auth/sso/start')
     // And says so, rather than flashing a form on the way out.
-    expect(view.text()).toContain('Taking you to')
+    expect(view.text()).toContain('Taking you to Acme SSO')
     expect(view.find('#login-email-form').exists()).toBe(false)
   })
 
@@ -112,7 +116,10 @@ describe('LoginView', () => {
     expect(assign).not.toHaveBeenCalled()
     expect(view.text()).toContain('Single sign-on failed')
     expect(view.find('#login-email-form').exists()).toBe(false)
-    expect(view.text()).toContain('Sign in with Nubisco Platform')
+    // The provider's name comes from the server. It used to be hardcoded,
+    // which told every self-hosted instance to sign in with a product its
+    // users have never heard of.
+    expect(view.text()).toContain('Sign in with Acme SSO')
   })
 
   // A self-hosted instance with no provider: codes are the only way in.

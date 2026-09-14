@@ -9,11 +9,11 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
 const uploadAvatar = vi.fn(async () => ({ ok: true, avatar_url: '/a.png' }))
-const markOnspaceed = vi.fn(async () => ({ ok: true }))
+const markOnboarded = vi.fn(async () => ({ ok: true }))
 
 vi.mock('@/api/client', () => ({
   api: { uploadAvatar: (...a: unknown[]) => uploadAvatar(...(a as [])) },
-  auth: { markOnspaceed: () => markOnspaceed() },
+  auth: { markOnboarded: () => markOnboarded() },
   // humanise() narrows on this, so a mock without it turns every error path
   // into a different error than the one under test.
   ApiHttpError: class ApiHttpError extends Error {
@@ -61,7 +61,7 @@ describe('WelcomeModal', () => {
   beforeEach(() => {
     uploadAvatar.mockReset()
     uploadAvatar.mockResolvedValue({ ok: true, avatar_url: '/a.png' })
-    markOnspaceed.mockClear()
+    markOnboarded.mockClear()
     setTheme.mockClear()
   })
 
@@ -76,7 +76,7 @@ describe('WelcomeModal', () => {
     await button(view, 'Skip for now').trigger('click')
     await flushPromises()
 
-    expect(markOnspaceed).toHaveBeenCalledTimes(1)
+    expect(markOnboarded).toHaveBeenCalledTimes(1)
     expect(uploadAvatar).not.toHaveBeenCalled()
     expect(view.emitted('done')?.[0]).toEqual([false])
   })
@@ -86,7 +86,7 @@ describe('WelcomeModal', () => {
     await button(view, 'Show me around').trigger('click')
     await flushPromises()
 
-    expect(markOnspaceed).toHaveBeenCalledTimes(1)
+    expect(markOnboarded).toHaveBeenCalledTimes(1)
     expect(view.emitted('done')?.[0]).toEqual([true])
   })
 
@@ -124,7 +124,7 @@ describe('WelcomeModal', () => {
     // instead of failing on the same blob forever.
     await button(view, 'Show me around').trigger('click')
     await flushPromises()
-    expect(markOnspaceed).toHaveBeenCalled()
+    expect(markOnboarded).toHaveBeenCalled()
     expect(view.emitted('done')?.[0]).toEqual([true])
     // Once, from the first press. The second got through precisely because
     // there was no longer a picture to upload.
