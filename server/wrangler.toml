@@ -24,6 +24,11 @@ bucket_name = "acta-attachments"
 
 [vars]
 ACTA_WORKSPACE = "Nubisco"
+# What the sign-in button calls the provider. The name used to be hardcoded in
+# the SPA, which told every self-hosted instance to sign in with a product its
+# users have no account on; it now comes from here, so this instance has to say
+# so explicitly.
+ACTA_SSO_LABEL = "Nubisco Platform"
 # No ACTA_ADMIN_* here: identity comes from platform.nubisco.io via SSO, and
 # the first person to sign in to a fresh workspace is made its admin. These
 # remain supported, and are still required, for an instance running on email
