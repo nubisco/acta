@@ -80,5 +80,5 @@ have them. An agent can read `blocked_by` and `blocks` on an item through
 
 ## Next
 
-- [Connecting a client](/mcp/connecting)
-- [Tool reference](/mcp/tools)
+- [Connecting a client](/users/connect-an-agent)
+- [Tool reference](/developers/mcp-tools)

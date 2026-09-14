@@ -11,7 +11,7 @@ export default defineConfig({
     // Acta's own mark. The docs briefly carried Verba's favicon, copied in
     // with the rest of that site's public assets.
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/acta/logo.svg' }],
-    ['meta', { name: 'theme-color', content: '#5c35c4' }],
+    ['meta', { name: 'theme-color', content: '#16253a' }],
     [
       'meta',
       {
@@ -44,10 +44,8 @@ export default defineConfig({
     logo: { src: '/logo.svg', width: 24, height: 24 },
 
     nav: [
-      { text: 'Guide', link: '/guide/' },
-      { text: 'Self-hosting', link: '/self-hosting/' },
-      { text: 'MCP', link: '/mcp/' },
-      { text: 'Migrate', link: '/migrate/trello' },
+      { text: 'Users', link: '/users/' },
+      { text: 'Developers', link: '/developers/' },
       {
         text: 'Project',
         items: [
@@ -75,66 +73,57 @@ export default defineConfig({
       },
     ],
 
+    // Two audiences, two sidebars. Someone using Acta and someone running it
+    // want different halves of this site, and a single flat list of sections
+    // made each of them read past the other's.
     sidebar: {
-      '/guide/': [
+      '/users/': [
         {
-          text: 'Getting started',
+          text: 'Using Acta',
           items: [
-            { text: 'What Acta is', link: '/guide/' },
-            { text: 'Concepts', link: '/guide/concepts' },
-            { text: 'Working in Acta', link: '/guide/using' },
+            { text: 'What Acta is', link: '/users/' },
+            { text: 'Concepts', link: '/users/concepts' },
+            { text: 'Working in Acta', link: '/users/working' },
+            { text: 'Connect an agent', link: '/users/connect-an-agent' },
           ],
         },
         {
-          text: 'Next',
-          items: [
-            { text: 'Run your own instance', link: '/self-hosting/' },
-            { text: 'Connect an agent', link: '/mcp/' },
-          ],
+          text: 'Running it yourself',
+          items: [{ text: 'For developers', link: '/developers/' }],
         },
       ],
-      '/self-hosting/': [
+      '/developers/': [
+        {
+          text: 'Start here',
+          items: [{ text: 'Overview', link: '/developers/' }],
+        },
         {
           text: 'Running Acta',
           items: [
-            { text: 'Install', link: '/self-hosting/' },
-            { text: 'Configuration', link: '/self-hosting/configuration' },
-            { text: 'Authentication', link: '/self-hosting/authentication' },
+            { text: 'Install', link: '/developers/install' },
+            { text: 'Configuration', link: '/developers/configuration' },
+            { text: 'Authentication', link: '/developers/authentication' },
           ],
         },
-        {
-          text: 'Reference',
-          items: [
-            { text: 'MCP endpoint', link: '/mcp/' },
-            { text: 'Architecture', link: '/develop/' },
-          ],
-        },
-      ],
-      '/mcp/': [
-        {
-          text: 'Model Context Protocol',
-          items: [
-            { text: 'Overview', link: '/mcp/' },
-            { text: 'Connecting a client', link: '/mcp/connecting' },
-            { text: 'Tools', link: '/mcp/tools' },
-          ],
-        },
-      ],
-      '/migrate/': [
         {
           text: 'Migrating',
           items: [
-            { text: 'From Trello', link: '/migrate/trello' },
-            { text: 'From Confluence', link: '/migrate/confluence' },
+            { text: 'From Trello', link: '/developers/migrate-trello' },
+            { text: 'From Confluence', link: '/developers/migrate-confluence' },
           ],
         },
-      ],
-      '/develop/': [
         {
-          text: 'Developing Acta',
+          text: 'Model Context Protocol',
           items: [
-            { text: 'Architecture', link: '/develop/' },
-            { text: 'The data model', link: '/develop/data-model' },
+            { text: 'The endpoint', link: '/developers/mcp' },
+            { text: 'Tools', link: '/developers/mcp-tools' },
+          ],
+        },
+        {
+          text: 'Internals',
+          items: [
+            { text: 'Architecture', link: '/developers/architecture' },
+            { text: 'The data model', link: '/developers/data-model' },
           ],
         },
       ],

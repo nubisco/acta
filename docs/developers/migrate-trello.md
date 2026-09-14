@@ -11,7 +11,7 @@ approach safe, which is to run it repeatedly until the reconciliation is clean.
 ## Before you start
 
 You need a running Acta instance and a token that can write to it. A
-[personal access token](/mcp/#authentication) with read and write is fine, and
+[personal access token](/developers/mcp#authentication) with read and write is fine, and
 has the advantage that the import is attributed to you.
 
 ```sh
@@ -147,6 +147,6 @@ have decided you can live with it.
 4. **Then** make Trello read-only, rather than deleting anything. Keep the
    exports; they cost nothing and settle arguments.
 
-If you are also [migrating Confluence](/migrate/confluence), do it after this
+If you are also [migrating Confluence](/developers/migrate-confluence), do it after this
 one and pass the Trello map, so that page references to Trello cards are
 rewritten into Acta references rather than left as dead links.

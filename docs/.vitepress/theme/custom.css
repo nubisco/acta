@@ -14,15 +14,20 @@
  */
 
 :root {
-  /* Grape hyacinth, the Nubisco accent. */
-  --nb-c-primary: #5c35c4;
-  --nb-c-primary-hover: #8e72d9;
-  --nb-c-primary-active: #9f87de;
+  /* Acta's own palette, taken from web/public/acta-icon.svg and the web
+     manifest: navy ground, the board's blue, the document's teal. The docs
+     used the Nubisco accent until I noticed the product already had one. */
+  --acta-navy: #16253a;
+  --acta-navy-deep: #0b101c;
+  --acta-blue: #3a6ede;
+  --acta-blue-bright: #5fa4f5;
+  --acta-teal: #3fd9b6;
+  --acta-teal-bright: #6ee7d8;
 
-  --vp-c-brand-1: var(--nb-c-primary);
-  --vp-c-brand-2: var(--nb-c-primary-hover);
-  --vp-c-brand-3: var(--nb-c-primary-active);
-  --vp-c-brand-soft: color-mix(in srgb, var(--nb-c-primary) 12%, transparent);
+  --vp-c-brand-1: var(--acta-blue);
+  --vp-c-brand-2: var(--acta-blue-bright);
+  --vp-c-brand-3: #2c3fa8;
+  --vp-c-brand-soft: color-mix(in srgb, var(--acta-blue) 12%, transparent);
 
   /* Paper rather than pure white, so the surfaces on it have somewhere to
      sit. The sidebar and code blocks lift off this. */
@@ -36,15 +41,15 @@
   --vp-home-hero-name-color: transparent;
   --vp-home-hero-name-background: linear-gradient(
     120deg,
-    #5c35c4 20%,
-    #9f87de 60%,
-    #10a9a4 100%
+    var(--acta-blue) 15%,
+    var(--acta-blue-bright) 50%,
+    var(--acta-teal) 100%
   );
   --vp-home-hero-image-background-image: linear-gradient(
     -45deg,
-    #5c35c4 22%,
-    #ad379f 55%,
-    #10a9a4 100%
+    var(--acta-blue) 20%,
+    #0e7f96 55%,
+    var(--acta-teal) 100%
   );
   --vp-home-hero-image-filter: blur(44px);
 }
@@ -69,14 +74,15 @@
    of which can fail that way. */
 
 .dark {
-  --vp-c-bg: #0d0d0f;
-  --vp-c-bg-alt: #151518;
-  --vp-c-bg-elv: #151518;
-  --vp-c-bg-soft: #151518;
-  --vp-c-brand-1: #9f87de;
-  --vp-c-brand-2: #8e72d9;
-  --vp-c-brand-3: #5c35c4;
-  --vp-nav-bg-color: #0d0d0f;
+  /* The icon's own ground, so the docs and the app agree in the dark. */
+  --vp-c-bg: var(--acta-navy-deep);
+  --vp-c-bg-alt: var(--acta-navy);
+  --vp-c-bg-elv: var(--acta-navy);
+  --vp-c-bg-soft: var(--acta-navy);
+  --vp-c-brand-1: var(--acta-teal-bright);
+  --vp-c-brand-2: var(--acta-teal);
+  --vp-c-brand-3: var(--acta-blue);
+  --vp-nav-bg-color: var(--acta-navy-deep);
   --vp-c-gutter: #000000;
 }
 

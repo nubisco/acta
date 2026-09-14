@@ -48,18 +48,31 @@ Authentication is passwordless: email one-time codes local to your instance, or 
 docker compose up -d   # see docker-compose.yml; data lives in the acta-data volume
 ```
 
-The server prints one-time login codes to its log until an email sender is configured, which is fine on a laptop and unacceptable once other people use the instance. See [Install](https://docs.nubisco.io/acta/self-hosting/) and [Authentication](https://docs.nubisco.io/acta/self-hosting/authentication).
+The server prints one-time login codes to its log until an email sender is configured, which is fine on a laptop and unacceptable once other people use the instance. See [Install](https://docs.nubisco.io/acta/developers/install) and [Authentication](https://docs.nubisco.io/acta/developers/authentication).
 
 ## Documentation
 
 Full documentation is at **[docs.nubisco.io/acta](https://docs.nubisco.io/acta/)**:
 
-- [What Acta is](https://docs.nubisco.io/acta/guide/) and its [concepts](https://docs.nubisco.io/acta/guide/concepts)
-- [Install](https://docs.nubisco.io/acta/self-hosting/): Docker, Cloudflare Workers, or from source
-- [Configuration](https://docs.nubisco.io/acta/self-hosting/configuration) and [Authentication](https://docs.nubisco.io/acta/self-hosting/authentication): one-time codes, OpenID Connect, access tokens
-- [The MCP endpoint](https://docs.nubisco.io/acta/mcp/): [connecting a client](https://docs.nubisco.io/acta/mcp/connecting) and the [tool reference](https://docs.nubisco.io/acta/mcp/tools)
-- Migrating from [Trello](https://docs.nubisco.io/acta/migrate/trello) and [Confluence](https://docs.nubisco.io/acta/migrate/confluence)
-- [Architecture](https://docs.nubisco.io/acta/develop/) and the [data model](https://docs.nubisco.io/acta/develop/data-model)
+It is in two halves.
+
+**[For users](https://docs.nubisco.io/acta/users/)**, if your team runs an instance:
+[what Acta is](https://docs.nubisco.io/acta/users/),
+[concepts](https://docs.nubisco.io/acta/users/concepts),
+[working in it](https://docs.nubisco.io/acta/users/working), and
+[connecting your own agent](https://docs.nubisco.io/acta/users/connect-an-agent).
+
+**[For developers](https://docs.nubisco.io/acta/developers/)**, if you run,
+integrate with or work on it:
+[install](https://docs.nubisco.io/acta/developers/install),
+[configuration](https://docs.nubisco.io/acta/developers/configuration),
+[authentication](https://docs.nubisco.io/acta/developers/authentication),
+migrating from [Trello](https://docs.nubisco.io/acta/developers/migrate-trello)
+and [Confluence](https://docs.nubisco.io/acta/developers/migrate-confluence),
+the [MCP endpoint](https://docs.nubisco.io/acta/developers/mcp) and its
+[tools](https://docs.nubisco.io/acta/developers/mcp-tools),
+[architecture](https://docs.nubisco.io/acta/developers/architecture) and the
+[data model](https://docs.nubisco.io/acta/developers/data-model).
 
 ## Development
 

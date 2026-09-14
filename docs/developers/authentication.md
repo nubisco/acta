@@ -154,7 +154,7 @@ configured, OIDC wins.
 
 Separately from signing in, a member can mint **personal access tokens** from
 **Settings → Access tokens**. These act as that person, with their role, for
-the API and [the MCP endpoint](/mcp/). They never carry administrator rights
+the API and [the MCP endpoint](/developers/mcp). They never carry administrator rights
 and cannot mint further tokens, so administration always requires a real
 session.
 

@@ -30,7 +30,7 @@ vacuum, so it cannot be used to escalate later.
 
 ## Identity
 
-See [Authentication](/self-hosting/authentication) for the whole picture.
+See [Authentication](/developers/authentication) for the whole picture.
 
 ### OpenID Connect (recommended)
 
@@ -73,7 +73,7 @@ have; prefer OIDC for anything new, and note that OIDC wins if both are set.
 
 ## Importer variables
 
-Used by the [migration CLIs](/migrate/trello), not by the server.
+Used by the [migration CLIs](/developers/migrate-trello), not by the server.
 
 | Variable                                                      | What it does                                             |
 | ------------------------------------------------------------- | -------------------------------------------------------- |

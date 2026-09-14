@@ -1,5 +1,8 @@
 # What Acta is
 
+_This half of the documentation is for using Acta. If you are the one running
+it, see [the developers' half](/developers/)._
+
 Acta (Latin: _things done_) is a project management and documentation server.
 It holds two things that usually live in two products:
 
@@ -21,9 +24,9 @@ hardware you already own. There is no seat count and nothing phones home.
 **Teams working with AI agents.** Acta treats an agent as an actor, not as a
 borrowed human account. Every card, comment and document edit records who made
 it, and an agent's work is attributed to the agent. The
-[MCP endpoint](/mcp/) exposes the same capability the UI has.
+[MCP endpoint](/developers/mcp) exposes the same capability the UI has.
 
-**Teams leaving something else.** There are [importers](/migrate/trello) for
+**Teams leaving something else.** There are [importers](/developers/migrate-trello) for
 Trello and Confluence that carry comments, attachments, history and
 cross-references, and report exactly what they could not bring.
 
@@ -81,7 +84,10 @@ something built around it, [talk to us](https://nubisco.io).
 
 ## Where to go next
 
-- [Concepts](/guide/concepts): spaces, items, keys, actors, events.
-- [Working in Acta](/guide/using): the day-to-day of the web app.
-- [Run your own instance](/self-hosting/): Docker, Cloudflare, or from source.
-- [Connect an agent](/mcp/): tokens, clients, tools.
+- [Concepts](/users/concepts): spaces, cards, keys, actors, events.
+- [Working in Acta](/users/working): the day-to-day of the web app.
+- [Connect an agent](/users/connect-an-agent): point your own editor or
+  assistant at your workspace, acting as you.
+
+Running an instance rather than using one? That is
+[the developers' half](/developers/).

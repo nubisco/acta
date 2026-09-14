@@ -57,7 +57,7 @@ docker compose logs -f acta
 `[acta] OTP for you@example.com: 123456` in the log means anyone who can read
 your logs can sign in as anyone. Before you let other people in, either
 configure an email sender or put an
-[identity provider](/self-hosting/authentication) in front.
+[identity provider](/developers/authentication) in front.
 :::
 
 ### Data
@@ -121,7 +121,7 @@ pnpm -C server exec wrangler deploy
 ```
 
 The schema migrates itself on first request, so there is no migration step to
-run. See [Configuration](/self-hosting/configuration) for the variables.
+run. See [Configuration](/developers/configuration) for the variables.
 
 ## From source
 

@@ -72,7 +72,7 @@ This is what makes the audit trail worth reading. Work done by an agent is
 attributed to that agent, not to whoever's credentials it borrowed.
 
 ::: tip Acting as yourself
-A [personal access token](/mcp/#authentication) is different from an agent
+A [personal access token](/developers/mcp#authentication) is different from an agent
 token: it acts as _you_, with your role, and the history says you did it.
 That is the right choice when you are driving the tool yourself from an editor
 or a script. An agent token is for something running on its own.
