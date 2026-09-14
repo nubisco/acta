@@ -25,7 +25,9 @@ Acta (Latin: "things done") is an open-core, MCP-first project management and do
 - **Docs are Markdown**: a precisely specified extension set (callouts, collapsibles, `[[cross-references]]`, live item embeds) over CommonMark + GFM.
 - **Self-host first**: one Docker container, SQLite, runs on NAS-class hardware.
 
-Authentication is passwordless email OTP, local to your instance. A pluggable provider interface for external identity (generic OIDC) is on the roadmap, so self-hosters can bring their own IAM.
+Authentication is passwordless: email one-time codes local to your instance, or standard OpenID Connect against your own provider (Keycloak, Auth0, Okta, Entra, Google Workspace and anything else that speaks it). Members can mint personal access tokens that let an editor, a script or an MCP client act as them, with their role and their name in the audit trail.
+
+**[Documentation](https://docs.nubisco.io/acta/)** covers self-hosting, authentication, migrating from Trello and Confluence, and connecting an agent over MCP.
 
 ## Layout
 
@@ -41,7 +43,7 @@ Authentication is passwordless email OTP, local to your instance. A pluggable pr
 docker compose up -d   # see docker-compose.yml; data lives in the acta-data volume
 ```
 
-The server prints one-time login codes to its log until an email sender is configured.
+The server prints one-time login codes to its log until an email sender is configured, which is fine on a laptop and unacceptable once other people use the instance. See [Install](https://docs.nubisco.io/acta/self-hosting/) and [Authentication](https://docs.nubisco.io/acta/self-hosting/authentication).
 
 ## Development
 
