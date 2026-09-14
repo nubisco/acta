@@ -8,6 +8,9 @@ export default defineConfig({
   base: '/acta/',
 
   head: [
+    // Acta's own mark. The docs briefly carried Verba's favicon, copied in
+    // with the rest of that site's public assets.
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/acta/logo.svg' }],
     ['meta', { name: 'theme-color', content: '#5c35c4' }],
     [
       'meta',
@@ -38,8 +41,6 @@ export default defineConfig({
 
   themeConfig: {
     siteTitle: 'Acta',
-    // Acta has no mark of its own yet, so it carries the Nubisco one. Worth
-    // replacing once brand/icons has an acta/ directory like the others.
     logo: { src: '/logo.svg', width: 24, height: 24 },
 
     nav: [

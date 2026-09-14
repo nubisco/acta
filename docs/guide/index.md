@@ -62,6 +62,23 @@ not so that you can hold conversations in it.
 The MCP endpoint is not a wrapper around a subset of the API. It is a second
 client of the same services, which is why an agent can do what you can do.
 
+## Built by Nubisco
+
+Acta is built and maintained by **[Nubisco](https://nubisco.io)**, a Portuguese
+software company that builds the tools it needs and opens the ones useful to
+other people.
+
+|                                                         |                                                                                           |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **[Nubisco UI](https://docs.nubisco.io/ui/)**           | The Vue 3 component library this interface is built on.                                   |
+| **[Verba](https://docs.nubisco.io/verba/)**             | Self-hostable i18n collaboration: structured, reviewable, deployable translations.        |
+| **[Nubisco CMS](https://docs.nubisco.io/cms/)**         | A headless CMS where content is reviewed, batched into releases and published on purpose. |
+| **[OpenBridge](https://github.com/nubisco/openbridge)** | Home automation bridge and its plugin ecosystem.                                          |
+
+If Acta saves your team time, [sponsoring it](https://github.com/sponsors/joseporto)
+is what keeps it maintained. If you would rather we ran it for you, or you need
+something built around it, [talk to us](https://nubisco.io).
+
 ## Where to go next
 
 - [Concepts](/guide/concepts): spaces, items, keys, actors, events.
