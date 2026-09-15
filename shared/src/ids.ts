@@ -25,6 +25,9 @@ export const ID_PREFIXES = [
   'rul',
   'evt',
   'ntf',
+  // OAuth client registrations and the tokens issued to them.
+  'oac',
+  'oat',
 ] as const
 
 export type TIdPrefix = (typeof ID_PREFIXES)[number]

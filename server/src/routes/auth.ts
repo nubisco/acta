@@ -17,6 +17,7 @@ import { now, type IActorCtx, type ICtx } from '../core/ctx'
 import { emitEvent, flushPendingEvents } from '../core/events'
 import { JwksVerifier, type ISsoClaims, type ISsoConfig } from '../core/sso'
 import { OidcClient, type IOidcConfig } from '../core/oidc'
+import { resolveOauthToken } from '../core/oauth'
 import type { ISqlDriver } from '../db'
 
 const SESSION_COOKIE = 'acta_session'
@@ -50,6 +51,28 @@ export type TSsoRuntime =
   | { mode: 'oidc'; config: IOidcConfig; client: OidcClient }
 
 const SSO_STATE_COOKIE = 'acta_sso_state'
+/**
+ * Where to land after the provider is done.
+ *
+ * The callback used to redirect to "/" unconditionally, which is right for an
+ * ordinary sign-in and wrong for anything that sends you to sign in mid-task.
+ * The OAuth consent screen is exactly that: bounce to the provider and come
+ * back at the workspace home, and the connector's request is gone.
+ *
+ * Only a local path is ever honoured, because this is a value the caller
+ * supplies and an absolute URL here would be an open redirect through our own
+ * sign-in.
+ */
+const SSO_RETURN_COOKIE = 'acta_sso_return'
+
+export function safeReturnPath(raw: string | undefined): string | null {
+  if (!raw) return null
+  // "//host" and "/\host" are both protocol-relative and leave the site.
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) {
+    return null
+  }
+  return raw
+}
 /** The PKCE verifier and nonce, which must survive the trip to the provider. */
 const OIDC_HANDSHAKE_COOKIE = 'acta_oidc_handshake'
 
@@ -164,7 +187,9 @@ async function signInWithClaims(
     path: '/',
     maxAge: SESSION_TTL / 1000,
   })
-  return c.redirect('/', 302)
+  const ret = safeReturnPath(getCookie(c, SSO_RETURN_COOKIE))
+  deleteCookie(c, SSO_RETURN_COOKIE, { path: '/' })
+  return c.redirect(ret ?? '/', 302)
 }
 
 export function authRoutes(
@@ -214,6 +239,16 @@ export function authRoutes(
   app.get('/sso/start', async (c) => {
     if (!sso) return c.json({ error: 'sso not configured' }, 404)
 
+    const oidcReturn = safeReturnPath(c.req.query('to'))
+    if (oidcReturn) {
+      setCookie(c, SSO_RETURN_COOKIE, oidcReturn, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'Lax',
+        path: '/',
+        maxAge: 600,
+      })
+    }
     if (sso.mode === 'oidc') {
       let authorize
       try {
@@ -237,6 +272,16 @@ export function authRoutes(
       return c.redirect(authorize.url, 302)
     }
 
+    const ret = safeReturnPath(c.req.query('to'))
+    if (ret) {
+      setCookie(c, SSO_RETURN_COOKIE, ret, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'Lax',
+        path: '/',
+        maxAge: 600,
+      })
+    }
     const state = randomToken(16)
     setCookie(c, SSO_STATE_COOKIE, state, {
       httpOnly: true,
@@ -567,12 +612,30 @@ export function authRoutes(
   return app
 }
 
-/** Auth middleware: Bearer token (agents) or session cookie (humans). */
-export function requireAuth(): MiddlewareHandler<IAuthEnv> {
+/**
+ * Auth middleware: Bearer token (agent, personal or OAuth) or session cookie.
+ *
+ * `resourceMetadata` adds the RFC 9728 pointer to the 401. It is what turns a
+ * refusal into an instruction: without it a connector sees a bare 401, has no
+ * idea an authorization server exists, and reports that it cannot determine
+ * how the server signs in. Only the MCP endpoint needs it; the REST API's
+ * clients already know how they authenticate.
+ */
+export function requireAuth(
+  opts: { resourceMetadata?: boolean } = {},
+): MiddlewareHandler<IAuthEnv> {
   return async (c, next) => {
     const db = c.get('db')
     const authed = await authedFrom(c)
-    if (!authed) return c.json({ error: 'unauthorized' }, 401)
+    if (!authed) {
+      if (opts.resourceMetadata) {
+        const origin = new URL(c.req.url).origin
+        return c.json({ error: 'unauthorized' }, 401, {
+          'www-authenticate': `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp"`,
+        })
+      }
+      return c.json({ error: 'unauthorized' }, 401)
+    }
     c.set('actor', authed)
     // Without a workspace segment the request means "the one the token was
     // minted in", which keeps the unprefixed endpoints working.
@@ -591,6 +654,12 @@ async function authedFrom(c: {
   const bearer = header?.startsWith('Bearer ') ? header.slice(7) : undefined
   const token = bearer ?? getCookie(c as never, SESSION_COOKIE)
   if (!token) return null
+  // Tokens minted by the OAuth server live in their own table and carry their
+  // own expiry and rotation, so they are resolved first. Everything after this
+  // point cannot tell the difference, which is the point: a connector acts as
+  // the member who approved it.
+  const oauth = await resolveOauthToken(c.get('db'), token)
+  if (oauth) return oauth
   return resolveToken(c.get('db'), token)
 }
 

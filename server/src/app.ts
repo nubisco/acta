@@ -13,6 +13,12 @@ import {
   type TSsoRuntime,
 } from './routes/auth'
 import { hookRoutes } from './routes/hooks'
+import {
+  oauthRoutes,
+  protectedResourceMetadata,
+  authorizationServerMetadata,
+} from './routes/oauth'
+import { OAUTH_CORS } from './core/oauth'
 import { ingestRoutes } from './routes/ingest'
 import { JwksVerifier, type ISsoConfig } from './core/sso'
 import { OidcClient, type IOidcConfig } from './core/oidc'
@@ -93,6 +99,42 @@ export async function createApp(
     c.json({ ok: true, service: 'acta', ts: Date.now() }),
   )
 
+  /**
+   * OAuth discovery. Mounted before everything else because a connector asks
+   * these questions unauthenticated, and the SPA fallback below would
+   * otherwise hand it the sign-in redirect and end the handshake.
+   *
+   * The openid-configuration alias is deliberate: Acta is not an OpenID
+   * provider, but several clients try that path first and treat a 404 as "no
+   * authorization server here".
+   */
+  const asMeta = (c: {
+    req: { url: string }
+    json: (b: unknown, s?: number, h?: Record<string, string>) => Response
+  }) =>
+    c.json(
+      authorizationServerMetadata(new URL(c.req.url).origin),
+      200,
+      OAUTH_CORS,
+    )
+  app.get('/.well-known/oauth-protected-resource/mcp', (c) =>
+    c.json(
+      protectedResourceMetadata(new URL(c.req.url).origin),
+      200,
+      OAUTH_CORS,
+    ),
+  )
+  app.get('/.well-known/oauth-protected-resource', (c) =>
+    c.json(
+      protectedResourceMetadata(new URL(c.req.url).origin),
+      200,
+      OAUTH_CORS,
+    ),
+  )
+  app.get('/.well-known/oauth-authorization-server', asMeta)
+  app.get('/.well-known/openid-configuration', asMeta)
+  app.route('/oauth', oauthRoutes())
+
   // Two provider modes, one runtime. OIDC wins when both are configured: it
   // is the standard one, and an instance that has gone to the trouble of
   // configuring a real provider did not mean to keep the bespoke contract.
@@ -135,7 +177,7 @@ export async function createApp(
   app.use('/api/v1/*', requireAuth())
   app.route('/api/v1', apiRoutes(store))
 
-  app.use('/mcp', requireAuth())
+  app.use('/mcp', requireAuth({ resourceMetadata: true }))
   app.route('/mcp', mcpRoutes(store))
 
   // Static SPA: assets by path, index.html fallback so vue-router resolves
@@ -170,7 +212,16 @@ export async function createApp(
         signedOut &&
         !url.searchParams.has('error')
       ) {
-        return c.redirect('/api/v1/auth/sso/start', 302)
+        // Carry where they were going. Without this, anyone sent to sign in
+        // mid-task lands at the workspace home instead, which silently breaks
+        // the OAuth consent screen: the connector's request is gone.
+        const to = url.pathname + url.search
+        return c.redirect(
+          to === '/'
+            ? '/api/v1/auth/sso/start'
+            : `/api/v1/auth/sso/start?to=${encodeURIComponent(to)}`,
+          302,
+        )
       }
       const index = await serveAsset('/index.html')
       if (!index) return c.notFound()

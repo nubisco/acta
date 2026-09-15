@@ -51,6 +51,50 @@ CREATE TABLE IF NOT EXISTS auth_token (
   revoked_at INTEGER
 );
 
+-- OAuth 2.1 authorization server for the MCP endpoint (RFC 7591 + PKCE).
+-- Connector UIs (ChatGPT, the claude.ai web connector) will not accept a
+-- pasted bearer token; they discover this server, self-register, and exchange
+-- a code. Everything here is hashed, exactly like auth_token.
+CREATE TABLE IF NOT EXISTS oauth_client (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  -- JSON array. Matched exactly at authorize time; a prefix match is how open
+  -- redirects are born.
+  redirect_uris TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS oauth_code (
+  code_hash TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  client_id TEXT NOT NULL REFERENCES oauth_client(id),
+  actor_id TEXT NOT NULL REFERENCES actor(id),
+  redirect_uri TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  -- Single use. Stamped rather than deleted so a replay is refused rather
+  -- than looking like a code that never existed.
+  used_at INTEGER,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS oauth_token (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  client_id TEXT NOT NULL REFERENCES oauth_client(id),
+  actor_id TEXT NOT NULL REFERENCES actor(id),
+  access_hash TEXT NOT NULL UNIQUE,
+  refresh_hash TEXT NOT NULL UNIQUE,
+  scope TEXT NOT NULL,
+  access_expires_at INTEGER NOT NULL,
+  refresh_expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  rotated_at INTEGER,
+  last_used_at INTEGER,
+  revoked_at INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS otp_challenge (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL REFERENCES workspace(id),

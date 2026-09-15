@@ -453,7 +453,13 @@ describe('JwksVerifier fetch binding', () => {
     for (const path of ['/', '/nubisco/s/ST', '/login']) {
       const res = await request(path)
       expect(res.status).toBe(302)
-      expect(res.headers.get('location')).toBe('/api/v1/auth/sso/start')
+      // Where they were going rides along, so anything that sends someone to
+      // sign in mid-task (the OAuth consent screen) survives the round trip.
+      const expected =
+        path === '/'
+          ? '/api/v1/auth/sso/start'
+          : `/api/v1/auth/sso/start?to=${encodeURIComponent(path)}`
+      expect(res.headers.get('location')).toBe(expected)
     }
 
     // A failed sign-in must still reach the page, or it would bounce back out
