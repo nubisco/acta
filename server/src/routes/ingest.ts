@@ -234,3 +234,74 @@ async function createIngestSecret(
   )
   return raw
 }
+
+export interface IIngestTokenView {
+  id: string
+  name: string
+  handle: string
+  space: string
+  list: string | null
+  created_at: number
+  last_used_at: number | null
+  items: number
+}
+
+/**
+ * The tokens that exist, for the settings screen. The raw token is not here
+ * and cannot be: only its hash was ever stored. What an admin needs in order
+ * to decide whether to revoke one is where it posts and whether it is still
+ * being used, so that is what this returns.
+ */
+export async function listIngestTokens(
+  ctx: ICtx,
+): Promise<{ tokens: IIngestTokenView[] }> {
+  const rows = await ctx.db.query<{
+    id: string
+    name: string
+    handle: string
+    space: string
+    list: string | null
+    created_at: number
+    last_used_at: number | null
+    items: number
+  }>(
+    `SELECT t.id, a.name, a.handle, s.key AS space, l.name AS list,
+            t.created_at,
+            (SELECT MAX(e.ts) FROM event e WHERE e.actor_id = t.actor_id) AS last_used_at,
+            (SELECT COUNT(*) FROM item i WHERE i.created_by = t.actor_id) AS items
+       FROM ingest_token t
+       JOIN actor a ON a.id = t.actor_id
+       JOIN space s ON s.id = t.space_id
+       LEFT JOIN list l ON l.id = t.list_id
+      WHERE t.workspace_id = ? AND a.disabled = 0
+      ORDER BY t.created_at DESC`,
+    [ctx.workspaceId],
+  )
+  return { tokens: rows }
+}
+
+/**
+ * The row goes, the actor stays. Deleting the actor would orphan every item
+ * and event it ever created, turning a year of contact-form history into
+ * cards from nobody. Disabling it stops the credential working while the
+ * attribution it already wrote keeps resolving.
+ */
+export async function revokeIngestToken(
+  ctx: ICtx,
+  id: string,
+): Promise<{ ok: true }> {
+  const rows = await ctx.db.query<{ actor_id: string }>(
+    'SELECT actor_id FROM ingest_token WHERE workspace_id = ? AND id = ?',
+    [ctx.workspaceId, id],
+  )
+  if (rows.length === 0) throw new ApiError(404, `ingest token ${id} not found`)
+  await ctx.db.run(
+    'DELETE FROM ingest_token WHERE workspace_id = ? AND id = ?',
+    [ctx.workspaceId, id],
+  )
+  await ctx.db.run(
+    "UPDATE actor SET disabled = 1 WHERE workspace_id = ? AND id = ? AND kind = 'agent'",
+    [ctx.workspaceId, rows[0].actor_id],
+  )
+  return { ok: true }
+}

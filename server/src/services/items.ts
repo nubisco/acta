@@ -124,6 +124,26 @@ async function syncLinks(
   }
 }
 
+/**
+ * The mentions that are new in this text, as a body a notifier can scan.
+ *
+ * Editing a description must not ring for everyone named in it every time.
+ * Only handles that were not there before are worth telling, so the diff is
+ * taken here and the result handed on as if it were freshly written text.
+ */
+function newMentions(before: string, after: string): string {
+  const had = new Set(
+    extractRefs(before)
+      .filter((r) => r.type === 'actor')
+      .map((r) => r.target.toLowerCase()),
+  )
+  return extractRefs(after)
+    .filter((r) => r.type === 'actor')
+    .filter((r) => !had.has(r.target.toLowerCase()))
+    .map((r) => `[[@${r.target}]]`)
+    .join(' ')
+}
+
 async function applyItemOp(
   ctx: ICtx,
   op: TItemOp,
@@ -199,6 +219,11 @@ async function applyItemOp(
         'item',
         id,
         `created ${key}: ${op.title}`,
+        undefined,
+        // Naming somebody in a card's description is a mention, exactly as it
+        // is in a comment. This was not passed, so it silently told nobody:
+        // the mention rendered as a chip and never reached an inbox.
+        op.description,
       )
       return { key, id, rev: 1 }
     }
@@ -223,6 +248,10 @@ async function applyItemOp(
         'item',
         item.id,
         `updated ${item.key}`,
+        undefined,
+        op.description === undefined
+          ? undefined
+          : newMentions(item.description, op.description),
       )
       return { key: item.key, rev }
     }

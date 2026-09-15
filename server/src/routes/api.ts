@@ -26,6 +26,7 @@ import {
   docGet,
   docTree,
   itemGet,
+  myWork,
   search,
   workspaceOverview,
 } from '../services/reads'
@@ -48,7 +49,12 @@ import {
   zConnectionWrite,
 } from '../services/connections'
 import { webhookList, webhookWrite, zWebhookWrite } from '../services/webhooks'
-import { createIngestToken, zIngestTokenCreate } from './ingest'
+import {
+  createIngestToken,
+  listIngestTokens,
+  revokeIngestToken,
+  zIngestTokenCreate,
+} from './ingest'
 
 function ctxOf(c: {
   get: (key: 'db' | 'workspaceId' | 'actor') => unknown
@@ -109,6 +115,12 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     })
     return c.json(await spaceGet(ctxOf(c), params))
   })
+
+  /**
+   * What is mine, across every space. Every other item read is space-scoped,
+   * which cannot answer the question Home is for.
+   */
+  app.get('/me/work', async (c) => c.json(await myWork(ctxOf(c))))
 
   app.post('/items/get', async (c) =>
     c.json(await itemGet(ctxOf(c), zItemGet.parse(await c.req.json()))),
@@ -293,11 +305,32 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
   })
   app.get('/rules', async (c) => c.json(await ruleList(ctxOf(c))))
 
+  app.get('/ingest_tokens', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    return c.json(await listIngestTokens(ctx))
+  })
+
   app.post('/ingest_tokens', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'admin')
     const body = zIngestTokenCreate.parse(await c.req.json())
     return c.json(await createIngestToken(ctx, body))
+  })
+
+  app.delete('/ingest_tokens/:id', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    const result = await revokeIngestToken(ctx, c.req.param('id'))
+    await emitEvent(
+      ctx,
+      'ingest_token.revoked',
+      'ingest_token',
+      c.req.param('id'),
+      'revoked ingest token',
+    )
+    flushPendingEvents()
+    return c.json(result)
   })
 
   app.post('/attachments', async (c) => {

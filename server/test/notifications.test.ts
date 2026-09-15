@@ -16,6 +16,7 @@ import {
   notificationList,
   notificationRead,
 } from '../src/services/notifications'
+import { myWork } from '../src/services/reads'
 import type { ICtx } from '../src/core/ctx'
 
 let db: BunSqliteDriver
@@ -222,5 +223,245 @@ describe('notifications', () => {
 
     await notificationRead(ivan)
     expect(await unread(ivan)).toBe(0)
+  })
+})
+
+/**
+ * What one person should look at, across every space.
+ *
+ * The cases worth pinning are the ones that make the panel wrong rather than
+ * empty: the same card counted twice, work that belongs to somebody else, and
+ * a "recent" list that reflects the workspace instead of the reader.
+ */
+/**
+ * Mentions in a card's own description.
+ *
+ * `emitEvent` documents a notify body as "the comment and description
+ * paths", but only comments ever passed one, so naming somebody in a
+ * description rendered a chip that reached no inbox. Writing a ticket and
+ * tagging the person who should pick it up is the ordinary way to hand work
+ * over, and it silently did nothing.
+ */
+describe('description mentions', () => {
+  it('tells someone named in a new card description', async () => {
+    await itemWrite(
+      jose,
+      [
+        {
+          op: 'create',
+          op_id: 'd1',
+          list: 'To Do',
+          title: 'Needs a look',
+          description: 'over to you [[@daniela]]',
+        },
+      ],
+      'ST',
+    )
+    expect(await unread(daniela)).toBe(1)
+    expect((await inbox(daniela))[0].reason).toBe('mention')
+  })
+
+  it('tells someone added by an edit, and only once', async () => {
+    await itemWrite(
+      jose,
+      [
+        {
+          op: 'create',
+          op_id: 'd2',
+          list: 'To Do',
+          title: 'Quiet',
+          description: 'nothing yet',
+        },
+      ],
+      'ST',
+    )
+    expect(await unread(ivan)).toBe(0)
+
+    await itemWrite(
+      jose,
+      [
+        {
+          op: 'update',
+          op_id: 'd3',
+          key: 'ST-1',
+          description: 'actually [[@ivan]] should take this',
+        },
+      ],
+      'ST',
+    )
+    expect(await unread(ivan)).toBe(1)
+
+    // Editing the text again must not ring for a mention he has already been
+    // told about. Every save would otherwise re-notify everyone named in the
+    // description, which is how a bell gets switched off for good.
+    await itemWrite(
+      jose,
+      [
+        {
+          op: 'update',
+          op_id: 'd4',
+          key: 'ST-1',
+          description: 'actually [[@ivan]] should take this, by Friday',
+        },
+      ],
+      'ST',
+    )
+    expect(await unread(ivan)).toBe(1)
+
+    // A genuinely new name still rings.
+    await itemWrite(
+      jose,
+      [
+        {
+          op: 'update',
+          op_id: 'd5',
+          key: 'ST-1',
+          description: '[[@ivan]] and [[@daniela]] please',
+        },
+      ],
+      'ST',
+    )
+    expect(await unread(daniela)).toBe(1)
+    expect(await unread(ivan)).toBe(1)
+  })
+})
+
+describe('my work', () => {
+  const DAY = 24 * 60 * 60 * 1000
+
+  it('gathers assigned, due, mentioned and touched, each for the reader', async () => {
+    await itemWrite(
+      jose,
+      [
+        {
+          op: 'create',
+          op_id: 'w1',
+          list: 'Backlog',
+          title: 'Mine and overdue',
+          assignees: ['jose'],
+          due: Date.now() - DAY,
+        },
+        {
+          op: 'create',
+          op_id: 'w2',
+          list: 'Backlog',
+          title: "Ivan's",
+          assignees: ['ivan'],
+        },
+        {
+          op: 'create',
+          op_id: 'w3',
+          list: 'Backlog',
+          title: 'Unassigned but due',
+          due: Date.now() + DAY,
+        },
+      ],
+      'ST',
+    )
+
+    const mine = await myWork(jose)
+
+    expect(mine.assigned.map((i) => i.title)).toEqual(['Mine and overdue'])
+    // Computed server-side, against one clock rather than the viewer's.
+    expect(mine.assigned[0].overdue).toBe(true)
+
+    // Dated work nobody holds still appears: a due list that only shows what
+    // is already assigned hides exactly the ones about to be missed.
+    expect(mine.due.map((i) => i.title)).toContain('Unassigned but due')
+
+    // Assigned and due at once is one card, not two. The same row in two
+    // panels on one screen reads as two pieces of work.
+    expect(mine.due.map((i) => i.title)).not.toContain('Mine and overdue')
+
+    // Someone else's work is never mine, however it is dated.
+    expect(JSON.stringify(mine.assigned)).not.toContain("Ivan's")
+  })
+
+  it('lists a mention until it has been read, and only for the person mentioned', async () => {
+    await itemWrite(
+      jose,
+      [
+        {
+          op: 'create',
+          op_id: 'w4',
+          list: 'Backlog',
+          title: 'Needs Ivan',
+          description: 'over to you [[@ivan]]',
+        },
+      ],
+      'ST',
+    )
+
+    expect((await myWork(ivan)).mentions.map((i) => i.title)).toEqual([
+      'Needs Ivan',
+    ])
+    // Daniela was not mentioned, so it is not waiting on her.
+    expect((await myWork(daniela)).mentions).toHaveLength(0)
+
+    // Read is the proxy for answered: nothing else records having dealt with
+    // a mention, and an inbox that never empties stops being read at all.
+    await notificationRead(ivan)
+    expect((await myWork(ivan)).mentions).toHaveLength(0)
+  })
+
+  it('shows what the reader touched, not what the workspace did', async () => {
+    await itemWrite(
+      ivan,
+      [{ op: 'create', op_id: 'w5', list: 'Backlog', title: "Ivan's edit" }],
+      'ST',
+    )
+    await itemWrite(
+      jose,
+      [{ op: 'create', op_id: 'w6', list: 'Backlog', title: "Jose's edit" }],
+      'ST',
+    )
+
+    // Touched, not viewed. Nothing records a view, and having edited
+    // something is the stronger signal of "I was working on this" anyway.
+    expect((await myWork(jose)).recent.map((i) => i.title)).toEqual([
+      "Jose's edit",
+    ])
+    expect((await myWork(ivan)).recent.map((i) => i.title)).toEqual([
+      "Ivan's edit",
+    ])
+  })
+
+  it('leaves out work that is finished or filed away', async () => {
+    await itemWrite(
+      jose,
+      [
+        {
+          op: 'create',
+          op_id: 'w7',
+          list: 'Backlog',
+          title: 'Done',
+          assignees: ['jose'],
+        },
+        {
+          op: 'create',
+          op_id: 'w8',
+          list: 'Backlog',
+          title: 'Archived',
+          assignees: ['jose'],
+        },
+      ],
+      'ST',
+    )
+    await itemWrite(
+      jose,
+      [
+        { op: 'complete', op_id: 'w9', key: 'ST-1' },
+        { op: 'archive', op_id: 'w10', key: 'ST-2' },
+      ],
+      'ST',
+    )
+
+    const mine = await myWork(jose)
+    const titles = mine.assigned.map((i) => i.title)
+    expect(titles).not.toContain('Done')
+    expect(titles).not.toContain('Archived')
+    // Archived work is gone from every bucket, including the one built from
+    // this person's own edits.
+    expect(mine.recent.map((i) => i.title)).not.toContain('Archived')
   })
 })

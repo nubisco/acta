@@ -42,6 +42,20 @@ export const zRuleOp = z.discriminatedUnion('op', [
     op_id: z.string().min(1).max(200),
     id: z.string().min(1),
     name: z.string().min(1).max(200).optional(),
+    /**
+     * A rule's logic, not only its name and its switch.
+     *
+     * Update used to accept name and enabled alone, so changing what a rule
+     * actually does meant deleting it and creating another. That is a
+     * different rule: new id, and an audit trail that splits in two at the
+     * moment somebody edited a condition.
+     *
+     * `condition: null` clears it, which is not the same as omitting the
+     * field and leaving it alone.
+     */
+    trigger: z.string().min(1).max(100).optional(),
+    condition: z.string().max(500).nullable().optional(),
+    action: zRuleAction.optional(),
     enabled: z.boolean().optional(),
   }),
   z.object({
@@ -92,10 +106,25 @@ export async function ruleWrite(ctx: ICtx, ops: TRuleOp[]) {
             )
             if (rows.length === 0)
               throw new ApiError(404, `rule ${op.id} not found`)
+            // Same check as create. A condition that does not parse matches
+            // nothing, so accepting one here would silently retire a rule
+            // that still reads as active in the list.
+            if (op.condition && parseEmbedQuery(op.condition) === null)
+              throw new ApiError(400, `invalid condition: ${op.condition}`)
             await ctx.db.run(
-              'UPDATE rule SET name = COALESCE(?, name), enabled = COALESCE(?, enabled) WHERE id = ?',
+              `UPDATE rule
+                  SET name = COALESCE(?, name),
+                      trigger = COALESCE(?, trigger),
+                      condition = CASE WHEN ? THEN ? ELSE condition END,
+                      action = COALESCE(?, action),
+                      enabled = COALESCE(?, enabled)
+                WHERE id = ?`,
               [
                 op.name ?? null,
+                op.trigger ?? null,
+                op.condition === undefined ? 0 : 1,
+                op.condition ?? null,
+                op.action ? JSON.stringify(op.action) : null,
                 op.enabled === undefined ? null : op.enabled ? 1 : 0,
                 op.id,
               ],

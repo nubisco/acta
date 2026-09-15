@@ -77,6 +77,7 @@ export type {
   IEventRow,
   ISearchResult,
   ILiveEvent,
+  IMyWorkItem,
 } from '@/types/api'
 import type {
   IOverview,
@@ -87,6 +88,7 @@ import type {
   IEventRow,
   ISearchResult,
   ILiveEvent,
+  IMyWorkItem,
 } from '@/types/api'
 
 // -- Auth -------------------------------------------------------------------
@@ -134,6 +136,28 @@ export const auth = {
 
   revokeToken: (id: string) =>
     req<{ ok: boolean }>(`/auth/me/tokens/${id}`, { method: 'DELETE' }),
+
+  /**
+   * Applications connected over OAuth: the claude.ai connector, ChatGPT, an
+   * MCP client. Grouped per client rather than per grant, because
+   * re-authorising produces a second grant for what a person thinks of as
+   * one connection.
+   */
+  apps: () =>
+    req<{
+      apps: {
+        client_id: string
+        name: string
+        scopes: string[]
+        created_at: number
+        last_used_at?: number
+        expires_at: number
+      }[]
+    }>('/auth/me/apps'),
+
+  revokeApp: (clientId: string) =>
+    req<{ ok: boolean }>(`/auth/me/apps/${clientId}`, { method: 'DELETE' }),
+
   requestOtp: (email: string) =>
     req<{ ok: boolean }>('/auth/otp', {
       method: 'POST',
@@ -162,6 +186,18 @@ export const api = {
       items: ISpaceItemRow[]
       cursor?: string
     }>(`/spaces/${space}?${new URLSearchParams(params)}`),
+
+  /**
+   * What is mine, across every space. Everything else is space-scoped, which
+   * cannot answer the question Home opens with.
+   */
+  myWork: () =>
+    req<{
+      assigned: IMyWorkItem[]
+      due: IMyWorkItem[]
+      mentions: IMyWorkItem[]
+      recent: IMyWorkItem[]
+    }>('/me/work'),
 
   itemGet: (keys: string[], include?: string[]) =>
     req<{ items: IItemDetail[] }>('/items/get', {
@@ -368,11 +404,28 @@ export const api = {
       body: JSON.stringify(patch),
     }),
 
+  ingestTokens: () =>
+    req<{
+      tokens: {
+        id: string
+        name: string
+        handle: string
+        space: string
+        list: string | null
+        created_at: number
+        last_used_at: number | null
+        items: number
+      }[]
+    }>('/ingest_tokens'),
+
   createIngestToken: (name: string, space: string, list?: string) =>
     req<{ token: string; actor_id: string }>('/ingest_tokens', {
       method: 'POST',
       body: JSON.stringify({ name, space, list }),
     }),
+
+  revokeIngestToken: (id: string) =>
+    req<{ ok: boolean }>(`/ingest_tokens/${id}`, { method: 'DELETE' }),
 
   // -- Attachments ----------------------------------------------------------
 

@@ -573,6 +573,69 @@ export function authRoutes(
     return c.json({ ok: true })
   })
 
+  /**
+   * Applications this person has connected over OAuth: the claude.ai
+   * connector, ChatGPT, an MCP client. Grouped by client rather than listed
+   * per token, because "Claude" re-authorising produces a second row for
+   * what the person thinks of as one connection, and a revoke that leaves a
+   * live sibling grant behind is a revoke that did not work.
+   *
+   * Personal to the signed-in actor, exactly like /me/tokens: an admin has
+   * no business seeing, or cutting, what someone else connected.
+   */
+  app.get('/me/apps', requireAuth(), async (c) => {
+    const actor = c.get('actor')
+    const rows = await c.get('db').query<{
+      client_id: string
+      name: string
+      scope: string
+      created_at: number
+      last_used_at: number | null
+      expires_at: number
+    }>(
+      `SELECT t.client_id,
+              c.name,
+              GROUP_CONCAT(DISTINCT t.scope) AS scope,
+              MIN(t.created_at) AS created_at,
+              MAX(t.last_used_at) AS last_used_at,
+              MAX(t.refresh_expires_at) AS expires_at
+         FROM oauth_token t
+         JOIN oauth_client c ON c.id = t.client_id
+        WHERE t.actor_id = ? AND t.revoked_at IS NULL
+          AND t.refresh_expires_at > ?
+        GROUP BY t.client_id, c.name
+        ORDER BY created_at DESC`,
+      [actor.id, now()],
+    )
+    return c.json({
+      apps: rows.map((r) => ({
+        client_id: r.client_id,
+        name: r.name,
+        // GROUP_CONCAT of comma-joined scope strings re-splits cleanly, and
+        // the set is what matters, not which grant carried which scope.
+        scopes: [...new Set(r.scope.split(',').filter(Boolean))].sort(),
+        created_at: r.created_at,
+        last_used_at: r.last_used_at ?? undefined,
+        expires_at: r.expires_at,
+      })),
+    })
+  })
+
+  /**
+   * Revokes every live grant for one client. Stamped rather than deleted, so
+   * a refresh arriving afterwards is refused as revoked instead of looking
+   * like a token that never existed. `refreshGrant` already reads that.
+   */
+  app.delete('/me/apps/:clientId', requireAuth(), async (c) => {
+    const actor = c.get('actor')
+    await c.get('db').run(
+      `UPDATE oauth_token SET revoked_at = ?
+          WHERE client_id = ? AND actor_id = ? AND revoked_at IS NULL`,
+      [now(), c.req.param('clientId'), actor.id],
+    )
+    return c.json({ ok: true })
+  })
+
   app.post('/me/onboarded', requireAuth(), async (c) => {
     const actor = c.get('actor')
     await c

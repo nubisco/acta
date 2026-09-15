@@ -706,3 +706,158 @@ describe('discovery spellings', () => {
     expect(res.headers.get('location')).toBeNull()
   })
 })
+
+/**
+ * Connected applications, and cutting one off.
+ *
+ * The revoke is the point. `oauth_token.revoked_at` existed and was honoured
+ * by the refresh path from the start, but nothing ever set it and no route
+ * listed a grant, so authorising a connector was a one-way door. These cover
+ * the two ways a revoke silently fails to revoke: a sibling grant from a
+ * re-authorisation left alive, and a refresh token that still works after.
+ */
+describe('connected applications', () => {
+  it('lists an approved client once, however often it was authorised', async () => {
+    const client = await register()
+    const challenge = await s256Challenge(VERIFIER)
+    // Twice: a person re-authorising the same connector, which is what
+    // produces two grant rows for one thing they think of as one app.
+    for (let i = 0; i < 2; i++) {
+      const code = await approve(client, challenge)
+      await tokenReq({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: REDIRECT,
+        client_id: client,
+        code_verifier: VERIFIER,
+      })
+    }
+
+    const res = await app.request('https://acta.test/api/v1/auth/me/apps', {
+      headers: asCookie(),
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      apps: { client_id: string; name: string; scopes: string[] }[]
+    }
+    expect(body.apps).toHaveLength(1)
+    expect(body.apps[0].client_id).toBe(client)
+    expect(body.apps[0].name).toBe('Test Connector')
+    // Never admin, whatever the approver's role: the same guarantee the
+    // token endpoint makes, restated where a person reads it.
+    expect(body.apps[0].scopes).not.toContain('admin')
+  })
+
+  it('revoking kills every grant for that client, including a refresh token', async () => {
+    const client = await register()
+    const challenge = await s256Challenge(VERIFIER)
+
+    const first = await approve(client, challenge)
+    const firstTok = (await (
+      await tokenReq({
+        grant_type: 'authorization_code',
+        code: first,
+        redirect_uri: REDIRECT,
+        client_id: client,
+        code_verifier: VERIFIER,
+      })
+    ).json()) as { access_token: string; refresh_token: string }
+
+    // A second authorisation: the sibling grant that a per-token revoke
+    // would leave behind, still able to mint fresh access tokens.
+    const second = await approve(client, challenge)
+    const secondTok = (await (
+      await tokenReq({
+        grant_type: 'authorization_code',
+        code: second,
+        redirect_uri: REDIRECT,
+        client_id: client,
+        code_verifier: VERIFIER,
+      })
+    ).json()) as { access_token: string; refresh_token: string }
+
+    const cut = await app.request(
+      `https://acta.test/api/v1/auth/me/apps/${client}`,
+      { method: 'DELETE', headers: asCookie() },
+    )
+    expect(cut.status).toBe(200)
+
+    // Gone from the list.
+    const after = (await (
+      await app.request('https://acta.test/api/v1/auth/me/apps', {
+        headers: asCookie(),
+      })
+    ).json()) as { apps: unknown[] }
+    expect(after.apps).toHaveLength(0)
+
+    // Both access tokens stop working.
+    for (const tok of [firstTok.access_token, secondTok.access_token]) {
+      const res = await app.request('https://acta.test/mcp', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${tok}`,
+          'content-type': 'application/json',
+        },
+        body: '{}',
+      })
+      expect(res.status).toBe(401)
+    }
+
+    // And neither refresh token can mint a replacement, which is what makes
+    // the revoke durable rather than a pause until the access token expires.
+    for (const tok of [firstTok.refresh_token, secondTok.refresh_token]) {
+      const res = await tokenReq({
+        grant_type: 'refresh_token',
+        refresh_token: tok,
+        client_id: client,
+      })
+      expect(res.status).toBe(400)
+    }
+  })
+
+  it("never shows or cuts another person's grants", async () => {
+    const client = await register()
+    const challenge = await s256Challenge(VERIFIER)
+    const code = await approve(client, challenge)
+    await tokenReq({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: REDIRECT,
+      client_id: client,
+      code_verifier: VERIFIER,
+    })
+
+    const ws = (await db.query<{ id: string }>('SELECT id FROM workspace'))[0]
+      .id
+    const otherId = 'act-other'
+    await db.run(
+      `INSERT INTO actor (id, workspace_id, kind, handle, name, role, created_at)
+       VALUES (?, ?, 'human', 'daniela', 'Daniela', 'admin', 0)`,
+      [otherId, ws],
+    )
+    const otherSession = await createToken(db, ws, otherId, 'session', [
+      'read',
+      'write',
+      'admin',
+    ])
+    const headers = { cookie: `acta_session=${otherSession}` }
+
+    // An admin, and still cannot see what someone else connected.
+    const seen = (await (
+      await app.request('https://acta.test/api/v1/auth/me/apps', { headers })
+    ).json()) as { apps: unknown[] }
+    expect(seen.apps).toHaveLength(0)
+
+    await app.request(`https://acta.test/api/v1/auth/me/apps/${client}`, {
+      method: 'DELETE',
+      headers,
+    })
+    const mine = (await (
+      await app.request('https://acta.test/api/v1/auth/me/apps', {
+        headers: asCookie(),
+      })
+    ).json()) as { apps: unknown[] }
+    expect(mine).toBeDefined()
+    expect((mine as { apps: unknown[] }).apps).toHaveLength(1)
+  })
+})

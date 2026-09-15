@@ -6,7 +6,7 @@ import type { ICtx } from '../src/core/ctx'
 import { openDb, type BunSqliteDriver } from '../src/db'
 import { spaceWrite } from '../src/services/spaces'
 import { itemWrite } from '../src/services/items'
-import { ruleWrite } from '../src/services/rules'
+import { ruleList, ruleWrite } from '../src/services/rules'
 import { signPayload, webhookWrite } from '../src/services/webhooks'
 import { activityQuery, itemGet } from '../src/services/reads'
 
@@ -237,6 +237,103 @@ describe('rules', () => {
     const systemMoves = activity.events.filter((e) => e.verb === 'item.moved')
     expect(systemMoves).toHaveLength(1)
   })
+
+  /**
+   * Editing a rule's logic in place.
+   *
+   * Update took name and enabled only, so any real change meant delete plus
+   * create: a new id, and an audit trail that splits in two exactly where
+   * somebody changed a condition. The editor needs to edit.
+   */
+  it('changes trigger, condition and action in place, keeping the id', async () => {
+    const [created] = await ruleWrite(ctx, [
+      {
+        op: 'create',
+        op_id: 'r-edit-1',
+        name: 'route bugs',
+        trigger: 'item.created',
+        condition: 'space=SUP label=Bug',
+        action: { kind: 'move_item', list: 'In Progress' },
+        enabled: true,
+      },
+    ])
+    const id = (created as { id: string }).id
+
+    await ruleWrite(ctx, [
+      {
+        op: 'update',
+        op_id: 'r-edit-2',
+        id,
+        trigger: 'item.updated',
+        condition: 'space=SUP label=Urgent',
+        action: { kind: 'apply_label', label: 'Bug' },
+      },
+    ])
+
+    const rule = (await ruleList(ctx)).rules.find((r) => r.id === id)
+    expect(rule).toBeDefined()
+    expect(rule!.trigger).toBe('item.updated')
+    expect(rule!.condition).toBe('space=SUP label=Urgent')
+    expect(rule!.action).toEqual({ kind: 'apply_label', label: 'Bug' })
+    // Untouched fields survive: a partial update is a patch, not a replace.
+    expect(rule!.name).toBe('route bugs')
+    expect(rule!.enabled).toBe(true)
+  })
+
+  it('tells clearing a condition apart from leaving it alone', async () => {
+    const [created] = await ruleWrite(ctx, [
+      {
+        op: 'create',
+        op_id: 'r-cond-1',
+        name: 'narrow rule',
+        trigger: 'item.created',
+        condition: 'space=SUP',
+        action: { kind: 'complete' },
+        enabled: true,
+      },
+    ])
+    const id = (created as { id: string }).id
+
+    // Omitted: untouched.
+    await ruleWrite(ctx, [
+      { op: 'update', op_id: 'r-cond-2', id, name: 'renamed' },
+    ])
+    expect(
+      (await ruleList(ctx)).rules.find((r) => r.id === id)!.condition,
+    ).toBe('space=SUP')
+
+    // Explicit null: cleared, so the rule now matches every event of its
+    // trigger. Without the distinction there is no way back to "no
+    // condition" once one has been set. The list normalises the stored NULL
+    // to undefined, which is the shape the client actually receives.
+    await ruleWrite(ctx, [
+      { op: 'update', op_id: 'r-cond-3', id, condition: null },
+    ])
+    expect(
+      (await ruleList(ctx)).rules.find((r) => r.id === id)!.condition,
+    ).toBeUndefined()
+  })
+
+  it('refuses a condition that would silently match nothing', async () => {
+    const [created] = await ruleWrite(ctx, [
+      {
+        op: 'create',
+        op_id: 'r-bad-1',
+        name: 'rule',
+        trigger: 'item.created',
+        action: { kind: 'complete' },
+        enabled: true,
+      },
+    ])
+    const id = (created as { id: string }).id
+
+    // An unparseable condition matches nothing, so accepting it here would
+    // retire a rule that still reads as active in the list.
+    const [result] = await ruleWrite(ctx, [
+      { op: 'update', op_id: 'r-bad-2', id, condition: 'nonsense' },
+    ])
+    expect(result.ok).toBe(false)
+  })
 })
 
 describe('ingest', () => {
@@ -296,5 +393,124 @@ describe('ingest', () => {
       body: JSON.stringify({ title: 'x' }),
     })
     expect(bad.status).toBe(401)
+  })
+
+  /**
+   * The settings screen had no way to see what existed: there was a create
+   * route and nothing else, so the Ingest tab was create-only and a token
+   * pasted into a form a year ago could not be found, let alone revoked.
+   */
+  it('lists tokens with the context needed to decide about them', async () => {
+    const admin = await createToken(
+      db,
+      ctx.workspaceId,
+      ctx.actor.id,
+      'session',
+      ['read', 'write', 'admin'],
+    )
+    const as = { authorization: `Bearer ${admin}` }
+    const mk = async (name: string) =>
+      (await (
+        await app.request('/api/v1/ingest_tokens', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', ...as },
+          body: JSON.stringify({ name, space: 'SUP', list: 'Backlog' }),
+        })
+      ).json()) as { token: string; actor_id: string }
+
+    const marketing = await mk('Contact Form (Marketing)')
+    await mk('Contact Form (Support)')
+
+    await app.request(`/api/v1/ingest/${marketing.token}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'from the website' }),
+    })
+
+    const body = (await (
+      await app.request('/api/v1/ingest_tokens', { headers: as })
+    ).json()) as {
+      tokens: {
+        id: string
+        name: string
+        space: string
+        list: string | null
+        items: number
+        last_used_at: number | null
+      }[]
+    }
+    expect(body.tokens).toHaveLength(2)
+    const row = body.tokens.find((t) => t.name === 'Contact Form (Marketing)')
+    expect(row).toBeDefined()
+    expect(row?.space).toBe('SUP')
+    expect(row?.list).toBe('Backlog')
+    // "Never used" is what makes an old token safe to revoke.
+    expect(row?.items).toBe(1)
+    expect(row?.last_used_at).toBeGreaterThan(0)
+    const unused = body.tokens.find((t) => t.name === 'Contact Form (Support)')
+    expect(unused?.items).toBe(0)
+
+    // The secret itself is unrecoverable, and must stay that way: only its
+    // hash was ever stored, and a list route that could return one would be
+    // a far worse bug than the missing list it fixed.
+    expect(JSON.stringify(body)).not.toContain(marketing.token)
+  })
+
+  it('revoking stops the token but keeps what it already created', async () => {
+    const admin = await createToken(
+      db,
+      ctx.workspaceId,
+      ctx.actor.id,
+      'session',
+      ['read', 'write', 'admin'],
+    )
+    const as = { authorization: `Bearer ${admin}` }
+    const made = (await (
+      await app.request('/api/v1/ingest_tokens', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...as },
+        body: JSON.stringify({ name: 'Contact form', space: 'SUP' }),
+      })
+    ).json()) as { token: string; actor_id: string }
+
+    const first = (await (
+      await app.request(`/api/v1/ingest/${made.token}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'before the revoke' }),
+      })
+    ).json()) as { key: string }
+
+    const listed = (await (
+      await app.request('/api/v1/ingest_tokens', { headers: as })
+    ).json()) as { tokens: { id: string }[] }
+    const cut = await app.request(
+      `/api/v1/ingest_tokens/${listed.tokens[0].id}`,
+      {
+        method: 'DELETE',
+        headers: as,
+      },
+    )
+    expect(cut.status).toBe(200)
+
+    // The credential is dead.
+    const after = await app.request(`/api/v1/ingest/${made.token}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'after the revoke' }),
+    })
+    expect(after.status).toBe(401)
+
+    // The history it wrote is not. Deleting the actor instead would leave a
+    // year of contact-form cards attributed to nobody.
+    const item = (await itemGet(ctx, { keys: [first.key] })).items[0] as {
+      title: string
+    }
+    expect(item.title).toBe('before the revoke')
+
+    const gone = (await (
+      await app.request('/api/v1/ingest_tokens', { headers: as })
+    ).json()) as { tokens: unknown[] }
+    expect(gone.tokens).toHaveLength(0)
   })
 })

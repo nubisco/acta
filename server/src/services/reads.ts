@@ -10,7 +10,7 @@ import type {
   zItemGet,
   zSearch,
 } from '@nubisco/acta-shared'
-import type { ICtx } from '../core/ctx'
+import { now, type ICtx } from '../core/ctx'
 import { docBySlug, spaceByKey, itemByKey, type IItemRow } from '../core/store'
 import { sectionMap } from '@nubisco/acta-shared'
 
@@ -85,9 +85,10 @@ export async function workspaceOverview(ctx: ICtx) {
     handle: string
     kind: string
     name: string
+    role: string
     avatar_url: string | null
   }>(
-    'SELECT id, handle, kind, name, avatar_url FROM actor WHERE workspace_id = ? AND disabled = 0 ORDER BY handle',
+    'SELECT id, handle, kind, name, role, avatar_url FROM actor WHERE workspace_id = ? AND disabled = 0 ORDER BY handle',
     [ctx.workspaceId],
   )
   const docRoots = await ctx.db.query<{
@@ -664,5 +665,165 @@ export async function activityQuery(ctx: ICtx, params: TActivityQuery) {
   return {
     events: rows,
     cursor: rows.length === params.limit ? rows[rows.length - 1].id : undefined,
+  }
+}
+
+/** A week out is close enough to act on and far enough to plan around. */
+const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
+
+// --------------------------------------------------------------------------
+// my_work
+// --------------------------------------------------------------------------
+
+export interface IMyWorkItem {
+  key: string
+  title: string
+  space: string
+  space_key: string
+  list: string
+  due?: number
+  overdue?: boolean
+  completed?: boolean
+  reason?: string
+  at?: number
+}
+
+export interface IMyWork {
+  assigned: IMyWorkItem[]
+  due: IMyWorkItem[]
+  mentions: IMyWorkItem[]
+  recent: IMyWorkItem[]
+}
+
+/**
+ * What one person should probably look at, across every space.
+ *
+ * Every other item read here is scoped to a single space, which is right for
+ * a board and useless for the question people actually arrive with, which is
+ * "what is mine". Home showed spaces and a workspace activity feed, neither
+ * of which answers it: a grid of boards is a filing cabinet, and an activity
+ * feed is everything everyone did.
+ *
+ * Four buckets, deliberately small and capped. This runs on every visit to
+ * Home, so it is four indexed reads rather than one query that tries to rank
+ * everything against everything.
+ */
+export async function myWork(ctx: ICtx, limit = 8): Promise<IMyWork> {
+  const actorId = ctx.actor.id
+  const today = now()
+
+  const base = `SELECT i.key, i.title, i.due, i.completed,
+                       s.key AS space_key, s.name AS space, l.name AS list
+                  FROM item i
+                  JOIN space s ON s.id = i.space_id
+                  JOIN list l ON l.id = i.list_id`
+
+  type TRow = {
+    key: string
+    title: string
+    due: number | null
+    completed: number
+    space_key: string
+    space: string
+    list: string
+  }
+
+  const shape = (r: TRow): IMyWorkItem => ({
+    key: r.key,
+    title: r.title,
+    space: r.space,
+    space_key: r.space_key,
+    list: r.list,
+    due: r.due ?? undefined,
+    // Computed here rather than in the browser, so "overdue" is decided
+    // against one clock instead of whatever the viewer's machine believes.
+    overdue: r.due !== null && r.due < today ? true : undefined,
+    completed: r.completed === 1 || undefined,
+  })
+
+  const assigned = await ctx.db.query<TRow>(
+    `${base}
+      WHERE i.workspace_id = ? AND i.archived = 0 AND i.completed = 0
+        AND EXISTS (SELECT 1 FROM item_assignee ia
+                     WHERE ia.item_id = i.id AND ia.actor_id = ?)
+      ORDER BY CASE WHEN i.due IS NULL THEN 1 ELSE 0 END, i.due, i.updated_at DESC
+      LIMIT ?`,
+    [ctx.workspaceId, actorId, limit],
+  )
+
+  /**
+   * Dated work, whoever holds it. Assignment is how work is yours, but a
+   * milestone nobody is on still lands on the same day, and a due list that
+   * only shows what is already assigned hides exactly the ones about to be
+   * missed.
+   */
+  const dueSoon = await ctx.db.query<TRow>(
+    `${base}
+      WHERE i.workspace_id = ? AND i.archived = 0 AND i.completed = 0
+        AND i.due IS NOT NULL AND i.due <= ?
+      ORDER BY i.due
+      LIMIT ?`,
+    [ctx.workspaceId, today + SEVEN_DAYS, limit],
+  )
+
+  /**
+   * Mentions still waiting on this person.
+   *
+   * Unread is the proxy for unanswered: reading the notification is the act
+   * of having seen it, and anything cleverer (did they reply, did they react)
+   * needs state nothing writes today.
+   */
+  const mentionRows = await ctx.db.query<TRow & { reason: string; at: number }>(
+    `SELECT i.key, i.title, i.due, i.completed,
+            s.key AS space_key, s.name AS space, l.name AS list,
+            n.reason, n.created_at AS at
+       FROM notification n
+       JOIN item i ON i.key = n.item_key AND i.workspace_id = n.workspace_id
+       JOIN space s ON s.id = i.space_id
+       JOIN list l ON l.id = i.list_id
+      WHERE n.workspace_id = ? AND n.actor_id = ? AND n.read_at IS NULL
+        AND n.reason = 'mention' AND i.archived = 0
+      ORDER BY n.created_at DESC
+      LIMIT ?`,
+    [ctx.workspaceId, actorId, limit],
+  )
+
+  /**
+   * Where this person left off.
+   *
+   * Touched, not viewed. Nothing records a view, and adding a write on every
+   * card open to find out would cost more than the row is worth. Having
+   * edited something is the stronger signal anyway: it means work, where
+   * opening a card can mean a mis-click.
+   */
+  const recent = await ctx.db.query<TRow & { at: number }>(
+    `SELECT i.key, i.title, i.due, i.completed,
+            s.key AS space_key, s.name AS space, l.name AS list,
+            MAX(e.ts) AS at
+       FROM event e
+       JOIN item i ON i.id = e.entity_id
+       JOIN space s ON s.id = i.space_id
+       JOIN list l ON l.id = i.list_id
+      WHERE e.workspace_id = ? AND e.actor_id = ? AND e.entity = 'item'
+        AND i.archived = 0
+      GROUP BY i.id
+      ORDER BY at DESC
+      LIMIT ?`,
+    [ctx.workspaceId, actorId, limit],
+  )
+
+  const assignedKeys = new Set(assigned.map((r) => r.key))
+
+  return {
+    assigned: assigned.map(shape),
+    // Anything already listed as assigned is not repeated under Due: the
+    // same card twice on one screen reads as two pieces of work.
+    due: dueSoon.filter((r) => !assignedKeys.has(r.key)).map(shape),
+    mentions: mentionRows.map((r) => ({
+      ...shape(r),
+      reason: r.reason,
+      at: r.at,
+    })),
+    recent: recent.map((r) => ({ ...shape(r), at: r.at })),
   }
 }

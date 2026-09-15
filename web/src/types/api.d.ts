@@ -21,6 +21,7 @@ export interface IOverview {
     handle: string
     kind: string
     name: string
+    role: string
     avatar_url?: string | null
   }[]
   doc_roots: { slug: string; title: string; children: number }[]
@@ -169,3 +170,17 @@ export interface ILiveEvent {
 }
 
 export type TViewState = 'loading' | 'error' | 'forbidden' | 'ready'
+
+/** One row in the Home queue. Shaped by the server so every bucket matches. */
+export interface IMyWorkItem {
+  key: string
+  title: string
+  space: string
+  space_key: string
+  list: string
+  due?: number
+  overdue?: boolean
+  completed?: boolean
+  reason?: string
+  at?: number
+}
