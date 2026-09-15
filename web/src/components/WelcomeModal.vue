@@ -8,7 +8,8 @@
   >
     <div class="welcome">
       <p class="welcome__lede">
-        Two things worth setting now. Both can be changed later in Settings.
+        Two things worth setting now. Appearance stays under your avatar at the
+        foot of the sidebar, and your picture in Settings.
       </p>
 
       <NbBanner v-if="error" status="error" variant="inline" :title="error" />

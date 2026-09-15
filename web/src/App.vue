@@ -174,7 +174,21 @@
         :show-profile="false"
         placement="right-end"
         @sign-out="signOut"
-      />
+      >
+        <!-- The design system's slot for product rows. Theme lived in the
+             command palette and in the welcome modal, and nowhere else, so
+             anyone who had been through onboarding once had no way left to
+             find it. This is where a person looks for their own settings. -->
+        <div class="user-theme">
+          <p class="user-theme__title">Appearance</p>
+          <NbRadio
+            name="user-menu-theme"
+            :options="themeOptions"
+            :model-value="theme.theme.value"
+            @update:model-value="theme.setTheme($event as TTheme)"
+          />
+        </div>
+      </NbUserMenu>
     </template>
 
     <template #notification>
@@ -255,7 +269,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCommandPalette, useTheme, useWalkthrough } from '@nubisco/ui'
-import type { NbMenu, NbShell } from '@nubisco/ui'
+import type { NbMenu, NbShell, TTheme } from '@nubisco/ui'
 import { introTour, tourLabels } from '@/lib/tour'
 import {
   sidebarDefaultFor,
@@ -279,6 +293,13 @@ const inspector = useInspector()
 const ui = useUiState()
 const palette = useCommandPalette()
 const theme = useTheme()
+// The same three choices the welcome modal offers, worded the same way, so
+// the two places cannot drift into describing different things.
+const themeOptions = [
+  { label: 'Light', value: 'light' },
+  { label: 'Dark', value: 'dark' },
+  { label: 'Match my system', value: 'system' },
+]
 const shell = ref<InstanceType<typeof NbShell> | null>(null)
 const tour = useWalkthrough(introTour)
 
@@ -638,6 +659,15 @@ watch(
 </script>
 
 <style scoped lang="scss">
+.user-theme {
+  padding: var(--nb-spacing-8) var(--nb-spacing-12);
+
+  &__title {
+    margin: 0 0 var(--nb-spacing-8);
+    color: var(--nb-c-text-subtle);
+    font-size: var(--nb-type-body-sm-size);
+  }
+}
 .brand-switch {
   display: block;
   inline-size: 100%;
