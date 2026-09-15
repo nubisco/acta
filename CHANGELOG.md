@@ -1,3 +1,10 @@
+# [1.18.0](https://github.com/nubisco/acta/compare/v1.17.1...v1.18.0) (2026-09-15)
+
+
+### Features
+
+* **oauth:** build the consent screen from the design system ([6feecaf](https://github.com/nubisco/acta/commit/6feecaf5a70d5f5d9ac85ec2f4256a2e08bf1e3a))
+
 ## [1.17.1](https://github.com/nubisco/acta/compare/v1.17.0...v1.17.1) (2026-09-15)
 
 
