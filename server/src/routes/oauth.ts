@@ -17,12 +17,17 @@ import {
 /**
  * The OAuth surface: discovery, registration, consent and token.
  *
- * The consent screen is rendered here rather than by the SPA, on purpose.
- * app.ts hands a signed-out visitor to the identity provider before any HTML
- * is served, so an SPA-routed consent page would be bounced to sign-in and
- * come back at "/" with the OAuth parameters gone. Serving it from the server
- * keeps the whole handshake in one place and keeps it working when the SPA
- * does not.
+ * The consent screen itself is a page of the app (web/src/views/
+ * OAuthConsentView.vue), built from the design system like every other
+ * surface, so it looks like Acta and keeps looking like it as the system
+ * moves. This file keeps every decision that matters: /oauth/context says
+ * whether the request is well formed and who is asking, and the approval
+ * posts back to POST /oauth/authorize, which revalidates from scratch.
+ *
+ * An SPA-routed consent page used to be unreachable, because a signed-out
+ * visitor was handed to the identity provider and came back at "/" with the
+ * OAuth parameters gone. The sign-in redirect now carries ?to=, so the
+ * parameters survive the round trip and the page can live in the app.
  */
 
 const SESSION_COOKIE = 'acta_session'
@@ -33,49 +38,6 @@ export interface IOauthEnv {
     workspaceId: string
     actor: IActorCtx
   }
-}
-
-const esc = (s: string): string =>
-  s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-
-/**
- * Deliberately one small self-contained page. It is an authentication surface:
- * it must render with no build step, no bundle and no network beyond itself.
- */
-function page(title: string, body: string): string {
-  return `<!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)} · Acta</title>
-<style>
-  :root { color-scheme: light dark;
-    --bg:#f2f2f2; --card:#fff; --text:#16253a; --muted:#5b6b80;
-    --line:#dfe4ea; --accent:#3a6ede; }
-  @media (prefers-color-scheme: dark) { :root {
-    --bg:#0b101c; --card:#16253a; --text:#eef2f7; --muted:#9fb0c4;
-    --line:#24364f; --accent:#5fa4f5; } }
-  * { box-sizing: border-box }
-  body { margin:0; min-height:100vh; display:grid; place-items:center;
-    background:var(--bg); color:var(--text);
-    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; padding:24px }
-  .card { width:100%; max-width:29rem; background:var(--card); border:1px solid var(--line);
-    border-radius:14px; padding:28px 28px 22px }
-  h1 { margin:0 0 6px; font-size:1.2rem; letter-spacing:-0.01em }
-  p { margin:0 0 14px; color:var(--muted) }
-  strong { color:var(--text) }
-  ul { margin:0 0 18px; padding-left:20px; color:var(--muted) }
-  li { margin:3px 0 }
-  .row { display:flex; gap:10px; justify-content:flex-end; margin-top:22px }
-  button, .btn { font:inherit; padding:9px 16px; border-radius:9px; border:1px solid var(--line);
-    background:transparent; color:var(--text); cursor:pointer; text-decoration:none }
-  button.primary { background:var(--accent); border-color:var(--accent); color:#fff }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.9em }
-</style>
-</head><body><div class="card">${body}</div></body></html>`
 }
 
 export function oauthRoutes(): Hono<IOauthEnv> {
@@ -128,76 +90,57 @@ export function oauthRoutes(): Hono<IOauthEnv> {
   })
 
   // ── Consent ──
+
+  /**
+   * GET /oauth/authorize — hands the request to the app's consent route.
+   *
+   * A malformed request that still names a registered client and one of its
+   * redirect addresses is answered the way the spec asks, by sending the
+   * error back to the client rather than showing a person a page about it.
+   * Everything else goes to the screen, which asks /oauth/context what to
+   * say.
+   */
   app.get('/authorize', async (c) => {
     const url = new URL(c.req.url)
     const check = await validateAuthorize(
       c.get('db'),
       (k) => url.searchParams.get(k) ?? '',
     )
-    if (!check.ok) {
-      if (check.kind === 'redirect') return c.redirect(check.to, 302)
-      return c.html(
-        page(
-          'Request refused',
-          `<h1>That request cannot be approved</h1>
-           <p>${esc(check.message)}. Nothing has been shared.</p>`,
-        ),
-        400,
-      )
-    }
+    if (!check.ok && check.kind === 'redirect') return c.redirect(check.to, 302)
+    return c.redirect(`/oauth/consent?${url.searchParams.toString()}`, 302)
+  })
+
+  /**
+   * GET /oauth/context — what the consent screen needs to render honestly:
+   * is this a well-formed request from a registered client, what is that
+   * client called, and is there a person signed in to approve it. Validation
+   * only; approving revalidates all of it at POST time.
+   */
+  app.get('/context', async (c) => {
+    const url = new URL(c.req.url)
+    const check = await validateAuthorize(
+      c.get('db'),
+      (k) => url.searchParams.get(k) ?? '',
+    )
+    // Neither refusal shape is usable by the SPA (one is an error page, the
+    // other a redirect to the client), so both collapse to one renderable no.
+    if (!check.ok)
+      return c.json({
+        ok: false,
+        reason:
+          check.kind === 'refuse'
+            ? check.message
+            : 'That request cannot be approved',
+      })
 
     const token = getCookie(c, SESSION_COOKIE)
     const actor = token ? await resolveToken(c.get('db'), token) : null
-    if (!actor || actor.kind !== 'human') {
-      // Sign in, then come back here with the parameters intact. Losing them
-      // is the failure this route exists to avoid.
-      const back = `/oauth/authorize?${url.searchParams.toString()}`
-      return c.html(
-        page(
-          'Sign in',
-          `<h1>Sign in to continue</h1>
-           <p><strong>${esc(check.p.clientName)}</strong> is asking to connect to Acta.
-              Sign in and you will come straight back here.</p>
-           <div class="row"><a class="btn" href="/login?to=${encodeURIComponent(back)}">Sign in</a></div>`,
-        ),
-      )
-    }
-
-    const hidden = [
-      'client_id',
-      'redirect_uri',
-      'state',
-      'code_challenge',
-      'code_challenge_method',
-      'response_type',
-      'scope',
-    ]
-      .map(
-        (k) =>
-          `<input type="hidden" name="${k}" value="${esc(url.searchParams.get(k) ?? '')}">`,
-      )
-      .join('')
-
-    return c.html(
-      page(
-        'Connect',
-        `<h1>Connect ${esc(check.p.clientName)}?</h1>
-         <p>It will act as <strong>@${esc(actor.handle)}</strong> in this workspace, and
-            anything it does will be recorded under your name.</p>
-         <ul>
-           <li>Read spaces, cards, documents and activity</li>
-           <li>Create and change them</li>
-           <li>No administration: it cannot manage members or mint tokens</li>
-         </ul>
-         <p>You can revoke it at any time in Settings.</p>
-         <form method="post" action="/oauth/authorize">${hidden}
-           <div class="row">
-             <button type="submit" name="decision" value="deny">Cancel</button>
-             <button type="submit" name="decision" value="approve" class="primary">Connect</button>
-           </div>
-         </form>`,
-      ),
-    )
+    const human = actor && actor.kind === 'human' ? actor : null
+    return c.json({
+      ok: true,
+      clientName: check.p.clientName,
+      handle: human?.handle ?? null,
+    })
   })
 
   /**
@@ -235,7 +178,7 @@ export function oauthRoutes(): Hono<IOauthEnv> {
         const v = form.get(k)
         if (typeof v === 'string' && v) params.set(k, v)
       }
-      return c.redirect(`/oauth/authorize?${params.toString()}`, 302)
+      return c.redirect(`/oauth/consent?${params.toString()}`, 302)
     }
 
     if (get('decision') !== 'approve') {

@@ -211,45 +211,67 @@ describe('oauth registration', () => {
 })
 
 describe('oauth authorize', () => {
-  it('shows consent to a signed-in member', async () => {
+  // The screen is a page of the app, so this route's whole job is to hand the
+  // request over with its parameters intact.
+  it('hands a valid request to the consent page with its parameters', async () => {
     const id = await register()
     const res = await app.request(
       authorizeUrl(id, await s256Challenge(VERIFIER)),
-      {
-        headers: asCookie(),
-      },
+      { headers: asCookie() },
     )
+    expect(res.status).toBe(302)
+    const to = new URL(res.headers.get('location') ?? '', 'https://acta.test')
+    expect(to.pathname).toBe('/oauth/consent')
+    expect(to.searchParams.get('client_id')).toBe(id)
+    expect(to.searchParams.get('code_challenge')).toBeTruthy()
+  })
+
+  it('tells the consent page who is asking and who would approve', async () => {
+    const id = await register()
+    const url = authorizeUrl(id, await s256Challenge(VERIFIER)).replace(
+      '/oauth/authorize',
+      '/oauth/context',
+    )
+    const res = await app.request(url, { headers: asCookie() })
     expect(res.status).toBe(200)
-    const html = await res.text()
-    expect(html).toContain('Test Connector')
-    expect(html).toContain('@jose')
-    // The person should be told what it cannot do, not only what it can.
-    expect(html).toContain('cannot manage members')
+    expect(await res.json()).toMatchObject({
+      ok: true,
+      clientName: 'Test Connector',
+      handle: 'jose',
+    })
   })
 
-  // Losing the parameters on the way to sign-in is the failure the
-  // server-rendered consent page exists to avoid.
-  it('offers sign-in that returns to the same request', async () => {
+  // No session means the page shows its own sign-in prompt rather than
+  // bouncing, which is how the request's parameters survive.
+  it('reports no approver when signed out', async () => {
     const id = await register()
-    const res = await app.request(
-      authorizeUrl(id, await s256Challenge(VERIFIER)),
+    const url = authorizeUrl(id, await s256Challenge(VERIFIER)).replace(
+      '/oauth/authorize',
+      '/oauth/context',
     )
-    const html = await res.text()
-    expect(html).toContain('Sign in')
-    expect(html).toContain(encodeURIComponent('/oauth/authorize?'))
-    expect(html).toContain(encodeURIComponent('code_challenge'))
+    const res = await app.request(url)
+    expect(await res.json()).toMatchObject({ ok: true, handle: null })
   })
 
-  // An unregistered redirect must be refused in place. Reporting the error by
-  // redirecting to it is how an open redirect is built.
+  // An unregistered redirect must never be reported by redirecting to it.
+  // That is how an open redirect is built.
   it('refuses an unregistered redirect_uri without redirecting to it', async () => {
     const id = await register()
     const url = authorizeUrl(id, await s256Challenge(VERIFIER), {
       redirect_uri: 'https://evil.test/steal',
     })
     const res = await app.request(url, { headers: asCookie() })
-    expect(res.status).toBe(400)
-    expect(res.headers.get('location')).toBeNull()
+    // Same origin, our own page. The rejected address travels as a query
+    // parameter, which is not a redirect to it.
+    const to = new URL(res.headers.get('location') ?? '', 'https://acta.test')
+    expect(to.host).toBe('acta.test')
+    expect(to.pathname).toBe('/oauth/consent')
+
+    const ctx = await app.request(
+      url.replace('/oauth/authorize', '/oauth/context'),
+      { headers: asCookie() },
+    )
+    expect(await ctx.json()).toMatchObject({ ok: false })
   })
 
   // "Starts with the registered URI" would let this through.
@@ -257,9 +279,9 @@ describe('oauth authorize', () => {
     const id = await register(['https://client.test/callback'])
     const url = authorizeUrl(id, await s256Challenge(VERIFIER), {
       redirect_uri: 'https://client.test/callback.evil.test/x',
-    })
+    }).replace('/oauth/authorize', '/oauth/context')
     const res = await app.request(url, { headers: asCookie() })
-    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ ok: false })
   })
 
   it('refuses a request without S256 PKCE', async () => {
@@ -314,7 +336,7 @@ describe('oauth authorize', () => {
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: form.toString(),
     })
-    expect(res.headers.get('location')).toContain('/oauth/authorize?')
+    expect(res.headers.get('location')).toContain('/oauth/consent?')
     expect(await db.query('SELECT code_hash FROM oauth_code')).toHaveLength(0)
   })
 })

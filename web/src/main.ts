@@ -54,6 +54,15 @@ const router = createRouter({
       meta: { public: true, frameless: true, title: 'Sign in' },
     },
     {
+      // OAuth consent for MCP connectors, reached by redirect from the
+      // server's GET /oauth/authorize. Public: it renders its own sign-in
+      // prompt, because bouncing to /login would drop the request params.
+      path: '/oauth/consent',
+      name: 'oauth-consent',
+      component: () => import('./views/OAuthConsentView.vue'),
+      meta: { public: true, frameless: true, title: 'Connect' },
+    },
+    {
       // The entry point, the way CMS and Verba have one. Skips straight
       // through when there is only one workspace to choose.
       path: '/',
