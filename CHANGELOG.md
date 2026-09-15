@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/nubisco/acta/compare/v1.16.0...v1.17.0) (2026-09-15)
+
+
+### Features
+
+* **mcp:** OAuth 2.1, so connector UIs can reach the MCP endpoint ([ac5be22](https://github.com/nubisco/acta/commit/ac5be227040b41854c1e9516241776cd8bc48207))
+
 # [1.16.0](https://github.com/nubisco/acta/compare/v1.15.1...v1.16.0) (2026-09-14)
 
 
