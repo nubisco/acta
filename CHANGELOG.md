@@ -1,3 +1,10 @@
+## [1.18.2](https://github.com/nubisco/acta/compare/v1.18.1...v1.18.2) (2026-09-15)
+
+
+### Bug Fixes
+
+* **ci:** run wrangler from the worker's own directory ([1bb9d12](https://github.com/nubisco/acta/commit/1bb9d12dc91c8386424f0fc28c5e5e9877793bc3))
+
 ## [1.18.1](https://github.com/nubisco/acta/compare/v1.18.0...v1.18.1) (2026-09-15)
 
 
