@@ -46,6 +46,15 @@ In `claude_desktop_config.json`:
 }
 ```
 
+## claude.ai and other connector UIs
+
+These do not take a pasted token. Add a custom connector pointing at
+`https://acta.example.com/mcp` and Acta will take you through signing in and a
+consent screen instead. Nothing to paste, nothing to configure.
+
+The connection acts as you, with your role, and appears in the audit trail
+under your name. Revoke it from **Settings → Access tokens** like any other.
+
 ## Any other client
 
 Transport `streamable-http`, URL `https://acta.example.com/mcp`, and an

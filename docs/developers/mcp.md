@@ -64,11 +64,20 @@ This is the right choice for something running on its own: a scheduled job, a
 long-lived assistant, anything whose work should read as _its_ work. Scopes
 are chosen at creation (`read`, `write`, `admin`).
 
-## What is deliberately absent
+### Connectors
 
-No OAuth flow. Connector UIs that refuse a pasted header (ChatGPT, the
-claude.ai web connector) are therefore not supported; clients that accept a
-bearer header are.
+Clients that will not take a pasted header (ChatGPT, the claude.ai custom
+connector) sign in instead. Acta is its own authorization server: the client
+discovers it, registers itself, sends you through a consent screen, and
+exchanges a code with PKCE. You approve once, in your browser, and the
+connection acts as you.
+
+There is nothing to configure. Add `https://acta.example.com/mcp` as a custom
+connector and the rest is automatic. Access tokens last an hour and refresh
+themselves; a connection carries read and write and, like a personal token,
+never administration.
+
+## What is deliberately absent
 
 No tool for member administration, workspace settings or token management,
 because none of those is routine agent work and all of them are the things you
