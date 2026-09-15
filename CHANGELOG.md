@@ -1,3 +1,11 @@
+## [1.18.1](https://github.com/nubisco/acta/compare/v1.18.0...v1.18.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **app:** put the theme where a person would look for it ([256e5c2](https://github.com/nubisco/acta/commit/256e5c2ad6b5cc088cff5b39244af5133dd03824))
+* **ci:** let packageManager pick pnpm for the deploy job ([deaee3f](https://github.com/nubisco/acta/commit/deaee3f3358a09403510996b65b71861a884251a))
+
 # [1.18.0](https://github.com/nubisco/acta/compare/v1.17.1...v1.18.0) (2026-09-15)
 
 
