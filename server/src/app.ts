@@ -36,6 +36,14 @@ export interface IAppEnv {
 
 export interface IAppOptions {
   bootstrap?: IBootstrapOptions
+  /**
+   * The commit this build came from, reported by /healthz.
+   *
+   * Without it every instance answers "dev" and there is no way to tell a
+   * deploy that landed from one that silently did not, which cost us most of
+   * a day of guessing.
+   */
+  buildSha?: string
   /** Attachment content store. Defaults to the filesystem under dataDir. */
   blobStore?: IBlobStore
   /** Directory for the default filesystem blob store. */
@@ -96,7 +104,12 @@ export async function createApp(
   })
 
   app.get('/healthz', (c) =>
-    c.json({ ok: true, service: 'acta', ts: Date.now() }),
+    c.json({
+      ok: true,
+      service: 'acta',
+      build: opts.buildSha ?? 'dev',
+      ts: Date.now(),
+    }),
   )
 
   /**

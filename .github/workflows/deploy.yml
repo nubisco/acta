@@ -1,5 +1,10 @@
 name: Deploy
 
+# Two independent outputs from one release: the Cloudflare Worker that serves
+# acta.nubisco.io, and the GHCR image self-hosters run. The worker job used to
+# be missing entirely, so every hosted deploy was done by hand from a laptop
+# while CI reported success for having pushed an image.
+
 on:
   workflow_run:
     workflows: [Release]
@@ -88,3 +93,40 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max,ignore-error=true
+
+  worker:
+    name: Deploy Cloudflare Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: master
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The worker serves the SPA from the assets binding, so the deploy is
+      # only as current as this build.
+      - name: Build the app
+        run: pnpm -C web build
+
+      - name: Deploy worker
+        # --var ACTA_BUILD_SHA is what lets GET /healthz answer "did my deploy
+        # land?". Without it every instance reports "dev" and the endpoint
+        # cannot tell a deploy that landed from one that silently did not.
+        run: pnpm -C server wrangler deploy --var ACTA_BUILD_SHA:${GITHUB_SHA::7}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

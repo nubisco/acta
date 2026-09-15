@@ -30,6 +30,8 @@ interface IWorkerEnv {
   DB: ID1Database
   ATTACHMENTS: IR2Bucket
   ASSETS: IAssetsBinding
+  /** Set by the deploy workflow (--var), reported by /healthz. */
+  ACTA_BUILD_SHA?: string
   ACTA_WORKSPACE?: string
   ACTA_ADMIN_EMAIL?: string
   ACTA_ADMIN_HANDLE?: string
@@ -80,6 +82,7 @@ function getApp(env: IWorkerEnv, origin: string): Promise<Hono<IAppEnv>> {
     await driver.migrate()
     return createApp(driver, {
       blobStore: r2BlobStore(env.ATTACHMENTS),
+      buildSha: env.ACTA_BUILD_SHA,
       // Falls back to the origin of the request that warmed this isolate, so
       // a self-hosted deploy links back to itself with nothing configured.
       baseUrl: env.ACTA_BASE_URL ?? origin,
