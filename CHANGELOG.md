@@ -1,3 +1,19 @@
+# [1.19.0](https://github.com/nubisco/acta/compare/v1.18.2...v1.19.0) (2026-09-15)
+
+
+### Bug Fixes
+
+* **app:** people are addressable, automations are not ([1800b38](https://github.com/nubisco/acta/commit/1800b3856cbd6a5d020fd761096002c2f753a183))
+
+
+### Features
+
+* **api:** the reads and writes the interface had no way to reach ([165f12b](https://github.com/nubisco/acta/commit/165f12be0504e4a9350f810d48cee6ae106b23e1))
+* **app:** group settings by intent, and give rules an editor ([defacd4](https://github.com/nubisco/acta/commit/defacd481208aa594c6a19d81c6070ef92e5af16))
+* **app:** one overlay for commands and content ([4e16cc8](https://github.com/nubisco/acta/commit/4e16cc83d7ce0e887fb4c43fe4564f97cca0b7e9))
+* **app:** open Home on what is waiting for you ([0b09d39](https://github.com/nubisco/acta/commit/0b09d3918abc44c374e052462bca7980a5ea9bc8))
+* **app:** render Google Drive links as pills ([9d5da3d](https://github.com/nubisco/acta/commit/9d5da3d8adb77b55dfb6df0882a82571c77b077f))
+
 ## [1.18.2](https://github.com/nubisco/acta/compare/v1.18.1...v1.18.2) (2026-09-15)
 
 
