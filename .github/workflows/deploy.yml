@@ -127,6 +127,7 @@ jobs:
         # --var ACTA_BUILD_SHA is what lets GET /healthz answer "did my deploy
         # land?". Without it every instance reports "dev" and the endpoint
         # cannot tell a deploy that landed from one that silently did not.
-        run: pnpm -C server wrangler deploy --var ACTA_BUILD_SHA:${GITHUB_SHA::7}
+        working-directory: server
+        run: pnpm exec wrangler deploy --var ACTA_BUILD_SHA:${GITHUB_SHA::7}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
