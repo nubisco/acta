@@ -238,26 +238,34 @@ export const RefTypeahead = Extension.create({
  */
 function mentionItems(query: string): ISuggestionItem[] {
   const q = query.trim().toLowerCase()
-  return (useWorkspace().overview.value?.actors ?? [])
-    .filter((a) => a.kind !== 'system')
-    .filter(
-      (a) =>
-        !q ||
-        a.handle.toLowerCase().includes(q) ||
-        a.name.toLowerCase().includes(q),
-    )
-    .slice(0, 8)
-    .map((a) => ({
-      id: `actor:${a.handle}`,
-      label: a.name,
-      icon: a.kind === 'agent' ? 'robot' : 'user',
-      hint: `@${a.handle}`,
-      // [[@handle]], not @handle. A mention is a reference: extractRefs only
-      // sees the bracketed form, the reader only renders that as a mention,
-      // and only that lands in the link table. Plain @handle is prose that
-      // looks like a mention and notifies nobody.
-      apply: inserter(`[[@${a.handle}]] `),
-    }))
+  return (
+    (useWorkspace().overview.value?.actors ?? [])
+      // People only. Agent actors exist so that work arriving from outside has
+      // an author: a card from the marketing form reads "created by Contact
+      // Form" rather than naming whichever admin happened to hold the token.
+      // That is attribution, and it is not the same as being addressable.
+      // Nothing consumes a mention of a bot, so offering one only produces a
+      // notification aimed at something that cannot read it.
+      .filter((a) => a.kind === 'human')
+      .filter(
+        (a) =>
+          !q ||
+          a.handle.toLowerCase().includes(q) ||
+          a.name.toLowerCase().includes(q),
+      )
+      .slice(0, 8)
+      .map((a) => ({
+        id: `actor:${a.handle}`,
+        label: a.name,
+        icon: 'user',
+        hint: `@${a.handle}`,
+        // [[@handle]], not @handle. A mention is a reference: extractRefs only
+        // sees the bracketed form, the reader only renders that as a mention,
+        // and only that lands in the link table. Plain @handle is prose that
+        // looks like a mention and notifies nobody.
+        apply: inserter(`[[@${a.handle}]] `),
+      }))
+  )
 }
 
 export const MentionTypeahead = Extension.create({

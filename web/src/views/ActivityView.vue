@@ -4,7 +4,11 @@
 
     <component :is="filterBar.Outlet">
       <div class="activity-view__filters">
-        <ActorFilter v-model="actorFilter" label="Filter activity by person" />
+        <ActorFilter
+          v-model="actorFilter"
+          scope="acting"
+          label="Filter activity by person"
+        />
       </div>
     </component>
 

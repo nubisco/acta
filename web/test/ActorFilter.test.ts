@@ -23,17 +23,39 @@ vi.mock('@/stores/workspace', () => ({
   }),
 }))
 
-function render(modelValue: string[] = []) {
-  return mount(ActorFilter, { props: { modelValue } })
+function render(modelValue: string[] = [], scope?: 'assignable' | 'acting') {
+  return mount(ActorFilter, { props: { modelValue, scope } })
 }
 
 describe('ActorFilter', () => {
-  it('offers people and agents but not the system actor', () => {
-    // Acta acts on its own behalf constantly; filtering to it is noise.
+  /**
+   * The same avatars mean different things on different screens, and the
+   * component was offering one answer to both questions.
+   *
+   * Filtering a space filters by ASSIGNEE. An importer or a contact-form
+   * token cannot hold a card, so its avatar was a filter guaranteed to
+   * return nothing: a control that looks identical to the working ones and
+   * silently empties the board.
+   *
+   * Filtering activity filters by AUTHOR, where those same bots are among
+   * the busiest actors in the workspace and the whole point of the filter.
+   */
+  it('offers only people when the filter means "assigned to"', () => {
     const handles = render()
       .findAll('.people__one')
       .map((b) => b.attributes('aria-label'))
+    expect(handles).toHaveLength(2)
+    expect(handles.join(' ')).not.toContain('Importer')
+    expect(handles.join(' ')).not.toContain('Acta')
+  })
+
+  it('offers bots too when the filter means "done by"', () => {
+    // Acta acts on its own behalf constantly, so filtering to it is noise.
+    const handles = render([], 'acting')
+      .findAll('.people__one')
+      .map((b) => b.attributes('aria-label'))
     expect(handles).toHaveLength(3)
+    expect(handles.join(' ')).toContain('Importer')
     expect(handles.join(' ')).not.toContain('Acta')
   })
 
@@ -54,7 +76,7 @@ describe('ActorFilter', () => {
     const pressed = view
       .findAll('.people__one')
       .map((b) => b.attributes('aria-pressed'))
-    expect(pressed).toEqual(['false', 'true', 'false'])
+    expect(pressed).toEqual(['false', 'true'])
   })
 
   it('offers a way back to everyone only once something is selected', async () => {

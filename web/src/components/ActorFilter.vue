@@ -36,7 +36,23 @@ import { computed } from 'vue'
 import { useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 
-const props = defineProps<{ modelValue: string[]; label?: string }>()
+const props = defineProps<{
+  modelValue: string[]
+  label?: string
+  /**
+   * Which actors are worth offering, which is not the same question on every
+   * surface.
+   *
+   * `assignable` is people who can hold work: humans. An ingest token or a
+   * provider connection creates cards and can never be assigned one, so
+   * offering it as an assignee filter is offering a button that always
+   * returns nothing.
+   *
+   * `acting` is anyone who can appear as the author of an event, bots
+   * included, which is exactly what the activity feed is filtered by.
+   */
+  scope?: 'assignable' | 'acting'
+}>()
 const emit = defineEmits<{ 'update:modelValue': [value: string[]] }>()
 
 const ws = useWorkspace()
@@ -44,7 +60,11 @@ const label = computed(() => props.label ?? 'Filter by person')
 const selected = computed(() => props.modelValue)
 
 const actors = computed(() =>
-  (ws.overview.value?.actors ?? []).filter((a) => a.kind !== 'system'),
+  (ws.overview.value?.actors ?? []).filter((a) =>
+    (props.scope ?? 'assignable') === 'acting'
+      ? a.kind !== 'system'
+      : a.kind === 'human',
+  ),
 )
 
 function toggle(handle: string): void {
