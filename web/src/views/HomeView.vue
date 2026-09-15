@@ -4,6 +4,10 @@
       {{ ws.overview.value?.workspace.name ?? 'Workspace' }}
     </h1>
 
+    <!-- Before the spaces. What is mine is the question people open Home
+         with, and a grid of boards does not answer it. -->
+    <MyWorkPanel />
+
     <component :is="actions.Outlet">
       <NbButton
         size="sm"
@@ -126,22 +130,34 @@
       </template>
     </template>
 
-    <NbPanel v-if="recent.length > 0" class="home__activity">
-      <h2 class="type-heading-02">Recent activity</h2>
-      <ActivityList :events="recent" />
-    </NbPanel>
+    <!--
+      Activity used to be a twelve-row feed at the bottom of this page, which
+      is a whole nav destination reprinted underneath the thing it competes
+      with. Everything anyone did is rarely what a person came here for, so
+      what is left is the way through to it.
+    -->
+    <p v-if="spaces.length > 0" class="home__activity">
+      <NbButton
+        size="sm"
+        variant="ghost"
+        icon="activity"
+        :href="wpath('/activity')"
+      >
+        See everything happening in this workspace
+      </NbButton>
+    </p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useShellSlot, useToast } from '@nubisco/ui'
 import { api } from '@/api/client'
-import type { IEventRow, TOverviewSpace } from '@/types/api'
+import type { TOverviewSpace } from '@/types/api'
 import { chartColorFor, roleColor } from '@/lib/colors'
 import { humanise, useLoadState } from '@/lib/state'
 import { useUiState, useWorkspace } from '@/stores/workspace'
-import ActivityList from '@/components/ActivityList.vue'
+import MyWorkPanel from '@/components/MyWorkPanel.vue'
 import { wpath } from '@/lib/paths'
 // A filled star is the same glyph at a different weight, not a different
 // name. Icon props take the artwork as well as a name, so the two weights are
@@ -191,8 +207,6 @@ async function toggleStar(space: {
     })
   }
 }
-const recent = ref<IEventRow[]>([])
-
 function itemCount(space: TOverviewSpace): number {
   return space.lists.reduce((sum, l) => sum + l.items, 0)
 }
@@ -229,10 +243,7 @@ function doneCount(space: TOverviewSpace): number {
 }
 
 async function reload(): Promise<void> {
-  const result = await load.run(
-    Promise.all([ws.refresh(), api.activity({ limit: '12' })]),
-  )
-  if (result) recent.value = result[1].events
+  await load.run(ws.refresh())
 }
 
 void reload()
