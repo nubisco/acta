@@ -244,7 +244,13 @@
     @close="ui.itemModalKey.value = null"
   />
   <DocPreviewModal />
-  <NbCommandPalette placeholder="Search Acta..." />
+  <!-- One overlay for both questions: what can I do, and where is that
+       thing. The suggester is asked as you type, debounced and race-guarded
+       by the component itself. -->
+  <NbCommandPalette
+    placeholder="Search Acta, or type a command..."
+    :suggest="suggestFromWorkspace"
+  />
   <WelcomeModal
     v-if="welcomeOpen && ws.me.value"
     :open="welcomeOpen"
@@ -285,6 +291,7 @@ import NewSpaceModal from '@/components/NewSpaceModal.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 import WelcomeModal from '@/components/WelcomeModal.vue'
 import { wpath } from '@/lib/paths'
+import { createPaletteSuggester } from '@/lib/paletteSearch'
 
 const route = useRoute()
 const router = useRouter()
@@ -292,6 +299,10 @@ const ws = useWorkspace()
 const inspector = useInspector()
 const ui = useUiState()
 const palette = useCommandPalette()
+const suggestFromWorkspace = createPaletteSuggester({
+  router,
+  openItem: (key) => inspector.open(key),
+})
 const theme = useTheme()
 // The same three choices the welcome modal offers, worded the same way, so
 // the two places cannot drift into describing different things.

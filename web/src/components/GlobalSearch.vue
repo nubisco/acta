@@ -88,7 +88,7 @@ import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import type { ISearchResult } from '@/types/api'
 import { useInspector } from '@/stores/workspace'
-import { wpath } from '@/lib/paths'
+import { openHit as navigateToHit } from '@/lib/paletteSearch'
 
 const router = useRouter()
 const inspector = useInspector()
@@ -148,12 +148,11 @@ function iconFor(type: string): string {
   return 'kanban'
 }
 
+// Shared with the command palette, which opens the same hits: two copies of
+// "what does clicking this result do" drift the moment one is changed.
 function openHit(hit: ISearchResult): void {
   open.value = false
-  if (hit.type === 'doc') void router.push(wpath(`/docs/${hit.ref}`))
-  else if (hit.type === 'item') inspector.open(hit.ref)
-  // Comment hits carry the owning item key as their title.
-  else inspector.open(hit.title)
+  navigateToHit(hit, router, (key) => inspector.open(key))
 }
 
 function goToSearchPage(): void {

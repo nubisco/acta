@@ -116,8 +116,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@nubisco/ui':
-        specifier: ^5.0.0
-        version: 5.0.0(esbuild@0.28.1)(pixi.js@8.20.1)(rolldown@1.2.7)(rollup@4.63.1)(unplugin-fonts@2.0.0(esbuild@0.28.1)(postcss@8.5.28)(rolldown@1.2.7)(rollup@4.63.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(sass-embedded@1.104.0)(sass@1.104.0)(yaml@2.9.0)))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(sass-embedded@1.104.0)(sass@1.104.0)(yaml@2.9.0))(vue-i18n@11.4.10(vue@3.5.42(typescript@5.9.3)))(vue@3.5.42(typescript@5.9.3))
+        specifier: ^5.1.0
+        version: 5.1.0(esbuild@0.28.1)(pixi.js@8.20.1)(rolldown@1.2.7)(rollup@4.63.1)(unplugin-fonts@2.0.0(esbuild@0.28.1)(postcss@8.5.28)(rolldown@1.2.7)(rollup@4.63.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(sass-embedded@1.104.0)(sass@1.104.0)(yaml@2.9.0)))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(sass-embedded@1.104.0)(sass@1.104.0)(yaml@2.9.0))(vue-i18n@11.4.10(vue@3.5.42(typescript@5.9.3)))(vue@3.5.42(typescript@5.9.3))
       '@tiptap/core':
         specifier: ^2.27.3
         version: 2.27.3(@tiptap/pm@2.27.3)
@@ -1070,8 +1070,8 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@nubisco/ui@5.0.0':
-    resolution: {integrity: sha512-41u9azfVgW8vP+EHSXV04v2vk/yMFbh0gfl85Uqj2gXxF0VW/KtG1Nhdyh4gOeRT1w0KKbCyi498i9HlJPvn9A==}
+  '@nubisco/ui@5.1.0':
+    resolution: {integrity: sha512-0RFUc4GX2f9TXOCT3hMc3814iSymxCNFVAvPu9WQe5AeUqa6j+D88vClR4K0zRLUIlJ61CzW56cHK4m4UeOMeQ==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       pixi.js: ^8.0.0
@@ -5323,7 +5323,7 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.3
 
-  '@nubisco/ui@5.0.0(esbuild@0.28.1)(pixi.js@8.20.1)(rolldown@1.2.7)(rollup@4.63.1)(unplugin-fonts@2.0.0(esbuild@0.28.1)(postcss@8.5.28)(rolldown@1.2.7)(rollup@4.63.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(sass-embedded@1.104.0)(sass@1.104.0)(yaml@2.9.0)))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(sass-embedded@1.104.0)(sass@1.104.0)(yaml@2.9.0))(vue-i18n@11.4.10(vue@3.5.42(typescript@5.9.3)))(vue@3.5.42(typescript@5.9.3))':
+  '@nubisco/ui@5.1.0(esbuild@0.28.1)(pixi.js@8.20.1)(rolldown@1.2.7)(rollup@4.63.1)(unplugin-fonts@2.0.0(esbuild@0.28.1)(postcss@8.5.28)(rolldown@1.2.7)(rollup@4.63.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(sass-embedded@1.104.0)(sass@1.104.0)(yaml@2.9.0)))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(sass-embedded@1.104.0)(sass@1.104.0)(yaml@2.9.0))(vue-i18n@11.4.10(vue@3.5.42(typescript@5.9.3)))(vue@3.5.42(typescript@5.9.3))':
     dependencies:
       magic-string: 1.2.3
       pixi.js: 8.20.1
