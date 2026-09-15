@@ -4,6 +4,13 @@ export const SCHEMA_SQL = `
 -- Acta schema (design-spec §1). SQLite dialect, D1-portable.
 -- Every entity row carries workspace_id (multi-tenant readiness).
 
+-- What shape this database is already in. See SCHEMA_FINGERPRINT.
+CREATE TABLE IF NOT EXISTS schema_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  fingerprint TEXT NOT NULL,
+  applied_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS workspace (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

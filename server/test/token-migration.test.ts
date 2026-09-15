@@ -141,3 +141,54 @@ describe('auth_token personal-kind migration', () => {
     expect(rows[0].id).toBe('p1')
   })
 })
+
+/**
+ * The fast path.
+ *
+ * Migrating ran 66 statements on every cold isolate even when the database
+ * already matched. On Workers that is 66 sequential D1 round trips before the
+ * first byte: 4.8 seconds of wall time for 20 milliseconds of CPU, measured in
+ * production, which is long enough that an MCP client's five-second probe gave
+ * up and called the server unreachable.
+ */
+describe('migration fast path', () => {
+  it('records what it applied, and recognises it next time', async () => {
+    const { SCHEMA_FINGERPRINT } = await import('../src/db')
+    const path = await legacyDb()
+    const db = (await openDb(path)) as BunSqliteDriver
+    const rows = await db.query<{ fingerprint: string }>(
+      'SELECT fingerprint FROM schema_state WHERE id = 1',
+    )
+    expect(rows[0].fingerprint).toBe(SCHEMA_FINGERPRINT)
+  })
+
+  // The guard must not skip a database this build would change, or a schema
+  // change would silently never reach production.
+  it('migrates again when the fingerprint does not match this build', async () => {
+    const path = await legacyDb()
+    const first = (await openDb(path)) as BunSqliteDriver
+    await first.run(
+      "UPDATE schema_state SET fingerprint = 'from-an-older-build' WHERE id = 1",
+    )
+    // A table this build creates, dropped behind the fast path's back.
+    await first.run('DROP TABLE oauth_client')
+
+    const second = (await openDb(path)) as BunSqliteDriver
+    const back = await second.query(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'oauth_client'",
+    )
+    expect(back).toHaveLength(1)
+  })
+
+  it('does not skip a database that has never been migrated', async () => {
+    const path = await legacyDb()
+    const db = (await openDb(path)) as BunSqliteDriver
+    // The legacy fixture has no schema_state at all; the tables must exist.
+    for (const t of ['oauth_client', 'oauth_token', 'notification']) {
+      const rows = await db.query(
+        `SELECT name FROM sqlite_master WHERE type = 'table' AND name = '${t}'`,
+      )
+      expect(`${t}: ${rows.length}`).toBe(`${t}: 1`)
+    }
+  })
+})

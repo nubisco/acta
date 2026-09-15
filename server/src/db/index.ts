@@ -58,6 +58,40 @@ export function schemaStatements(): string[] {
 // bun:sqlite
 // ---------------------------------------------------------------------------
 
+/**
+ * What this build's migration would produce, as one short string.
+ *
+ * Migrating cost 66 sequential statements on every cold isolate, even when the
+ * database was already exactly right. On Workers that is 66 D1 round trips
+ * before the first byte of a response: measured at 4.8 seconds of wall time
+ * for 20 milliseconds of CPU, which is long enough that an MCP client's
+ * five-second probe gave up and reported the server unreachable. Every cold
+ * request paid it; the probe simply had a deadline.
+ *
+ * So a database records the fingerprint of the migration that produced it, and
+ * a matching fingerprint means there is nothing to do. Derived from the
+ * migration inputs rather than hand-numbered, because a version constant is
+ * one someone forgets to bump, and the failure mode there is a migration that
+ * silently never runs.
+ */
+export const SCHEMA_FINGERPRINT: string = (() => {
+  const source = [
+    SCHEMA_SQL,
+    ...RENAMES,
+    ...ADDITIVE_COLUMNS,
+    LINK_REBUILD.detect,
+    TOKEN_REBUILD.detect,
+    FTS_COLUMN_RENAME.detect,
+  ].join('\u0000')
+  // FNV-1a. Not a security hash: it only needs to change when the input does.
+  let h = 0x811c9dc5
+  for (let i = 0; i < source.length; i++) {
+    h ^= source.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return `${h.toString(16)}-${source.length.toString(36)}`
+})()
+
 export class BunSqliteDriver implements ISqlDriver {
   private db: import('bun:sqlite').Database
   readonly supportsFts = true
@@ -79,6 +113,7 @@ export class BunSqliteDriver implements ISqlDriver {
   }
 
   migrate(): void {
+    if (this.alreadyMigrated()) return
     // Before the schema, or CREATE IF NOT EXISTS would make an empty `space`
     // beside a `space` holding every row.
     for (const statement of RENAMES) {
@@ -99,6 +134,36 @@ export class BunSqliteDriver implements ISqlDriver {
         if (!String(err).includes('duplicate column')) throw err
       }
     }
+    // Last, so a migration that throws part-way leaves no claim that it
+    // finished and the next boot does the whole thing again.
+    this.stampMigrated()
+  }
+
+  /**
+   * One query instead of sixty-six, when there is nothing to do.
+   *
+   * A missing table or a mismatched fingerprint both mean "migrate": the first
+   * is a new database, the second is this build changing the schema.
+   */
+  private alreadyMigrated(): boolean {
+    try {
+      const rows = this.db
+        .query('SELECT fingerprint FROM schema_state WHERE id = 1')
+        .all() as { fingerprint: string }[]
+      return rows[0]?.fingerprint === SCHEMA_FINGERPRINT
+    } catch {
+      return false
+    }
+  }
+
+  private stampMigrated(): void {
+    this.db
+      .query(
+        `INSERT INTO schema_state (id, fingerprint, applied_at) VALUES (1, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET fingerprint = excluded.fingerprint,
+                                         applied_at = excluded.applied_at`,
+      )
+      .run(SCHEMA_FINGERPRINT, Date.now())
   }
 
   /** See LINK_REBUILD: a CHECK constraint cannot be altered in place. */
@@ -215,6 +280,10 @@ export class D1Driver implements ISqlDriver {
   /** Idempotent, lazy: runs once per isolate. */
   async migrate(): Promise<void> {
     if (this.migrated) return
+    if (await this.alreadyMigrated()) {
+      this.migrated = true
+      return
+    }
     // Before the schema, or CREATE IF NOT EXISTS would make an empty `space`
     // beside a `space` holding every row.
     for (const statement of RENAMES) {
@@ -246,7 +315,32 @@ export class D1Driver implements ISqlDriver {
         if (!String(err).includes('duplicate column')) throw err
       }
     }
+    await this.stampMigrated()
     this.migrated = true
+  }
+
+  /** See the bun driver: one query instead of sixty-six when nothing changed. */
+  private async alreadyMigrated(): Promise<boolean> {
+    try {
+      const res = await this.db
+        .prepare('SELECT fingerprint FROM schema_state WHERE id = 1')
+        .all()
+      const row = (res.results ?? [])[0] as { fingerprint?: string } | undefined
+      return row?.fingerprint === SCHEMA_FINGERPRINT
+    } catch {
+      return false
+    }
+  }
+
+  private async stampMigrated(): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO schema_state (id, fingerprint, applied_at) VALUES (1, ?1, ?2)
+           ON CONFLICT(id) DO UPDATE SET fingerprint = excluded.fingerprint,
+                                         applied_at = excluded.applied_at`,
+      )
+      .bind(SCHEMA_FINGERPRINT, Date.now())
+      .run()
   }
 
   /** See LINK_REBUILD: a CHECK constraint cannot be altered in place. */

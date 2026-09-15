@@ -117,22 +117,40 @@ export async function createApp(
       200,
       OAUTH_CORS,
     )
-  app.get('/.well-known/oauth-protected-resource/mcp', (c) =>
+  const prMeta = (c: {
+    req: { url: string }
+    json: (b: unknown, s?: number, h?: Record<string, string>) => Response
+  }) =>
     c.json(
       protectedResourceMetadata(new URL(c.req.url).origin),
       200,
       OAUTH_CORS,
-    ),
-  )
-  app.get('/.well-known/oauth-protected-resource', (c) =>
-    c.json(
-      protectedResourceMetadata(new URL(c.req.url).origin),
-      200,
-      OAUTH_CORS,
-    ),
-  )
+    )
+
+  /**
+   * Both the plain and the path-inserted spellings.
+   *
+   * RFC 8414 builds the metadata path by inserting .well-known between the
+   * issuer's host and its path, so a client discovering the resource
+   * https://host/mcp asks for /.well-known/oauth-authorization-server/mcp as
+   * well as the bare path, and tries the OpenID spelling of both. Clients
+   * differ in which they try first and several try all of them.
+   *
+   * Answering only the bare path is what broke the claude.ai connector: the
+   * path-inserted probes fell through to the SPA, which redirected them into
+   * the sign-in flow, so the client followed a 302 into an HTML page instead
+   * of reading metadata, and reported that it could not reach the server at
+   * all. Our issuer has no path component, so every spelling describes the
+   * same server and returns the same document.
+   */
   app.get('/.well-known/oauth-authorization-server', asMeta)
+  app.get('/.well-known/oauth-authorization-server/*', asMeta)
   app.get('/.well-known/openid-configuration', asMeta)
+  app.get('/.well-known/openid-configuration/*', asMeta)
+  app.get('/mcp/.well-known/oauth-authorization-server', asMeta)
+  app.get('/.well-known/oauth-protected-resource', prMeta)
+  app.get('/.well-known/oauth-protected-resource/*', prMeta)
+  app.get('/mcp/.well-known/oauth-protected-resource', prMeta)
   app.route('/oauth', oauthRoutes())
 
   // Two provider modes, one runtime. OIDC wins when both are configured: it
@@ -177,6 +195,40 @@ export async function createApp(
   app.use('/api/v1/*', requireAuth())
   app.route('/api/v1', apiRoutes(store))
 
+  /**
+   * CORS for the MCP endpoint.
+   *
+   * A connector UI runs in a browser, so before it ever sees the 401 it sends
+   * a preflight. That preflight cannot carry credentials and must not be
+   * authenticated: answering it with 401 and no CORS headers fails the request
+   * at the network layer, which is why a connector reported that it could not
+   * even connect, let alone work out how to sign in.
+   *
+   * Exposing www-authenticate matters just as much. A browser cannot read a
+   * response header unless it is listed here, so without it the RFC 9728
+   * pointer is present, correct and invisible to the only kind of client that
+   * needs it.
+   */
+  const MCP_CORS: Record<string, string> = {
+    'access-control-allow-origin': '*',
+    'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
+    'access-control-allow-headers':
+      'Content-Type, Authorization, MCP-Protocol-Version, Mcp-Session-Id, Last-Event-ID',
+    'access-control-expose-headers':
+      'WWW-Authenticate, MCP-Protocol-Version, Mcp-Session-Id',
+  }
+  app.options(
+    '/mcp',
+    () =>
+      new Response(null, {
+        status: 204,
+        headers: { ...MCP_CORS, 'access-control-max-age': '86400' },
+      }),
+  )
+  app.use('/mcp', async (c, next) => {
+    await next()
+    for (const [k, v] of Object.entries(MCP_CORS)) c.res.headers.set(k, v)
+  })
   app.use('/mcp', requireAuth({ resourceMetadata: true }))
   app.route('/mcp', mcpRoutes(store))
 
@@ -205,6 +257,14 @@ export async function createApp(
        * is a real choice to present. `error` is exempt or a failed sign-in
        * would bounce straight back out and loop.
        */
+      /**
+       * A machine-readable discovery path must never be answered with a
+       * human sign-in redirect. Anything under /.well-known that we do not
+       * serve is simply absent, so a client can rule it out and move on
+       * rather than following a 302 into a login page.
+       */
+      if (path.startsWith('/.well-known/')) return c.notFound()
+
       const signedOut = !getCookie(c as never, SESSION_COOKIE)
       if (
         ssoRuntime &&

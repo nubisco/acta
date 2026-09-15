@@ -562,3 +562,125 @@ describe('sign-in return path', () => {
     expect(safeReturnPath(undefined)).toBeNull()
   })
 })
+
+/**
+ * CORS on the MCP endpoint.
+ *
+ * A connector UI runs in a browser. Without a preflight it never reaches the
+ * 401, and without www-authenticate being exposed it cannot read the pointer
+ * even when it does. Both are invisible to curl and to every CLI client,
+ * which is exactly why they were missed.
+ */
+describe('mcp cors', () => {
+  it('answers the preflight without demanding credentials', async () => {
+    const res = await app.request('https://acta.test/mcp', {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://claude.ai',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type,authorization',
+      },
+    })
+    expect(res.status).toBe(204)
+    expect(res.headers.get('access-control-allow-origin')).toBe('*')
+    expect(res.headers.get('access-control-allow-headers')).toContain(
+      'Authorization',
+    )
+  })
+
+  it('exposes www-authenticate on the 401, or a browser cannot read it', async () => {
+    const res = await app.request('https://acta.test/mcp', {
+      method: 'POST',
+      headers: {
+        origin: 'https://claude.ai',
+        'content-type': 'application/json',
+      },
+      body: '{}',
+    })
+    expect(res.status).toBe(401)
+    expect(res.headers.get('access-control-allow-origin')).toBe('*')
+    expect(res.headers.get('access-control-expose-headers')).toContain(
+      'WWW-Authenticate',
+    )
+    expect(res.headers.get('www-authenticate')).toContain('resource_metadata=')
+  })
+
+  it('keeps the headers on a successful call too', async () => {
+    const id = await register()
+    const code = await approve(id, await s256Challenge(VERIFIER))
+    const pair = (await (
+      await tokenReq({
+        grant_type: 'authorization_code',
+        code,
+        client_id: id,
+        redirect_uri: REDIRECT,
+        code_verifier: VERIFIER,
+      })
+    ).json()) as { access_token: string }
+
+    const res = await app.request('https://acta.test/mcp', {
+      method: 'POST',
+      headers: {
+        origin: 'https://claude.ai',
+        'content-type': 'application/json',
+        authorization: `Bearer ${pair.access_token}`,
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('access-control-allow-origin')).toBe('*')
+  })
+})
+
+/**
+ * The spellings a client actually asks for.
+ *
+ * RFC 8414 inserts .well-known between the issuer's host and the resource's
+ * path, so discovering https://host/mcp means asking for
+ * /.well-known/oauth-authorization-server/mcp as well as the bare path, in
+ * both the OAuth and OpenID spellings. Serving only the bare path is what
+ * broke the claude.ai connector: the other probes fell through to the SPA and
+ * were answered with a redirect into the sign-in flow, so the client followed
+ * a 302 into HTML and gave up before it ever reached the metadata it could
+ * read. Every CLI client happened to ask for the one spelling that worked.
+ */
+describe('discovery spellings', () => {
+  const AS = [
+    '/.well-known/oauth-authorization-server',
+    '/.well-known/oauth-authorization-server/mcp',
+    '/.well-known/openid-configuration',
+    '/.well-known/openid-configuration/mcp',
+    '/mcp/.well-known/oauth-authorization-server',
+  ]
+  const PR = [
+    '/.well-known/oauth-protected-resource',
+    '/.well-known/oauth-protected-resource/mcp',
+    '/mcp/.well-known/oauth-protected-resource',
+  ]
+
+  it('serves the authorization server at every spelling', async () => {
+    for (const path of AS) {
+      const res = await app.request(`https://acta.test${path}`)
+      expect(`${path} -> ${res.status}`).toBe(`${path} -> 200`)
+      expect(await res.json()).toMatchObject({ issuer: 'https://acta.test' })
+    }
+  })
+
+  it('serves the protected resource at every spelling', async () => {
+    for (const path of PR) {
+      const res = await app.request(`https://acta.test${path}`)
+      expect(`${path} -> ${res.status}`).toBe(`${path} -> 200`)
+      expect(await res.json()).toMatchObject({
+        resource: 'https://acta.test/mcp',
+      })
+    }
+  })
+
+  // A discovery probe that cannot be served must be absent, not redirected
+  // somewhere a machine will try to parse as metadata.
+  it('never answers an unknown well-known path with a sign-in redirect', async () => {
+    const res = await app.request('https://acta.test/.well-known/nonsense')
+    expect(res.status).toBe(404)
+    expect(res.headers.get('location')).toBeNull()
+  })
+})
