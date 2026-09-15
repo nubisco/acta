@@ -106,13 +106,29 @@ Two agents editing different sections of the same page both succeed.
   "name": "Triage security reports",
   "trigger": "item.created",
   "condition": "space=ENG label=security",
-  "action": "assign"
+  "action": { "kind": "assign", "actor": "daniela" }
 }
 ```
 
-Triggers are event patterns. Conditions use the embed-query grammar
-(`space=X list=Y label=Z assignee=H state=open|done|archived`). Actions are
-`move_item`, `apply_label`, `assign`, `comment`, `complete` or `call_webhook`.
+An action is an object, not a name: its `kind` decides which other field it
+carries. `move_item` takes `list` (and optionally `space`), `apply_label`
+takes `label`, `assign` takes `actor`, `comment` takes `body`,
+`call_webhook` takes `url`, and `complete` takes nothing.
+
+Triggers are event patterns matched against event verbs, and only item events
+ever reach the engine. A rule triggered on `doc.created` or `space.updated`
+is accepted and stored, and will never fire.
+
+Conditions use the embed-query grammar
+(`space=X list=Y label=Z assignee=H state=open|done|archived`). A condition
+that does not parse is refused rather than stored, because one that matched
+nothing would leave a rule reading as active while quietly doing nothing.
+
+`update` patches in place. Send only the fields you are changing, and the rest
+are left alone. `trigger`, `condition` and `action` can all be changed without
+recreating the rule, which keeps its id and its history intact. Passing
+`"condition": null` clears the condition, which is deliberately different from
+omitting the field.
 
 Rule actions are attributed to the system actor with `caused_by` chaining, and
 never re-trigger rules, so a pair of rules cannot loop.

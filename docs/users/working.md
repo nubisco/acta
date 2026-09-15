@@ -47,7 +47,7 @@ The **Plan** section is where a card takes its place in the sequence:
 
 - **Blocked by** and **Blocks**: pick a relation, pick a card. Cycles are
   refused, with the two cards named.
-- **Size**: a unitless estimate. It feeds the critical path; a card with no
+- **Size**: a unitless estimate. It feeds the critical path. A card with no
   size counts as 1.
 - **Milestone**: marks a card as a point worth reaching.
 
@@ -94,11 +94,30 @@ The bell shows what you were mentioned in, assigned to, or are involved in.
 Involvement means you commented, were assigned, or created the thing.
 
 Browser notifications must be granted from a real click, so the first time you
-enable them Acta asks. Without permission the bell still works; you simply have
+enable them Acta asks. Without permission the bell still works, you simply have
 to look at it.
 
 ## Settings
 
-**Members** is where people are invited and agent tokens are minted.
-**Labels**, **Webhooks**, **Rules** and **Ingest** are administrative.
-**Access tokens** is not: it holds _your_ tokens, and every member has it.
+Four sections, grouped by what you are trying to do.
+
+**People** is who can sign in. Only people can be assigned work or mentioned.
+
+**Labels** is the vocabulary your cards are filed under.
+
+**Automation** is everything that happens without a person, arranged by which
+way the work flows: **ingest endpoints** take a URL you paste into a website
+form, **connections** let a provider like GitHub push signed events in,
+**webhooks** post events back out to your systems, **rules** are Acta reacting
+to itself, and **agent tokens** are credentials for a script that acts under
+its own name.
+
+**Your account** is the only one that is not administrative, and every member
+has it. It holds your own **access tokens**, which let a tool act as _you_
+rather than as a bot, and your **connected applications**, which is where you
+disconnect something like Claude that you signed in through.
+
+The distinction worth holding on to is whose name ends up in the history. An
+access token is you. An agent token, an ingest endpoint and a connection are
+each their own identity, which is why a card raised by your contact form says
+it came from the contact form rather than from whoever set it up.

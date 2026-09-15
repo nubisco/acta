@@ -32,8 +32,8 @@ sender before other people use the instance, or move to a provider.
 ### Seeding the first member
 
 Nobody can sign in until an actor with their email exists. Set
-`ACTA_ADMIN_EMAIL` on first boot; that person can then invite everyone else
-from **Settings → Members**.
+`ACTA_ADMIN_EMAIL` on first boot, and that person can then invite everyone else
+from **Settings → People**.
 
 ## OpenID Connect
 
@@ -153,11 +153,16 @@ configured, OIDC wins.
 ## Access tokens
 
 Separately from signing in, a member can mint **personal access tokens** from
-**Settings → Access tokens**. These act as that person, with their role, for
+**Settings → Your account**. These act as that person, with their role, for
 the API and [the MCP endpoint](/developers/mcp). They never carry administrator rights
 and cannot mint further tokens, so administration always requires a real
 session.
 
 **Agent tokens** are different: an administrator mints them from
-**Settings → Members**, and each gets its own actor, so an agent's work is
+**Settings → Automation**, and each gets its own actor, so an agent's work is
 attributed to the agent rather than to a person.
+
+**Connected applications** are the third kind, and the only one nobody pastes
+anywhere: a connector that signed in through OAuth holds a grant rather than a
+token. Those are listed under **Settings → Your account** and can be revoked
+per application, which cuts every grant that application holds at once.

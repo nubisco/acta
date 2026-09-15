@@ -39,7 +39,7 @@ matters because it decides whose name ends up in the history.
 
 ### Personal access tokens
 
-Minted by any member from **Settings → Access tokens**, shown once, stored
+Minted by any member from **Settings → Your account**, shown once, stored
 hashed, revocable instantly. They act as **you**, with your role, and the
 audit trail attributes the work to you.
 
@@ -57,7 +57,7 @@ what lets you retire an old one with confidence.
 
 ### Agent tokens
 
-Minted by an administrator from **Settings → Members**. Each gets its own
+Minted by an administrator from **Settings → Automation**. Each gets its own
 actor with its own handle, optionally marked as acting on behalf of a person.
 
 This is the right choice for something running on its own: a scheduled job, a
@@ -74,8 +74,14 @@ connection acts as you.
 
 There is nothing to configure. Add `https://acta.example.com/mcp` as a custom
 connector and the rest is automatic. Access tokens last an hour and refresh
-themselves; a connection carries read and write and, like a personal token,
+themselves. A connection carries read and write and, like a personal token,
 never administration.
+
+Connections are listed under **Settings → Your account**, as **Connected
+applications**, and revoking one cuts every grant that application holds,
+including any it opened by being authorised a second time. Its refresh tokens
+stop working too, so the revoke holds rather than lasting until the current
+hour is up.
 
 ## What is deliberately absent
 

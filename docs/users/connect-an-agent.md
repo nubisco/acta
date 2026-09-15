@@ -3,12 +3,12 @@
 ## Get a token
 
 1. Sign in to Acta.
-2. **Settings → Access tokens**.
+2. **Settings → Your account**, under **Access tokens**.
 3. Give it a label you will recognise later (`laptop`, `CI`, `Claude Code`) and
    choose **Read and write** or **Read only**.
 4. Copy it. It is shown once.
 
-![The Access tokens tab in Settings](/media/access-tokens.jpg)
+![Access tokens under Your account in Settings](/media/access-tokens.jpg)
 
 Read-only is worth considering for anything exploratory. An agent that only
 needs to answer questions about your plan has no reason to hold a token that
@@ -53,7 +53,12 @@ These do not take a pasted token. Add a custom connector pointing at
 consent screen instead. Nothing to paste, nothing to configure.
 
 The connection acts as you, with your role, and appears in the audit trail
-under your name. Revoke it from **Settings → Access tokens** like any other.
+under your name.
+
+To disconnect it, go to **Settings → Your account** and find it under
+**Connected applications**. Revoking cuts every session that connector holds
+at once, including any it opened by re-authorising, and it cannot mint a
+replacement afterwards.
 
 ## Any other client
 
@@ -88,7 +93,7 @@ curl -s https://acta.example.com/mcp \
 instance. Check it is the whole string including the `acta_pat_` prefix.
 
 **A write tool returns an error mentioning the write scope.** The token was
-created read-only. Mint a new one; scopes are fixed at creation.
+created read-only. Mint a new one, because scopes are fixed at creation.
 
 **403 on something administrative.** Expected. Personal tokens never carry
 administrator rights. Use the web app.

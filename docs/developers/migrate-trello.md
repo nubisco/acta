@@ -52,7 +52,7 @@ The keys are Trello usernames, the values are Acta handles. Members you leave
 out are skipped and reported, rather than silently dropped: assignments to
 them simply do not appear, and the report tells you how many.
 
-Create the Acta members first, from **Settings → Members**.
+Create the Acta members first, from **Settings → People**.
 
 ## 3. Choose the space keys
 
@@ -101,11 +101,11 @@ bun src/trello-import.ts \
 | `--fetch <boardId ...>`     | Fetch live instead, using `TRELLO_KEY`/`TRELLO_TOKEN`.                     |
 | `--key KEY=file.json`       | Space key for a board. Repeatable.                                         |
 | `--map member-map.json`     | Trello username to Acta handle.                                            |
-| `--dry-run`                 | Print the plan and reconciliation; write nothing.                          |
+| `--dry-run`                 | Print the plan and reconciliation, write nothing.                          |
 | `--done-as-archived [KEYS]` | Archive cards that land in a done list, for all boards or the listed keys. |
 | `--allow-missing-comments`  | Proceed when fewer comments are found than the card badges claim.          |
 | `--out report.json`         | Write the reconciliation report.                                           |
-| `--fix-comments`            | Imports nothing; rewrites comments imported before provenance existed.     |
+| `--fix-comments`            | Imports nothing, rewrites comments imported before provenance existed.     |
 
 ## What comes across
 
@@ -145,7 +145,7 @@ have decided you can live with it.
 2. Spot-check attachments actually open.
 3. Check the report for skipped members and any other skips.
 4. **Then** make Trello read-only, rather than deleting anything. Keep the
-   exports; they cost nothing and settle arguments.
+   exports, because they cost nothing and settle arguments.
 
 If you are also [migrating Confluence](/developers/migrate-confluence), do it after this
 one and pass the Trello map, so that page references to Trello cards are
