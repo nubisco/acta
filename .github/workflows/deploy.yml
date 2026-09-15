@@ -107,9 +107,9 @@ jobs:
         with:
           ref: master
 
+      # No `version:` here on purpose. package.json pins packageManager, and
+      # naming a version as well makes the action refuse both.
       - uses: pnpm/action-setup@v6
-        with:
-          version: 10
 
       - uses: actions/setup-node@v6
         with:
