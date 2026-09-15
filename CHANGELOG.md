@@ -1,3 +1,10 @@
+## [1.17.1](https://github.com/nubisco/acta/compare/v1.17.0...v1.17.1) (2026-09-15)
+
+
+### Performance Improvements
+
+* **db:** stop re-running the whole migration on every cold start ([c44acd7](https://github.com/nubisco/acta/commit/c44acd7e011d0a48f5a15b2abe973f12ee6bc921))
+
 # [1.17.0](https://github.com/nubisco/acta/compare/v1.16.0...v1.17.0) (2026-09-15)
 
 
