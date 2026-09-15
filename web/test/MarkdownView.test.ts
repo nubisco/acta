@@ -69,3 +69,53 @@ describe('MarkdownView', () => {
     expect(view.text()).toContain('onerror')
   })
 })
+
+/**
+ * Google Drive links, as pills.
+ *
+ * A pasted Drive URL is forty-odd characters of noise in the middle of a
+ * sentence. The pill needs no Google account and no API call, because the
+ * URL already says what kind of file it points at.
+ */
+describe('MarkdownView Drive links', () => {
+  it('turns a pasted Drive URL into a pill that opens in a new tab', () => {
+    const html = render(
+      'Notes: https://docs.google.com/document/d/1AbC/edit',
+    ).html()
+    expect(html).toContain('md__drive')
+    expect(html).toContain('data-drive-kind="document"')
+    expect(html).toContain('data-drive-id="1AbC"')
+    expect(html).toContain('Google Doc')
+    // A document opened from a ticket belongs beside it, not instead of it.
+    expect(html).toContain('target="_blank"')
+    // Without this, the opened tab can reach back through window.opener.
+    expect(html).toContain('rel="noopener noreferrer"')
+  })
+
+  it('keeps the words somebody wrote', () => {
+    // "[the Q3 plan](url)" already says what the link is. Replacing that with
+    // "Google Sheet" would throw away what the author told the reader.
+    const html = render(
+      '[the Q3 plan](https://docs.google.com/spreadsheets/d/1S/edit)',
+    ).html()
+    expect(html).toContain('the Q3 plan')
+    expect(html).not.toContain('md__drive')
+  })
+
+  it('leaves other links as links', () => {
+    const html = render('https://github.com/nubisco/acta').html()
+    expect(html).not.toContain('md__drive')
+    expect(html).toContain('href="https://github.com/nubisco/acta"')
+  })
+
+  it('colours a sheet differently from a doc', () => {
+    // The colour is the whole reason the pill is readable at a glance: people
+    // recognise a Sheet by its green before they read the word.
+    const doc = render('https://docs.google.com/document/d/1A/edit').html()
+    const sheet = render(
+      'https://docs.google.com/spreadsheets/d/1B/edit',
+    ).html()
+    expect(doc).toContain('#1a73e8')
+    expect(sheet).toContain('#0f9d58')
+  })
+})

@@ -45,6 +45,12 @@ import { useRefCards } from '@/stores/refs'
 import { chartColorFor } from '@/lib/colors'
 import { DOC_NAV_KEY } from '@/lib/keys'
 import { wpath } from '@/lib/paths'
+import {
+  DRIVE_COLORS,
+  DRIVE_LABELS,
+  parseDriveUrl,
+  type TDriveKind,
+} from '@/lib/drive'
 
 const props = defineProps<{
   source: string
@@ -177,6 +183,65 @@ function renderRefs(html: string): string {
   )
 }
 
+/**
+ * Google Drive links become pills.
+ *
+ * Applied to the rendered HTML rather than the markdown source, so it catches
+ * both `[text](url)` links and bare URLs that linkify turned into anchors,
+ * without having to re-implement either.
+ *
+ * A link whose text is not the URL is left alone: somebody who wrote
+ * "[the Q3 plan](https://docs.google.com/...)" has already said what it is,
+ * and replacing their words with "Google Doc" would lose information. Only
+ * the naked URL, which reads as forty characters of noise, is worth
+ * replacing.
+ */
+function renderDriveLinks(html: string): string {
+  return html.replace(
+    /<a href="([^"]+)"([^>]*)>([^<]*)<\/a>/g,
+    (raw, href: string, attrs: string, text: string) => {
+      const link = parseDriveUrl(decodeHtml(href))
+      if (!link) return raw
+      const bare = decodeHtml(text).replace(/\/$/, '')
+      const target = decodeHtml(href).replace(/\/$/, '')
+      if (bare !== target) return raw
+      const label = DRIVE_LABELS[link.kind]
+      return (
+        `<a class="md__drive" href="${esc(decodeHtml(href))}"` +
+        ` target="_blank" rel="noopener noreferrer"` +
+        ` data-drive-kind="${link.kind}" data-drive-id="${esc(link.id)}"` +
+        ` title="Opens ${label} in a new tab"${attrs}>` +
+        `${driveGlyph(link.kind)}<span class="md__drive-label">${label}</span>` +
+        `</a>`
+      )
+    },
+  )
+}
+
+/** markdown-it escapes attribute values, so they come back out before parsing. */
+function decodeHtml(value: string): string {
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+}
+
+/**
+ * A filled rounded square in the app's own colour, with the sheet-corner cut
+ * every Drive icon shares. Inline rather than an image so it inherits the
+ * text size and needs no network request.
+ */
+function driveGlyph(kind: TDriveKind): string {
+  return (
+    `<svg class="md__drive-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">` +
+    `<path fill="${DRIVE_COLORS[kind]}" d="M14 2H6.5A1.5 1.5 0 0 0 5 3.5v17A1.5 1.5 0 0 0 6.5 22h11a1.5 1.5 0 0 0 1.5-1.5V7l-5-5Z"/>` +
+    `<path fill="#fff" fill-opacity=".35" d="M14 2l5 5h-5V2Z"/>` +
+    `</svg>`
+  )
+}
+
 function renderTaskLists(html: string): string {
   // GFM task syntax: "- [ ] text" / "- [x] text". markdown-it leaves the
   // brackets as literal text at the start of the list item.
@@ -237,6 +302,7 @@ const html = computed(() => {
   out = renderTaskLists(out)
   out = renderCallouts(out)
   out = renderRefs(out)
+  out = renderDriveLinks(out)
   // Mermaid fences render as marked code blocks for now (diagram rendering
   // is a follow-up; the source stays intact and legible).
   out = out.replace(
@@ -455,6 +521,40 @@ onMounted(() => {
       border: 1px solid var(--nb-c-border);
       padding: var(--nb-spacing-4) var(--nb-spacing-8);
     }
+  }
+
+  /* Drive links read as one object rather than forty characters of URL.
+     Inline-flex so the pill sits on the text baseline inside a sentence and
+     never breaks across two lines mid-pill. */
+  :deep(.md__drive) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nb-spacing-4);
+    padding: 1px var(--nb-spacing-8) 1px var(--nb-spacing-4);
+    border: 1px solid var(--nb-c-border);
+    border-radius: 999px;
+    background: var(--nb-c-surface);
+    color: var(--nb-c-text);
+    text-decoration: none;
+    vertical-align: baseline;
+    white-space: nowrap;
+    font-size: var(--nb-type-body-sm-size);
+
+    &:hover {
+      background: var(--nb-c-surface-hover);
+      border-color: var(--nb-c-border-strong, var(--nb-c-border));
+    }
+
+    &:focus-visible {
+      outline: 1px solid var(--nb-c-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+
+  :deep(.md__drive-glyph) {
+    inline-size: 1em;
+    block-size: 1em;
+    flex: none;
   }
 
   :deep(.md__task) {
