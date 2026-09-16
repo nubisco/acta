@@ -1,3 +1,10 @@
+## [1.19.1](https://github.com/nubisco/acta/compare/v1.19.0...v1.19.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* **app:** stop the editor rewriting documents it was only asked to open ([372d093](https://github.com/nubisco/acta/commit/372d093c45bb9eb5a152023bec30aff2bc7b8e1f))
+
 # [1.19.0](https://github.com/nubisco/acta/compare/v1.18.2...v1.19.0) (2026-09-15)
 
 
