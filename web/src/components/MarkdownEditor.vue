@@ -38,6 +38,8 @@ import {
   RefTypeahead,
   SlashMenu,
 } from '@/components/editor/suggestions'
+import { Callout } from '@/components/editor/nodes/Callout'
+import { Emphasis } from '@/components/editor/nodes/Emphasis'
 
 const props = defineProps<{
   modelValue: string
@@ -75,6 +77,10 @@ const editor = new Editor({
     TableCell,
     TaskList,
     TaskItem.configure({ nested: true }),
+    // Before the typeaheads, so `> [!NOTE] ` is claimed as a callout rather
+    // than left to the blockquote it came from.
+    Callout,
+    Emphasis,
     Placeholder.configure({
       placeholder: props.placeholder ?? 'Type here...',
     }),

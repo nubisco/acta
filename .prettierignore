@@ -6,3 +6,9 @@ pnpm-lock.yaml
 CHANGELOG.md
 *.jsonl
 data/
+
+# Test fixtures are captured copies of real stored content, so they must stay
+# byte-faithful. Prettier rewrites markdown (emphasis `*` becomes `_`, among
+# others), which silently turns a round-trip corpus into a test of Prettier's
+# output rather than of ours.
+web/test/fixtures/

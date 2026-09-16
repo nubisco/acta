@@ -15,6 +15,7 @@
     "@nubisco/ui": "^5.1.0",
     "@tiptap/core": "^2.27.3",
     "@tiptap/extension-bubble-menu": "^2.27.3",
+    "@tiptap/extension-italic": "^2.27.3",
     "@tiptap/extension-link": "^2.27.3",
     "@tiptap/extension-placeholder": "^2.27.3",
     "@tiptap/extension-table": "^2.27.3",
