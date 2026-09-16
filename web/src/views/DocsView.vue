@@ -1,8 +1,10 @@
 <template>
-  <div class="docs">
-    <component :is="treebar.Outlet">
-      <DocsTreePanel />
-    </component>
+  <div
+    ref="docsEl"
+    class="docs"
+    :class="{ 'docs--wide': isWide, 'docs--toc-overlay': tocOverlay }"
+  >
+    <DocsTreeSlot v-if="!chrome.frameHidden.value" />
 
     <div class="docs__content">
       <component :is="topbarActions.Outlet">
@@ -70,6 +72,15 @@
       <article v-else class="docs__doc">
         <h1 class="type-heading-04">{{ doc.title }}</h1>
         <ProvenanceNote v-if="doc.imported" :imported="doc.imported" />
+        <DocChromeBar
+          v-if="!viewingOld"
+          :slug="doc.slug"
+          :stats="stats"
+          :wide="isWide"
+          :editing="editing"
+          :can-edit="canEdit"
+          @update:wide="setWide"
+        />
 
         <NbBanner
           v-if="conflict"
@@ -109,6 +120,7 @@
           v-if="editing"
           ref="bodyEditor"
           v-model="draft"
+          :focus-mode="chrome.prefs.dimBlocks"
           autofocus
           placeholder="Start writing. Headings, lists, quotes and code all form as you type. Drop an image to attach it."
           class="docs__editor"
@@ -171,13 +183,33 @@
         </section>
       </article>
     </div>
+
+    <div v-if="tocShown" class="docs__toc">
+      <DocToc
+        :source="shownSource"
+        :root="bodyRoot"
+        :words="stats.words"
+        :overlay="tocOverlay"
+      />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, provide, ref, watch } from 'vue'
+import {
+  computed,
+  defineAsyncComponent,
+  onBeforeUnmount,
+  onMounted,
+  provide,
+  ref,
+  watch,
+} from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import { useConfirm, useShellSlot, useToast } from '@nubisco/ui'
+import { useWorkspace } from '@/stores/workspace'
+import { useDocChrome } from '@/lib/docChrome'
+import { documentOutline, documentStats, tocWorthShowing } from '@/lib/docText'
 import { api, newOpId, ApiHttpError } from '@/api/client'
 import type { IDocDetail } from '@/types/api'
 import { humanise, relativeTime, useLoadState } from '@/lib/state'
@@ -186,7 +218,9 @@ import { useViewCommands } from '@/lib/commands'
 import CommentThread from '@/components/CommentThread.vue'
 import DocCommentLayer from '@/components/comments/DocCommentLayer.vue'
 import type { IAnchor } from '@/lib/anchors'
-import DocsTreePanel from '@/components/DocsTreePanel.vue'
+import DocChromeBar from '@/components/DocChromeBar.vue'
+import DocToc from '@/components/DocToc.vue'
+import DocsTreeSlot from '@/components/DocsTreeSlot.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
@@ -264,7 +298,6 @@ function removeDoc(): void {
 }
 const load = useLoadState()
 const topbarActions = useShellSlot('topbar-right')
-const treebar = useShellSlot('contextbar')
 
 const doc = ref<IDocDetail | null>(null)
 const editing = ref(false)
@@ -282,6 +315,74 @@ const isDirty = computed(
 const viewingOld = computed(
   () => doc.value !== null && viewedVersion.value !== doc.value.rev,
 )
+
+/*
+ * Document chrome: contents, width, focus and stats. All of it reads the
+ * markdown and none of it writes to it. Width is the stored `layout`, and
+ * focus mode is this viewer's own preference, kept in this browser.
+ */
+const ws = useWorkspace()
+const chrome = useDocChrome()
+const canEdit = computed(() => !!ws.me.value?.scopes.includes('write'))
+const isWide = computed(() => doc.value?.layout === 'wide')
+const shownSource = computed(() =>
+  editing.value ? draft.value : (doc.value?.body ?? ''),
+)
+const stats = computed(() => documentStats(shownSource.value))
+const tocShown = computed(
+  () =>
+    !!doc.value &&
+    !viewingOld.value &&
+    tocWorthShowing(
+      documentOutline(shownSource.value),
+      stats.value.words,
+      shownSource.value,
+    ),
+)
+
+function setWide(wide: boolean): void {
+  if (doc.value) doc.value.layout = wide ? 'wide' : undefined
+}
+
+/**
+ * The element the headings render into: the editor's while editing, the
+ * reader's otherwise. Derived from the refs the comment layer already holds,
+ * because an element can carry only one `ref` and both features need it.
+ */
+const bodyRoot = computed<HTMLElement | null>(() => {
+  if (bodyEditor.value) return bodyEditor.value.root()
+  const el = bodyReader.value?.$el
+  return el instanceof HTMLElement ? el : null
+})
+
+/**
+ * Whether the contents have a gutter to sit in beside the page column, or
+ * have to float over it. Measured, because the room depends on the rail, the
+ * tree and the inspector as much as on the window.
+ */
+const docsEl = ref<HTMLElement | null>(null)
+const docsWidth = ref(Number.POSITIVE_INFINITY)
+const tocOverlay = computed(() => {
+  const rem = parseFloat(
+    getComputedStyle(document.documentElement).fontSize || '16',
+  )
+  const column = (isWide.value ? 72 : 52) * rem
+  return docsWidth.value < column + 2 * 15 * rem
+})
+let resizeObserver: ResizeObserver | null = null
+let releaseSurface: (() => void) | null = null
+onMounted(() => {
+  releaseSurface = chrome.attachSurface()
+  if (typeof ResizeObserver === 'undefined' || !docsEl.value) return
+  resizeObserver = new ResizeObserver(([entry]) => {
+    docsWidth.value = entry.contentRect.width
+  })
+  resizeObserver.observe(docsEl.value)
+})
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  releaseSurface?.()
+})
 
 const versionColumns = [
   { key: 'version', header: 'Version' },
@@ -554,17 +655,52 @@ async function restoreVersion(): Promise<void> {
 .docs {
   /* The tree lives in the shell's contextbar; the page itself reads as an
    * isolated column, Confluence-style, instead of running edge to edge. */
+  /* The gutters either side of the column are where the contents sit. */
+  --docs-column: 52rem;
+
   display: grid;
+  grid-template-columns:
+    minmax(0, 1fr) minmax(0, var(--docs-column))
+    minmax(0, 1fr);
   min-height: 0;
 
+  /* The document's stored `layout`. */
+  &--wide {
+    --docs-column: 72rem;
+  }
+
   &__content {
+    grid-column: 2;
+    grid-row: 1;
     display: grid;
     gap: var(--nb-spacing-16);
     align-content: start;
     min-width: 0;
     width: 100%;
-    max-inline-size: 52rem;
-    margin-inline: auto;
+  }
+
+  &__toc {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: start;
+    position: sticky;
+    inset-block-start: var(--nb-spacing-16);
+    max-inline-size: 16rem;
+    padding-inline-start: var(--nb-spacing-24);
+  }
+
+  /* No gutter wide enough: the contents float at the column's edge instead,
+   * and the column keeps a strip clear so the button never sits on text. */
+  &--toc-overlay &__toc {
+    grid-column: 2;
+    justify-self: end;
+    inline-size: 0;
+    padding: 0;
+    z-index: 1;
+  }
+
+  &--toc-overlay:has(.docs__toc) &__content {
+    padding-inline-end: var(--nb-spacing-32);
   }
 
   &__placeholder {
@@ -598,6 +734,32 @@ async function restoreVersion(): Promise<void> {
 
   &__editor {
     min-block-size: 24rem;
+  }
+
+  /* A contents link lands with the heading clear of the top edge. */
+  &__doc :deep(:is(h1, h2, h3, h4, h5, h6)) {
+    scroll-margin-block-start: var(--nb-spacing-24);
+  }
+
+  /* A wide page is wide for prose too, not only for tables and diagrams. */
+  &--wide &__doc :deep(:is(.md, .tiptap) :is(p, li, blockquote)) {
+    max-width: none;
+  }
+
+  /* Focus mode's block dimming. The editor extension marks the root and the
+   * caret's block (editor/focusMode.ts), this decides what that looks like. */
+  &__doc :deep(.acta-focus-mode > *) {
+    transition: opacity 160ms ease;
+  }
+
+  &__doc :deep(.acta-focus-mode > :not(.acta-focus-current)) {
+    opacity: 0.3;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &__doc :deep(.acta-focus-mode > *) {
+      transition: none;
+    }
   }
 
   &__backlinks {

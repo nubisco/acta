@@ -356,6 +356,13 @@ export const zDocOp = z.discriminatedUnion('op', [
     imported_meta: zImportedMeta.nullable(),
   }),
   z.object({
+    op: z.literal('set_layout'),
+    op_id: zOpId,
+    ref: zDocSlug,
+    /** Page width. Presentation, not content: does not bump rev. */
+    layout: z.enum(['default', 'wide']),
+  }),
+  z.object({
     op: z.literal('replace'),
     op_id: zOpId,
     ref: zDocSlug,

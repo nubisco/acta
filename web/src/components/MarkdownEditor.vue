@@ -155,6 +155,7 @@ import { MermaidBlock } from '@/components/editor/nodes/MermaidBlock'
 import { LinkCard } from '@/components/editor/nodes/LinkCard'
 import { ColorSwatches } from '@/components/editor/decorations'
 import { CommentHighlights } from '@/components/comments/commentHighlights'
+import { FocusMode } from '@/components/editor/focusMode'
 
 const props = defineProps<{
   modelValue: string
@@ -166,6 +167,8 @@ const props = defineProps<{
    * surface with nothing to attach them to.
    */
   owner?: { item?: string; doc?: string }
+  /** Dim every block but the caret's. Presentation only, see focusMode.ts. */
+  focusMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -342,6 +345,7 @@ const editor = new Editor({
     ColorSwatches,
     // Inline comment highlights: decorations only, never document content.
     CommentHighlights,
+    FocusMode.configure({ enabled: !!props.focusMode }),
     Placeholder.configure({
       placeholder: props.placeholder ?? 'Type here...',
     }),
@@ -405,11 +409,22 @@ watch(
   },
 )
 
+watch(
+  () => !!props.focusMode,
+  (enabled) => editor.commands.setFocusMode(enabled),
+)
+
 onBeforeUnmount(() => editor.destroy())
 
 // `editor` so a page can decorate the document it shows (inline comments)
-// without this component knowing about them.
-defineExpose({ focus: () => editor.commands.focus('end'), editor })
+// without this component knowing about them, and `root` for the element
+// headings render into, which the document's contents are built from.
+defineExpose({
+  focus: () => editor.commands.focus('end'),
+  editor,
+  /** The element headings render into, for the document's contents. */
+  root: () => editor.view.dom as HTMLElement,
+})
 
 /* The selection bubble: inline styling first, block moves after. */
 const bubbleActions = [

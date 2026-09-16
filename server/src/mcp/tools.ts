@@ -133,7 +133,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'doc_write',
     description:
-      'Batch document mutations, idempotent via op_id. Ops: create, replace (needs if_rev), patch_section (needs section slug + if_hash from doc_get sections; conflicts only when the same section changed), append (no read needed, ideal for logs), move, rename, archive, delete (hard delete, leaf pages only), comment (a page comment; add anchor {exact, prefix?, suffix?} to comment inline on quoted text, which must appear in the document, with prefix or suffix to pick one repeat; never changes the document), comment_update, comment_resolve (resolved: false reopens). Section edits transfer only the changed section, not the whole document.',
+      'Batch document mutations, idempotent via op_id. Ops: create, replace (needs if_rev), patch_section (needs section slug + if_hash from doc_get sections; conflicts only when the same section changed), append (no read needed, ideal for logs), move, rename, set_layout (page width, default or wide, no rev bump), archive, delete (hard delete, leaf pages only), comment (a page comment; add anchor {exact, prefix?, suffix?} to comment inline on quoted text, which must appear in the document, with prefix or suffix to pick one repeat; never changes the document), comment_update, comment_resolve (resolved: false reopens). Section edits transfer only the changed section, not the whole document.',
     schema: zDocWrite,
     write: true,
     handler: async (ctx, args) => {

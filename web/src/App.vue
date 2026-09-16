@@ -11,9 +11,11 @@
     inspector-label="Item"
     contextbar-label="Documents"
     collapse-at="md"
+    :topbar="docChrome.frameHidden.value ? 'never' : 'auto'"
     resizable
   >
-    <template #sidebar-logo>
+    <!-- Page focus mode on a document takes the rail and the topbar away. -->
+    <template v-if="!docChrome.frameHidden.value" #sidebar-logo>
       <!-- The brand doubles as the workspace switcher, which is where a
            person looks for it: the name they are trying to change is already
            printed there. Only interactive when there is somewhere to go. -->
@@ -61,7 +63,7 @@
       </NbMenu>
     </template>
 
-    <template #sidebar-nav>
+    <template v-if="!docChrome.frameHidden.value" #sidebar-nav>
       <template v-if="sidebarVariant === 'compact'">
         <NbSidebarLink
           v-for="entry in navEntries"
@@ -130,7 +132,7 @@
       </NbSidebarMenu>
     </template>
 
-    <template #sidebar-bottom>
+    <template v-if="!docChrome.frameHidden.value" #sidebar-bottom>
       <NotificationBell
         v-nb-tour-step="'notifications'"
         :compact="sidebarVariant === 'compact'"
@@ -292,6 +294,7 @@ import NotificationBell from '@/components/NotificationBell.vue'
 import WelcomeModal from '@/components/WelcomeModal.vue'
 import { wpath } from '@/lib/paths'
 import { createPaletteSuggester } from '@/lib/paletteSearch'
+import { useDocChrome } from '@/lib/docChrome'
 
 const route = useRoute()
 const router = useRouter()
@@ -299,6 +302,7 @@ const ws = useWorkspace()
 const inspector = useInspector()
 const ui = useUiState()
 const palette = useCommandPalette()
+const docChrome = useDocChrome()
 const suggestFromWorkspace = createPaletteSuggester({
   router,
   openItem: (key) => inspector.open(key),

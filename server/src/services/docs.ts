@@ -239,6 +239,27 @@ async function applyDocOp(
       ])
       return { slug: doc.slug, rev: doc.rev }
     }
+    case 'set_layout': {
+      // Page width is how the page is shown, not what it says. No rev bump
+      // and no version, so an editor holding `if_rev` is not put into a
+      // conflict by somebody widening the page, and the body is never read or
+      // written here.
+      const doc = await docBySlug(ctx, op.ref)
+      if (doc.layout === op.layout) return { slug: doc.slug, rev: doc.rev }
+      await ctx.db.run(
+        'UPDATE document SET layout = ?, updated_at = ? WHERE id = ?',
+        [op.layout, ts, doc.id],
+      )
+      await emitEvent(
+        ctx,
+        'doc.layout_changed',
+        'doc',
+        doc.id,
+        `set ${doc.slug} to ${op.layout} width`,
+        { layout: op.layout },
+      )
+      return { slug: doc.slug, rev: doc.rev }
+    }
     case 'replace': {
       const doc = await docBySlug(ctx, op.ref)
       if (op.if_rev !== doc.rev)

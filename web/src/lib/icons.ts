@@ -21,6 +21,8 @@ import * as chatCircle from '@nubisco/ui/icons/chat-circle'
 import * as checkSquare from '@nubisco/ui/icons/check-square'
 import * as clockCounterClockwise from '@nubisco/ui/icons/clock-counter-clockwise'
 import * as code from '@nubisco/ui/icons/code'
+import * as cornersOut from '@nubisco/ui/icons/corners-out'
+import * as crosshairSimple from '@nubisco/ui/icons/crosshair-simple'
 import * as fileText from '@nubisco/ui/icons/file-text'
 import * as fn from '@nubisco/ui/icons/function'
 import * as house from '@nubisco/ui/icons/house'
@@ -85,5 +87,8 @@ export function registerActaIcons(): void {
     'pencil-simple': pencilSimple,
     trash,
     'clock-counter-clockwise': clockCounterClockwise,
+    // Document chrome commands (DocChromeBar.vue).
+    'corners-out': cornersOut,
+    'crosshair-simple': crosshairSimple,
   })
 }
