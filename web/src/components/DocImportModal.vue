@@ -244,6 +244,7 @@ async function start(): Promise<void> {
         fetchRemote: importer.fetchRemoteInBrowser,
         attachmentFetchRemote: (owner, url) =>
           api.attachmentFetchRemote(owner, url),
+        attachmentBytes: (id) => api.attachmentBytes(id),
       },
       (next) => (progress.value = next),
     )

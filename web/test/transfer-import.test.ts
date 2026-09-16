@@ -177,7 +177,7 @@ describe('pictures on the web', () => {
     expectStable(acta)
   })
 
-  it('fetches a repeated address once across the whole import', async () => {
+  it('fetches a repeated address once, and gives every page its own copy', async () => {
     const acta = new FakeActa()
     const open = 'https://cdn.example.com/open.png'
     acta.web.set(LOGO, { bytes: PNG, mime: 'image/png', cors: false })
@@ -198,25 +198,58 @@ describe('pictures on the web', () => {
     expect(count(acta.browserReads, gone)).toBe(1)
     expect(count(acta.serverCopies, gone)).toBe(1)
 
-    // The server copy is one attachment both pages refer to. The browser read
-    // is uploaded to each page, the way a file beside the pages is.
-    const copied = acta.attachments.filter((a) => a.filename === 'logo.png')
-    expect(copied).toHaveLength(1)
+    // Each page owns its own attachment for each picture, and a picture used
+    // twice on one page is one attachment there.
+    const idsOn = (slug: string) => [
+      ...new Set(
+        [...acta.doc(slug).body.matchAll(/attachment:(att_\d+)/g)].map(
+          (m) => m[1],
+        ),
+      ),
+    ]
     for (const slug of ['one', 'two']) {
       const body = acta.doc(slug).body
-      expect(body.split(`attachment:${copied[0].id}`)).toHaveLength(3)
       expect(body).not.toContain(LOGO)
       expect(body).not.toContain(open)
       expect(body.split(gone)).toHaveLength(3)
+      const ids = idsOn(slug)
+      expect(ids).toHaveLength(2)
+      for (const id of ids) {
+        const owned = acta.attachments.find((a) => a.id === id)!
+        expect(owned.doc).toBe(slug)
+        const uses = owned.filename === 'logo.png' ? 2 : 1
+        expect(body.split(`attachment:${id}`)).toHaveLength(uses + 1)
+      }
     }
-    expect(
-      acta.attachments.filter((a) => a.filename === 'open.png'),
-    ).toHaveLength(2)
+    expect(idsOn('one').some((id) => idsOn('two').includes(id))).toBe(false)
     // Reported once per page that still hotlinks it.
     expect(result.issues.filter((issue) => issue.includes(gone))).toHaveLength(
       2,
     )
     expectStable(acta)
+
+    // Deleting the page the server copied onto leaves the other page whole.
+    const twoIds = idsOn('two')
+    acta.deleteDoc('one')
+    for (const id of twoIds)
+      expect(acta.attachments.find((a) => a.id === id)?.bytes).toEqual(PNG)
+  })
+
+  it('fetches again for a page when the stored copy cannot be read', async () => {
+    const acta = new FakeActa()
+    acta.web.set(LOGO, { bytes: PNG, mime: 'image/png', cors: false })
+    const api = { ...acta.importApi(), attachmentBytes: async () => null }
+    const prepared = await prepareImport(
+      await readInputs([
+        textFile('one.md', `# One\n\n![a](${LOGO})`),
+        textFile('two.md', `# Two\n\n![a](${LOGO})`),
+      ]),
+      {},
+    )
+    const result = await runImport(prepared, {}, api)
+    expect(result.issues).toEqual([])
+    expect(acta.serverCopies).toEqual([LOGO, LOGO])
+    expect(acta.attachments.map((a) => a.doc).sort()).toEqual(['one', 'two'])
   })
 
   it('never has more than a few copies running at once', async () => {

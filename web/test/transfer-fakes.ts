@@ -74,6 +74,12 @@ export class FakeActa {
     return row
   }
 
+  /** Deletes a page and the attachments it owns, as the server does. */
+  deleteDoc(slug: string): void {
+    this.docs = this.docs.filter((doc) => doc.slug !== slug)
+    this.attachments = this.attachments.filter((a) => a.doc !== slug)
+  }
+
   doc(slug: string): IFakeDoc {
     const found = this.docs.find((doc) => doc.slug === slug)
     if (!found) throw new Error(`no doc ${slug}`)
@@ -156,6 +162,12 @@ export class FakeActa {
         } finally {
           this.copiesRunning--
         }
+      },
+      attachmentBytes: async (id) => {
+        const found = this.attachments.find((a) => a.id === id)
+        return found?.kind === 'file'
+          ? { bytes: found.bytes, mime: found.mime }
+          : null
       },
     }
   }

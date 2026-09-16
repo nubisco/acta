@@ -469,6 +469,18 @@ export const api = {
       },
     ),
 
+  /** A stored file attachment's bytes, or null for a link or a failure. */
+  attachmentBytes: async (
+    id: string,
+  ): Promise<{ bytes: Uint8Array; mime: string } | null> => {
+    const res = await fetch(`${BASE}/attachments/${id}`, {
+      credentials: 'include',
+    })
+    if (!res.ok || !res.headers.get('content-disposition')) return null
+    const mime = (res.headers.get('content-type') ?? '').split(';')[0].trim()
+    return { bytes: new Uint8Array(await res.arrayBuffer()), mime }
+  },
+
   attachmentUpload: async (
     owner: { item?: string; doc?: string },
     file: File,

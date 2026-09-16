@@ -65,6 +65,14 @@ export interface IImportApi {
     owner: { doc: string },
     url: string,
   ) => Promise<{ id: string }>
+  /**
+   * The bytes of an attachment already in Acta, or null. Lets a later page
+   * take its own copy of a picture the server fetched for an earlier one,
+   * without fetching the address again.
+   */
+  attachmentBytes?: (
+    id: string,
+  ) => Promise<{ bytes: Uint8Array; mime: string } | null>
 }
 
 /**
@@ -224,16 +232,21 @@ export async function runImport(
   }
   walkParents(roots, target.parent)
 
-  // One browser read and at most one server copy per address, for the whole
-  // import. The bytes a browser read are uploaded to every page that shows the
-  // picture, like a file beside the pages is. A server copy already is an
-  // attachment, so a later page refers to that one rather than fetching the
-  // address again.
+  // One browser read and at most one server fetch per address, for the whole
+  // import. Every page still owns its own attachment, so deleting one page
+  // never breaks a picture on another. The bytes a browser read are uploaded
+  // to each page, like a file beside the pages is. A server copy lands on the
+  // first page that needs it, and a later page uploads its own copy of those
+  // stored bytes, falling back to a fetch of its own only when it cannot read
+  // them.
   const browserReads = new Map<
     string,
     Promise<{ bytes: Uint8Array; mime: string } | null>
   >()
-  const serverCopies = new Map<string, Promise<string | null>>()
+  const serverCopies = new Map<
+    string,
+    Promise<{ id: string; doc: string } | null>
+  >()
 
   let done = 0
   for (const page of pages) {
@@ -406,15 +419,25 @@ export async function runImport(
             ? await upload(item, read.bytes, read.mime || item.mime)
             : null
           if (id) return { id }
+          const fetchHere = () =>
+            api.attachmentFetchRemote!({ doc: pageSlug }, url).then(
+              (made) => ({ id: made.id, doc: pageSlug }),
+              () => null,
+            )
           const copied = api.attachmentFetchRemote
-            ? await once(serverCopies, url, () =>
-                api.attachmentFetchRemote!({ doc: pageSlug }, url).then(
-                  (made) => made.id,
-                  () => null,
-                ),
-              )
+            ? await once(serverCopies, url, fetchHere)
             : null
-          if (copied) return { id: copied }
+          if (copied?.doc === pageSlug) return { id: copied.id }
+          if (copied) {
+            // Stored already, for another page. This page takes its own copy.
+            const stored = api.attachmentBytes
+              ? await api.attachmentBytes(copied.id).catch(() => null)
+              : null
+            const own = stored
+              ? await upload(item, stored.bytes, stored.mime || item.mime)
+              : ((await fetchHere())?.id ?? null)
+            if (own) return { id: own }
+          }
           return {
             issue: `A picture in "${page.title}" could not be copied (${url.slice(0, 120)}), so it still points at the original address.`,
           }
