@@ -1,3 +1,12 @@
+# [1.25.0](https://github.com/nubisco/acta/compare/v1.24.0...v1.25.0) (2026-09-16)
+
+
+### Features
+
+* **docs:** add a table of contents, page width, focus mode and reading stats ([2b8b916](https://github.com/nubisco/acta/commit/2b8b916f016df9452ab7e06eeedf7bfc9a1ca13d))
+* **docs:** import and export documents ([fded395](https://github.com/nubisco/acta/commit/fded395c56104db3fb7faa1690e62e86fd13f1fa))
+* **docs:** save with Cmd/Ctrl+S and stay in the editor ([ec0e487](https://github.com/nubisco/acta/commit/ec0e487546950377f594bf9e891df74bd37bc4dc))
+
 # [1.24.0](https://github.com/nubisco/acta/compare/v1.23.0...v1.24.0) (2026-09-16)
 
 
