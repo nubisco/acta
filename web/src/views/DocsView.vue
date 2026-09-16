@@ -120,7 +120,12 @@
           />
           <DocDiff :original="viewedBody" :modified="doc.body" />
         </template>
-        <MarkdownView v-else :source="doc.body" :wide="doc.layout === 'wide'" />
+        <MarkdownView
+          v-else
+          :source="doc.body"
+          :wide="doc.layout === 'wide'"
+          :attachments="doc.attachments"
+        />
 
         <footer
           v-if="doc.backlinks && doc.backlinks.length > 0"

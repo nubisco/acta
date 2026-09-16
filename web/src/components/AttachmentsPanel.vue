@@ -60,6 +60,7 @@
 </template>
 
 <script setup lang="ts">
+import type { IAttachment } from '@/types/api'
 /**
  * Attachment list + upload surface for one item or doc. Owns its API calls
  * (the owner ref comes in as a prop) and asks the parent to reload via
@@ -71,17 +72,9 @@ import type { NbFileUploader } from '@nubisco/ui'
 import { api, attachmentHref } from '@/api/client'
 import { humanise } from '@/lib/state'
 
-interface IAttachmentView {
-  id: string
-  kind: string
-  filename: string
-  url: string | null
-  size: number | null
-}
-
 const props = defineProps<{
   owner: { item?: string; doc?: string }
-  attachments: IAttachmentView[]
+  attachments: IAttachment[]
 }>()
 
 const emit = defineEmits<{ changed: [] }>()
@@ -126,7 +119,7 @@ async function addLink(): Promise<void> {
   }
 }
 
-function remove(att: IAttachmentView): void {
+function remove(att: IAttachment): void {
   void confirm({
     title: 'Remove attachment',
     message: 'The file is deleted from storage as well.',

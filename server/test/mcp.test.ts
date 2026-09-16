@@ -88,6 +88,8 @@ describe('mcp endpoint', () => {
       'webhook_write',
       'rule_write',
       'attachment_add',
+      'attachment_add_batch',
+      'attachment_delete',
     ])
     for (const tool of list.result.tools) {
       expect(tool.inputSchema.type).toBe('object')

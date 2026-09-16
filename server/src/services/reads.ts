@@ -12,6 +12,7 @@ import type {
 } from '@nubisco/acta-shared'
 import { now, type ICtx } from '../core/ctx'
 import { docBySlug, spaceByKey, itemByKey, type IItemRow } from '../core/store'
+import { attachmentUrl } from './attachments'
 import { sectionMap } from '@nubisco/acta-shared'
 
 type TSpaceGet = z.infer<typeof zSpaceGet>
@@ -374,16 +375,7 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
       }
     }
     if (include.has('attachments')) {
-      out.attachments = await ctx.db.query<{
-        id: string
-        kind: string
-        filename: string
-        url: string | null
-        size: number | null
-      }>(
-        "SELECT id, kind, filename, url, size FROM attachment WHERE owner_kind = 'item' AND owner_id = ?",
-        [item.id],
-      )
+      out.attachments = await attachmentsFor(ctx, 'item', item.id)
     }
     if (include.has('activity')) {
       out.activity = await ctx.db.query<{
@@ -443,6 +435,44 @@ export async function docTree(ctx: ICtx, root?: string, depth = 10) {
   return { docs: out }
 }
 
+/**
+ * Attachments on one owner, with the address each is reachable at.
+ *
+ * `url` used to be whatever was in the column, which is the external address
+ * for a link attachment and NULL for an uploaded file. A caller therefore had
+ * no way to display or embed a file it could see listed. An upload now
+ * reports where it is served from.
+ *
+ * `mime` is included because it is what decides whether something renders as
+ * an image or as a chip you can download, and a reader cannot tell from an
+ * id.
+ */
+async function attachmentsFor(
+  ctx: ICtx,
+  ownerKind: 'item' | 'doc',
+  ownerId: string,
+) {
+  const rows = await ctx.db.query<{
+    id: string
+    kind: string
+    filename: string
+    mime: string | null
+    url: string | null
+    size: number | null
+  }>(
+    'SELECT id, kind, filename, mime, url, size FROM attachment WHERE owner_kind = ? AND owner_id = ? ORDER BY created_at',
+    [ownerKind, ownerId],
+  )
+  return rows.map((r) => ({
+    id: r.id,
+    kind: r.kind,
+    filename: r.filename,
+    mime: r.mime ?? undefined,
+    size: r.size ?? undefined,
+    url: r.url ?? attachmentUrl(r.id),
+  }))
+}
+
 export async function docGet(
   ctx: ICtx,
   ref: string,
@@ -472,6 +502,10 @@ export async function docGet(
     body,
     imported: parseImportedMeta(doc.imported_meta),
   }
+  // Always, not behind `include`. A document's body can embed an attachment,
+  // so a reader that has the body but not the attachment list cannot render
+  // what the body refers to.
+  out.attachments = await attachmentsFor(ctx, 'doc', doc.id)
   if (include.has('comments')) {
     out.comments = (
       await ctx.db.query<{

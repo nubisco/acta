@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
 import { emitEvent, flushPendingEvents } from '../core/events'
+import { withOp } from '../core/ops'
 import { docBySlug, itemByKey } from '../core/store'
 
 export const zAttachmentAdd = z
@@ -46,6 +47,65 @@ export class AttachmentStore {
   remove(id: string): Promise<void> {
     return this.blobs.delete?.(id) ?? Promise.resolve()
   }
+}
+
+/**
+ * Where an attachment is served from.
+ *
+ * Relative on purpose. A stored absolute URL is wrong the moment an instance
+ * moves host, and these end up inside document markdown that outlives any
+ * one deployment. Markdown should carry `attachment:<id>` and let the reader
+ * resolve it, but callers that want a plain link get this.
+ */
+export function attachmentUrl(id: string): string {
+  return `/api/v1/attachments/${id}`
+}
+
+/**
+ * Types safe to render in the page rather than hand to the downloads folder.
+ *
+ * A safelist, not a blocklist. Anything not named here downloads, so a type
+ * nobody considered cannot be talked into rendering as a document by a
+ * creative `mime` on upload.
+ */
+const INLINE_MIMES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/avif',
+  'image/svg+xml',
+  'application/pdf',
+])
+
+/**
+ * The headers an attachment is served with.
+ *
+ * Two problems are being solved. Nothing here set `nosniff`, so a `.png` whose
+ * bytes are HTML could be sniffed as a document and run on the app's own
+ * origin, taking the session with it. And an SVG *is* a document: it can carry
+ * script, so serving one inline is stored XSS unless something stops it.
+ *
+ * The CSP is what stops it. `default-src 'none'` allows the image no scripts,
+ * no network and no frames, and `sandbox` drops it into an opaque origin so
+ * it cannot reach cookies even if a future change loosens the rest.
+ */
+export function attachmentHeaders(
+  mime: string | null,
+  filename: string,
+): Record<string, string> {
+  const type = mime ?? 'application/octet-stream'
+  const inline = INLINE_MIMES.has(type)
+  const headers: Record<string, string> = {
+    'content-type': type,
+    'x-content-type-options': 'nosniff',
+    'content-disposition': `${inline ? 'inline' : 'attachment'}; filename="${filename.replace(/"/g, '')}"`,
+  }
+  if (type === 'image/svg+xml') {
+    headers['content-security-policy'] =
+      "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+  }
+  return headers
 }
 
 export async function attachmentAdd(
@@ -105,8 +165,43 @@ export async function attachmentAdd(
     id,
     filename: input.filename,
     size: size ?? undefined,
-    url: input.url ?? undefined,
+    // A link attachment keeps its own address. An uploaded file gets the one
+    // it is served from, so a caller can embed it without a second round trip
+    // to work out where it went.
+    url: input.url ?? attachmentUrl(id),
   }
+}
+
+/**
+ * Several attachments in one call, each carrying its own op_id.
+ *
+ * Embedding an icon set means sixteen uploads. One at a time over MCP is
+ * sixteen round trips, and a retry after a timeout re-uploads whatever
+ * already landed, so a document ends up with duplicates nobody asked for.
+ *
+ * Idempotent through the same op log every other batch write uses: a replayed
+ * op_id returns the recorded result rather than attaching a second copy.
+ * Results are per op, so one bad file does not lose the fifteen good ones.
+ */
+export const zAttachmentAddBatch = z.object({
+  ops: z
+    .array(zAttachmentAdd.extend({ op_id: z.string().min(1).max(200) }))
+    .min(1)
+    .max(25),
+})
+export type TAttachmentAddBatch = z.infer<typeof zAttachmentAddBatch>
+
+export async function attachmentAddBatch(
+  ctx: ICtx,
+  store: AttachmentStore,
+  input: TAttachmentAddBatch,
+) {
+  const results = []
+  for (const op of input.ops) {
+    const { op_id: opId, ...rest } = op
+    results.push(await withOp(ctx, opId, () => attachmentAdd(ctx, store, rest)))
+  }
+  return { results }
 }
 
 export const zAttachmentUpload = z
@@ -159,7 +254,12 @@ export async function attachmentUpload(
     `attached ${input.filename} to ${input.item ?? input.doc}`,
   )
   flushPendingEvents()
-  return { id, filename: input.filename, size: bytes.byteLength }
+  return {
+    id,
+    filename: input.filename,
+    size: bytes.byteLength,
+    url: attachmentUrl(id),
+  }
 }
 
 export async function attachmentDelete(

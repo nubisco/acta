@@ -35,11 +35,14 @@ import { newId } from '@nubisco/acta-shared'
 import { now } from '../core/ctx'
 import {
   attachmentAdd,
+  attachmentAddBatch,
   attachmentDelete,
   attachmentGet,
+  attachmentHeaders,
   attachmentUpload,
   zAttachmentUpload,
   zAttachmentAdd,
+  zAttachmentAddBatch,
   type AttachmentStore,
 } from '../services/attachments'
 import { ruleList, ruleWrite, zRuleWrite } from '../services/rules'
@@ -341,6 +344,13 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
   })
 
   // Binary upload path: metadata in the query, the body is the file itself.
+  app.post('/attachments/batch', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'write')
+    const body = zAttachmentAddBatch.parse(await c.req.json())
+    return c.json(await attachmentAddBatch(ctx, store, body))
+  })
+
   app.post('/attachments/raw', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
@@ -366,10 +376,7 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     if (!bytes)
       return c.json({ kind: 'url', url: meta.url, filename: meta.filename })
     return new Response(new Uint8Array(bytes), {
-      headers: {
-        'content-type': meta.mime ?? 'application/octet-stream',
-        'content-disposition': `attachment; filename="${meta.filename.replace(/"/g, '')}"`,
-      },
+      headers: attachmentHeaders(meta.mime, meta.filename),
     })
   })
 

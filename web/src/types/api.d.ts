@@ -100,14 +100,25 @@ export interface IItemDetail {
     out: { ref_type: string; target: string }[]
     in: { src_kind: string; src_id: string }[]
   }
-  attachments?: {
-    id: string
-    kind: string
-    filename: string
-    url: string | null
-    size: number | null
-  }[]
+  attachments?: IAttachment[]
   activity?: { ts: number; verb: string; summary: string; actor_kind: string }[]
+}
+
+/**
+ * One attachment, as every read returns it.
+ *
+ * `url` is never null now: a link attachment reports its own address and an
+ * uploaded file reports the one it is served from, so a caller can display
+ * what it can see listed. `mime` is what decides between an image and a
+ * download chip, which an id cannot answer.
+ */
+export interface IAttachment {
+  id: string
+  kind: string
+  filename: string
+  mime?: string
+  size?: number
+  url: string
 }
 
 export interface IDocNode {
@@ -127,6 +138,8 @@ export interface IDocDetail {
   updated: number
   body: string
   imported?: IImportedMeta
+  /** Always returned: a body can embed one, so a reader needs the list. */
+  attachments?: IAttachment[]
   sections?: { slug: string; level: number; hash: string }[]
   backlinks?: {
     src_kind: string

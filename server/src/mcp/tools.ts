@@ -19,6 +19,9 @@ import {
 import type { ICtx } from '../core/ctx'
 import {
   attachmentAdd,
+  attachmentAddBatch,
+  attachmentDelete,
+  zAttachmentAddBatch,
   zAttachmentAdd,
   type AttachmentStore,
 } from '../services/attachments'
@@ -229,11 +232,33 @@ export function createMcpTools(store: AttachmentStore): IMcpTool[] {
     {
       name: 'attachment_add',
       description:
-        'Attach to an item (by key) or doc (by slug): either a url attachment or inline base64 content up to 1 MB (larger files go through POST /api/v1/attachments). Returns the attachment id.',
+        'Attach to an item (by key) or doc (by slug): either a url attachment or inline base64 content up to 1 MB (larger files go through POST /api/v1/attachments). Returns the attachment id and the url it is served from, which can be embedded in markdown as ![alt](attachment:<id>).',
       schema: zAttachmentAdd,
       write: true,
       handler: (ctx, args) =>
         attachmentAdd(ctx, store, args as z.infer<typeof zAttachmentAdd>),
+    },
+    {
+      name: 'attachment_add_batch',
+      description:
+        'Up to 25 attachments in one call, each with its own op_id, returning a result per op. Idempotent: replaying an op_id returns the recorded result instead of attaching a second copy, so a retry after a timeout cannot duplicate what already landed.',
+      schema: zAttachmentAddBatch,
+      write: true,
+      handler: (ctx, args) =>
+        attachmentAddBatch(
+          ctx,
+          store,
+          args as z.infer<typeof zAttachmentAddBatch>,
+        ),
+    },
+    {
+      name: 'attachment_delete',
+      description:
+        'Remove one attachment by id. The blob goes with it. Deleting an attachment a document still embeds leaves a broken image, so check the body first.',
+      schema: z.object({ id: z.string().min(1) }),
+      write: true,
+      handler: (ctx, args) =>
+        attachmentDelete(ctx, store, (args as { id: string }).id),
     },
   ]
 }

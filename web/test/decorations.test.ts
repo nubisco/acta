@@ -87,3 +87,61 @@ describe('callouts', () => {
     expect(view.find('blockquote').exists()).toBe(true)
   })
 })
+
+describe('attachment embeds', () => {
+  const png = {
+    id: 'att_1',
+    filename: 'icon.png',
+    mime: 'image/png',
+    url: '/api/v1/attachments/att_1',
+  }
+  const pdf = {
+    id: 'att_2',
+    filename: 'spec.pdf',
+    mime: 'application/pdf',
+    size: 2_400_000,
+    url: '/api/v1/attachments/att_2',
+  }
+
+  async function withAttachments(source: string) {
+    const view = mount(MarkdownView, {
+      props: { source, attachments: [png, pdf] },
+    })
+    await flushPromises()
+    return view
+  }
+
+  it('resolves an id to the address it is served from', async () => {
+    // The markdown stores an id rather than a URL, because a URL is wrong the
+    // moment the instance moves host.
+    const view = await withAttachments('![An icon](attachment:att_1)')
+    const img = view.find('img')
+    expect(img.attributes('src')).toBe('/api/v1/attachments/att_1')
+    expect(img.attributes('alt')).toBe('An icon')
+    expect(img.attributes('loading')).toBe('lazy')
+  })
+
+  it('shows a download chip for something that is not an image', async () => {
+    const view = await withAttachments('![Spec](attachment:att_2)')
+    expect(view.find('img').exists()).toBe(false)
+    const chip = view.find('.md__file')
+    expect(chip.exists()).toBe(true)
+    expect(chip.text()).toContain('spec.pdf')
+    expect(chip.text()).toContain('2.3 MB')
+    expect(chip.attributes('download')).toBeDefined()
+  })
+
+  it('still renders when the attachment list is not to hand', async () => {
+    // Comments and card descriptions render without one. An image is the
+    // common case, so it renders as one rather than failing.
+    const view = await render('![x](attachment:att_9)')
+    expect(view.find('img').attributes('src')).toBe('/api/v1/attachments/att_9')
+  })
+
+  it('leaves an ordinary image alone', async () => {
+    const view = await render('![x](https://example.test/a.png)')
+    expect(view.find('img').attributes('src')).toBe(
+      'https://example.test/a.png',
+    )
+  })
+})

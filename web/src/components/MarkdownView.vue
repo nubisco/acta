@@ -59,6 +59,19 @@ const props = defineProps<{
   source: string
   wide?: boolean
   /**
+   * Attachments on the thing being rendered, so `attachment:<id>` embeds can
+   * be resolved. Without them an embed still renders, as an image pointing at
+   * the served URL, which is right for the common case and wrong only for a
+   * non-image, where the mime is what decides between a picture and a chip.
+   */
+  attachments?: {
+    id: string
+    filename: string
+    mime?: string
+    size?: number
+    url: string
+  }[]
+  /**
    * Collapse to this many rem and fade the cut, with a toggle underneath.
    * Omitted, the block renders at its natural height, which is right for a
    * document but wrong for a card whose description runs to a page and
@@ -211,6 +224,51 @@ function driveGlyph(kind: TDriveKind): string {
   )
 }
 
+/**
+ * `![alt](attachment:<id>)` becomes the file it names.
+ *
+ * The markdown stores an id rather than a URL on purpose: a URL is wrong the
+ * moment the instance moves host, and these live in documents that outlast
+ * any deployment. Resolution happens here, at render time.
+ *
+ * An image is shown. Anything else becomes a chip you can download, because
+ * an `<img>` pointing at a PDF is a broken image icon and tells the reader
+ * nothing about what is attached.
+ */
+function renderAttachments(html: string): string {
+  return html.replace(
+    /<img([^>]*?)src="attachment:([^"]+)"([^>]*)>/g,
+    (_raw, before: string, id: string, after: string) => {
+      const meta = (props.attachments ?? []).find((a) => a.id === id.trim())
+      const url = meta?.url ?? `/api/v1/attachments/${id.trim()}`
+      const mime = meta?.mime
+      if (mime && !mime.startsWith('image/')) {
+        const name = meta?.filename ?? 'Attachment'
+        return (
+          `<a class="md__file" href="${esc(url)}" download>` +
+          `<span class="md__file-name">${esc(name)}</span>` +
+          `<span class="md__file-hint">${esc(formatSize(meta?.size))}</span>` +
+          `</a>`
+        )
+      }
+      return `<img${before}src="${esc(url)}"${after} loading="lazy">`
+    },
+  )
+}
+
+/** A size a person can read, or an empty string when it is not known. */
+function formatSize(bytes: number | undefined): string {
+  if (!bytes) return 'Download'
+  const units = ['B', 'kB', 'MB', 'GB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit++
+  }
+  return `${value < 10 && unit > 0 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`
+}
+
 function renderTaskLists(html: string): string {
   // GFM task syntax: "- [ ] text" / "- [x] text". markdown-it leaves the
   // brackets as literal text at the start of the list item.
@@ -272,6 +330,7 @@ const html = computed(() => {
   out = renderCallouts(out)
   out = renderRefs(out)
   out = renderDriveLinks(out)
+  out = renderAttachments(out)
   // Mermaid fences render as marked code blocks for now (diagram rendering
   // is a follow-up; the source stays intact and legible).
   out = out.replace(
@@ -507,6 +566,40 @@ onMounted(() => {
 
   /* A colour written as inline code carries the colour beside it. The value
      stays exactly as written, because it is the thing being documented. */
+  /* An embedded image is content, so it gets the column and nothing more.
+     Constrained to the text width and never taller than a screen, or one
+     large upload pushes the rest of the document out of view. */
+  :deep(.md img) {
+    max-inline-size: 100%;
+    max-block-size: 80vh;
+    block-size: auto;
+    border-radius: var(--nb-radius-sm);
+  }
+
+  /* A non-image attachment: a chip that says what it is and downloads. An
+     <img> pointing at a PDF is a broken image icon, which tells the reader
+     nothing about what is attached. */
+  :deep(.md__file) {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--nb-spacing-8);
+    padding: var(--nb-spacing-4) var(--nb-spacing-12);
+    border: 1px solid var(--nb-c-border);
+    border-radius: var(--nb-radius-sm);
+    background: var(--nb-c-surface);
+    color: var(--nb-c-text);
+    text-decoration: none;
+
+    &:hover {
+      background: var(--nb-c-surface-hover);
+    }
+  }
+
+  :deep(.md__file-hint) {
+    color: var(--nb-c-text-subtle);
+    font-size: var(--nb-type-body-sm-size);
+  }
+
   :deep(.md__color) {
     display: inline-flex;
     align-items: baseline;
