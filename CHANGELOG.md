@@ -1,3 +1,15 @@
+# [1.21.0](https://github.com/nubisco/acta/compare/v1.20.0...v1.21.0) (2026-09-16)
+
+
+### Bug Fixes
+
+* **security:** refuse attachment URLs that execute ([fc929c8](https://github.com/nubisco/acta/commit/fc929c8267f82993ca1e95b626540cb9eea9cdbc))
+
+
+### Features
+
+* **app:** highlighted code blocks and copyable heading anchors ([cca2f0a](https://github.com/nubisco/acta/commit/cca2f0ab6bb8fc224ab59e26567d2ec6f5a49a3f))
+
 # [1.20.0](https://github.com/nubisco/acta/compare/v1.19.1...v1.20.0) (2026-09-16)
 
 
