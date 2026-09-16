@@ -1,3 +1,10 @@
+## [1.22.1](https://github.com/nubisco/acta/compare/v1.22.0...v1.22.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* **app:** three faults visible on the manual's own pages ([8a40b91](https://github.com/nubisco/acta/commit/8a40b91dcfb0fb107f021e6cd4c94055874a219c))
+
 # [1.22.0](https://github.com/nubisco/acta/compare/v1.21.0...v1.22.0) (2026-09-16)
 
 
