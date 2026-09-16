@@ -1,3 +1,15 @@
+# [1.26.0](https://github.com/nubisco/acta/compare/v1.25.0...v1.26.0) (2026-09-16)
+
+
+### Bug Fixes
+
+* **docs:** render the editor identically to the reader ([0761a4c](https://github.com/nubisco/acta/commit/0761a4cf563b03bd849769465d9e19eecf76ff21))
+
+
+### Features
+
+* **docs:** block grip menu, block links and one selection toolbar ([b4566bf](https://github.com/nubisco/acta/commit/b4566bfd95a76924c3aa38cb0bef87240410f6f3))
+
 # [1.25.0](https://github.com/nubisco/acta/compare/v1.24.0...v1.25.0) (2026-09-16)
 
 
