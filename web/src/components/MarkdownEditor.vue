@@ -45,6 +45,8 @@ import { Callout } from '@/components/editor/nodes/Callout'
 import { Emphasis } from '@/components/editor/nodes/Emphasis'
 import { Ref } from '@/components/editor/nodes/Ref'
 import { Embed } from '@/components/editor/nodes/Embed'
+import { Image } from '@/components/editor/nodes/Image'
+import { ColorSwatches } from '@/components/editor/decorations'
 
 const props = defineProps<{
   modelValue: string
@@ -68,26 +70,39 @@ const emit = defineEmits<{
 /**
  * Files dropped or pasted into the document.
  *
- * Uploaded first, then embedded at the caret as `![name](attachment:<id>)`,
- * which is the same syntax somebody would type. The markdown carries an id
- * rather than a URL so it survives the instance moving host.
+ * Uploaded first, then embedded as `![name](attachment:<id>)`, which is the
+ * same syntax somebody would type. The markdown carries an id rather than a
+ * URL so it survives the instance moving host.
+ *
+ * `at` is where a drop landed. Without it a dropped file went in at whatever
+ * the caret happened to be, which for a document somebody had scrolled down
+ * to meant the picture appeared somewhere off screen. A paste passes no
+ * position, because the caret IS where a paste belongs.
  *
  * Several files keep their order. Awaiting each in turn is slower than firing
  * them together, but a race would insert them in whatever order the server
  * happened to answer, which is not the order they were dropped.
  */
-async function attachFiles(files: File[]): Promise<void> {
+async function attachFiles(files: File[], at?: number): Promise<void> {
   const owner = props.owner
   if (!owner || files.length === 0) return
+  // Held across the awaits so several files land in order rather than all at
+  // the same spot, and mapped through the document's changes so a slow upload
+  // does not insert at a position that has since moved.
+  let target = at
   for (const file of files) {
     try {
       const made = await api.attachmentUpload(owner, file)
       const alt = file.name.replace(/\.[^.]+$/, '')
-      editor
-        .chain()
-        .focus()
-        .insertContent(`![${alt}](attachment:${made.id})`)
-        .run()
+      const markdown = `![${alt}](attachment:${made.id})`
+      if (target === undefined) {
+        editor.chain().focus().insertContent(markdown).run()
+      } else {
+        const pos = Math.min(target, editor.state.doc.content.size)
+        editor.chain().focus().insertContentAt(pos, markdown).run()
+        // Past what was just inserted, so the next file follows it.
+        target = editor.state.selection.from
+      }
     } catch (err) {
       toast.error(humanise(err), { title: `Could not attach ${file.name}` })
     }
@@ -133,6 +148,8 @@ const editor = new Editor({
     Emphasis,
     Ref,
     Embed,
+    Image,
+    ColorSwatches,
     Placeholder.configure({
       placeholder: props.placeholder ?? 'Type here...',
     }),
@@ -158,11 +175,18 @@ const editor = new Editor({
       void attachFiles(files)
       return true
     },
-    handleDrop: (_view, event) => {
+    handleDrop: (view, event) => {
       const files = imagesFrom((event as DragEvent).dataTransfer?.files)
       if (files.length === 0 || !props.owner) return false
       event.preventDefault()
-      void attachFiles(files)
+      // Where the pointer let go, so the picture lands where it was aimed.
+      // posAtCoords returns null for a drop outside any content, and the
+      // caret is the sensible fallback for that.
+      const drop = view.posAtCoords({
+        left: (event as DragEvent).clientX,
+        top: (event as DragEvent).clientY,
+      })
+      void attachFiles(files, drop?.pos)
       return true
     },
   },

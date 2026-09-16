@@ -27,6 +27,7 @@ import { Callout } from '@/components/editor/nodes/Callout'
 import { Emphasis } from '@/components/editor/nodes/Emphasis'
 import { Ref } from '@/components/editor/nodes/Ref'
 import { Embed } from '@/components/editor/nodes/Embed'
+import { Image } from '@/components/editor/nodes/Image'
 
 function roundtrip(md: string): string {
   const editor = new Editor({
@@ -47,6 +48,7 @@ function roundtrip(md: string): string {
       Emphasis,
       Ref,
       Embed,
+      Image,
       Markdown.configure({
         html: false,
         linkify: true,
@@ -300,5 +302,46 @@ describe('callout tables are not interchangeable', () => {
       await import('@/lib/callouts')
     for (const kind of Object.keys(CALLOUT_KEYWORD))
       expect(CALLOUT_ICON_PATHS[kind], kind).toBeTruthy()
+  })
+})
+
+describe('images survive a save', () => {
+  /*
+   * Measured before the image node existed: this exact line came back empty.
+   * StarterKit ships no image node, so `![...](...)` parsed to nothing and
+   * serialized to nothing, and a document opened and saved with no edit lost
+   * every picture in it. The Icon System page had fourteen.
+   */
+  it('keeps an attachment embed rather than deleting it', () => {
+    const src = '![Stagewright icon](attachment:att_01m2n3gben9smtrepqbmrbax14)'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps the attachment id, not the URL it was displayed with', () => {
+    const src = '![Icon](attachment:att_abc123)'
+    // The served path is a display detail. Writing it into the document would
+    // hard-code this instance's host into somebody's file.
+    expect(roundtrip(src)).not.toContain('/api/v1/attachments/')
+    expect(roundtrip(src)).toContain('attachment:att_abc123')
+  })
+
+  it('keeps an ordinary image URL', () => {
+    const src = '![A picture](https://example.test/a.png)'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps an image sitting between prose', () => {
+    const src =
+      '### Stagewright\n\n![Stagewright icon](attachment:att_x)\n\n**the patch, as shipped**'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps an empty alt', () => {
+    expect(roundtrip('![](attachment:att_x)')).toBe('![](attachment:att_x)')
+  })
+
+  it('is stable on a second save', () => {
+    const src = '![Icon](attachment:att_x)'
+    expect(roundtrip(roundtrip(src))).toBe(src)
   })
 })

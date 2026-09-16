@@ -719,28 +719,7 @@ onMounted(() => {
     font-size: var(--nb-type-body-sm-size);
   }
 
-  :deep(.md__color) {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.4em;
-  }
-
-  :deep(.md__color-dot) {
-    align-self: center;
-    inline-size: 0.85em;
-    block-size: 0.85em;
-    flex: none;
-    border-radius: var(--nb-radius-xs);
-    /* Its own border, because a swatch of the page's background colour would
-       otherwise be an invisible chip that looks like a rendering fault. */
-    box-shadow: inset 0 0 0 1px
-      color-mix(in srgb, currentColor 35%, transparent);
-  }
-
-  :deep(.md__color-dot--light) {
-    box-shadow: inset 0 0 0 1px
-      color-mix(in srgb, currentColor 55%, transparent);
-  }
+  /* Colour swatch styling is shared with the editor: styles/decorations.scss */
 
   /* The bar sits inside the block so it scrolls with nothing and stays put
      when the code scrolls sideways. */
