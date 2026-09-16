@@ -1,3 +1,10 @@
+## [1.22.2](https://github.com/nubisco/acta/compare/v1.22.1...v1.22.2) (2026-09-16)
+
+
+### Bug Fixes
+
+* **editor:** stop the editor deleting every image in a document ([aaf59d6](https://github.com/nubisco/acta/commit/aaf59d68d746476d1a520a8a869bb473a7e4a6ca))
+
 ## [1.22.1](https://github.com/nubisco/acta/compare/v1.22.0...v1.22.1) (2026-09-16)
 
 
