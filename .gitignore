@@ -16,3 +16,6 @@ discovery-findings.md
 design-spec.md
 mvp-spec.md
 import-report.json
+
+# Agent worktrees: complete copies of this repository, created inside it.
+.claude/worktrees/

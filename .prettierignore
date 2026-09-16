@@ -12,3 +12,7 @@ data/
 # others), which silently turns a round-trip corpus into a test of Prettier's
 # output rather than of ours.
 web/test/fixtures/
+
+# Agent worktrees are full copies of this repository living inside it.
+# Formatting them walks the whole codebase once per worktree.
+.claude/

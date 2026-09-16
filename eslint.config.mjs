@@ -81,6 +81,11 @@ export default defineConfig(
       'data/',
       '*.js',
       '*.mjs',
+      // Agent worktrees are complete copies of this repository living inside
+      // it. Linting them means linting the whole codebase once per worktree,
+      // which exhausted the Node heap and failed the push rather than the
+      // code. They are checked on their own branch before they are merged.
+      '.claude/',
     ],
   },
 )
