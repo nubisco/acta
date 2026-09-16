@@ -5,7 +5,7 @@
     <!-- eslint-disable vue/no-v-html -->
     <div
       ref="rootEl"
-      class="md"
+      class="md md-prose"
       :class="{ 'md--wide': wide, 'md--clamped': clampedNow }"
       :style="clampedNow ? { maxBlockSize: `${clamp}rem` } : undefined"
       @click="onClick"
@@ -444,11 +444,16 @@ async function hydrateDiagrams(): Promise<void> {
     const result = await renderDiagram(source)
     if (!root.contains(pre)) continue
     if ('svg' in result) {
+      // The same wrapper the editor's node view draws, so the diagram keeps
+      // its spacing when the page goes into edit mode.
+      const block = document.createElement('div')
+      block.className = 'md__diagram'
       const figure = document.createElement('div')
       figure.className = 'md__diagram-figure'
       figure.setAttribute('role', 'img')
       figure.innerHTML = result.svg
-      pre.replaceWith(figure)
+      block.append(figure)
+      pre.replaceWith(block)
       continue
     }
     const note = document.createElement('div')
@@ -771,173 +776,11 @@ onMounted(() => {
   mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
 }
 
+/* Typography and block rhythm come from styles/prose.scss (`md-prose`), and
+   every `md__*` decoration from styles/decorations.scss, because the editor
+   renders the same document and has to look like it. Only what exists in the
+   reader alone lives here: Shiki's colours, which the editor does not apply. */
 .md {
-  line-height: 1.65;
-
-  /* Prose never set a size, so it inherited the browser's 16px and came out
-   * the same size as a card's own title. It is supporting text: body-md puts
-   * it below the title and level with the rest of the interface. */
-  font-size: var(--nb-type-body-md-size);
-
-  /* User content contains things with no break opportunity: a pasted URL, a
-   * stack frame, a run of x's from a load test. Without this they push past
-   * the column and overlap whatever sits beside them, rather than wrapping. */
-  overflow-wrap: anywhere;
-
-  :deep(p),
-  :deep(li),
-  :deep(blockquote) {
-    max-width: 68ch;
-  }
-
-  :deep(p) {
-    margin-block: var(--nb-spacing-12);
-  }
-
-  :deep(h1),
-  :deep(h2),
-  :deep(h3) {
-    margin-block: var(--nb-spacing-32) var(--nb-spacing-8);
-  }
-
-  /* A rule is a breath, not a line squeezed between paragraphs. */
-  :deep(hr) {
-    border: 0;
-    border-block-start: 1px solid var(--nb-c-border);
-    margin-block: var(--nb-spacing-32);
-  }
-
-  :deep(pre) {
-    overflow-x: auto;
-    padding: var(--nb-spacing-12);
-    border-radius: var(--nb-radius-sm);
-    background: var(--nb-c-surface);
-    border: 1px solid var(--nb-c-border);
-    font-family: var(--nb-font-family-mono);
-    font-size: var(--nb-type-code-sm-size);
-  }
-
-  /* A colour written as inline code carries the colour beside it. The value
-     stays exactly as written, because it is the thing being documented. */
-  /* An embedded image is content, so it gets the column and nothing more.
-     Constrained to the text width and never taller than a screen, or one
-     large upload pushes the rest of the document out of view. */
-  :deep(.md img) {
-    max-inline-size: 100%;
-    max-block-size: 80vh;
-    block-size: auto;
-    border-radius: var(--nb-radius-sm);
-  }
-
-  /* A non-image attachment: a chip that says what it is and downloads. An
-     <img> pointing at a PDF is a broken image icon, which tells the reader
-     nothing about what is attached. */
-  :deep(.md__file) {
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--nb-spacing-8);
-    padding: var(--nb-spacing-4) var(--nb-spacing-12);
-    border: 1px solid var(--nb-c-border);
-    border-radius: var(--nb-radius-sm);
-    background: var(--nb-c-surface);
-    color: var(--nb-c-text);
-    text-decoration: none;
-
-    &:hover {
-      background: var(--nb-c-surface-hover);
-    }
-  }
-
-  :deep(.md__file-hint) {
-    color: var(--nb-c-text-subtle);
-    font-size: var(--nb-type-body-sm-size);
-  }
-
-  /* Colour swatch styling is shared with the editor: styles/decorations.scss */
-
-  /* The bar sits inside the block so it scrolls with nothing and stays put
-     when the code scrolls sideways. */
-  /* The anchor appears on hover or focus, so a heading reads as a heading
-     until somebody wants the link. It stays visible once focused, or it
-     cannot be reached from the keyboard. */
-  :deep(.md__heading) {
-    scroll-margin-block-start: var(--nb-spacing-32);
-  }
-
-  :deep(.md__anchor) {
-    margin-inline-start: var(--nb-spacing-8);
-    padding: 0 var(--nb-spacing-4);
-    background: none;
-    border: 0;
-    color: var(--nb-c-text-subtle);
-    font: inherit;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 120ms ease;
-
-    &:focus-visible {
-      opacity: 1;
-      outline: 1px solid var(--nb-c-focus-ring);
-      outline-offset: 2px;
-    }
-  }
-
-  :deep(.md__heading:hover) .md__anchor {
-    opacity: 1;
-  }
-
-  :deep(.md__anchor--copied) {
-    opacity: 1;
-    color: var(--nb-c-success);
-  }
-
-  :deep(.md__code) {
-    position: relative;
-    padding-block-start: var(--nb-spacing-32);
-  }
-
-  :deep(.md__code-bar) {
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--nb-spacing-8);
-    padding: var(--nb-spacing-4) var(--nb-spacing-8);
-    border-block-end: 1px solid var(--nb-c-border);
-    background: var(--nb-c-surface);
-    border-start-start-radius: var(--nb-radius-sm);
-    border-start-end-radius: var(--nb-radius-sm);
-  }
-
-  :deep(.md__code-lang) {
-    color: var(--nb-c-text-subtle);
-    font-family: var(--nb-font-family-mono);
-    font-size: var(--nb-type-code-sm-size);
-  }
-
-  :deep(.md__code-copy) {
-    padding: 0 var(--nb-spacing-8);
-    background: none;
-    border: 1px solid transparent;
-    border-radius: var(--nb-radius-xs);
-    color: var(--nb-c-text-subtle);
-    font: inherit;
-    font-size: var(--nb-type-body-sm-size);
-    cursor: pointer;
-
-    &:hover {
-      color: var(--nb-c-text);
-      border-color: var(--nb-c-border);
-    }
-
-    &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring);
-      outline-offset: 1px;
-    }
-  }
-
   /* Shiki emits both themes as custom properties, so the same markup follows
      the page into dark mode without being highlighted again. */
   :deep(.shiki),
@@ -958,205 +801,6 @@ onMounted(() => {
     :deep(.shiki span) {
       color: var(--nb-shiki-dark);
     }
-  }
-
-  :deep(code) {
-    font-family: var(--nb-font-family-mono);
-  }
-
-  :deep(table) {
-    border-collapse: collapse;
-
-    th,
-    td {
-      border: 1px solid var(--nb-c-border);
-      padding: var(--nb-spacing-4) var(--nb-spacing-8);
-    }
-  }
-
-  /* Drive links read as one object rather than forty characters of URL.
-     Inline-flex so the pill sits on the text baseline inside a sentence and
-     never breaks across two lines mid-pill. */
-  :deep(.md__drive) {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--nb-spacing-4);
-    padding: 1px var(--nb-spacing-8) 1px var(--nb-spacing-4);
-    border: 1px solid var(--nb-c-border);
-    border-radius: 999px;
-    background: var(--nb-c-surface);
-    color: var(--nb-c-text);
-    text-decoration: none;
-    vertical-align: baseline;
-    white-space: nowrap;
-    font-size: var(--nb-type-body-sm-size);
-
-    &:hover {
-      background: var(--nb-c-surface-hover);
-      border-color: var(--nb-c-border-strong, var(--nb-c-border));
-    }
-
-    &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring);
-      outline-offset: 2px;
-    }
-  }
-
-  :deep(.md__drive-glyph) {
-    inline-size: 1em;
-    block-size: 1em;
-    flex: none;
-  }
-
-  :deep(.md__task) {
-    list-style: none;
-    margin-inline-start: calc(var(--nb-spacing-16) * -1);
-
-    input[type='checkbox'] {
-      accent-color: var(--nb-c-primary);
-      margin-inline-end: var(--nb-spacing-4);
-      vertical-align: -2px;
-    }
-  }
-
-  /* Callouts wear their kind: a solid accent bar and a soft tint of the
-   * same hue, the way Confluence panels read. */
-  /* Callout styling is shared with the editor: styles/decorations.scss */
-
-  /* Toggle styling is shared with the editor: styles/decorations.scss */
-
-  :deep(.md__ref) {
-    color: var(--nb-c-primary);
-    text-decoration: none;
-    border-block-end: 1px dashed currentColor;
-  }
-
-  /* A doc or space reference is a link, so it says so: a glyph, the pointer,
-     and a shape that matches the card chips beside it. It used to render as
-     a bare underlined word, indistinguishable from prose. */
-  :deep(.md__ref--link) {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.3em;
-    cursor: pointer;
-    border-block-end: 1px solid
-      color-mix(in srgb, currentColor 40%, transparent);
-  }
-
-  :deep(.md__ref-icon) {
-    align-self: center;
-    inline-size: 0.95em;
-    block-size: 0.95em;
-    flex: none;
-  }
-
-  :deep(button.md__ref) {
-    background: none;
-    border: 0;
-    border-block-end: 1px dashed currentColor;
-    padding: 0;
-    cursor: pointer;
-    font-family: var(--nb-font-family-mono);
-    font-size: var(--nb-type-code-sm-size);
-
-    &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring);
-      outline-offset: 2px;
-    }
-  }
-
-  /* A hydrated card ref: inline chip with the list as a colored dot, the key
-   * in mono and the live title, the Confluence smart-link mental model. */
-  :deep(.md__ref.md__ref--chip) {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    max-inline-size: 34ch;
-    padding: 1px 8px;
-    border: 1px solid var(--nb-c-border);
-    border-block-end: 1px solid var(--nb-c-border);
-    border-radius: 999px;
-    background: var(--nb-c-bg-soft);
-    color: var(--nb-c-text);
-    vertical-align: -0.35em;
-
-    .md__chip-dot {
-      flex: none;
-      inline-size: 7px;
-      block-size: 7px;
-      border-radius: 50%;
-      background: var(--nb-c-primary);
-    }
-
-    .md__chip-key {
-      flex: none;
-      font-family: var(--nb-font-family-mono);
-      font-size: var(--nb-type-code-sm-size);
-      color: var(--nb-c-text-muted);
-    }
-
-    .md__chip-title {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-family: var(--nb-font-family-sans);
-      font-size: var(--nb-font-size-13);
-    }
-
-    &.md__ref--done .md__chip-dot {
-      background: var(--nb-c-success);
-    }
-
-    &.md__ref--archived {
-      opacity: 0.65;
-
-      .md__chip-dot {
-        background: var(--nb-c-text-muted);
-      }
-
-      .md__chip-title {
-        text-decoration: line-through;
-      }
-    }
-
-    &.md__ref--gone {
-      opacity: 0.6;
-      cursor: default;
-      text-decoration: line-through;
-    }
-  }
-
-  :deep(.md__mention) {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    vertical-align: -0.3em;
-    color: var(--nb-c-primary);
-    font-weight: var(--nb-type-label-lg-weight);
-
-    .md__mention-avatar {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      inline-size: 16px;
-      block-size: 16px;
-      border-radius: 50%;
-      overflow: hidden;
-      object-fit: cover;
-      flex: none;
-      font-size: 8px;
-      font-weight: var(--nb-type-label-lg-weight);
-      color: var(--nb-c-bg);
-    }
-  }
-
-  :deep(.md__embed) {
-    display: block;
-    font-size: var(--nb-type-body-sm-size);
-    color: var(--nb-c-text-muted);
-    border: 1px dashed var(--nb-c-border);
-    border-radius: var(--nb-radius-sm);
-    padding: var(--nb-spacing-8);
   }
 }
 </style>

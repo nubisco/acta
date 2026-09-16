@@ -368,6 +368,9 @@ const editor = new Editor({
     SlashMenu,
   ],
   editorProps: {
+    // The reader's prose class, so both surfaces take their typography and
+    // block rhythm from one stylesheet (styles/prose.scss).
+    attributes: { class: 'md-prose' },
     handlePaste: (_view, event) => {
       // Only when there is a file. A paste carrying both an image and text,
       // as a screenshot tool often does, should still paste the text.
@@ -454,86 +457,24 @@ defineExpose({
   :deep(.tiptap) {
     outline: none;
     min-height: 8rem;
-    line-height: var(--nb-type-body-md-line-height);
     caret-color: var(--nb-c-primary);
 
-    > * + * {
-      margin-block-start: var(--nb-spacing-8);
-    }
+    /* Typography, block rhythm and every decoration come from
+       styles/prose.scss and styles/decorations.scss, the same sheets the
+       reader uses. Only what exists because this is an editor belongs here:
+       the table grips, the cell selection and the placeholder. Nothing here
+       may set a size, a margin, a colour or a border on a block, or the page
+       reflows when somebody clicks Edit (test/prose-parity.test.ts). */
 
-    p,
-    li,
-    blockquote {
-      max-width: 68ch;
-    }
-
-    h1,
-    h2,
-    h3,
-    h4 {
-      margin-block: var(--nb-spacing-24) var(--nb-spacing-8);
-
-      &:first-child {
-        margin-block-start: 0;
-      }
-    }
-
-    ul,
-    ol {
-      padding-inline-start: var(--nb-spacing-24);
-    }
-
-    blockquote {
-      border-inline-start: 2px solid var(--nb-c-border);
-      padding-inline-start: var(--nb-spacing-12);
-      margin-inline: 0;
-      color: var(--nb-c-text-muted);
-    }
-
-    pre {
-      overflow-x: auto;
-      padding: var(--nb-spacing-12);
-      border-radius: var(--nb-radius-sm);
-      background: var(--nb-c-surface);
-      border: 1px solid var(--nb-c-border);
-      font-family: var(--nb-font-family-mono);
-      font-size: var(--nb-type-code-sm-size);
-    }
-
-    code {
-      font-family: var(--nb-font-family-mono);
-      font-size: var(--nb-type-code-sm-size);
-    }
-
-    a {
-      color: var(--nb-c-primary);
-    }
-
-    hr {
-      border: 0;
-      border-block-start: 1px solid var(--nb-c-border);
-      margin-block: var(--nb-spacing-16);
-    }
-
-    /* Tables, matching the reader's borders so switching into edit mode is
-       not a change of appearance. */
+    /* The grips sit just outside the table edge, in the column's margin, so
+       the table starts where the reader's does rather than being pushed in to
+       make room for them. */
     table {
-      border-collapse: collapse;
       table-layout: fixed;
-      /* Room in the margin for the grips, which sit outside the table edge. */
-      margin-block: var(--nb-spacing-16);
-      margin-inline-start: var(--nb-spacing-12);
 
       th,
       td {
         position: relative;
-        border: 1px solid var(--nb-c-border);
-        padding: var(--nb-spacing-4) var(--nb-spacing-8);
-
-        > p {
-          margin: 0;
-          max-width: none;
-        }
       }
 
       /* prosemirror-tables marks a cell selection with this class. Without it

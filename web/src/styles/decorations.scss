@@ -13,13 +13,19 @@
 
 /* A hex value in a code span, with the colour it names shown beside it. */
 .md__color {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.4em;
+  white-space: nowrap;
 }
 
+/* The reader puts the dot inside `code.md__color`. The editor cannot put a
+   class on the code element, so its dot sits beside a `span.md__color` inside
+   the code. Both are plain inline flow, with the dot an inline-block centred
+   on the text, so they place it on the same pixel. This was a flex row in the
+   reader, which the editor's markup cannot be: its dot was an inline span
+   with no width, and the swatch vanished on Edit. */
 .md__color-dot {
-  align-self: center;
+  display: inline-block;
+  vertical-align: middle;
+  margin-inline-end: 0.4em;
   inline-size: 0.85em;
   block-size: 0.85em;
   flex: none;
@@ -118,6 +124,37 @@
   min-inline-size: 0;
 }
 
+/* The reader's disclosure, drawn to match the editor's caret button: the
+   same glyph (Phosphor caret-right, as NbIcon renders it), the same 14px box
+   centred on the title's first line, and the same inset for the title and
+   the body. `display: block` on the summary removes the browser's marker, so
+   without this the reader showed no sign that a toggle opens at all. */
+details.md__details {
+  --md-details-caret: calc(14px + var(--nb-spacing-4));
+
+  padding-inline-start: calc(var(--nb-spacing-8) + var(--md-details-caret));
+
+  > .md__details-summary {
+    position: relative;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset-inline-start: calc(var(--md-details-caret) * -1);
+      inset-block-start: 0;
+      inline-size: 14px;
+      block-size: calc(var(--nb-line-height-relaxed) * 1em);
+      background: var(--nb-c-text-muted);
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z'/%3E%3C/svg%3E")
+        center / 14px 14px no-repeat;
+    }
+  }
+
+  &[open] > .md__details-summary::before {
+    rotate: 90deg;
+  }
+}
+
 .md__details[data-open='false'] .md__details-body {
   display: none;
 }
@@ -127,8 +164,12 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  /* Aligned with the first line of the title rather than the top of the box. */
-  block-size: var(--nb-type-body-md-line-height, 1.5em);
+  /* Aligned with the first line of the title rather than the top of the box.
+     This was `var(--nb-type-body-md-line-height)`, a unitless 1.5, which is
+     not a length: the declaration was dropped and the caret sat at the top of
+     the line. `font: inherit` so `em` is the prose size, not the button's. */
+  font: inherit;
+  block-size: calc(var(--nb-line-height-relaxed) * 1em);
   padding: 0;
   border: 0;
   background: transparent;
@@ -456,7 +497,8 @@
   grid-row: 1;
   align-self: start;
   inline-size: 20px;
-  block-size: 1.65em;
+  /* One line of prose (styles/prose.scss). */
+  block-size: calc(var(--nb-line-height-relaxed) * 1em);
   color: var(--callout-accent);
 }
 
@@ -540,4 +582,284 @@
   .md__block-target {
     animation: none;
   }
+}
+
+/* Everything below lived in the reader's scoped block, so the editor emitted
+   the same classes (refs, mentions, embeds, code blocks) with nothing to
+   match them. Moved here unchanged, apart from losing the `.md` prefix. */
+
+/* Headings. The anchor appears on hover or focus, so a heading reads as a
+   heading until somebody wants the link. It stays visible once focused, or it
+   cannot be reached from the keyboard. */
+.md__heading {
+  scroll-margin-block-start: var(--nb-spacing-32);
+}
+
+.md__anchor {
+  margin-inline-start: var(--nb-spacing-8);
+  padding: 0 var(--nb-spacing-4);
+  background: none;
+  border: 0;
+  color: var(--nb-c-text-subtle);
+  font: inherit;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+
+  &:focus-visible {
+    opacity: 1;
+    outline: 1px solid var(--nb-c-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.md__heading:hover .md__anchor,
+.md__anchor--copied {
+  opacity: 1;
+}
+
+.md__anchor--copied {
+  color: var(--nb-c-success);
+}
+
+/* A code block's bar: the language and a copy button. It sits inside the
+   block so it scrolls with nothing and stays put when the code scrolls
+   sideways. The editor draws the same bar (MermaidView.vue), so the block
+   does not lose 20px of height when somebody clicks Edit. */
+.md__code {
+  position: relative;
+  padding-block-start: var(--nb-spacing-32);
+}
+
+.md__code-bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nb-spacing-8);
+  padding: var(--nb-spacing-4) var(--nb-spacing-8);
+  border-block-end: 1px solid var(--nb-c-border);
+  background: var(--nb-c-surface);
+  border-start-start-radius: var(--nb-radius-sm);
+  border-start-end-radius: var(--nb-radius-sm);
+}
+
+.md__code-lang {
+  color: var(--nb-c-text-subtle);
+  font-family: var(--nb-font-family-mono);
+  font-size: var(--nb-type-code-sm-size);
+}
+
+.md__code-copy {
+  padding: 0 var(--nb-spacing-8);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--nb-radius-xs);
+  color: var(--nb-c-text-subtle);
+  font: inherit;
+  font-size: var(--nb-type-body-sm-size);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--nb-c-text);
+    border-color: var(--nb-c-border);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--nb-c-focus-ring);
+    outline-offset: 1px;
+  }
+}
+
+/* A non-image attachment: a chip that says what it is and downloads. An
+   <img> pointing at a PDF is a broken image icon, which tells the reader
+   nothing about what is attached. */
+.md__file {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--nb-spacing-8);
+  padding: var(--nb-spacing-4) var(--nb-spacing-12);
+  border: 1px solid var(--nb-c-border);
+  border-radius: var(--nb-radius-sm);
+  background: var(--nb-c-surface);
+  color: var(--nb-c-text);
+  text-decoration: none;
+
+  &:hover {
+    background: var(--nb-c-surface-hover);
+  }
+}
+
+.md__file-hint {
+  color: var(--nb-c-text-subtle);
+  font-size: var(--nb-type-body-sm-size);
+}
+
+/* Drive links read as one object rather than forty characters of URL.
+   Inline-flex so the pill sits on the text baseline inside a sentence and
+   never breaks across two lines mid-pill. */
+.md__drive {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nb-spacing-4);
+  padding: 1px var(--nb-spacing-8) 1px var(--nb-spacing-4);
+  border: 1px solid var(--nb-c-border);
+  border-radius: 999px;
+  background: var(--nb-c-surface);
+  color: var(--nb-c-text);
+  text-decoration: none;
+  vertical-align: baseline;
+  white-space: nowrap;
+  font-size: var(--nb-type-body-sm-size);
+
+  &:hover {
+    background: var(--nb-c-surface-hover);
+    border-color: var(--nb-c-border-strong, var(--nb-c-border));
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--nb-c-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.md__drive-glyph {
+  inline-size: 1em;
+  block-size: 1em;
+  flex: none;
+}
+
+/* References to cards, docs and spaces. */
+.md__ref {
+  color: var(--nb-c-primary);
+  text-decoration: none;
+  border-block-end: 1px dashed currentColor;
+}
+
+/* A doc or space reference is a link, so it says so: a glyph, the pointer,
+   and a shape that matches the card chips beside it. */
+.md__ref--link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3em;
+  cursor: pointer;
+  border-block-end: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+}
+
+.md__ref-icon {
+  align-self: center;
+  inline-size: 0.95em;
+  block-size: 0.95em;
+  flex: none;
+}
+
+button.md__ref {
+  background: none;
+  border: 0;
+  border-block-end: 1px dashed currentColor;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--nb-font-family-mono);
+  font-size: var(--nb-type-code-sm-size);
+
+  &:focus-visible {
+    outline: 1px solid var(--nb-c-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* A hydrated card ref: inline chip with the list as a colored dot, the key
+   in mono and the live title, the Confluence smart-link mental model. */
+.md__ref.md__ref--chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-inline-size: 34ch;
+  padding: 1px 8px;
+  border: 1px solid var(--nb-c-border);
+  border-block-end: 1px solid var(--nb-c-border);
+  border-radius: 999px;
+  background: var(--nb-c-bg-soft);
+  color: var(--nb-c-text);
+  vertical-align: -0.35em;
+
+  .md__chip-dot {
+    flex: none;
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: 50%;
+    background: var(--nb-c-primary);
+  }
+
+  .md__chip-key {
+    flex: none;
+    font-family: var(--nb-font-family-mono);
+    font-size: var(--nb-type-code-sm-size);
+    color: var(--nb-c-text-muted);
+  }
+
+  .md__chip-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--nb-font-family-sans);
+    font-size: var(--nb-font-size-13);
+  }
+
+  &.md__ref--done .md__chip-dot {
+    background: var(--nb-c-success);
+  }
+
+  &.md__ref--archived {
+    opacity: 0.65;
+
+    .md__chip-dot {
+      background: var(--nb-c-text-muted);
+    }
+
+    .md__chip-title {
+      text-decoration: line-through;
+    }
+  }
+
+  &.md__ref--gone {
+    opacity: 0.6;
+    cursor: default;
+    text-decoration: line-through;
+  }
+}
+
+.md__mention {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: -0.3em;
+  color: var(--nb-c-primary);
+  font-weight: var(--nb-type-label-lg-weight);
+
+  .md__mention-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 16px;
+    block-size: 16px;
+    border-radius: 50%;
+    overflow: hidden;
+    object-fit: cover;
+    flex: none;
+    font-size: 8px;
+    font-weight: var(--nb-type-label-lg-weight);
+    color: var(--nb-c-bg);
+  }
+}
+
+.md__embed {
+  display: block;
+  font-size: var(--nb-type-body-sm-size);
+  color: var(--nb-c-text-muted);
+  border: 1px dashed var(--nb-c-border);
+  border-radius: var(--nb-radius-sm);
+  padding: var(--nb-spacing-8);
 }

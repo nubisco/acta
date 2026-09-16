@@ -5,6 +5,21 @@
     class="md__code"
     :data-language="language || null"
   >
+    <!-- The reader's bar, so the block keeps its shape when the page goes
+         into edit mode. Outside the editable content, so it is never part of
+         the code. -->
+    <div class="md__code-bar" contenteditable="false">
+      <span class="md__code-lang">{{ language || 'text' }}</span>
+      <button
+        type="button"
+        class="md__code-copy"
+        aria-label="Copy code"
+        @mousedown.prevent
+        @click="copySource"
+      >
+        {{ copied ? 'Copied' : 'Copy' }}
+      </button>
+    </div>
     <NodeViewContent
       as="code"
       :class="language ? `language-${language}` : null"
@@ -130,6 +145,15 @@ watch(
   },
   { immediate: true },
 )
+
+/** The copy button, behaving as the reader's does. */
+const copied = ref(false)
+function copySource(): void {
+  void navigator.clipboard?.writeText(source.value).then(() => {
+    copied.value = true
+    setTimeout(() => (copied.value = false), 1500)
+  })
+}
 
 /** Clicking the picture is how you get at the text that made it. */
 function openSource(): void {

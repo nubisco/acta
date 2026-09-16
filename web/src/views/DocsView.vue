@@ -2,7 +2,11 @@
   <div
     ref="docsEl"
     class="docs"
-    :class="{ 'docs--wide': isWide, 'docs--toc-overlay': tocOverlay }"
+    :class="{
+      'docs--wide': isWide,
+      'docs--toc-overlay': tocOverlay,
+      'docs--toc-side': tocShown && !tocOverlay,
+    }"
   >
     <DocsTreeSlot v-if="!chrome.frameHidden.value" />
 
@@ -383,12 +387,20 @@ const bodyRoot = computed<HTMLElement | null>(() => {
  */
 const docsEl = ref<HTMLElement | null>(null)
 const docsWidth = ref(Number.POSITIVE_INFINITY)
+/*
+ * It floats only when the page is genuinely too narrow for text and contents
+ * side by side. Below a full gutter on both sides the column gives up the
+ * room instead (see `.docs--toc-side`): a 1440px laptop with the document
+ * tree open used to reduce the contents to one icon in a corner, which nobody
+ * found, while the column held 135px it never filled with prose.
+ */
+const TOC_RAIL_REM = 12
+const COLUMN_MIN_REM = 44
 const tocOverlay = computed(() => {
   const rem = parseFloat(
     getComputedStyle(document.documentElement).fontSize || '16',
   )
-  const column = (isWide.value ? 72 : 52) * rem
-  return docsWidth.value < column + 2 * 15 * rem
+  return docsWidth.value < (COLUMN_MIN_REM + TOC_RAIL_REM) * rem
 })
 let resizeObserver: ResizeObserver | null = null
 let releaseSurface: (() => void) | null = null
@@ -792,6 +804,17 @@ async function restoreVersion(): Promise<void> {
     minmax(0, 1fr);
   min-height: 0;
 
+  /* Contents beside the column. The right track never drops below the rail's
+     width, so where both gutters are wide the page stays centred exactly as
+     before, and where they are not the column narrows (down to the 44rem
+     DocsView.vue's `tocOverlay` guarantees, still wider than a 68ch line)
+     rather than the contents collapsing into a corner button. */
+  &--toc-side {
+    grid-template-columns:
+      minmax(0, 1fr) minmax(0, var(--docs-column))
+      minmax(12rem, 1fr);
+  }
+
   /* The document's stored `layout`. */
   &--wide {
     --docs-column: 72rem;
@@ -870,7 +893,7 @@ async function restoreVersion(): Promise<void> {
   }
 
   /* A wide page is wide for prose too, not only for tables and diagrams. */
-  &--wide &__doc :deep(:is(.md, .tiptap) :is(p, li, blockquote)) {
+  &--wide &__doc :deep(.md-prose :is(p, li, blockquote)) {
     max-width: none;
   }
 

@@ -1,0 +1,229 @@
+/**
+ * Prose: the typography and block rhythm of a markdown document.
+ *
+ * One stylesheet for both surfaces. The reader (MarkdownView) and the editor
+ * (MarkdownEditor) each put `md-prose` on the element that holds the blocks,
+ * and nothing else sets the size, line height or spacing of those blocks.
+ *
+ * It used to be two copies, one scoped to each component, and they drifted:
+ * the editor set 16px text where the reader set 14px, so every paragraph
+ * rewrapped when somebody clicked Edit, and its blockquote rule outranked the
+ * shared callout rule and turned a coloured 3px accent into a grey 2px one.
+ * web/e2e/parity.mjs measures the two surfaces in a real browser, and
+ * test/prose-parity.test.ts keeps the editor from growing its own copy again.
+ *
+ * Element rules sit under `:where(.md-prose)`, which contributes no
+ * specificity. A decoration class (`.md__callout`, `.md__img`, ...) therefore
+ * always wins over the element it decorates, whatever order the sheets load
+ * in, and nobody needs a more specific selector to style a block.
+ */
+
+.md-prose {
+  font-size: var(--nb-type-body-md-size);
+  line-height: var(--nb-line-height-relaxed);
+
+  /* User content contains things with no break opportunity: a pasted URL, a
+   * stack frame, a run of x's from a load test. Without this they push past
+   * the column and overlap whatever sits beside them, rather than wrapping. */
+  overflow-wrap: anywhere;
+
+  /* ProseMirror's own sheet turns ligatures off in the editor, because a
+     caret cannot sit inside one. Off here too, or "fi" is a narrower glyph in
+     the reader than in the editor and a line can wrap one word earlier. */
+  font-variant-ligatures: none;
+  font-feature-settings: 'liga' 0;
+
+  /* ProseMirror's sheet also sets `white-space: break-spaces`, where the
+     space before a wrap takes up room on the line, and `overflow-wrap:
+     break-word`. The reader collapses that space into the margin, so a word
+     that just fits in the reader wrapped in the editor. `pre-wrap` keeps
+     every typed space (which is all ProseMirror needs) and lets the space at
+     a wrap hang, as the reader's does. Two classes, because ProseMirror's
+     rule is injected after this sheet. */
+  &.ProseMirror {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* The container decides the space around the document, not its first and
+     last blocks. Otherwise a page that opens with a heading starts lower than
+     one that opens with a paragraph. */
+  > :first-child {
+    margin-block-start: 0;
+  }
+
+  > :last-child {
+    margin-block-end: 0;
+  }
+}
+
+:where(.md-prose) {
+  p,
+  li,
+  blockquote {
+    max-width: 68ch;
+  }
+
+  p {
+    margin-block: var(--nb-spacing-12);
+  }
+
+  /* The body's headings sit below the page title (heading-04), one step per
+     level, so a document's own `# Overview` never outranks the page it is on. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin-block: var(--nb-spacing-24) var(--nb-spacing-8);
+  }
+
+  h1,
+  h2 {
+    margin-block-start: var(--nb-spacing-32);
+  }
+
+  h1 {
+    font-size: var(--nb-type-heading-03-size);
+    font-weight: var(--nb-type-heading-03-weight);
+    line-height: var(--nb-type-heading-03-line-height);
+    letter-spacing: var(--nb-type-heading-03-letter-spacing);
+  }
+
+  h2 {
+    font-size: var(--nb-type-heading-02-size);
+    font-weight: var(--nb-type-heading-02-weight);
+    line-height: var(--nb-type-heading-02-line-height);
+    letter-spacing: var(--nb-type-heading-02-letter-spacing);
+  }
+
+  h3 {
+    font-size: var(--nb-type-heading-01-size);
+    font-weight: var(--nb-type-heading-01-weight);
+    line-height: var(--nb-type-heading-01-line-height);
+    letter-spacing: var(--nb-type-heading-01-letter-spacing);
+  }
+
+  h4,
+  h5,
+  h6 {
+    font-size: var(--nb-type-label-lg-size);
+    font-weight: var(--nb-type-label-lg-weight);
+    line-height: var(--nb-type-label-lg-line-height);
+    letter-spacing: var(--nb-type-label-lg-letter-spacing);
+  }
+
+  a {
+    color: var(--nb-c-primary);
+  }
+
+  /* Markers inside the column, not hanging in the margin. */
+  ul,
+  ol {
+    margin-block: var(--nb-spacing-12);
+    padding-inline-start: var(--nb-spacing-24);
+  }
+
+  li > :is(ul, ol) {
+    margin-block: 0;
+  }
+
+  /* The editor wraps every list item's text in a paragraph. In a tight list
+     the reader has no paragraph there, so it must not add space. */
+  :is(ul, ol)[data-tight='true'] > li > p {
+    margin-block: 0;
+  }
+
+  /* Task lists. The reader renders `li.md__task > input` followed by the
+     text, the editor `li[data-checked] > label > input` followed by a
+     paragraph. Both become a row whose first item is the checkbox, aligned on
+     the text baseline, so the two lay out identically. */
+  ul:has(> li.md__task),
+  ul[data-type='taskList'] {
+    list-style: none;
+    padding-inline-start: 0;
+  }
+
+  li.md__task,
+  li[data-checked] {
+    display: flex;
+    align-items: baseline;
+    gap: var(--nb-spacing-8);
+
+    input[type='checkbox'] {
+      margin: 0;
+      accent-color: var(--nb-c-primary);
+    }
+  }
+
+  li[data-checked] {
+    > label {
+      display: flex;
+      flex: none;
+    }
+
+    > div {
+      flex: 1;
+      min-inline-size: 0;
+
+      > p {
+        margin-block: 0;
+      }
+    }
+  }
+
+  /* A plain quote. A callout is a blockquote too, and its class outranks all
+     of this. */
+  blockquote {
+    margin-block: var(--nb-spacing-12);
+    margin-inline: 0;
+    padding-inline-start: var(--nb-spacing-12);
+    border-inline-start: 2px solid var(--nb-c-border);
+    color: var(--nb-c-text-muted);
+  }
+
+  code {
+    font-family: var(--nb-font-family-mono);
+    font-size: var(--nb-type-code-md-size);
+  }
+
+  pre {
+    overflow-x: auto;
+    margin-block: var(--nb-spacing-16);
+    padding: var(--nb-spacing-12);
+    border-radius: var(--nb-radius-sm);
+    background: var(--nb-c-surface);
+    border: 1px solid var(--nb-c-border);
+    font-family: var(--nb-font-family-mono);
+    font-size: var(--nb-type-code-sm-size);
+
+    code {
+      font-size: inherit;
+    }
+  }
+
+  /* A rule is a breath, not a line squeezed between paragraphs. */
+  hr {
+    border: 0;
+    border-block-start: 1px solid var(--nb-c-border);
+    margin-block: var(--nb-spacing-32);
+  }
+
+  table {
+    border-collapse: collapse;
+    margin-block: var(--nb-spacing-16);
+  }
+
+  th,
+  td {
+    border: 1px solid var(--nb-c-border);
+    padding: var(--nb-spacing-4) var(--nb-spacing-8);
+
+    /* The editor's cells hold paragraphs, the reader's hold text. */
+    > p {
+      margin: 0;
+      max-width: none;
+    }
+  }
+}

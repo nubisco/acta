@@ -46,8 +46,13 @@ function build(doc: PMNode): DecorationSet {
     found.push(
       Decoration.inline(pos, pos + node.nodeSize, { class: 'md__color' }),
       // `side: -1` puts the dot before the text rather than after it, and
-      // matches the reader, which prepends.
-      Decoration.widget(pos, () => swatch(color), { side: -1 }),
+      // matches the reader, which prepends. `marks` puts it inside the code
+      // span, where the reader has it, so it is sized against the code's font
+      // rather than the paragraph's.
+      Decoration.widget(pos, () => swatch(color), {
+        side: -1,
+        marks: node.marks,
+      }),
     )
   })
   return DecorationSet.create(doc, found)
