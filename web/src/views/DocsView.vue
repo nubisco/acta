@@ -20,6 +20,7 @@
           <NbButton size="sm" variant="primary" @click="startEdit"
             >Edit</NbButton
           >
+          <DocTransferMenu :doc="doc" />
           <NbButton
             v-nb-tooltip="{ body: 'Delete page' }"
             size="sm"
@@ -226,6 +227,7 @@ import type { IAnchor } from '@/lib/anchors'
 import DocChromeBar from '@/components/DocChromeBar.vue'
 import DocToc from '@/components/DocToc.vue'
 import DocsTreeSlot from '@/components/DocsTreeSlot.vue'
+import DocTransferMenu from '@/components/DocTransferMenu.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
