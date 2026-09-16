@@ -25,6 +25,8 @@ import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
 import { Callout } from '@/components/editor/nodes/Callout'
 import { Emphasis } from '@/components/editor/nodes/Emphasis'
+import { Ref } from '@/components/editor/nodes/Ref'
+import { Embed } from '@/components/editor/nodes/Embed'
 
 function roundtrip(md: string): string {
   const editor = new Editor({
@@ -43,6 +45,8 @@ function roundtrip(md: string): string {
       TaskItem.configure({ nested: true }),
       Callout,
       Emphasis,
+      Ref,
+      Embed,
       Markdown.configure({
         html: false,
         linkify: true,
@@ -192,5 +196,80 @@ describe('known normalisations', () => {
         .filter((l) => l.trim() !== '')
         .join('\n')
     expect(strip(out)).toBe(strip(source))
+  })
+})
+
+/**
+ * References.
+ *
+ * These were plain text in the editor, so the brackets were visible, the
+ * caret could sit inside a card key, and a save re-serialized them as prose.
+ * As a node they are one object, which is also what stops them being escaped.
+ */
+describe('references survive a save', () => {
+  it('writes every target form back unchanged', () => {
+    for (const src of [
+      'See [[SU-12]] for detail.',
+      'See [[doc:handbook]].',
+      'See [[space:ENG]].',
+      'Ask [[@jose]] about it.',
+      'Read [[doc:handbook|the handbook]] first.',
+      'Card [[SU-12|the login bug]] is open.',
+    ]) {
+      expect(roundtrip(src), src).toBe(src)
+    }
+  })
+
+  it('keeps several references in one line apart', () => {
+    const src = 'Both [[SU-1]] and [[SU-2]] block [[SU-3]].'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('leaves brackets inside code alone', () => {
+    // `[[x]]` in a code span is a literal somebody typed on purpose, most
+    // obviously when documenting this very syntax.
+    expect(roundtrip('Write `[[SU-12]]` to link a card.')).toBe(
+      'Write `[[SU-12]]` to link a card.',
+    )
+    const fence = '```\n[[SU-12]]\n```'
+    expect(roundtrip(fence)).toBe(fence)
+  })
+
+  it('leaves an embed alone, which is a different construct', () => {
+    // `![[query:...]]` is an embed, not a reference. The leading `!` is the
+    // whole difference, so the pattern has to refuse to match it.
+    const src = '![[query:space=ENG state=open]]'
+    expect(roundtrip(src)).toContain('![[query:space=ENG state=open]]')
+  })
+
+  it('keeps text either side of a reference', () => {
+    const src = 'Before [[SU-12]] after.'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('is idempotent', () => {
+    const src = 'See [[SU-12]] and [[@jose]].'
+    expect(roundtrip(roundtrip(src))).toBe(roundtrip(src))
+  })
+})
+
+/**
+ * Constructs the editor does not model yet.
+ *
+ * `:::details` is not used in any document in the workspace, so it has no
+ * node and still appears as its literal text while editing. That is a gap in
+ * the editing experience, not damage: the point of this test is that it comes
+ * back byte-identical, so nobody's collapsible section is destroyed by a save
+ * while it waits for a node view.
+ */
+describe('unmodelled constructs are preserved, not corrupted', () => {
+  it('round-trips a details block unchanged', () => {
+    const src = ':::details How it works\n\nSome body text.\n\n:::'
+    const out = roundtrip(src)
+    expect(out).toContain(':::details How it works')
+    expect(out).toContain('Some body text.')
+    expect(out).toContain(':::')
+    // Nothing escaped, which is what went wrong with callouts.
+    expect(out).not.toContain('\\:')
   })
 })

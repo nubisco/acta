@@ -46,6 +46,8 @@ import { chartColorFor } from '@/lib/colors'
 import { DOC_NAV_KEY } from '@/lib/keys'
 import { wpath } from '@/lib/paths'
 import { CALLOUT_TYPES, calloutIconSvg as calloutIcon } from '@/lib/callouts'
+import { isDarkColor, parseColor } from '@/components/decorations/colors'
+import { itemChip, itemChipHtml } from '@/components/decorations/refs'
 import {
   DRIVE_COLORS,
   DRIVE_LABELS,
@@ -318,22 +320,17 @@ function hydrateItemRefs(): void {
   for (const el of root.querySelectorAll<HTMLElement>('.md__ref--item')) {
     const key = el.getAttribute('data-ref') ?? ''
     refCards.request(key)
-    const card = refCards.cards.get(key)
-    if (card === undefined) continue
-    if (card === null) {
-      el.classList.add('md__ref--chip', 'md__ref--gone')
-      el.title = 'This card no longer exists'
+    const view = itemChip(key, refCards.cards.get(key))
+    if (!view) continue
+    if (view.gone) {
+      el.classList.add(...view.classes)
+      el.title = view.title
       el.textContent = key
       continue
     }
-    el.classList.add('md__ref--chip')
-    el.classList.toggle('md__ref--done', !!card.done)
-    el.classList.toggle('md__ref--archived', !!card.archived)
-    el.title = card.archived ? `${card.list} · archived` : card.list
-    el.innerHTML =
-      `<span class="md__chip-dot" aria-hidden="true"></span>` +
-      `<span class="md__chip-key">${esc(card.key)}</span>` +
-      `<span class="md__chip-title">${esc(card.title)}</span>`
+    el.classList.add(...view.classes)
+    el.title = view.title
+    el.innerHTML = itemChipHtml(view)
   }
 }
 
@@ -367,12 +364,44 @@ function hydrateMentions(): void {
   }
 }
 
+/**
+ * Inline code holding a colour gets the colour shown next to it.
+ *
+ * A page of hex values is unreadable as text, which is exactly the situation
+ * on the Icon System page. The detection is deliberately strict, because this
+ * looks at every code span in the document and `#include` must not get a
+ * swatch. The value itself is left as written: it is the thing being
+ * documented, and the swatch is an addition rather than a replacement.
+ */
+function hydrateColors(): void {
+  const root = rootEl.value
+  if (!root) return
+  for (const el of root.querySelectorAll<HTMLElement>('code')) {
+    if (el.dataset.swatch === '1') continue
+    // Never inside a fence: that is source, and a line of CSS would sprout
+    // dots down the side of the block.
+    if (el.closest('pre')) continue
+    const color = parseColor(el.textContent ?? '')
+    if (!color) continue
+    el.dataset.swatch = '1'
+    el.classList.add('md__color')
+    const dark = isDarkColor(color)
+    const dot = document.createElement('span')
+    dot.className = 'md__color-dot'
+    dot.setAttribute('aria-hidden', 'true')
+    dot.style.background = color
+    if (dark === false) dot.classList.add('md__color-dot--light')
+    el.prepend(dot)
+  }
+}
+
 watch(
   [() => html.value, () => refCards.version.value, () => ws.overview.value],
   () =>
     void nextTick(() => {
       hydrateItemRefs()
       hydrateMentions()
+      hydrateColors()
       void measure()
     }),
   { immediate: true, flush: 'post' },
@@ -476,6 +505,31 @@ onMounted(() => {
     font-size: var(--nb-type-code-sm-size);
   }
 
+  /* A colour written as inline code carries the colour beside it. The value
+     stays exactly as written, because it is the thing being documented. */
+  :deep(.md__color) {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4em;
+  }
+
+  :deep(.md__color-dot) {
+    align-self: center;
+    inline-size: 0.85em;
+    block-size: 0.85em;
+    flex: none;
+    border-radius: var(--nb-radius-xs);
+    /* Its own border, because a swatch of the page's background colour would
+       otherwise be an invisible chip that looks like a rendering fault. */
+    box-shadow: inset 0 0 0 1px
+      color-mix(in srgb, currentColor 35%, transparent);
+  }
+
+  :deep(.md__color-dot--light) {
+    box-shadow: inset 0 0 0 1px
+      color-mix(in srgb, currentColor 55%, transparent);
+  }
+
   :deep(code) {
     font-family: var(--nb-font-family-mono);
   }
@@ -537,18 +591,30 @@ onMounted(() => {
 
   /* Callouts wear their kind: a solid accent bar and a soft tint of the
    * same hue, the way Confluence panels read. */
+  /* A grid rather than absolute positioning, so the icon belongs to the
+     first line instead of floating at a guessed offset from the top. The
+     icon occupies row 1 of its own column and everything else stacks in
+     column 2, which keeps several paragraphs, lists and code inside a
+     callout laying out normally. */
   :deep(.md__callout) {
     --callout-accent: var(--nb-c-info);
-    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: var(--nb-spacing-12);
+    align-items: start;
     margin-block: var(--nb-spacing-16);
     margin-inline: 0;
     padding: var(--nb-spacing-12) var(--nb-spacing-16);
-    padding-inline-start: calc(var(--nb-spacing-16) * 2 + 20px);
     border: 0;
     border-inline-start: 3px solid var(--callout-accent);
     border-radius: var(--nb-radius-xs);
     background: color-mix(in srgb, var(--callout-accent) 9%, transparent);
     color: var(--nb-c-text);
+
+    > :not(.md__callout-icon) {
+      grid-column: 2;
+      min-inline-size: 0;
+    }
 
     p:first-of-type {
       margin-block-start: 0;
@@ -559,12 +625,17 @@ onMounted(() => {
     }
   }
 
+  /* The box is one line tall, the glyph is 20px. An SVG letterboxes rather
+     than stretching, so the artwork sits optically centred on the first line
+     whatever the callout's height: centred-looking when there is one line,
+     and level with the first line when there are ten. The old rule nudged a
+     20px box down by 0.2em, which was right at one font size only. */
   :deep(.md__callout-icon) {
-    position: absolute;
-    inset-block-start: calc(var(--nb-spacing-12) + 0.2em);
-    inset-inline-start: var(--nb-spacing-16);
+    grid-column: 1;
+    grid-row: 1;
+    align-self: start;
     inline-size: 20px;
-    block-size: 20px;
+    block-size: 1.65em;
     color: var(--callout-accent);
   }
 

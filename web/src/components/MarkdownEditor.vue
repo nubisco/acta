@@ -40,6 +40,8 @@ import {
 } from '@/components/editor/suggestions'
 import { Callout } from '@/components/editor/nodes/Callout'
 import { Emphasis } from '@/components/editor/nodes/Emphasis'
+import { Ref } from '@/components/editor/nodes/Ref'
+import { Embed } from '@/components/editor/nodes/Embed'
 
 const props = defineProps<{
   modelValue: string
@@ -81,6 +83,8 @@ const editor = new Editor({
     // than left to the blockquote it came from.
     Callout,
     Emphasis,
+    Ref,
+    Embed,
     Placeholder.configure({
       placeholder: props.placeholder ?? 'Type here...',
     }),

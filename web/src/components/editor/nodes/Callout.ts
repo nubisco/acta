@@ -1,4 +1,5 @@
 import { Node, mergeAttributes, wrappingInputRule } from '@tiptap/core'
+import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import type { MarkdownSerializerState } from '@tiptap/pm/markdown'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import {
@@ -7,6 +8,7 @@ import {
   calloutIconSvg,
   parseCalloutMarker,
 } from '@/lib/callouts'
+import CalloutView from '@/components/decorations/CalloutView.vue'
 
 /**
  * Callouts as a real node, rather than a blockquote whose first line happens
@@ -77,6 +79,10 @@ export const Callout = Node.create({
       }),
       0,
     ]
+  },
+
+  addNodeView() {
+    return VueNodeViewRenderer(CalloutView)
   },
 
   addCommands() {
