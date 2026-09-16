@@ -33,6 +33,9 @@ import TableHeader from '@tiptap/extension-table-header'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
+import { useToast } from '@nubisco/ui'
+import { api } from '@/api/client'
+import { humanise } from '@/lib/state'
 import {
   MentionTypeahead,
   RefTypeahead,
@@ -47,12 +50,55 @@ const props = defineProps<{
   modelValue: string
   placeholder?: string
   autofocus?: boolean
+  /**
+   * What a dropped or pasted image should attach to. Without it the editor
+   * still works and simply does not accept files, which is right for a
+   * surface with nothing to attach them to.
+   */
+  owner?: { item?: string; doc?: string }
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   blur: []
+  /** An upload finished, so the owner can refresh its attachment list. */
+  attached: []
 }>()
+
+/**
+ * Files dropped or pasted into the document.
+ *
+ * Uploaded first, then embedded at the caret as `![name](attachment:<id>)`,
+ * which is the same syntax somebody would type. The markdown carries an id
+ * rather than a URL so it survives the instance moving host.
+ *
+ * Several files keep their order. Awaiting each in turn is slower than firing
+ * them together, but a race would insert them in whatever order the server
+ * happened to answer, which is not the order they were dropped.
+ */
+async function attachFiles(files: File[]): Promise<void> {
+  const owner = props.owner
+  if (!owner || files.length === 0) return
+  for (const file of files) {
+    try {
+      const made = await api.attachmentUpload(owner, file)
+      const alt = file.name.replace(/\.[^.]+$/, '')
+      editor
+        .chain()
+        .focus()
+        .insertContent(`![${alt}](attachment:${made.id})`)
+        .run()
+    } catch (err) {
+      toast.error(humanise(err), { title: `Could not attach ${file.name}` })
+    }
+  }
+  emit('attached')
+}
+
+/** Images only. A dropped folder or archive is not something to embed. */
+function imagesFrom(list: FileList | null | undefined): File[] {
+  return Array.from(list ?? []).filter((f) => f.type.startsWith('image/'))
+}
 
 /**
  * The document IS the editing surface (Typora-style): markdown in, markdown
@@ -60,6 +106,8 @@ const emit = defineEmits<{
  * :::details, [[refs]]) survive as their literal text, so the enhanced-
  * Markdown contract is never destroyed by an edit.
  */
+const toast = useToast()
+
 const editor = new Editor({
   content: props.modelValue,
   autofocus: props.autofocus ? 'end' : false,
@@ -100,6 +148,24 @@ const editor = new Editor({
     MentionTypeahead,
     SlashMenu,
   ],
+  editorProps: {
+    handlePaste: (_view, event) => {
+      // Only when there is a file. A paste carrying both an image and text,
+      // as a screenshot tool often does, should still paste the text.
+      const files = imagesFrom(event.clipboardData?.files)
+      if (files.length === 0 || !props.owner) return false
+      event.preventDefault()
+      void attachFiles(files)
+      return true
+    },
+    handleDrop: (_view, event) => {
+      const files = imagesFrom((event as DragEvent).dataTransfer?.files)
+      if (files.length === 0 || !props.owner) return false
+      event.preventDefault()
+      void attachFiles(files)
+      return true
+    },
+  },
   onBlur: () => emit('blur'),
   onUpdate: ({ editor: instance }) => {
     emit(

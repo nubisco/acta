@@ -109,8 +109,10 @@
           v-if="editing"
           v-model="draft"
           autofocus
-          placeholder="Start writing. Headings, lists, quotes and code all form as you type."
+          placeholder="Start writing. Headings, lists, quotes and code all form as you type. Drop an image to attach it."
           class="docs__editor"
+          :owner="{ doc: doc.slug }"
+          @attached="reloadAttachments"
         />
         <template v-else-if="viewingOld">
           <NbBanner
@@ -300,6 +302,24 @@ const backlinkFacts = computed(() =>
       : link.src_id,
   })),
 )
+
+/**
+ * Re-read the attachment list after an upload.
+ *
+ * Only the list: reloading the document would replace the body with what the
+ * server has, discarding whatever is being typed. The embed for the new file
+ * is already in the draft, and this is what lets it resolve to a picture
+ * rather than a broken one.
+ */
+async function reloadAttachments(): Promise<void> {
+  if (!slug.value || !doc.value) return
+  try {
+    const fresh = await api.docGet(slug.value)
+    doc.value = { ...doc.value, attachments: fresh.attachments }
+  } catch {
+    // The embed still renders once the page is next opened.
+  }
+}
 
 async function loadDoc(): Promise<void> {
   if (!slug.value) {

@@ -454,7 +454,12 @@ export const api = {
     })
     const body = await res.json().catch(() => null)
     if (!res.ok) throw new ApiHttpError(res.status, body)
-    return body as { id: string; filename: string; size: number }
+    return body as {
+      id: string
+      filename: string
+      size: number
+      url: string
+    }
   },
 
   attachmentDelete: (id: string) =>
