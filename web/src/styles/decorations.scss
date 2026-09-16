@@ -261,3 +261,147 @@
 .md__diagram.is-editing .md__diagram-pending {
   display: none;
 }
+
+/* A bare URL alone in a paragraph, as a preview card.
+ *
+ * Built from design tokens rather than from `@nubisco/ui` components, the
+ * same way every other markdown decoration here is. The reader renders its
+ * document as HTML it patches directly, so it has nowhere to mount a
+ * component, and a card assembled from components in the editor beside a
+ * hand-built one in the reader is exactly the drift these shared classes
+ * exist to prevent. See the note in linkCards.ts.
+ */
+.md__card-slot {
+  margin-block: var(--nb-spacing-16);
+}
+
+/* No box of its own: the slot is a paragraph in the reader and a node view
+   wrapper in the editor, and the card inside must lay out identically in
+   both. */
+.md__card-hold {
+  display: contents;
+}
+
+.md__card {
+  display: flex;
+  align-items: stretch;
+  max-inline-size: 68ch;
+  overflow: hidden;
+  border: 1px solid var(--nb-c-border);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-c-surface);
+  color: var(--nb-c-text);
+  text-decoration: none;
+
+  &:hover {
+    background: var(--nb-c-surface-hover);
+    border-color: var(--nb-c-border-strong, var(--nb-c-border));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--nb-c-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* The picture is supporting evidence, so it takes a third of the card and
+   never grows past it. A preview image is often 1200x630, and given its
+   natural size it would be the whole card and the title an afterthought. */
+.md__card-shot {
+  flex: none;
+  inline-size: 33%;
+  max-inline-size: 11rem;
+  background: var(--nb-c-layer-1);
+
+  img {
+    inline-size: 100%;
+    block-size: 100%;
+    min-block-size: 5.5rem;
+    object-fit: cover;
+    display: block;
+  }
+}
+
+.md__card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-spacing-4);
+  /* Or a long unbroken title pushes the picture out of the card. */
+  min-inline-size: 0;
+  padding: var(--nb-spacing-12);
+}
+
+.md__card-site {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-spacing-4);
+  color: var(--nb-c-text-subtle);
+  font-size: var(--nb-type-body-sm-size);
+}
+
+/* A favicon that fails to load leaves no gap, because alt is empty and the
+   element collapses. That is the intended behaviour: the site name carries
+   the identification, and the icon is a bonus. */
+.md__card-icon {
+  inline-size: 14px;
+  block-size: 14px;
+  flex: none;
+  border-radius: var(--nb-radius-xs);
+  object-fit: contain;
+}
+
+.md__card-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Two lines each, and then an ellipsis. A card is a summary: a site that
+   writes a paragraph into its og:description must not be able to make one
+   link taller than the text around it. */
+.md__card-title,
+.md__card-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.md__card-title {
+  font-weight: var(--nb-type-weight-semibold, 600);
+}
+
+.md__card-desc {
+  color: var(--nb-c-text-muted);
+  font-size: var(--nb-type-body-sm-size);
+}
+
+/* The state before the metadata lands, and for ever if it never does: the
+   plain link, exactly as it rendered before this feature existed. */
+.md__card-plain {
+  color: var(--nb-c-primary);
+}
+
+/* Selected in the editor. ProseMirror marks the selected atom, and without a
+   visible state there is no way to tell a card is about to be replaced by
+   whatever you type next. */
+.ProseMirror .md__card-slot.ProseMirror-selectednode {
+  outline: 2px solid var(--nb-c-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--nb-radius-md);
+}
+
+/* The card is one thing. Without this the caret can be put inside it and a
+   title can be edited into text that is not what the page says. */
+.ProseMirror .md__card-slot {
+  user-select: none;
+}
+
+/* A narrow column (a card description, a comment) has no room for a picture
+   beside the text. */
+@media (max-width: 30rem) {
+  .md__card-shot {
+    display: none;
+  }
+}

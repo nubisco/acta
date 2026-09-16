@@ -463,6 +463,32 @@ CREATE TABLE IF NOT EXISTS notification (
 CREATE INDEX IF NOT EXISTS idx_notification_inbox
   ON notification(actor_id, read_at, created_at DESC);
 
+-- Open Graph metadata behind a link preview card, cached with a TTL.
+--
+-- The one table here with no workspace_id, deliberately. This is not an
+-- entity, it is a cache of what a public web page said about itself, and the
+-- answer does not differ per workspace. Keyed per workspace it would fetch
+-- the same twenty URLs again for every tenant, which is the cost this table
+-- exists to avoid. What that trades away is small and worth naming: a row
+-- says somebody on this instance once linked that URL.
+--
+-- A failure is cached too, under status 'none' and a shorter TTL. Without
+-- that, a document holding twenty links to a site with no metadata refetches
+-- all twenty every time it is opened, which is the exact behaviour the cache
+-- is meant to stop.
+CREATE TABLE IF NOT EXISTS link_preview (
+  url TEXT PRIMARY KEY,
+  status TEXT NOT NULL CHECK (status IN ('ok', 'none')),
+  title TEXT,
+  description TEXT,
+  site_name TEXT,
+  image_url TEXT,
+  favicon_url TEXT,
+  fetched_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_link_preview_expires ON link_preview(expires_at);
+
 -- Full-text search over items, comments, docs (mvp F7).
 CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
   kind, ref, title, body, space_key, tokenize = 'unicode61'

@@ -114,6 +114,28 @@ prose is left alone: `$5 and $10`, `$PATH` and anything inside backticks or a
 fenced block are never read as maths. A single dollar you want kept literal can
 be written `\$`.
 
+### Link previews
+
+A URL on a line of its own becomes a card: the page's icon, title, description,
+site and picture. A URL inside a sentence stays an ordinary link, because that
+is where you meant it to read as one.
+
+```md
+Worth reading:
+
+https://example.com/the-article
+```
+
+Nothing is added to the document. What is stored is still the plain URL, so a
+page written before this existed already shows its cards, and a page exported
+somewhere else is unaffected.
+
+The metadata is read by the server, not by your browser, and kept for a day, so
+a page of twenty links opens in one request. Acta only fetches public
+addresses: an intranet or `localhost` URL is refused, and so is any name that
+resolves to a private address. When there is nothing to show, for that reason
+or because the site publishes no metadata, the link simply stays a link.
+
 ## Search
 
 `Cmd/Ctrl + K` anywhere. It covers card titles and descriptions, comments and

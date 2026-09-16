@@ -29,6 +29,7 @@ import { Table, TableCell, TableHeader } from '@/components/editor/nodes/Table'
 import { Details } from '@/components/editor/nodes/Details'
 import { MathBlock, MathInline, MathText } from '@/components/editor/nodes/Math'
 import { MermaidBlock } from '@/components/editor/nodes/MermaidBlock'
+import { LinkCard } from '@/components/editor/nodes/LinkCard'
 
 function roundtrip(md: string): string {
   const editor = new Editor({
@@ -55,6 +56,7 @@ function roundtrip(md: string): string {
       MathBlock,
       MathInline,
       MermaidBlock,
+      LinkCard,
       Markdown.configure({
         html: false,
         linkify: true,
@@ -935,6 +937,97 @@ describe('mermaid diagrams survive a save', () => {
 
   it('is stable on a second save', () => {
     const src = '```mermaid\ngraph LR;\n  A-->B;\n```'
+    expect(roundtrip(roundtrip(src))).toBe(src)
+  })
+})
+
+/**
+ * Link preview cards.
+ *
+ * The card is a decoration over a plain markdown link, so the only thing
+ * these can assert about the document is that it did not change. Measured
+ * before the LinkCard node existed: `https://example.com/page` came back as
+ * `<https://example.com/page>`, because prosemirror-markdown writes a link
+ * whose text is its own href as an autolink. So the node is not merely
+ * harmless to the markdown, it is what makes a bare URL survive a save.
+ */
+describe('link preview cards leave the markdown alone', () => {
+  it('writes a bare URL back as exactly the bare URL', () => {
+    const src = 'https://example.com/page'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps the URL byte for byte, query string and all', () => {
+    for (const url of [
+      'https://example.com/a/b?x=1&y=2',
+      'http://example.com:8443/path',
+      'https://sub.domain.example.com/',
+      'https://example.com/a_b-c~d/(e)',
+    ])
+      expect(roundtrip(url), url).toBe(url)
+  })
+
+  it('makes no card of a URL whose text and href disagree', () => {
+    // Found by the test above before this rule existed. markdown-it decodes
+    // the link TEXT and leaves the href encoded, so this URL renders with
+    // the text ".../Café". Reading the card's URL off that text wrote the
+    // decoded spelling back into the document.
+    //
+    // Measured: `.../Café` and `.../Caf%C3%A9` produce a byte-identical DOM,
+    // so there is no way to tell which was typed, and no card can be made
+    // without choosing one and re-spelling half of everyone's links. This
+    // one gets no card and stays the ordinary link it already was.
+    //
+    // What comes back is a labelled link rather than a bare URL, which is
+    // what happened before this feature existed too: the target is intact
+    // and the label is the decoded spelling. Pinned here because it is the
+    // behaviour this rule deliberately leaves alone, not one it introduced.
+    const out = roundtrip('https://example.com/wiki/Caf%C3%A9')
+    expect(out).toContain('(https://example.com/wiki/Caf%C3%A9)')
+    expect(out).not.toContain('md__card')
+  })
+
+  it('keeps a document of cards and prose intact', () => {
+    const src = [
+      '# Reading',
+      '',
+      'The first one:',
+      '',
+      'https://example.com/one',
+      '',
+      'https://example.com/two',
+      '',
+      'And that is all.',
+    ].join('\n')
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('leaves a URL inside a sentence as an inline link', () => {
+    // The distinction the whole feature rests on. What comes back is the
+    // autolink form, which is prosemirror-markdown's own behaviour for any
+    // link whose text is its href and is what happened before this feature
+    // existed too. Pinned so a change to it is a decision rather than a
+    // surprise: what matters is that the URL is still there, still inline,
+    // and still inside the sentence rather than lifted out of it.
+    const out = roundtrip('See https://example.com/page for more.')
+    expect(out).toContain('https://example.com/page')
+    expect(out).toBe('See <https://example.com/page> for more.')
+  })
+
+  it('leaves a labelled link labelled', () => {
+    const src = '[the plan](https://example.com/page)'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('never touches a URL inside code', () => {
+    const fence = ['```', 'https://example.com/page', '```'].join('\n')
+    expect(roundtrip(fence)).toBe(fence)
+    const span = 'Run `curl https://example.com/page` first.'
+    expect(roundtrip(span)).toBe(span)
+  })
+
+  it('is stable on a second save', () => {
+    const src = 'Intro.\n\nhttps://example.com/page\n\nOutro.'
     expect(roundtrip(roundtrip(src))).toBe(src)
   })
 })

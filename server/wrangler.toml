@@ -39,3 +39,8 @@ enabled = true
 
 [alias]
 "bun:sqlite" = "./src/db/bun-sqlite-stub.ts"
+# Link previews resolve a hostname before fetching it, which on Bun is
+# node:dns. Workers has no resolver, and without this the bundler cannot
+# resolve the specifier at all and the deploy fails to build. The stub throws,
+# which is what makes safeFetch fall through to DNS-over-HTTPS there.
+"node:dns/promises" = "./src/core/node-dns-stub.ts"

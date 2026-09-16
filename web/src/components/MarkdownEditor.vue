@@ -152,6 +152,7 @@ import type { TTableAlignment } from '@/components/editor/nodes/Table'
 import { TableGrips, selectedTableBand } from '@/components/editor/tableGrips'
 import { MathBlock, MathInline, MathText } from '@/components/editor/nodes/Math'
 import { MermaidBlock } from '@/components/editor/nodes/MermaidBlock'
+import { LinkCard } from '@/components/editor/nodes/LinkCard'
 import { ColorSwatches } from '@/components/editor/decorations'
 
 const props = defineProps<{
@@ -332,6 +333,11 @@ const editor = new Editor({
     MathText,
     MathBlock,
     MathInline,
+    // A bare URL alone in a paragraph is a preview card in the reader, so it
+    // has to be a node here too. Without one the editor would show the plain
+    // link, which is harmless, and then write it back as `<https://...>`,
+    // which is not: the two surfaces would disagree about the text.
+    LinkCard,
     ColorSwatches,
     Placeholder.configure({
       placeholder: props.placeholder ?? 'Type here...',

@@ -45,6 +45,7 @@ import {
   zAttachmentAddBatch,
   type AttachmentStore,
 } from '../services/attachments'
+import { linkPreviewGet, zLinkPreviewRequest } from '../services/linkPreviews'
 import { ruleList, ruleWrite, zRuleWrite } from '../services/rules'
 import {
   connectionList,
@@ -334,6 +335,21 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     )
     flushPendingEvents()
     return c.json(result)
+  })
+
+  /**
+   * Metadata for the bare URLs in a document, so each can render as a card.
+   *
+   * POST rather than GET because a document's worth of URLs does not fit in a
+   * query string, and one request rather than one per link because the point
+   * of the batch is that opening a document is one round trip whatever it
+   * contains. Everything outbound from here goes through the SSRF guard in
+   * core/safeFetch.ts, and every failure comes back as status 'none' so the
+   * reader can keep showing the plain link.
+   */
+  app.post('/link-previews', async (c) => {
+    const body = zLinkPreviewRequest.parse(await c.req.json())
+    return c.json({ previews: await linkPreviewGet(ctxOf(c), body.urls) })
   })
 
   app.post('/attachments', async (c) => {

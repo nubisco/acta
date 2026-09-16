@@ -11,6 +11,8 @@ import type {
   TOpResult,
 } from '@nubisco/acta-shared'
 
+import type { ILinkPreview } from '@/components/decorations/linkCards'
+
 const BASE = '/api/v1'
 
 /**
@@ -198,6 +200,20 @@ export const api = {
       mentions: IMyWorkItem[]
       recent: IMyWorkItem[]
     }>('/me/work'),
+
+  /**
+   * Open Graph metadata for bare URLs, so each can render as a preview card.
+   *
+   * Batched, because the whole point is that opening a document costs one
+   * round trip whatever it contains. The server answers from its own cache
+   * where it can, and answers `status: 'none'` rather than failing when a
+   * site has no metadata or is one it refuses to fetch.
+   */
+  linkPreviews: (urls: string[]) =>
+    req<{ previews: ILinkPreview[] }>('/link-previews', {
+      method: 'POST',
+      body: JSON.stringify({ urls }),
+    }),
 
   itemGet: (keys: string[], include?: string[]) =>
     req<{ items: IItemDetail[] }>('/items/get', {

@@ -8,6 +8,8 @@
  * these assert the round trip rather than the toolbar.
  */
 import { describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
+import type { NodeSelection } from '@tiptap/pm/state'
 import { mount, flushPromises } from '@vue/test-utils'
 
 vi.mock('@/api/client', () => ({
@@ -24,6 +26,7 @@ import { Table, TableCell, TableHeader } from '@/components/editor/nodes/Table'
 import { TableGrips, tableGripsKey } from '@/components/editor/tableGrips'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { imageSrc } from '@/components/editor/nodes/Image'
+import { useLinkPreviews } from '@/stores/linkPreviews'
 import {
   IMAGE_MAX_WIDTH,
   IMAGE_MIN_WIDTH,
@@ -899,5 +902,106 @@ describe('MarkdownEditor keeps maths and diagrams', () => {
     // dropped on parse, the save after the typo would delete it.
     const src = '$$\n\\frac{1}{\n$$'
     expect(await roundTrip(src)).toBe(src)
+  })
+})
+
+/**
+ * Link preview cards in the editor.
+ *
+ * The reader shows a bare URL on its own as a card, so the editor's schema
+ * has to know that node. Without it the editor would not merely show
+ * something different, it would write the paragraph back as an autolink,
+ * which is the same class of silent damage that dropped tables and images.
+ *
+ * The metadata is seeded into the shared store rather than mocked at the HTTP
+ * layer: what is under test is the node and its markdown, not the transport.
+ */
+describe('MarkdownEditor link cards', () => {
+  const store = useLinkPreviews()
+
+  /** The mounted editor, for the tests that need to act on the document. */
+  async function open(source: string) {
+    const view = mount(MarkdownEditor, {
+      props: { modelValue: source },
+      attachTo: document.body,
+      // The selection bubble positions itself with tippy, which needs a
+      // layout engine jsdom does not have, and it runs on every transaction.
+      // Stubbed so that acting on the document here fails for reasons to do
+      // with the document.
+      global: { stubs: { BubbleMenu: true } },
+    })
+    await flushPromises()
+    await nextTick()
+    const editor = (view.vm as unknown as { editor: Editor }).editor
+    return { view, editor }
+  }
+
+  /** Where the one link card node is, or -1. */
+  function cardAt(editor: Editor): number {
+    let found = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'linkCard' && found === -1) found = pos
+    })
+    return found
+  }
+
+  it('makes a card node of a bare URL alone in a paragraph', async () => {
+    const url = 'https://example.com/editor-1'
+    store.previews.set(url, {
+      url,
+      status: 'ok',
+      title: 'A page',
+      site_name: 'Example',
+    })
+    const { view, editor } = await open(`Before.\n\n${url}\n\nAfter.`)
+    expect(cardAt(editor)).toBeGreaterThan(-1)
+    expect(view.find('a.md__card').text()).toContain('A page')
+    // And the document is unchanged by any of it.
+    expect(editor.storage.markdown.getMarkdown()).toBe(
+      `Before.\n\n${url}\n\nAfter.`,
+    )
+    view.unmount()
+  })
+
+  it('leaves a URL inside a sentence as an ordinary link', async () => {
+    const url = 'https://example.com/editor-2'
+    store.previews.set(url, { url, status: 'ok', title: 'A page' })
+    const { view, editor } = await open(`See ${url} for the detail.`)
+    expect(cardAt(editor)).toBe(-1)
+    expect(view.find('a.md__card').exists()).toBe(false)
+    view.unmount()
+  })
+
+  it('shows the plain link when there is no metadata', async () => {
+    const url = 'https://example.com/editor-3'
+    store.previews.set(url, { url, status: 'none' })
+    const { view, editor } = await open(url)
+    // Still a card NODE, which is what keeps the markdown intact, and still
+    // rendered as the plain link, which is what keeps it from being a box.
+    expect(cardAt(editor)).toBeGreaterThan(-1)
+    expect(view.find('a.md__card').exists()).toBe(false)
+    expect(view.find('a.md__card-plain').text()).toBe(url)
+    expect(editor.storage.markdown.getMarkdown()).toBe(url)
+    view.unmount()
+  })
+
+  it('selects and deletes as one block, like any other atom', async () => {
+    const url = 'https://example.com/editor-4'
+    store.previews.set(url, { url, status: 'ok', title: 'A page' })
+    const { view, editor } = await open(`Keep this.\n\n${url}`)
+    const pos = cardAt(editor)
+    expect(pos).toBeGreaterThan(-1)
+
+    editor.commands.setNodeSelection(pos)
+    const selection = editor.state.selection as NodeSelection
+    // One selection over the whole card, not a caret inside a title that
+    // came from somebody else's web page.
+    expect(selection.node?.type.name).toBe('linkCard')
+
+    editor.commands.deleteSelection()
+    const out = editor.storage.markdown.getMarkdown()
+    expect(out).not.toContain(url)
+    expect(out).toContain('Keep this.')
+    view.unmount()
   })
 })

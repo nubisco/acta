@@ -42,6 +42,7 @@ import MarkdownIt from 'markdown-it'
 import { useRouter } from 'vue-router'
 import { useDocPreview, useInspector, useWorkspace } from '@/stores/workspace'
 import { useRefCards } from '@/stores/refs'
+import { useLinkPreviews } from '@/stores/linkPreviews'
 import { chartColorFor } from '@/lib/colors'
 import { DOC_NAV_KEY } from '@/lib/keys'
 import { wpath } from '@/lib/paths'
@@ -60,6 +61,10 @@ import {
   itemChipHtml,
   refIconSvg,
 } from '@/components/decorations/refs'
+import {
+  bareUrlParagraph,
+  linkCardHtml,
+} from '@/components/decorations/linkCards'
 import {
   DRIVE_COLORS,
   DRIVE_LABELS,
@@ -96,6 +101,7 @@ const router = useRouter()
 const inspector = useInspector()
 const docPreview = useDocPreview()
 const refCards = useRefCards()
+const linkPreviews = useLinkPreviews()
 const ws = useWorkspace()
 const rootEl = ref<HTMLElement | null>(null)
 
@@ -600,6 +606,37 @@ function hydrateItemRefs(): void {
 }
 
 /**
+ * A bare URL that is the whole paragraph becomes a preview card.
+ *
+ * The distinction is the whole design: a URL inside a sentence stays an
+ * ordinary link, and only a URL that is a paragraph on its own is a card.
+ * Nothing about this touches the markdown, which still holds exactly the URL
+ * the author typed.
+ *
+ * Hydrated rather than rendered, because the metadata comes from the server
+ * and arrives after the document is already on screen. Until it does, and
+ * for ever if the server has nothing, what is shown is the plain link that
+ * was there before. A card must never become a broken box.
+ */
+function hydrateLinkCards(): void {
+  const root = rootEl.value
+  if (!root) return
+  for (const el of root.querySelectorAll<HTMLElement>('p')) {
+    // Remembered on the element, because once the card is in place the
+    // paragraph no longer looks like a bare URL to the detector.
+    const url = el.dataset.linkCard || bareUrlParagraph(el)
+    if (!url) continue
+    el.dataset.linkCard = url
+    linkPreviews.request(url)
+    const preview = linkPreviews.previews.get(url)
+    // Not asked yet, or asked and still in flight: leave the link alone.
+    if (!preview) continue
+    el.classList.add('md__card-slot')
+    el.innerHTML = `<span class="md__card-hold">${linkCardHtml(url, preview)}</span>`
+  }
+}
+
+/**
  * @mentions render as avatar + display name (the @handle is storage, never
  * presentation): a tiny initials-or-image disc from the same actor data the
  * rest of the app uses.
@@ -661,10 +698,16 @@ function hydrateColors(): void {
 }
 
 watch(
-  [() => html.value, () => refCards.version.value, () => ws.overview.value],
+  [
+    () => html.value,
+    () => refCards.version.value,
+    () => linkPreviews.version.value,
+    () => ws.overview.value,
+  ],
   () =>
     void nextTick(() => {
       hydrateItemRefs()
+      hydrateLinkCards()
       hydrateMentions()
       hydrateColors()
       void hydrateCodeBlocks()

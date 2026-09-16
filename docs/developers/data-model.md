@@ -57,6 +57,19 @@ Rebuilt on save, which is what makes backlinks possible.
 documents. FTS5 has no `RENAME COLUMN`, so any column change means dropping and
 reindexing from the source rows.
 
+**`link_preview`** Open Graph metadata behind a link preview card, keyed by
+URL, with a TTL: a day for a page that answered, an hour for one that did not,
+so a document full of links to a site with no metadata is not refetched on
+every open. The one table with no `workspace_id`, because it caches what a
+public web page said about itself and that does not differ per tenant.
+
+Everything that fills it goes out through `server/src/core/safeFetch.ts`. The
+URL comes from a document, which makes it an SSRF sink: the scheme must be
+http or https, the hostname is resolved and every address it resolves to is
+checked against the private and special-use ranges, redirects are followed by
+hand and re-checked at each hop, and size and time are both capped. Read that
+file before changing anything that fetches a URL a person supplied.
+
 ## The spine
 
 **`event`** Every mutation: `ts`, `actor_id`, `actor_kind`, `on_behalf_of`,

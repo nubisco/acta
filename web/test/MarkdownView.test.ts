@@ -5,8 +5,11 @@
  * unbreakable text escaping its column.
  */
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
+import { mount, flushPromises } from '@vue/test-utils'
 import MarkdownView from '@/components/MarkdownView.vue'
+import { useLinkPreviews } from '@/stores/linkPreviews'
+import type { ILinkPreview } from '@/components/decorations/linkCards'
 
 function render(source: string) {
   return mount(MarkdownView, { props: { source } })
@@ -334,5 +337,148 @@ describe('maths in the reader', () => {
   it('refuses an empty formula', () => {
     expect(render('A $ $ B').html()).not.toContain('data-math')
     expect(render('$$\n\n$$').html()).not.toContain('data-math')
+  })
+})
+
+/**
+ * Link preview cards in the reader.
+ *
+ * The metadata is seeded into the shared store rather than mocked at the HTTP
+ * layer, because what is under test is the rule for WHEN a card appears and
+ * what it renders, not the transport. Every test uses its own URL, since the
+ * store is one cache shared by every surface in the app.
+ */
+describe('link preview cards', () => {
+  const store = useLinkPreviews()
+
+  function seed(url: string, preview: Partial<ILinkPreview>): void {
+    store.previews.set(url, { url, status: 'ok', ...preview })
+  }
+
+  async function show(source: string) {
+    const view = mount(MarkdownView, { props: { source } })
+    await flushPromises()
+    await nextTick()
+    return view
+  }
+
+  it('renders a bare URL that is the whole paragraph as a card', async () => {
+    const url = 'https://example.com/card-1'
+    seed(url, {
+      title: 'The page title',
+      description: 'What it is about.',
+      site_name: 'Example',
+      image_url: 'https://example.com/shot.png',
+      favicon_url: 'https://example.com/icon.png',
+    })
+    const view = await show(`Before.\n\n${url}\n\nAfter.`)
+    const card = view.find('a.md__card')
+    expect(card.exists()).toBe(true)
+    expect(card.attributes('href')).toBe(url)
+    expect(card.text()).toContain('The page title')
+    expect(card.text()).toContain('What it is about.')
+    expect(card.text()).toContain('Example')
+    expect(view.find('.md__card-shot img').attributes('src')).toBe(
+      'https://example.com/shot.png',
+    )
+    expect(view.find('img.md__card-icon').attributes('src')).toBe(
+      'https://example.com/icon.png',
+    )
+    // The prose around it is untouched.
+    expect(view.text()).toContain('Before.')
+    expect(view.text()).toContain('After.')
+  })
+
+  it('leaves a URL inside a sentence as an ordinary link', async () => {
+    // The distinction the whole feature rests on.
+    const url = 'https://example.com/card-2'
+    seed(url, { title: 'Would be a card' })
+    const view = await show(`See ${url} for the detail.`)
+    expect(view.find('a.md__card').exists()).toBe(false)
+    expect(view.find(`a[href="${url}"]`).exists()).toBe(true)
+    expect(view.text()).toContain('See ')
+    expect(view.text()).toContain(' for the detail.')
+  })
+
+  it('makes no card of a labelled link', async () => {
+    const url = 'https://example.com/card-3'
+    seed(url, { title: 'Would be a card' })
+    const view = await show(`[the plan](${url})`)
+    expect(view.find('a.md__card').exists()).toBe(false)
+    expect(view.text()).toBe('the plan')
+  })
+
+  it('shows the plain link while the metadata is still in flight', async () => {
+    // A document opens before any preview lands. A page of grey boxes
+    // filling in one by one reads as a document repairing itself.
+    const url = 'https://example.com/card-4-unseeded'
+    const view = await show(url)
+    expect(view.find('a.md__card').exists()).toBe(false)
+    expect(view.find(`a[href="${url}"]`).text()).toBe(url)
+  })
+
+  it('keeps the plain link for ever when there is no metadata', async () => {
+    // A site with no Open Graph tags, a page that is down, and an address
+    // the server refuses to fetch all arrive here. A card must never become
+    // a broken box.
+    const url = 'https://example.com/card-5'
+    store.previews.set(url, { url, status: 'none' })
+    const view = await show(url)
+    expect(view.find('a.md__card').exists()).toBe(false)
+    const plain = view.find('a.md__card-plain')
+    expect(plain.attributes('href')).toBe(url)
+    expect(plain.text()).toBe(url)
+  })
+
+  it('renders a card with no picture and no description', async () => {
+    const url = 'https://example.com/card-6'
+    seed(url, { title: 'Only a title' })
+    const view = await show(url)
+    expect(view.find('a.md__card').exists()).toBe(true)
+    expect(view.find('.md__card-shot').exists()).toBe(false)
+    expect(view.find('.md__card-desc').exists()).toBe(false)
+    // The hostname stands in for a site that did not name itself.
+    expect(view.find('.md__card-host').text()).toBe('example.com')
+  })
+
+  it('escapes what the remote page said', async () => {
+    // The title is somebody else's HTML. It arrives as data and it renders
+    // as text, or a link in a document is a way to run script here.
+    const url = 'https://example.com/card-7'
+    seed(url, {
+      title: '<img src=x onerror=alert(1)>',
+      description: '"><script>alert(2)</script>',
+    })
+    const view = await show(url)
+    expect(view.find('.md__card-title img').exists()).toBe(false)
+    expect(view.find('script').exists()).toBe(false)
+    expect(view.find('.md__card-title').text()).toContain('onerror')
+  })
+
+  it('refuses a preview image with an unsafe scheme', async () => {
+    const url = 'https://example.com/card-8'
+    seed(url, { title: 'Fine', image_url: 'javascript:alert(1)' })
+    const view = await show(url)
+    expect(view.find('a.md__card').exists()).toBe(true)
+    expect(view.find('.md__card-shot').exists()).toBe(false)
+  })
+
+  it('opens in a new tab without handing the tab over', async () => {
+    const url = 'https://example.com/card-9'
+    seed(url, { title: 'Somewhere else' })
+    const view = await show(url)
+    const card = view.find('a.md__card')
+    expect(card.attributes('target')).toBe('_blank')
+    expect(card.attributes('rel')).toBe('noopener noreferrer')
+  })
+
+  it('leaves a Drive link as the pill it already was', async () => {
+    // Drive answers an anonymous fetch with a sign-in page, so a card would
+    // be empty where the pill is built from the URL alone and always works.
+    const url = 'https://docs.google.com/document/d/1Card/edit'
+    seed(url, { title: 'Would be a card' })
+    const view = await show(url)
+    expect(view.find('a.md__card').exists()).toBe(false)
+    expect(view.find('a.md__drive').exists()).toBe(true)
   })
 })
