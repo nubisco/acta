@@ -1,3 +1,11 @@
+# [1.20.0](https://github.com/nubisco/acta/compare/v1.19.1...v1.20.0) (2026-09-16)
+
+
+### Features
+
+* **api:** embeddable attachments, served safely ([e1d35b6](https://github.com/nubisco/acta/commit/e1d35b69f005a63d6664e541a725d1affbc7d851))
+* **app:** references, embeds and colours as decorations, not markup ([5623e07](https://github.com/nubisco/acta/commit/5623e0704bc1e1aca265da7f906ee60c4d91fa58))
+
 ## [1.19.1](https://github.com/nubisco/acta/compare/v1.19.0...v1.19.1) (2026-09-16)
 
 
