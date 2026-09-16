@@ -408,7 +408,7 @@ export async function docTree(ctx: ICtx, root?: string, depth = 10) {
     updated_at: number
   }
   const all = await ctx.db.query<INode>(
-    'SELECT id, slug, title, parent_id, rev, updated_at FROM document WHERE workspace_id = ? AND archived = 0 ORDER BY pos',
+    'SELECT id, slug, title, parent_id, rev, updated_at FROM document WHERE workspace_id = ? AND archived = 0 ORDER BY pos, id',
     [ctx.workspaceId],
   )
   const rootNode = root ? all.find((d) => d.slug === root) : undefined

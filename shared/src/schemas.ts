@@ -390,6 +390,14 @@ export const zDocOp = z.discriminatedUnion('op', [
     ref: zDocSlug,
     parent: zDocSlug.nullable().optional(),
     position: z.number().optional(),
+    /**
+     * Place the page directly before or after this sibling, under the
+     * sibling's parent. The server picks the position, renumbering the
+     * siblings when there is no room left between the neighbours. At most one
+     * of `before`, `after` and `position`.
+     */
+    before: zDocSlug.optional(),
+    after: zDocSlug.optional(),
   }),
   z.object({
     op: z.literal('rename'),

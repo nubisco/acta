@@ -26,6 +26,15 @@
           >
           <DocTransferMenu :doc="doc" />
           <NbButton
+            v-if="canEdit"
+            v-nb-tooltip="{ body: 'Move page' }"
+            size="sm"
+            variant="secondary"
+            icon="arrow-elbow-down-right"
+            aria-label="Move page"
+            @click="moving = true"
+          />
+          <NbButton
             v-nb-tooltip="{ body: 'Delete page' }"
             size="sm"
             variant="secondary"
@@ -205,6 +214,14 @@
         :overlay="tocOverlay"
       />
     </div>
+
+    <DocMoveModal
+      v-if="doc && canEdit"
+      :open="moving"
+      :slug="doc.slug"
+      @close="moving = false"
+      @moved="moving = false"
+    />
   </div>
 </template>
 
@@ -241,6 +258,7 @@ import DocChromeBar from '@/components/DocChromeBar.vue'
 import DocToc from '@/components/DocToc.vue'
 import DocsTreeSlot from '@/components/DocsTreeSlot.vue'
 import DocTransferMenu from '@/components/DocTransferMenu.vue'
+import DocMoveModal from '@/components/DocMoveModal.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
@@ -275,6 +293,15 @@ useViewCommands('docs', [
     namespace: 'Docs',
     handler: () => {
       if (doc.value && !editing.value) startEdit()
+    },
+  },
+  {
+    id: 'docs:move',
+    label: 'Move page',
+    icon: 'arrow-elbow-down-right',
+    namespace: 'Docs',
+    handler: () => {
+      if (doc.value && canEdit.value) moving.value = true
     },
   },
   {
@@ -327,6 +354,7 @@ const topbarActions = useShellSlot('topbar-right')
 const doc = ref<IDocDetail | null>(null)
 const editing = ref(false)
 const showHistory = ref(false)
+const moving = ref(false)
 const saving = ref(false)
 const conflict = ref(false)
 const draft = ref('')

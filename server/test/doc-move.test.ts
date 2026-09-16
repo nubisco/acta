@@ -163,6 +163,151 @@ describe('moving a document under itself', () => {
   })
 })
 
+describe('where a moved document lands', () => {
+  it('moves into another document as its last child', async () => {
+    expect((await move({ ref: 'runbook', parent: 'home/manual' })).ok).toBe(
+      true,
+    )
+    expect(await outline()).toEqual([
+      '0:home',
+      '1:home/manual',
+      '2:home/manual/icons',
+      '2:home/manual/colour',
+      '2:runbook',
+      '1:home/roadmap',
+      '0:changelog',
+    ])
+  })
+
+  it('moves to the top level with parent null, and before or after a root', async () => {
+    expect((await move({ ref: 'home/roadmap', parent: null })).ok).toBe(true)
+    expect((await outline()).slice(-2)).toEqual([
+      '0:changelog',
+      '0:home/roadmap',
+    ])
+
+    expect((await move({ ref: 'home/manual/icons', before: 'home' })).ok).toBe(
+      true,
+    )
+    expect(
+      (await move({ ref: 'home/manual/colour', after: 'runbook' })).ok,
+    ).toBe(true)
+    expect(await outline()).toEqual([
+      '0:home/manual/icons',
+      '0:home',
+      '1:home/manual',
+      '0:runbook',
+      '0:home/manual/colour',
+      '0:changelog',
+      '0:home/roadmap',
+    ])
+  })
+
+  it('places before and after a sibling under a parent', async () => {
+    await move({ ref: 'runbook', before: 'home/manual/colour' })
+    await move({ ref: 'changelog', after: 'home/manual/icons' })
+    expect(await outline()).toEqual([
+      '0:home',
+      '1:home/manual',
+      '2:home/manual/icons',
+      '2:changelog',
+      '2:runbook',
+      '2:home/manual/colour',
+      '1:home/roadmap',
+    ])
+  })
+
+  it('keeps siblings in order through many moves into the same gap', async () => {
+    // Every move lands directly after `home`, halving the same gap each time,
+    // until there is no room left and the siblings are renumbered.
+    const pages = ['a', 'b', 'c']
+    for (const slug of pages) await create(slug, slug.toUpperCase())
+    const expected = ['home', 'runbook', 'changelog', 'a', 'b', 'c']
+    for (let i = 0; i < 90; i++) {
+      const slug = pages[i % pages.length]
+      expect((await move({ ref: slug, after: 'home' })).ok).toBe(true)
+      expected.splice(expected.indexOf(slug), 1)
+      expected.splice(expected.indexOf('home') + 1, 0, slug)
+      const roots = (await outline())
+        .filter((line) => line.startsWith('0:'))
+        .map((line) => line.slice(2))
+      expect(roots).toEqual(expected)
+    }
+    const positions = (
+      await db.query<{ pos: number }>(
+        'SELECT pos FROM document WHERE parent_id IS NULL',
+      )
+    ).map((r) => r.pos)
+    expect(new Set(positions).size).toBe(positions.length)
+  })
+
+  it('moves a whole group, three levels deep, with its node', async () => {
+    await move({ ref: 'home/manual', parent: 'runbook' })
+    expect(await outline()).toEqual([
+      '0:home',
+      '1:home/roadmap',
+      '0:runbook',
+      '1:home/manual',
+      '2:home/manual/icons',
+      '2:home/manual/colour',
+      '0:changelog',
+    ])
+    await move({ ref: 'home', after: 'changelog' })
+    await move({ ref: 'runbook', parent: 'home/roadmap' })
+    expect(await outline()).toEqual([
+      '0:changelog',
+      '0:home',
+      '1:home/roadmap',
+      '2:runbook',
+      '3:home/manual',
+      '4:home/manual/icons',
+      '4:home/manual/colour',
+    ])
+  })
+
+  it('never changes a slug, and references still resolve', async () => {
+    const before = await slugs()
+    await move({ ref: 'home/manual', parent: null })
+    await move({ ref: 'home/manual/icons', after: 'changelog' })
+    await move({ ref: 'home', parent: 'runbook' })
+    expect(await slugs()).toEqual(before)
+    const res = await app.request('/api/v1/docs/home/manual/icons', {
+      headers: as(writer),
+    })
+    expect(res.status).toBe(200)
+    expect(((await res.json()) as { slug: string }).slug).toBe(
+      'home/manual/icons',
+    )
+  })
+
+  it('refuses placing next to a page inside its own subtree', async () => {
+    const before = await outline()
+    const result = await move({ ref: 'home', after: 'home/manual/icons' })
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('own subpages')
+    expect(await outline()).toEqual(before)
+  })
+
+  it('refuses conflicting placements', async () => {
+    expect(
+      (await move({ ref: 'runbook', before: 'home', after: 'changelog' })).ok,
+    ).toBe(false)
+    expect(
+      (await move({ ref: 'runbook', parent: 'home', before: 'changelog' })).ok,
+    ).toBe(false)
+    expect((await move({ ref: 'runbook', before: 'runbook' })).ok).toBe(false)
+  })
+
+  it('replays an op_id instead of moving twice', async () => {
+    const op = { op: 'move', op_id: 'same', ref: 'runbook', parent: 'home' }
+    await write([op])
+    await move({ ref: 'runbook', parent: null })
+    const res = await write([op])
+    expect(res.status).toBe(200)
+    expect(await outline()).toContain('0:runbook')
+  })
+})
+
 describe('who may move', () => {
   it('refuses a read-only caller and leaves the tree as it was', async () => {
     const before = await outline()

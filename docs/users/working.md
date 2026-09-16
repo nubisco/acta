@@ -62,6 +62,25 @@ target knows it was mentioned.
 A tree of Markdown pages in the left rail. Every save makes a version, and you
 can read or restore an old one.
 
+**Reorganise the tree by dragging.** Drop a page on the middle of another page
+to put it inside, as the last subpage. Drop it on the top or bottom edge of a
+page to put it just before or after that page, at the same level. Dropping
+beside a top-level page, or on the "Drop here to move to the top level" area
+that appears under the tree while you drag, makes it a top-level page. A page
+always moves with all of its subpages, and a page cannot be dropped inside
+itself or its own subpages, so no drop marker appears there.
+
+From the keyboard, open a page and use **Move page** (the arrow button next to
+the page actions, or the command palette) to pick its new parent or the top
+level. You need write access for either. Read-only members see the tree as it
+is.
+
+**Moving a page never changes its address.** A page keeps its slug wherever it
+goes, so its URL, every `[[doc:...]]` reference and every heading or block link
+to it keep working. That means a slug such as `home/manual/icon-system` may no
+longer spell out where the page now lives. That is deliberate: links that
+survive a reorganisation matter more than a tidy path.
+
 ![A document with a callout, a table of card references, and its backlinks](/media/documents.jpg)
 
 On top of CommonMark and GFM:

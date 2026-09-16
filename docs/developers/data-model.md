@@ -45,7 +45,13 @@ workspace-wide or scoped to a space.
 
 ## Documents
 
-**`document`** Slug-addressed, tree-shaped by slug path, with a `rev`.
+**`document`** Slug-addressed, with a `rev`. The tree is `parent_id` plus a
+`REAL` `pos` ordering siblings, not the slug. New pages go 1024 after the last
+sibling, and a move between two siblings takes the midpoint, renumbering the
+siblings in the same op when the gap gets too small. A move changes only
+`parent_id` and `pos`, never the slug, so links survive it even when the slug
+no longer describes where the page lives. A page can never become a descendant
+of itself.
 
 **`doc_version`** Every save. Reads can target an old version.
 

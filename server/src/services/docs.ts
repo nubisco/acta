@@ -68,6 +68,57 @@ async function syncDocDerived(
   }
 }
 
+/** Gap between neighbours when a page is created or siblings are renumbered. */
+const DOC_POS_STEP = 1024
+
+/**
+ * Below this, halving the gap again is left to renumbering. Positions are
+ * REAL, so a midpoint always exists in principle, but about fifty moves into
+ * the same gap exhaust a double's precision and the midpoint collapses onto a
+ * neighbour. Renumbering long before that keeps every position distinct.
+ */
+const DOC_POS_MIN_GAP = 1e-6
+
+/**
+ * A position directly before or after `anchorId` among the children of
+ * `parentId`, not counting the page being moved.
+ *
+ * Normally the midpoint between the two neighbours, which writes nothing else.
+ * When there is no room left, the siblings are renumbered in order, with the
+ * moved page's slot kept free, in the same op.
+ */
+async function placeBeside(
+  ctx: ICtx,
+  docId: string,
+  parentId: string | null,
+  anchorId: string,
+  side: 'before' | 'after',
+): Promise<number> {
+  const siblings = await ctx.db.query<{ id: string; pos: number }>(
+    'SELECT id, pos FROM document WHERE workspace_id = ? AND parent_id IS ? AND id != ? ORDER BY pos, id',
+    [ctx.workspaceId, parentId, docId],
+  )
+  const index = siblings.findIndex((s) => s.id === anchorId)
+  const insertAt = side === 'before' ? index : index + 1
+  const lo = siblings[insertAt - 1]?.pos
+  const hi = siblings[insertAt]?.pos
+  if (lo === undefined && hi === undefined) return DOC_POS_STEP
+  if (lo === undefined) return hi - DOC_POS_STEP
+  if (hi === undefined) return lo + DOC_POS_STEP
+  const mid = (lo + hi) / 2
+  if (hi - lo >= DOC_POS_MIN_GAP && lo < mid && mid < hi) return mid
+
+  for (let k = 0; k < siblings.length; k++) {
+    const target = (k + (k >= insertAt ? 2 : 1)) * DOC_POS_STEP
+    if (siblings[k].pos !== target)
+      await ctx.db.run('UPDATE document SET pos = ? WHERE id = ?', [
+        target,
+        siblings[k].id,
+      ])
+  }
+  return (insertAt + 1) * DOC_POS_STEP
+}
+
 /**
  * Whether `ancestorId` is `docId` itself or anywhere on the parent chain above
  * it.
@@ -348,26 +399,64 @@ async function applyDocOp(
       return { slug: doc.slug, rev }
     }
     case 'move': {
+      // Only `parent_id` and `pos` change. The slug never does, even when it
+      // no longer describes where the page lives, because URLs, doc refs,
+      // heading links and block links all point at it.
       const doc = await docBySlug(ctx, op.ref)
+      const placements = [op.before, op.after, op.position].filter(
+        (v) => v !== undefined,
+      ).length
+      if (placements > 1)
+        throw new ApiError(
+          400,
+          'give at most one of before, after and position',
+        )
+      const anchorSlug = op.before ?? op.after
+      const anchor = anchorSlug ? await docBySlug(ctx, anchorSlug) : null
+      if (anchor?.id === doc.id)
+        throw new ApiError(400, `cannot place ${doc.slug} next to itself`)
+
       let parentId = doc.parent_id
-      if (op.parent !== undefined) {
-        if (op.parent === null) {
-          parentId = null
-        } else {
-          const parent = await docBySlug(ctx, op.parent)
-          if (parent.id === doc.id)
-            throw new ApiError(400, 'doc cannot be its own parent')
-          if (await isAncestorOrSelf(ctx, doc.id, parent.id))
-            throw new ApiError(
-              400,
-              `cannot move ${doc.slug} into ${parent.slug}: that is one of its own subpages`,
-            )
-          parentId = parent.id
-        }
+      if (op.parent !== undefined)
+        parentId =
+          op.parent === null ? null : (await docBySlug(ctx, op.parent)).id
+      if (anchor) {
+        if (op.parent !== undefined && parentId !== anchor.parent_id)
+          throw new ApiError(
+            400,
+            `${anchor.slug} is not directly under ${op.parent ?? 'the top level'}`,
+          )
+        parentId = anchor.parent_id
+      }
+      if (parentId === doc.id)
+        throw new ApiError(400, 'doc cannot be its own parent')
+      if (parentId !== null && (await isAncestorOrSelf(ctx, doc.id, parentId)))
+        throw new ApiError(
+          400,
+          `cannot move ${doc.slug} into ${op.parent ?? anchor?.slug}: that is one of its own subpages`,
+        )
+
+      let pos = doc.pos
+      if (op.position !== undefined) pos = op.position
+      else if (anchor)
+        pos = await placeBeside(
+          ctx,
+          doc.id,
+          parentId,
+          anchor.id,
+          op.before !== undefined ? 'before' : 'after',
+        )
+      else if (parentId !== doc.parent_id) {
+        // A new parent with no placement: last child, like a new page.
+        const tail = await ctx.db.query<{ m: number | null }>(
+          'SELECT MAX(pos) AS m FROM document WHERE workspace_id = ? AND parent_id IS ? AND id != ?',
+          [ctx.workspaceId, parentId, doc.id],
+        )
+        pos = (tail[0]?.m ?? 0) + DOC_POS_STEP
       }
       await ctx.db.run(
-        'UPDATE document SET parent_id = ?, pos = COALESCE(?, pos), updated_at = ? WHERE id = ?',
-        [parentId, op.position ?? null, ts, doc.id],
+        'UPDATE document SET parent_id = ?, pos = ?, updated_at = ? WHERE id = ?',
+        [parentId, pos, ts, doc.id],
       )
       await emitEvent(ctx, 'doc.moved', 'doc', doc.id, `moved ${doc.slug}`)
       return { slug: doc.slug, rev: doc.rev }

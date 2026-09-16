@@ -65,19 +65,20 @@ work once, so a retry after a timeout is safe:
 
 ## Writing documents
 
-| Op                | Notes                                                                                               |
-| ----------------- | --------------------------------------------------------------------------------------------------- |
-| `create`          |                                                                                                     |
-| `replace`         | Needs `if_rev`.                                                                                     |
-| `patch_section`   | Needs the section slug and `if_hash` from `doc_get`. Conflicts only when that same section changed. |
-| `append`          | No read needed. Ideal for logs and running notes.                                                   |
-| `move`, `rename`  |                                                                                                     |
-| `set_layout`      | Page width, `default` or `wide`. Presentation only: no rev bump, and the body is untouched.         |
-| `archive`         |                                                                                                     |
-| `delete`          | Hard delete, leaf pages only.                                                                       |
-| `comment`         | A page comment, or an inline one with `anchor`. Never changes the document or its `rev`.            |
-| `comment_update`  | Edits a comment's body.                                                                             |
-| `comment_resolve` | Resolves an inline comment. `resolved: false` reopens it.                                           |
+| Op                | Notes                                                                                                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create`          |                                                                                                                                                                                                                                 |
+| `replace`         | Needs `if_rev`.                                                                                                                                                                                                                 |
+| `patch_section`   | Needs the section slug and `if_hash` from `doc_get`. Conflicts only when that same section changed.                                                                                                                             |
+| `append`          | No read needed. Ideal for logs and running notes.                                                                                                                                                                               |
+| `move`            | `parent` (a slug, or `null` for the top level) appends as the last child. `before` or `after` a sibling slug places it there instead. Refuses the page itself or any of its subpages as the new parent. The slug never changes. |
+| `rename`          |                                                                                                                                                                                                                                 |
+| `set_layout`      | Page width, `default` or `wide`. Presentation only: no rev bump, and the body is untouched.                                                                                                                                     |
+| `archive`         |                                                                                                                                                                                                                                 |
+| `delete`          | Hard delete, leaf pages only.                                                                                                                                                                                                   |
+| `comment`         | A page comment, or an inline one with `anchor`. Never changes the document or its `rev`.                                                                                                                                        |
+| `comment_update`  | Edits a comment's body.                                                                                                                                                                                                         |
+| `comment_resolve` | Resolves an inline comment. `resolved: false` reopens it.                                                                                                                                                                       |
 
 `patch_section` is the one worth learning. Read with sections, change one, send
 it back:

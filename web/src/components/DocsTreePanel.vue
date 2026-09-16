@@ -45,9 +45,36 @@
         </template>
       </NbEmptyState>
 
-      <NbTree v-else ref="treeRef" v-model="selected" size="sm" compact>
-        <DocsTreeNode v-for="node in tree" :key="node.slug" :node="node" />
-      </NbTree>
+      <div
+        v-else
+        ref="treeEl"
+        class="doc-tree__tree"
+        @dragstart.capture="onDragStart"
+        @dragover.capture="guardDragOver"
+        @dragend="endDrag"
+      >
+        <NbTree
+          ref="treeRef"
+          v-model="selected"
+          size="sm"
+          compact
+          :draggable="canWrite"
+          @drop="onTreeDrop"
+        >
+          <DocsTreeNode v-for="node in tree" :key="node.slug" :node="node" />
+        </NbTree>
+        <div
+          v-if="dragSource"
+          class="doc-tree__root-drop"
+          :class="{ 'doc-tree__root-drop--over': overRoot }"
+          data-testid="doc-tree-root-drop"
+          @dragover.prevent="overRoot = true"
+          @dragleave="overRoot = false"
+          @drop.prevent="onRootDrop"
+        >
+          Drop here to move to the top level
+        </div>
+      </div>
     </div>
   </aside>
 
@@ -63,41 +90,53 @@
 // The documents tree lives on the LEFT of the docs view (the Confluence
 // mental model), leaving the shell inspector free for item details opened
 // from inside a page.
-import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, toRaw, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { NbTree } from '@nubisco/ui'
-import { api } from '@/api/client'
+import { useToast, type NbTree } from '@nubisco/ui'
+import type { ITreeDropEvent } from '@nubisco/ui/components/Tree'
+import { api, newOpId } from '@/api/client'
 import type { IDocTreeNode } from '@/types/docs'
-import { useLoadState } from '@/lib/state'
+import { humanise, useLoadState } from '@/lib/state'
 import { useViewCommands } from '@/lib/commands'
 import { useWorkspace } from '@/stores/workspace'
 import DocsTreeNode from '@/components/DocsTreeNode.vue'
 import NewDocModal from '@/components/NewDocModal.vue'
 import { wpath } from '@/lib/paths'
+import {
+  ancestorsOf,
+  findTitle,
+  nestDocs,
+  planMove,
+  type IMovePlan,
+  type TMovePlacement,
+} from '@/lib/docTreeMove'
 
 const route = useRoute()
 const router = useRouter()
 const ws = useWorkspace()
+const toast = useToast()
 const load = useLoadState()
 const tree = ref<IDocTreeNode[]>([])
 const creating = ref(false)
 
 const currentSlug = computed(() => String(route.params.slug ?? ''))
 const treeRef = ref<InstanceType<typeof NbTree> | null>(null)
+const treeEl = ref<HTMLElement | null>(null)
+
+/** Only people who can write may reorganise, so readers get no drag at all. */
+const canWrite = computed(() => !!ws.me.value?.scopes.includes('write'))
 
 // Landing on a doc (deep link, breadcrumb, in-page ref) must show WHERE it
 // lives: expand its ancestor chain so the selected node is actually visible,
-// then bring it into the panel's viewport. Slugs are ancestor paths, so the
-// chain is every proper prefix of the current slug.
+// then bring it into the panel's viewport. The chain comes from the tree, not
+// from the slug. A moved page keeps its slug, so after a move the slug no
+// longer spells out where the page is.
 watch(
   [currentSlug, tree],
   async () => {
     const slug = currentSlug.value
     if (!slug || tree.value.length === 0) return
-    const parts = slug.split('/')
-    treeRef.value?.expandIds(
-      parts.slice(0, -1).map((_, i) => parts.slice(0, i + 1).join('/')),
-    )
+    treeRef.value?.expandIds(ancestorsOf(tree.value, slug))
     await nextTick()
     document
       .querySelector('.doc-tree [aria-selected="true"]')
@@ -113,24 +152,115 @@ const selected = computed<string | null>({
 })
 
 async function loadTree(): Promise<void> {
+  // A refresh behind a tree already on screen stays quiet. Going back through
+  // "loading" swaps the tree for a skeleton and remounts it, which collapses
+  // every expanded branch, and a live event follows every move.
+  if (load.state.value === 'ready' && tree.value.length > 0) {
+    const result = await api.docTree().catch(() => null)
+    if (result) tree.value = nestDocs(result.docs)
+    return
+  }
   const result = await load.run(api.docTree())
   if (!result) return
-  // The API returns a flat depth-ordered list; rebuild the nesting.
-  const roots: IDocTreeNode[] = []
-  const stack: { node: IDocTreeNode; depth: number }[] = []
-  for (const row of result.docs) {
-    const node: IDocTreeNode = {
-      slug: row.slug,
-      title: row.title,
-      children: [],
-    }
-    while (stack.length > 0 && stack[stack.length - 1].depth >= row.depth)
-      stack.pop()
-    if (stack.length === 0) roots.push(node)
-    else stack[stack.length - 1].node.children.push(node)
-    stack.push({ node, depth: row.depth })
+  tree.value = nestDocs(result.docs)
+}
+
+/*
+ * Drag and drop. NbTree does the dragging and reports where a node was
+ * dropped. What it cannot know is that a page may not go inside itself, so
+ * this wrapper answers that during the drag: a dragover anywhere in the
+ * dragged node's own subtree is stopped before any node sees it. That leaves
+ * no drop indicator there, and since the browser was never told the drop is
+ * welcome, no drop either.
+ */
+const dragSource = ref<string | null>(null)
+const overRoot = ref(false)
+let dragEl: Element | null = null
+
+function onDragStart(event: DragEvent): void {
+  if (!canWrite.value) return
+  const node = (event.target as Element | null)?.closest?.(
+    'li[role="treeitem"]',
+  ) as HTMLElement | null
+  if (!node?.dataset.slug) return
+  dragEl = node
+  dragSource.value = node.dataset.slug
+  // NbTreeNode (@nubisco/ui 5.3.0) lets `dragstart` bubble, so every ancestor
+  // row runs its own handler after the dragged one and the tree ends up
+  // dragging the outermost ancestor: grabbing "Icon System" moved all of
+  // "Nubisco Home". Registered now, during capture, this runs on the dragged
+  // row just after the node's own handler and stops the event there. Remove
+  // it once the library stops the propagation itself.
+  node.addEventListener('dragstart', (e) => e.stopPropagation(), {
+    once: true,
+  })
+}
+
+function guardDragOver(event: DragEvent): void {
+  if (!dragEl) return
+  const node = (event.target as Element | null)?.closest?.(
+    'li[role="treeitem"]',
+  )
+  if (!node || !dragEl.contains(node)) return
+  event.stopPropagation()
+  // An ancestor's row contains the dragged node, so moving from that row into
+  // the dragged subtree is not a "leave" as far as the ancestor can tell, and
+  // its indicator would stay lit over a place the page cannot go.
+  treeEl.value
+    ?.querySelectorAll(
+      '.nb-tree-node--drop-before, .nb-tree-node--drop-after, .nb-tree-node--drop-inside',
+    )
+    .forEach((el) => el.dispatchEvent(new Event('dragleave')))
+}
+
+function endDrag(): void {
+  dragEl = null
+  dragSource.value = null
+  overRoot.value = false
+}
+
+function onTreeDrop(event: ITreeDropEvent): void {
+  commitMove(event.sourceId, { kind: event.position, target: event.targetId })
+}
+
+function onRootDrop(): void {
+  const source = dragSource.value
+  if (source) commitMove(source, { kind: 'root' })
+}
+
+function commitMove(source: string, placement: TMovePlacement): void {
+  endDrag()
+  if (!canWrite.value) return
+  const plan = planMove(tree.value, source, placement, newOpId())
+  if (!plan) return
+  // Once the drop has finished dispatching. The dragged node re-renders
+  // somewhere else, and the drag's own `dragend` must still find it where it
+  // was so the tree clears its drag state.
+  setTimeout(() => void applyMove(source, plan), 0)
+}
+
+async function applyMove(source: string, plan: IMovePlan): Promise<void> {
+  const previous = toRaw(tree.value)
+  const title = findTitle(previous, source)
+  tree.value = plan.tree
+  treeRef.value?.expandIds(ancestorsOf(plan.tree, source))
+  await nextTick()
+  Array.from(treeEl.value?.querySelectorAll<HTMLElement>('li[data-slug]') ?? [])
+    .find((el) => el.dataset.slug === source)
+    ?.scrollIntoView?.({ block: 'nearest' })
+
+  let failure: string | null = null
+  try {
+    const { results } = await api.docWrite([plan.op])
+    if (!results[0]?.ok)
+      failure = String(results[0]?.error ?? 'The move was refused')
+  } catch (err) {
+    failure = humanise(err)
   }
-  tree.value = roots
+  if (failure === null) return
+  // Put it back, unless a live refresh has already replaced the tree.
+  if (toRaw(tree.value) === plan.tree) tree.value = previous
+  toast.error(failure, { title: `Could not move "${title}"` })
 }
 
 useViewCommands('docs', [
@@ -186,6 +316,23 @@ function onCreated(slug: string): void {
   &__body {
     flex: 1;
     min-height: 0;
+  }
+
+  /* Only there while a page is being dragged, so a short tree still has
+   * somewhere obvious to drop a page at the top level. */
+  &__root-drop {
+    margin-block-start: var(--nb-spacing-8);
+    padding: var(--nb-spacing-12);
+    border: 1px dashed var(--nb-c-border);
+    border-radius: var(--nb-radius-sm);
+    font-size: var(--nb-type-body-sm-size);
+    color: var(--nb-c-text-muted);
+    text-align: center;
+
+    &--over {
+      border-color: var(--nb-c-primary);
+      color: var(--nb-c-text);
+    }
   }
 
   &__loading {

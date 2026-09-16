@@ -1,5 +1,10 @@
 <template>
-  <NbTreeNode :id="node.slug" :label="node.title" icon="file-text">
+  <NbTreeNode
+    :id="node.slug"
+    :label="node.title"
+    icon="file-text"
+    :data-slug="node.slug"
+  >
     <DocsTreeNode
       v-for="child in node.children"
       :key="child.slug"
