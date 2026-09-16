@@ -10,7 +10,9 @@
         <a
           class="attachments__name"
           :href="
-            att.kind === 'url' && att.url ? att.url : attachmentHref(att.id)
+            att.kind === 'url'
+              ? (safeUrl(att.url) ?? attachmentHref(att.id))
+              : attachmentHref(att.id)
           "
           target="_blank"
           rel="noopener"
@@ -60,6 +62,7 @@
 </template>
 
 <script setup lang="ts">
+import { safeUrl } from '@/lib/safeUrl'
 import type { IAttachment } from '@/types/api'
 /**
  * Attachment list + upload surface for one item or doc. Owns its API calls

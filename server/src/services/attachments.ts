@@ -12,7 +12,32 @@ export const zAttachmentAdd = z
     doc: z.string().optional(),
     filename: z.string().min(1).max(300),
     mime: z.string().max(100).optional(),
-    url: z.url().optional(),
+    /*
+     * Only a scheme a link is meant to use.
+     *
+     * `z.url()` alone accepts `javascript:`, `data:` and `vbscript:`, because
+     * each is a valid URL. Stored and then rendered into an href, any of them
+     * is script running on Acta's own origin with the session attached. The
+     * client refuses them too, but this is what stops the data existing.
+     */
+    url: z
+      .url()
+      .refine(
+        (value) => {
+          try {
+            const protocol = new URL(value).protocol
+            return (
+              protocol === 'http:' ||
+              protocol === 'https:' ||
+              protocol === 'mailto:'
+            )
+          } catch {
+            return false
+          }
+        },
+        { message: 'url must be http, https or mailto' },
+      )
+      .optional(),
     content_base64: z.string().max(1_400_000).optional(), // ~1 MB decoded
   })
   .refine((v) => (v.item ? !v.doc : !!v.doc), {

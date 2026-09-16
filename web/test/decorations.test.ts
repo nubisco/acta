@@ -225,3 +225,58 @@ describe('heading anchors', () => {
     expect(ids).toEqual(['real-one'])
   })
 })
+
+/**
+ * A link attachment's URL is attacker-controlled.
+ *
+ * `attachment_add` takes a url for a link attachment, and a valid URL can be
+ * `javascript:`. markdown-it filters those for links written in a document,
+ * so `[x](javascript:...)` has never been a problem, but the attachment chip
+ * builds its own anchor and bypassed that filter. Clicking it ran script on
+ * Acta's origin, with the session.
+ */
+describe('attachment chips never link to something that executes', () => {
+  async function withUrl(url: string) {
+    const view = mount(MarkdownView, {
+      props: {
+        source: '![Doc](attachment:att_x)',
+        attachments: [
+          {
+            id: 'att_x',
+            filename: 'doc.pdf',
+            mime: 'application/pdf',
+            url,
+          },
+        ],
+      },
+    })
+    await flushPromises()
+    return view
+  }
+
+  it('refuses a javascript: URL and falls back to the served path', async () => {
+    const view = await withUrl('javascript:alert(document.cookie)')
+    const href = view.find('.md__file').attributes('href')
+    expect(href).not.toContain('javascript')
+    expect(href).toBe('/api/v1/attachments/att_x')
+  })
+
+  it('refuses the obfuscated forms too', async () => {
+    for (const url of [
+      'JaVaScRiPt:alert(1)',
+      'java\nscript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+    ]) {
+      const view = await withUrl(url)
+      const href = view.find('.md__file').attributes('href')
+      expect(href, url).toBe('/api/v1/attachments/att_x')
+    }
+  })
+
+  it('still links out to a real address', async () => {
+    const view = await withUrl('https://example.test/spec.pdf')
+    expect(view.find('.md__file').attributes('href')).toBe(
+      'https://example.test/spec.pdf',
+    )
+  })
+})

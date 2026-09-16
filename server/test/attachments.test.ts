@@ -231,3 +231,40 @@ describe('batching and removal', () => {
     expect((await serve(made.id)).status).toBe(404)
   })
 })
+
+describe('link attachments', () => {
+  const addUrl = (url: string) =>
+    app.request('/api/v1/attachments', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ item: 'SUP-1', filename: 'link', url }),
+    })
+
+  it('refuses a scheme that executes', async () => {
+    // `z.url()` on its own accepts all of these, because each is a valid URL.
+    // Stored and later rendered into an href, any of them is script running
+    // on this origin with the session attached.
+    for (const url of [
+      'javascript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+      'vbscript:msgbox(1)',
+      'file:///etc/passwd',
+    ]) {
+      const res = await addUrl(url)
+      expect(res.status, url).toBeGreaterThanOrEqual(400)
+    }
+    const rows = await db.query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM attachment WHERE kind = 'url'",
+    )
+    expect(rows[0].n).toBe(0)
+  })
+
+  it('accepts the schemes a link is meant to use', async () => {
+    expect((await addUrl('https://example.test/a')).status).toBe(200)
+    expect((await addUrl('http://example.test/a')).status).toBe(200)
+    expect((await addUrl('mailto:someone@example.test')).status).toBe(200)
+  })
+})

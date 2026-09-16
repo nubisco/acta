@@ -45,6 +45,7 @@ import { useRefCards } from '@/stores/refs'
 import { chartColorFor } from '@/lib/colors'
 import { DOC_NAV_KEY } from '@/lib/keys'
 import { wpath } from '@/lib/paths'
+import { safeUrl } from '@/lib/safeUrl'
 import { sectionMap } from '@nubisco/acta-shared'
 import { CALLOUT_TYPES, calloutIconSvg as calloutIcon } from '@/lib/callouts'
 import { isDarkColor, parseColor } from '@/components/decorations/colors'
@@ -242,7 +243,11 @@ function renderAttachments(html: string): string {
     /<img([^>]*?)src="attachment:([^"]+)"([^>]*)>/g,
     (_raw, before: string, id: string, after: string) => {
       const meta = (props.attachments ?? []).find((a) => a.id === id.trim())
-      const url = meta?.url ?? `/api/v1/attachments/${id.trim()}`
+      // A link attachment's URL is whatever somebody sent to the API, and a
+      // valid URL can still be `javascript:`. markdown-it filters those for
+      // links written in a document, but this builds an anchor itself and so
+      // has to do its own checking.
+      const url = safeUrl(meta?.url) ?? `/api/v1/attachments/${id.trim()}`
       const mime = meta?.mime
       if (mime && !mime.startsWith('image/')) {
         const name = meta?.filename ?? 'Attachment'
