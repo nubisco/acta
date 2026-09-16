@@ -16,10 +16,7 @@ import { resolve } from 'node:path'
 import { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
-import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
-import TableCell from '@tiptap/extension-table-cell'
-import TableHeader from '@tiptap/extension-table-header'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
@@ -28,6 +25,7 @@ import { Emphasis } from '@/components/editor/nodes/Emphasis'
 import { Ref } from '@/components/editor/nodes/Ref'
 import { Embed } from '@/components/editor/nodes/Embed'
 import { Image } from '@/components/editor/nodes/Image'
+import { Table, TableCell, TableHeader } from '@/components/editor/nodes/Table'
 import { Details } from '@/components/editor/nodes/Details'
 
 function roundtrip(md: string): string {
@@ -533,5 +531,286 @@ describe('image attributes survive a save', () => {
     const src =
       '### Stagewright\n\n![Stagewright icon](attachment:att_x){align=center width=640}\n\n**the patch, as shipped**'
     expect(roundtrip(src)).toBe(src)
+  })
+})
+
+/**
+ * GFM tables.
+ *
+ * The storage decision is portability: GFM tables only, cells holding inline
+ * content only, so an Acta document stays readable and editable in GitHub,
+ * Obsidian, VS Code and pandoc. That makes the serializer the whole feature.
+ * Two faults were measured before it existed:
+ *
+ * - `| :--- | :---: | ---: |` came back as `| --- | --- | --- |`, so the one
+ *   piece of table formatting markdown genuinely supports was destroyed by
+ *   every save.
+ * - a cell containing `x \| y` came back as `| x | y |`, which is not damage
+ *   to a character, it is an extra column: the table silently widened and the
+ *   header stopped matching the body.
+ */
+describe('GFM tables survive a save', () => {
+  const header = '| Name | Value |\n| --- | --- |'
+
+  it('keeps an alignment marker in all three positions', () => {
+    const src = '| a | b | c |\n| :--- | :---: | ---: |\n| 1 | 2 | 3 |'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps each alignment on its own, and leaves unset columns unset', () => {
+    for (const marker of [':---', ':---:', '---:', '---']) {
+      const src = `| a | b |\n| ${marker} | --- |\n| 1 | 2 |`
+      expect(roundtrip(src), marker).toBe(src)
+    }
+  })
+
+  it('is idempotent on an aligned table', () => {
+    const src = '| a | b |\n| ---: | :---: |\n| 1 | 2 |'
+    expect(roundtrip(roundtrip(src))).toBe(src)
+  })
+
+  it('keeps inline code and a link inside a cell', () => {
+    const src = `${header}\n| \`npm run build\` | [the docs](https://example.test/a) |`
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps an empty cell as an empty cell', () => {
+    const src = `${header}\n|  | filled |`
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('escapes a literal pipe rather than growing a column', () => {
+    // The classic GFM trap. `\|` is one cell containing a pipe, and writing it
+    // back unescaped turns it into two cells on the next read.
+    const src = `${header}\n| a \\| b | c |`
+    const out = roundtrip(src)
+    expect(out).toBe(src)
+    // Stated as a count as well, because the failure mode is arithmetic: the
+    // row must still hold two cells, so three unescaped pipes.
+    const row = out.split('\n')[2]
+    expect(row.replace(/\\\|/g, '').match(/\|/g)?.length).toBe(3)
+  })
+
+  it('escapes a pipe inside a code span, which GFM also requires', () => {
+    const src = `${header}\n| \`a \\| b\` | c |`
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps bold and italic in a cell', () => {
+    const src = `${header}\n| **bold** | *italic* |`
+    expect(roundtrip(src)).toBe(src)
+  })
+})
+
+/**
+ * Editing a table, measured on the file rather than on the model.
+ *
+ * The grips and the keyboard shortcuts both end at these commands, and the
+ * controls are only worth having if what they write is still a table somebody
+ * else's tool can read.
+ */
+function tableEditor(md: string): Editor {
+  return new Editor({
+    content: md,
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3, 4] },
+        codeBlock: {},
+      }),
+      Link.configure({ openOnClick: false }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Markdown.configure({
+        html: false,
+        linkify: true,
+        breaks: true,
+        transformPastedText: true,
+      }),
+    ],
+  })
+}
+
+/** The position of the table node, and its two structural landmarks. */
+function tablePos(editor: Editor): number {
+  let at = -1
+  editor.state.doc.descendants((node, pos) => {
+    if (at >= 0) return false
+    if (node.type.name === 'table') at = pos
+    return at < 0
+  })
+  return at
+}
+
+/** Inside the first cell of the first body row, where a caret would sit. */
+function firstBodyCell(editor: Editor): number {
+  const at = tablePos(editor)
+  const table = editor.state.doc.nodeAt(at)
+  if (!table) return 0
+  // Table start, past the header row, past the cell and paragraph openings,
+  // then to the end of what is in the cell: the caret sits after the text, the
+  // way it does when somebody clicks into a cell and keeps typing.
+  const paragraph = table.child(1).child(0).child(0)
+  return at + 1 + table.child(0).nodeSize + 3 + paragraph.content.size
+}
+
+/** The positions of the header row's cells, for a cell selection. */
+function headerCells(editor: Editor): number[] {
+  const at = tablePos(editor)
+  const table = editor.state.doc.nodeAt(at)
+  if (!table) return []
+  const positions: number[] = []
+  let offset = at + 2
+  table.child(0).forEach((cell) => {
+    positions.push(offset)
+    offset += cell.nodeSize
+  })
+  return positions
+}
+
+/** Run `apply` on a table parsed from `md`, and give back the markdown. */
+function edit(md: string, apply: (editor: Editor) => void): string {
+  const editor = tableEditor(md)
+  editor.commands.setTextSelection(firstBodyCell(editor))
+  apply(editor)
+  const out = (
+    editor.storage as { markdown: { getMarkdown: () => string } }
+  ).markdown.getMarkdown()
+  editor.destroy()
+  return out.trim()
+}
+
+describe('table editing writes valid GFM', () => {
+  const src = '| a | b |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |'
+
+  it('inserts a row before and after', () => {
+    expect(edit(src, (e) => e.commands.addRowBefore())).toBe(
+      '| a | b |\n| --- | --- |\n|  |  |\n| 1 | 2 |\n| 3 | 4 |',
+    )
+    expect(edit(src, (e) => e.commands.addRowAfter())).toBe(
+      '| a | b |\n| --- | --- |\n| 1 | 2 |\n|  |  |\n| 3 | 4 |',
+    )
+  })
+
+  it('deletes a row', () => {
+    expect(edit(src, (e) => e.commands.deleteRow())).toBe(
+      '| a | b |\n| --- | --- |\n| 3 | 4 |',
+    )
+  })
+
+  it('inserts a column before and after, delimiter row included', () => {
+    expect(edit(src, (e) => e.commands.addColumnBefore())).toBe(
+      '|  | a | b |\n| --- | --- | --- |\n|  | 1 | 2 |\n|  | 3 | 4 |',
+    )
+    expect(edit(src, (e) => e.commands.addColumnAfter())).toBe(
+      '| a |  | b |\n| --- | --- | --- |\n| 1 |  | 2 |\n| 3 |  | 4 |',
+    )
+  })
+
+  it('deletes a column', () => {
+    expect(edit(src, (e) => e.commands.deleteColumn())).toBe(
+      '| b |\n| --- |\n| 2 |\n| 4 |',
+    )
+  })
+
+  it('writes alignment into the delimiter row, for the whole column', () => {
+    expect(edit(src, (e) => e.commands.setColumnAlignment('center'))).toBe(
+      '| a | b |\n| :---: | --- |\n| 1 | 2 |\n| 3 | 4 |',
+    )
+    expect(edit(src, (e) => e.commands.setColumnAlignment('right'))).toBe(
+      '| a | b |\n| ---: | --- |\n| 1 | 2 |\n| 3 | 4 |',
+    )
+    expect(edit(src, (e) => e.commands.setColumnAlignment('left'))).toBe(
+      '| a | b |\n| :--- | --- |\n| 1 | 2 |\n| 3 | 4 |',
+    )
+  })
+
+  it('clears alignment back to the plain marker', () => {
+    const aligned = '| a | b |\n| :---: | --- |\n| 1 | 2 |'
+    expect(edit(aligned, (e) => e.commands.setColumnAlignment(null))).toBe(
+      '| a | b |\n| --- | --- |\n| 1 | 2 |',
+    )
+  })
+
+  it('selects a whole row and a whole column from a grip index', () => {
+    const editor = tableEditor(src)
+    editor.commands.setTextSelection(firstBodyCell(editor))
+    expect(editor.commands.selectTableRow({ index: 1 })).toBe(true)
+    expect(editor.commands.selectTableColumn({ index: 1 })).toBe(true)
+    // Out of range is declined rather than throwing, because a grip index can
+    // outlive the row it named when two edits race.
+    expect(editor.commands.selectTableRow({ index: 9 })).toBe(false)
+    expect(editor.commands.selectTableColumn({ index: 9 })).toBe(false)
+    editor.destroy()
+  })
+
+  it('reorders a row', () => {
+    expect(
+      edit(src, (e) => e.commands.moveTableRowTo({ from: 1, to: 2 })),
+    ).toBe('| a | b |\n| --- | --- |\n| 3 | 4 |\n| 1 | 2 |')
+  })
+
+  it('reorders a column, taking its alignment with it', () => {
+    const aligned = '| a | b |\n| ---: | --- |\n| 1 | 2 |'
+    expect(
+      edit(aligned, (e) => e.commands.moveTableColumnTo({ from: 0, to: 1 })),
+    ).toBe('| b | a |\n| --- | ---: |\n| 2 | 1 |')
+  })
+})
+
+/**
+ * Tables GFM cannot represent, flattened rather than escaped into HTML.
+ *
+ * `tiptap-markdown` writes an HTML `<table>` the moment a table has a merged
+ * cell or a cell holding more than one block, and an HTML block in the file is
+ * exactly what the storage decision rules out: it stops being a table in
+ * GitHub, Obsidian or pandoc and becomes a blob. The editor can still reach
+ * both states, so the serializer flattens, and these say what "sensibly"
+ * means in each case.
+ */
+describe('a table GFM cannot represent is flattened, never written as HTML', () => {
+  const src = '| a | b |\n| --- | --- |\n| 1 | 2 |'
+
+  function merged(md: string): string {
+    return edit(md, (editor) => {
+      const cells = headerCells(editor)
+      editor.commands.setCellSelection({
+        anchorCell: cells[0],
+        headCell: cells[1],
+      })
+      editor.commands.mergeCells()
+    })
+  }
+
+  it('expands a merged cell into the columns it covered', () => {
+    const out = merged(src)
+    expect(out).not.toContain('<table')
+    expect(out).toBe('| a b |  |\n| --- | --- |\n| 1 | 2 |')
+  })
+
+  it('flattens a list in a cell onto the one line GFM allows', () => {
+    const out = edit(src, (editor) => {
+      editor.commands.toggleBulletList()
+      editor.commands.splitListItem('listItem')
+      editor.commands.insertContent('two')
+    })
+    expect(out).not.toContain('<table')
+    expect(out).not.toContain('\n- ')
+    expect(out).toBe('| a | b |\n| --- | --- |\n| 1 two | 2 |')
+  })
+
+  it('flattens two paragraphs in a cell rather than ending the row', () => {
+    const out = edit(src, (editor) => {
+      editor.commands.splitBlock()
+      editor.commands.insertContent('second')
+    })
+    expect(out.split('\n')).toHaveLength(3)
+    expect(out).toBe('| a | b |\n| --- | --- |\n| 1 second | 2 |')
+  })
+
+  it('what it writes is a table it can read back', () => {
+    const once = merged(src)
+    expect(roundtrip(once)).toBe(once)
   })
 })

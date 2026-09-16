@@ -232,3 +232,31 @@ describe('MarkdownView Drive links', () => {
     expect(sheet).toContain('#0f9d58')
   })
 })
+
+/**
+ * Tables, as the reader draws them.
+ *
+ * Alignment is the one piece of table formatting markdown genuinely supports,
+ * and the editor now writes it. The reader has to honour it, or a column
+ * somebody aligned in the editor reads as unaligned the moment they leave
+ * edit mode, which looks like the setting was not saved.
+ */
+describe('MarkdownView tables', () => {
+  it('honours every alignment marker', () => {
+    const html = render(
+      '| a | b | c | d |\n| :--- | :---: | ---: | --- |\n| 1 | 2 | 3 | 4 |',
+    ).html()
+    expect(html).toContain('text-align:left')
+    expect(html).toContain('text-align:center')
+    expect(html).toContain('text-align:right')
+    // The fourth column asked for nothing, so it gets nothing.
+    expect(html.match(/text-align/g)?.length).toBe(6)
+  })
+
+  it('reads an escaped pipe as content, not as a column break', () => {
+    const html = render('| a | b |\n| --- | --- |\n| x \\| y | z |').html()
+    expect(html).toContain('x | y')
+    // Two columns, so two cells in the body row, not three.
+    expect(html.match(/<td/g)?.length).toBe(2)
+  })
+})

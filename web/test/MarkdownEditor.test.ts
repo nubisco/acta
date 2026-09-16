@@ -15,6 +15,13 @@ vi.mock('@/api/client', () => ({
   ApiHttpError: class extends Error {},
 }))
 
+import { Editor } from '@tiptap/core'
+import StarterKit from '@tiptap/starter-kit'
+import Link from '@tiptap/extension-link'
+import TableRow from '@tiptap/extension-table-row'
+import { Markdown } from 'tiptap-markdown'
+import { Table, TableCell, TableHeader } from '@/components/editor/nodes/Table'
+import { TableGrips, tableGripsKey } from '@/components/editor/tableGrips'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { imageSrc } from '@/components/editor/nodes/Image'
 import {
@@ -430,5 +437,368 @@ describe('MarkdownEditor image attributes', () => {
       '![Icon](attachment:att_x){align=left caption="a b"}',
     )
     view.unmount()
+  })
+})
+
+/** Every accessible name on a button under `root`. */
+function labels(root: ParentNode): string[] {
+  return Array.from(root.querySelectorAll('button[aria-label]')).map(
+    (element) => element.getAttribute('aria-label') ?? '',
+  )
+}
+
+/** One button by its accessible name, which is how a person finds it. */
+function button(root: ParentNode, label: string): HTMLElement | null {
+  return root.querySelector<HTMLElement>(`button[aria-label="${label}"]`)
+}
+
+/**
+ * Table grips and their inline controls.
+ *
+ * A grip is a mouse affordance: a bar on the left edge of a row and along the
+ * top of a column, revealed on hover, which selects that band when clicked and
+ * opens the controls for it. Asserted on the DOM rather than on the plugin,
+ * because the whole point of the feature is what is on screen.
+ *
+ * The controls come from `@nubisco/ui`, so these look for the buttons by the
+ * label a screen reader would read, not by a class this file invented.
+ */
+describe('MarkdownEditor table grips', () => {
+  const table = '| a | b |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |'
+
+  async function render(source: string) {
+    const view = mount(MarkdownEditor, {
+      props: { modelValue: source },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    return view
+  }
+
+  function editorOf(view: ReturnType<typeof mount>) {
+    return (
+      view.vm as unknown as {
+        editor: {
+          state: unknown
+          commands: Record<string, (...args: unknown[]) => boolean>
+          view: { dom: HTMLElement }
+          storage: { markdown: { getMarkdown(): string } }
+        }
+      }
+    ).editor
+  }
+
+  it('puts a grip on every row and every column', async () => {
+    const view = await render(table)
+    const rows = view.element.querySelectorAll('[data-table-grip="row"]')
+    const columns = view.element.querySelectorAll('[data-table-grip="column"]')
+    expect(rows.length).toBe(3)
+    expect(columns.length).toBe(2)
+    // Named, because a bar with no accessible name is a control nobody who is
+    // not looking at it can find.
+    expect(rows[0].getAttribute('aria-label')).toBe('Row 1')
+    expect(columns[1].getAttribute('aria-label')).toBe('Column 2')
+    view.unmount()
+  })
+
+  it('never lets a grip reach the document', async () => {
+    // A grip is a decoration, so it cannot be written to the file. If it ever
+    // becomes content, every save writes a stray character into the table.
+    const view = await render(table)
+    expect(editorOf(view).storage.markdown.getMarkdown().trim()).toBe(table)
+    view.unmount()
+  })
+
+  it('selects the row when its grip is clicked, and shows the row controls', async () => {
+    const view = await render(table)
+    const grip = view.element.querySelectorAll(
+      '[data-table-grip="row"]',
+    )[1] as HTMLElement
+    grip.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await flushPromises()
+
+    expect(view.element.querySelectorAll('.selectedCell').length).toBe(2)
+    expect(labels(document.body)).toContain('Insert row above')
+    expect(labels(document.body)).toContain('Insert row below')
+    expect(labels(document.body)).toContain('Delete row')
+    view.unmount()
+  })
+
+  it('offers alignment on a column, because that is what GFM can store', async () => {
+    const view = await render(table)
+    const grip = view.element.querySelectorAll(
+      '[data-table-grip="column"]',
+    )[0] as HTMLElement
+    grip.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await flushPromises()
+
+    const found = labels(document.body)
+    expect(found).toContain('Insert column before')
+    expect(found).toContain('Align left')
+    expect(found).toContain('Align centre')
+    expect(found).toContain('Align right')
+    expect(found).toContain('Delete column')
+    // Alignment is per column, so it is not offered on a row: there is nowhere
+    // in a GFM table to write it.
+    expect(found).not.toContain('Insert row above')
+    view.unmount()
+  })
+
+  it('reads delete as destructive', async () => {
+    const view = await render(table)
+    const grip = view.element.querySelectorAll(
+      '[data-table-grip="row"]',
+    )[1] as HTMLElement
+    grip.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await flushPromises()
+
+    const remove = button(document.body, 'Delete row')
+    expect(remove).not.toBeNull()
+    // The library's own danger variant, not a colour this file painted on.
+    expect(remove?.className).toMatch(/danger/)
+    view.unmount()
+  })
+
+  it('shows no controls until a band is selected', async () => {
+    const view = await render(table)
+    expect(button(document.body, 'Delete row')).toBeNull()
+    view.unmount()
+  })
+})
+
+/**
+ * The keyboard path.
+ *
+ * Grips are a mouse affordance, and a table that can only be edited with a
+ * mouse is not finished, so every grip action has a shortcut and selecting a
+ * band from the keyboard puts the same controls on screen.
+ *
+ * Driven against a bare editor carrying the same extensions rather than the
+ * mounted component, because tiptap's bubble menu calls tippy on every
+ * selection change and tippy needs a layout engine jsdom does not have. What
+ * is under test here is the keymap and what it writes, and both are the same
+ * either way.
+ */
+describe('table keyboard path', () => {
+  const table = '| a | b |\n| --- | --- |\n| 1 | 2 |'
+
+  function open(source: string): Editor {
+    return new Editor({
+      content: source,
+      extensions: [
+        StarterKit.configure({
+          heading: { levels: [1, 2, 3, 4] },
+          codeBlock: {},
+        }),
+        Link.configure({ openOnClick: false }),
+        Table.configure({ resizable: true }),
+        TableRow,
+        TableHeader,
+        TableCell,
+        TableGrips,
+        Markdown.configure({ html: false, linkify: true, breaks: true }),
+      ],
+    })
+  }
+
+  /** In the first body cell, where a caret sits after clicking into a table. */
+  function inTable(source = table): Editor {
+    const editor = open(source)
+    let position = 0
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name !== 'table' || position) return true
+      position = pos + 1 + node.child(0).nodeSize + 3
+      return false
+    })
+    editor.commands.setTextSelection(position)
+    return editor
+  }
+
+  function press(
+    editor: Editor,
+    key: string,
+    modifiers: Partial<KeyboardEventInit> = {},
+  ): void {
+    editor.view.dom.dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true, ...modifiers }),
+    )
+  }
+
+  function markdown(editor: Editor): string {
+    return (editor.storage as { markdown: { getMarkdown(): string } }).markdown
+      .getMarkdown()
+      .trim()
+  }
+
+  it('selects a row with Shift-Space, which opens the row controls', () => {
+    const editor = inTable()
+    press(editor, ' ', { shiftKey: true })
+    expect(editor.view.dom.querySelectorAll('.selectedCell').length).toBe(2)
+    expect(
+      editor.view.dom.querySelector('[data-table-controls="row"]'),
+    ).not.toBeNull()
+    editor.destroy()
+  })
+
+  it('selects a column with Ctrl-Space, which opens the column controls', () => {
+    const editor = inTable()
+    press(editor, ' ', { ctrlKey: true })
+    expect(editor.view.dom.querySelectorAll('.selectedCell').length).toBe(2)
+    expect(
+      editor.view.dom.querySelector('[data-table-controls="column"]'),
+    ).not.toBeNull()
+    editor.destroy()
+  })
+
+  it('inserts a row above and below without a mouse', () => {
+    const below = inTable()
+    press(below, 'ArrowDown', { ctrlKey: true, altKey: true })
+    expect(markdown(below)).toBe('| a | b |\n| --- | --- |\n| 1 | 2 |\n|  |  |')
+    below.destroy()
+
+    const above = inTable()
+    press(above, 'ArrowUp', { ctrlKey: true, altKey: true })
+    expect(markdown(above)).toBe('| a | b |\n| --- | --- |\n|  |  |\n| 1 | 2 |')
+    above.destroy()
+  })
+
+  it('deletes the row the caret is in without a mouse', () => {
+    const editor = inTable('| a | b |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |')
+    press(editor, 'Backspace', { ctrlKey: true, altKey: true })
+    expect(markdown(editor)).toBe('| a | b |\n| --- | --- |\n| 3 | 4 |')
+    editor.destroy()
+  })
+
+  it('inserts a column either side without a mouse', () => {
+    const after = inTable()
+    press(after, 'ArrowRight', { ctrlKey: true, altKey: true })
+    expect(markdown(after)).toBe(
+      '| a |  | b |\n| --- | --- | --- |\n| 1 |  | 2 |',
+    )
+    after.destroy()
+
+    const before = inTable()
+    press(before, 'ArrowLeft', { ctrlKey: true, altKey: true })
+    expect(markdown(before)).toBe(
+      '|  | a | b |\n| --- | --- | --- |\n|  | 1 | 2 |',
+    )
+    before.destroy()
+  })
+
+  it('deletes the column the caret is in without a mouse', () => {
+    const editor = inTable()
+    press(editor, 'Backspace', { ctrlKey: true, altKey: true, shiftKey: true })
+    expect(markdown(editor)).toBe('| b |\n| --- |\n| 2 |')
+    editor.destroy()
+  })
+
+  it('sets and clears alignment without a mouse, and writes it to the file', () => {
+    const editor = inTable()
+    press(editor, 'l', { ctrlKey: true, shiftKey: true })
+    expect(markdown(editor)).toContain('| :--- | --- |')
+    press(editor, 'e', { ctrlKey: true, shiftKey: true })
+    expect(markdown(editor)).toContain('| :---: | --- |')
+    press(editor, 'r', { ctrlKey: true, shiftKey: true })
+    expect(markdown(editor)).toContain('| ---: | --- |')
+    press(editor, '0', { ctrlKey: true, shiftKey: true })
+    expect(markdown(editor)).toContain('| --- | --- |')
+    editor.destroy()
+  })
+
+  it('reorders a row without a mouse', () => {
+    const editor = inTable('| a | b |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |')
+    press(editor, 'ArrowDown', { ctrlKey: true, altKey: true, shiftKey: true })
+    expect(markdown(editor)).toBe(
+      '| a | b |\n| --- | --- |\n| 3 | 4 |\n| 1 | 2 |',
+    )
+    editor.destroy()
+  })
+
+  it('reorders a column without a mouse', () => {
+    const editor = inTable()
+    press(editor, 'ArrowRight', { ctrlKey: true, altKey: true, shiftKey: true })
+    expect(markdown(editor)).toBe('| b | a |\n| --- | --- |\n| 2 | 1 |')
+    editor.destroy()
+  })
+
+  it('leaves the same keys alone outside a table', () => {
+    // Every one of these declines outside a table, or it would shadow an
+    // editing key in ordinary prose.
+    const editor = open('Just a sentence.')
+    editor.commands.setTextSelection(3)
+    press(editor, ' ', { shiftKey: true })
+    press(editor, 'Backspace', { ctrlKey: true, altKey: true })
+    press(editor, 'ArrowDown', { ctrlKey: true, altKey: true })
+    expect(markdown(editor)).toBe('Just a sentence.')
+    editor.destroy()
+  })
+})
+
+/**
+ * Dragging a grip to reorder.
+ *
+ * Only the plumbing is asserted here: which band the drag picked up, and that
+ * it is let go of afterwards. Where the pointer landed cannot be tested in
+ * jsdom, because `posAtCoords` needs a layout engine, so the move itself is
+ * covered by `moveTableRowTo` and `moveTableColumnTo` in the round-trip suite
+ * and by the keyboard shortcuts above.
+ */
+describe('table grip drag', () => {
+  const table = '| a | b |\n| --- | --- |\n| 1 | 2 |'
+
+  function open(): Editor {
+    return new Editor({
+      content: table,
+      extensions: [
+        StarterKit.configure({
+          heading: { levels: [1, 2, 3, 4] },
+          codeBlock: {},
+        }),
+        Table.configure({ resizable: true }),
+        TableRow,
+        TableHeader,
+        TableCell,
+        TableGrips,
+        Markdown.configure({ html: false, linkify: true, breaks: true }),
+      ],
+    })
+  }
+
+  /** A DragEvent jsdom does not implement, built from what the code reads. */
+  function drag(type: string): Event {
+    const event = new Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', {
+      value: { setData: () => {}, effectAllowed: '', dropEffect: '' },
+    })
+    return event
+  }
+
+  it('picks up the row a grip belongs to, and puts it down again', () => {
+    const editor = open()
+    const grip = editor.view.dom.querySelectorAll(
+      '[data-table-grip="row"]',
+    )[1] as HTMLElement
+    grip.dispatchEvent(drag('dragstart'))
+    expect(tableGripsKey.getState(editor.state)?.drag).toMatchObject({
+      kind: 'row',
+      index: 1,
+    })
+
+    editor.view.dom.dispatchEvent(drag('dragend'))
+    expect(tableGripsKey.getState(editor.state)?.drag).toBeNull()
+    editor.destroy()
+  })
+
+  it('picks up a column the same way', () => {
+    const editor = open()
+    const grip = editor.view.dom.querySelectorAll(
+      '[data-table-grip="column"]',
+    )[1] as HTMLElement
+    grip.dispatchEvent(drag('dragstart'))
+    expect(tableGripsKey.getState(editor.state)?.drag).toMatchObject({
+      kind: 'column',
+      index: 1,
+    })
+    editor.destroy()
   })
 })

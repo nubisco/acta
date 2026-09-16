@@ -17,6 +17,94 @@
       <NbIcon :name="action.icon" :size="15" />
     </button>
   </BubbleMenu>
+  <!--
+    Table row and column controls.
+
+    Teleported into a decoration inside the selected band's first cell, so the
+    bar sits against the thing it acts on without a single measured
+    coordinate, and the buttons are still `@nubisco/ui` buttons rather than
+    DOM the editor drew for itself.
+
+    Revealed by selecting a band, which a grip click does and the keyboard
+    shortcuts do too, so this is not a mouse-only affordance. Alignment is
+    offered on columns only, because that is the only place GFM can store it:
+    one marker per column in the delimiter row.
+  -->
+  <Teleport v-if="rowControls" :to="rowControls">
+    <div class="md-editor__table-bar" @mousedown.prevent>
+      <NbButton
+        size="xxs"
+        variant="ghost"
+        icon="rows-plus-top"
+        aria-label="Insert row above"
+        @click="editor.chain().focus().addRowBefore().run()"
+      />
+      <NbButton
+        size="xxs"
+        variant="ghost"
+        icon="rows-plus-bottom"
+        aria-label="Insert row below"
+        @click="editor.chain().focus().addRowAfter().run()"
+      />
+      <NbButton
+        size="xxs"
+        variant="danger"
+        icon="trash-simple"
+        aria-label="Delete row"
+        @click="editor.chain().focus().deleteRow().run()"
+      />
+    </div>
+  </Teleport>
+
+  <Teleport v-if="columnControls" :to="columnControls">
+    <div class="md-editor__table-bar" @mousedown.prevent>
+      <NbButton
+        size="xxs"
+        variant="ghost"
+        icon="columns-plus-left"
+        aria-label="Insert column before"
+        @click="editor.chain().focus().addColumnBefore().run()"
+      />
+      <NbButton
+        size="xxs"
+        variant="ghost"
+        icon="columns-plus-right"
+        aria-label="Insert column after"
+        @click="editor.chain().focus().addColumnAfter().run()"
+      />
+      <NbButton
+        size="xxs"
+        variant="ghost"
+        icon="text-align-left"
+        aria-label="Align left"
+        :aria-pressed="columnAlignment === 'left'"
+        @click="align('left')"
+      />
+      <NbButton
+        size="xxs"
+        variant="ghost"
+        icon="text-align-center"
+        aria-label="Align centre"
+        :aria-pressed="columnAlignment === 'center'"
+        @click="align('center')"
+      />
+      <NbButton
+        size="xxs"
+        variant="ghost"
+        icon="text-align-right"
+        aria-label="Align right"
+        :aria-pressed="columnAlignment === 'right'"
+        @click="align('right')"
+      />
+      <NbButton
+        size="xxs"
+        variant="danger"
+        icon="trash-simple"
+        aria-label="Delete column"
+        @click="editor.chain().focus().deleteColumn().run()"
+      />
+    </div>
+  </Teleport>
   <!-- The positioning context the image controls measure against. They are
        absolutely placed over whichever picture is hovered or selected, so
        they need a frame that does not move when the page scrolls. -->
@@ -30,15 +118,12 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { BubbleMenu, Editor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
-import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
-import TableCell from '@tiptap/extension-table-cell'
-import TableHeader from '@tiptap/extension-table-header'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
@@ -57,6 +142,14 @@ import { Embed } from '@/components/editor/nodes/Embed'
 import { Image } from '@/components/editor/nodes/Image'
 import ImageTools from '@/components/editor/ImageTools.vue'
 import { Details } from '@/components/editor/nodes/Details'
+import {
+  Table,
+  TableCell,
+  TableHeader,
+  selectedColumnAlignment,
+} from '@/components/editor/nodes/Table'
+import type { TTableAlignment } from '@/components/editor/nodes/Table'
+import { TableGrips, selectedTableBand } from '@/components/editor/tableGrips'
 import { ColorSwatches } from '@/components/editor/decorations'
 
 const props = defineProps<{
@@ -155,6 +248,44 @@ function imagesFrom(list: FileList | null | undefined): File[] {
  */
 const toast = useToast()
 
+/**
+ * Which band a table grip has selected, and how that column is aligned.
+ *
+ * Mirrored into refs rather than read from the editor in the template,
+ * because the editor is not reactive: a selection change does not re-render
+ * anything unless something tells Vue it happened.
+ */
+const rowControls = ref<HTMLElement | null>(null)
+const columnControls = ref<HTMLElement | null>(null)
+const columnAlignment = ref<TTableAlignment | null>(null)
+
+/**
+ * Clicking the same alignment again clears it, which writes `---` rather than
+ * `:---`. The two are not the same marker, and a document that never asked for
+ * alignment should not grow one it cannot get rid of.
+ */
+function align(alignment: TTableAlignment): void {
+  const next = columnAlignment.value === alignment ? null : alignment
+  editor.chain().focus().setColumnAlignment(next).run()
+  readTableSelection()
+}
+
+function readTableSelection(): void {
+  const band = selectedTableBand(editor.state)
+  // Re-queried every time rather than held, because the decoration carrying
+  // the host is rebuilt whenever the selection or the document changes, and a
+  // remembered element would be one ProseMirror has already thrown away.
+  const host = (kind: string) =>
+    band
+      ? editor.view.dom.querySelector<HTMLElement>(
+          `[data-table-controls="${kind}"]`,
+        )
+      : null
+  rowControls.value = band?.row ? host('row') : null
+  columnControls.value = band?.column ? host('column') : null
+  columnAlignment.value = selectedColumnAlignment(editor.state)
+}
+
 const editor = new Editor({
   content: props.modelValue,
   autofocus: props.autofocus ? 'end' : false,
@@ -172,6 +303,7 @@ const editor = new Editor({
     TableRow,
     TableHeader,
     TableCell,
+    TableGrips,
     TaskList,
     TaskItem.configure({ nested: true }),
     // Before the typeaheads, so `> [!NOTE] ` is claimed as a callout rather
@@ -227,7 +359,9 @@ const editor = new Editor({
     },
   },
   onBlur: () => emit('blur'),
+  onSelectionUpdate: () => readTableSelection(),
   onUpdate: ({ editor: instance }) => {
+    readTableSelection()
     emit(
       'update:modelValue',
       (
@@ -354,6 +488,17 @@ const bubbleActions = [
   position: relative;
 }
 
+.md-editor__table-bar {
+  display: flex;
+  gap: 2px;
+  padding: var(--nb-spacing-2);
+  background: var(--nb-c-layer-3);
+  border: 1px solid var(--nb-c-layer-border-3);
+  border-radius: var(--nb-radius-md);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+  white-space: nowrap;
+}
+
 .md-editor {
   :deep(.tiptap) {
     outline: none;
@@ -417,6 +562,99 @@ const bubbleActions = [
       border: 0;
       border-block-start: 1px solid var(--nb-c-border);
       margin-block: var(--nb-spacing-16);
+    }
+
+    /* Tables, matching the reader's borders so switching into edit mode is
+       not a change of appearance. */
+    table {
+      border-collapse: collapse;
+      table-layout: fixed;
+      /* Room in the margin for the grips, which sit outside the table edge. */
+      margin-block: var(--nb-spacing-16);
+      margin-inline-start: var(--nb-spacing-12);
+
+      th,
+      td {
+        position: relative;
+        border: 1px solid var(--nb-c-border);
+        padding: var(--nb-spacing-4) var(--nb-spacing-8);
+
+        > p {
+          margin: 0;
+          max-width: none;
+        }
+      }
+
+      /* prosemirror-tables marks a cell selection with this class. Without it
+         a band selected from a grip looks like nothing happened. */
+      .selectedCell::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: var(--nb-c-primary);
+        opacity: 0.12;
+        pointer-events: none;
+      }
+    }
+
+    /* The grips.
+
+       Positioned against the first cell of their band rather than measured
+       against the table, so they stay correct while the table is edited. They
+       appear on hover of the table, and stay visible once their band is
+       selected, which is how the inline controls are kept reachable. */
+    .md-table__grip {
+      position: absolute;
+      padding: 0;
+      border: 0;
+      border-radius: var(--nb-radius-xs);
+      background: var(--nb-c-border);
+      opacity: 0;
+      transition: opacity 120ms ease;
+      cursor: grab;
+
+      &:hover,
+      &.is-active {
+        background: var(--nb-c-primary);
+        opacity: 1;
+      }
+
+      &.is-dragging {
+        cursor: grabbing;
+        opacity: 1;
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--nb-c-focus-ring);
+        outline-offset: 1px;
+        opacity: 1;
+      }
+    }
+
+    .md-table__grip--row {
+      inset-inline-start: -9px;
+      inset-block: 1px;
+      inline-size: 5px;
+    }
+
+    /* The inline controls, floating above the band they act on. Absolute so
+       they never change the cell's size, which would make the table jump every
+       time somebody selected a row. */
+    .md-table__controls {
+      position: absolute;
+      z-index: 1;
+      inset-block-end: calc(100% + var(--nb-spacing-4));
+      inset-inline-start: 0;
+    }
+
+    .md-table__grip--column {
+      inset-block-start: -9px;
+      inset-inline: 1px;
+      block-size: 5px;
+    }
+
+    table:hover .md-table__grip {
+      opacity: 0.6;
     }
 
     p.is-editor-empty:first-child::before {
