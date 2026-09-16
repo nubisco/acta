@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/nubisco/acta/compare/v1.21.0...v1.22.0) (2026-09-16)
+
+
+### Features
+
+* **app:** drop or paste an image into a document ([16c9cd1](https://github.com/nubisco/acta/commit/16c9cd1426a16e5d9ca585783e24734545f2b484))
+
 # [1.21.0](https://github.com/nubisco/acta/compare/v1.20.0...v1.21.0) (2026-09-16)
 
 
