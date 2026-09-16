@@ -8,6 +8,11 @@
  * address on the web. A link to another page in the same import becomes a
  * `[[doc:...]]` reference.
  *
+ * A picture on the web is read by the browser first. Most sites do not allow
+ * that (CORS), so the fallback asks the server to copy it, through the SSRF
+ * guard it applies to every address a user supplies. Only a picture neither
+ * can read stays pointed at its original address, and the result says so.
+ *
  * Every body is stored in the editor's own serialization, so opening a page
  * and saving it changes nothing.
  */
@@ -51,6 +56,58 @@ export interface IImportApi {
   fetchRemote?: (
     url: string,
   ) => Promise<{ bytes: Uint8Array; mime: string } | null>
+  /**
+   * The same picture copied by the server into an attachment on `owner`, for
+   * when the browser is not allowed to read it. Throws when the server cannot
+   * fetch it either.
+   */
+  attachmentFetchRemote?: (
+    owner: { doc: string },
+    url: string,
+  ) => Promise<{ id: string }>
+}
+
+/**
+ * Pictures uploaded or fetched at once for one page.
+ *
+ * A document pasted from the web can carry a hundred images. Firing them all
+ * together would open a hundred connections from the browser and a hundred
+ * outbound fetches on the server, so they go a few at a time.
+ */
+export const IMPORT_CONCURRENCY = 4
+
+/** `run` over `items`, never more than `limit` at once, results in order. */
+async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  run: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++
+      results[index] = await run(items[index])
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker),
+  )
+  return results
+}
+
+/** The promise stored under `key`, started once however often it is asked. */
+function once<T>(
+  cache: Map<string, Promise<T>>,
+  key: string,
+  start: () => Promise<T>,
+): Promise<T> {
+  let found = cache.get(key)
+  if (!found) {
+    found = start()
+    cache.set(key, found)
+  }
+  return found
 }
 
 export interface IImportTarget {
@@ -167,6 +224,17 @@ export async function runImport(
   }
   walkParents(roots, target.parent)
 
+  // One browser read and at most one server copy per address, for the whole
+  // import. The bytes a browser read are uploaded to every page that shows the
+  // picture, like a file beside the pages is. A server copy already is an
+  // attachment, so a later page refers to that one rather than fetching the
+  // address again.
+  const browserReads = new Map<
+    string,
+    Promise<{ bytes: Uint8Array; mime: string } | null>
+  >()
+  const serverCopies = new Map<string, Promise<string | null>>()
+
   let done = 0
   for (const page of pages) {
     let slug = slugs.get(page)!
@@ -179,6 +247,8 @@ export async function runImport(
       name: string
       mime: string
       load: () => Promise<Uint8Array | null>
+      /** Set for a picture on the web, which has its own way in. */
+      remote?: string
     }
     const uploads = new Map<string, TUpload>()
     const plan = (raw: string, image: boolean): TUpload | null => {
@@ -195,7 +265,8 @@ export async function runImport(
         }
       }
       if (/^https?:\/\//i.test(trimmed)) {
-        if (!image || !api.fetchRemote) return null
+        if (!image || (!api.fetchRemote && !api.attachmentFetchRemote))
+          return null
         const name = safeAssetName(
           basename(new URL(trimmed).pathname) || 'image',
         )
@@ -203,10 +274,8 @@ export async function runImport(
           key: trimmed,
           name,
           mime: mimeFromName(name),
-          load: async () => {
-            const got = await api.fetchRemote!(trimmed)
-            return got ? got.bytes : null
-          },
+          load: async () => null,
+          remote: trimmed,
         }
       }
       if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) || trimmed.startsWith('#'))
@@ -306,25 +375,64 @@ export async function runImport(
       throw new Error(`Could not create "${page.title}": ${result.error}`)
 
     if (uploads.size > 0) {
-      const ids = new Map<string, string>()
-      for (const upload of uploads.values()) {
-        const bytes = await upload.load()
-        if (!bytes) {
-          issues.add(
-            `A picture in "${page.title}" could not be copied (${upload.key.slice(0, 120)}). Its site does not allow it, so it still points at the original address.`,
-          )
-          continue
-        }
+      const pageSlug = slug
+      const upload = async (
+        item: TUpload,
+        bytes: Uint8Array,
+        mime: string,
+      ): Promise<string | null> => {
         try {
           const uploaded = await api.attachmentUpload(
-            { doc: slug },
-            toFile(bytes, upload.name, upload.mime),
+            { doc: pageSlug },
+            toFile(bytes, item.name, mime),
           )
-          ids.set(upload.key, uploaded.id)
+          return uploaded.id
         } catch {
-          issues.add(`${upload.name} could not be attached to "${page.title}".`)
+          return null
         }
       }
+      // Each answer is the attachment id, or the issue to report instead.
+      const attach = async (
+        item: TUpload,
+      ): Promise<{ id: string } | { issue: string }> => {
+        if (item.remote) {
+          const url = item.remote
+          const read = api.fetchRemote
+            ? await once(browserReads, url, () =>
+                api.fetchRemote!(url).catch(() => null),
+              )
+            : null
+          const id = read
+            ? await upload(item, read.bytes, read.mime || item.mime)
+            : null
+          if (id) return { id }
+          const copied = api.attachmentFetchRemote
+            ? await once(serverCopies, url, () =>
+                api.attachmentFetchRemote!({ doc: pageSlug }, url).then(
+                  (made) => made.id,
+                  () => null,
+                ),
+              )
+            : null
+          if (copied) return { id: copied }
+          return {
+            issue: `A picture in "${page.title}" could not be copied (${url.slice(0, 120)}), so it still points at the original address.`,
+          }
+        }
+        const bytes = await item.load()
+        const id = bytes ? await upload(item, bytes, item.mime) : null
+        return id
+          ? { id }
+          : { issue: `${item.name} could not be attached to "${page.title}".` }
+      }
+
+      const items = [...uploads.values()]
+      const answers = await mapLimit(items, IMPORT_CONCURRENCY, attach)
+      const ids = new Map<string, string>()
+      answers.forEach((answer, index) => {
+        if ('id' in answer) ids.set(items[index].key, answer.id)
+        else issues.add(answer.issue)
+      })
       const body = resolveBody(ids)
       const replaced = (
         await api.docWrite([

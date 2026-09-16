@@ -455,6 +455,20 @@ export const api = {
       }),
     }),
 
+  /**
+   * A picture on another site, copied by the server into an attachment on a
+   * page. The import's fallback for images the browser may not read. Any
+   * failure is one 422 with no reason given, on purpose.
+   */
+  attachmentFetchRemote: (owner: { doc: string }, url: string) =>
+    req<{ id: string; filename: string; size: number; url: string }>(
+      '/attachments/fetch',
+      {
+        method: 'POST',
+        body: JSON.stringify({ doc: owner.doc, url }),
+      },
+    ),
+
   attachmentUpload: async (
     owner: { item?: string; doc?: string },
     file: File,

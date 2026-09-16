@@ -317,6 +317,29 @@ export async function assertPublicUrl(
   return url
 }
 
+/** How a caller wants the body read. Every field has the preview default. */
+export interface IFetchOptions {
+  accept?: string
+  /** Bytes read before the body is cut off, or refused. */
+  maxBytes?: number
+  /**
+   * What happens past `maxBytes`. A preview only needs `<head>`, so it keeps
+   * the start and carries on. An image cut in half is a broken file, so a
+   * caller storing bytes asks for a refusal instead.
+   */
+  overflow?: 'truncate' | 'refuse'
+  userAgent?: string
+}
+
+export interface IFetchBytesResult {
+  /** The URL actually read, after redirects. */
+  url: string
+  contentType: string
+  bytes: Uint8Array
+  /** True when the body was cut off at `maxBytes`. */
+  truncated: boolean
+}
+
 /**
  * GET a user-supplied URL, or throw.
  *
@@ -329,6 +352,33 @@ export async function safeFetch(
   deps: IFetchDeps,
   accept = 'text/html,application/xhtml+xml',
 ): Promise<IFetchResult> {
+  const res = await safeFetchBytes(raw, deps, { accept })
+  // Lossy on purpose: a multi-byte character cut in half at the cap must not
+  // throw, it must simply not be part of the title.
+  const body = new TextDecoder('utf-8').decode(res.bytes)
+  return {
+    url: res.url,
+    contentType: res.contentType,
+    body,
+    truncated: res.truncated,
+  }
+}
+
+/**
+ * The same guarded GET, handing back the raw bytes.
+ *
+ * Every rule in this file applies unchanged: this is where they live, and
+ * `safeFetch` is a text reading of it. A caller that stores what it fetched
+ * (an imported image) needs bytes rather than a decoded string, and a size cap
+ * that fits a picture rather than a page head.
+ */
+export async function safeFetchBytes(
+  raw: string,
+  deps: IFetchDeps,
+  options: IFetchOptions = {},
+): Promise<IFetchBytesResult> {
+  const maxBytes = options.maxBytes ?? MAX_BYTES
+  const overflow = options.overflow ?? 'truncate'
   let target = raw
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -344,10 +394,12 @@ export async function safeFetch(
         redirect: 'manual',
         signal: controller.signal,
         headers: {
-          accept,
-          // Named honestly. A preview fetch is a robot, and a site that would
-          // rather not be read by one should be able to say so.
-          'user-agent': 'ActaLinkPreview/1.0 (+https://nubisco.io/acta)',
+          accept: options.accept ?? 'text/html,application/xhtml+xml',
+          // Named honestly. A server-side fetch is a robot, and a site that
+          // would rather not be read by one should be able to say so.
+          'user-agent':
+            options.userAgent ??
+            'ActaLinkPreview/1.0 (+https://nubisco.io/acta)',
           'accept-language': 'en',
         },
       })
@@ -365,15 +417,19 @@ export async function safeFetch(
       const contentType = res.headers.get('content-type') ?? ''
       const declared = Number(res.headers.get('content-length') ?? '0')
       // The cheapest refusal: a site that admits up front that it is too big.
-      if (declared > MAX_BYTES * 8) throw new Error('too large')
+      // A truncating reader tolerates a generous multiple, since it only keeps
+      // the start. A refusing one takes the site at its word.
+      const declaredCap = overflow === 'truncate' ? maxBytes * 8 : maxBytes
+      if (declared > declaredCap) throw new Error('too large')
 
       // Inside the timer, deliberately. Clearing it once the headers arrived
       // left the body read uncapped in time, so a site that sent headers
       // promptly and then dribbled the page out could hold the request open
       // for as long as it liked. The size cap alone does not close that: a
       // byte a minute never reaches it.
-      const { text, truncated } = await readCapped(res)
-      return { url: url.toString(), contentType, body: text, truncated }
+      const { bytes, truncated } = await readCapped(res, maxBytes)
+      if (truncated && overflow === 'refuse') throw new Error('too large')
+      return { url: url.toString(), contentType, bytes, truncated }
     } finally {
       clearTimeout(timer)
     }
@@ -383,17 +439,21 @@ export async function safeFetch(
 }
 
 /**
- * The body, up to MAX_BYTES, then stop reading.
+ * The body, up to `maxBytes`, then stop reading.
  *
- * Reading the stream rather than calling `res.text()`, because `text()` has
+ * Reading the stream rather than calling `res.arrayBuffer()`, because that has
  * no cap: a URL that streams for as long as we listen would otherwise be a
  * memory exhaustion bug with a very short reproduction.
+ *
+ * `truncated` means the body went past the cap, not that it reached it, so a
+ * refusing caller does not throw away a file of exactly `maxBytes`.
  */
 async function readCapped(
   res: Response,
-): Promise<{ text: string; truncated: boolean }> {
+  maxBytes: number,
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
   const body = res.body
-  if (!body) return { text: '', truncated: false }
+  if (!body) return { bytes: new Uint8Array(0), truncated: false }
   const reader = body.getReader()
   const chunks: Uint8Array[] = []
   let size = 0
@@ -405,7 +465,7 @@ async function readCapped(
       if (!value) continue
       chunks.push(value)
       size += value.byteLength
-      if (size >= MAX_BYTES) {
+      if (size > maxBytes) {
         truncated = true
         break
       }
@@ -416,7 +476,7 @@ async function readCapped(
     await reader.cancel().catch(() => {})
   }
 
-  const joined = new Uint8Array(Math.min(size, MAX_BYTES))
+  const joined = new Uint8Array(Math.min(size, maxBytes))
   let offset = 0
   for (const chunk of chunks) {
     const room = joined.length - offset
@@ -424,9 +484,7 @@ async function readCapped(
     joined.set(chunk.subarray(0, Math.min(room, chunk.length)), offset)
     offset += Math.min(room, chunk.length)
   }
-  // Lossy on purpose: a multi-byte character cut in half at the cap must not
-  // throw, it must simply not be part of the title.
-  return { text: new TextDecoder('utf-8').decode(joined), truncated }
+  return { bytes: joined, truncated }
 }
 
 // ---------------------------------------------------------------------------

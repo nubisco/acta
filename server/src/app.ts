@@ -23,6 +23,7 @@ import { ingestRoutes } from './routes/ingest'
 import { JwksVerifier, type ISsoConfig } from './core/sso'
 import { OidcClient, type IOidcConfig } from './core/oidc'
 import { AttachmentStore, type IBlobStore } from './services/attachments'
+import type { IFetchDeps } from './core/safeFetch'
 import { startRulesEngine } from './services/rules'
 import { startWebhookDispatcher } from './services/webhooks'
 
@@ -71,6 +72,11 @@ export interface IAppOptions {
   otpFallback?: boolean
   /** Overridable for tests. */
   fetchImpl?: typeof fetch
+  /**
+   * Resolver and fetch behind the SSRF guard, for requests to addresses users
+   * supply (imported images). Overridable for tests.
+   */
+  remoteFetchDeps?: IFetchDeps
   webhookBackoffMs?: number
   /**
    * Acta's own public address. Only used to turn a card key into a link in
@@ -199,14 +205,20 @@ export async function createApp(
   // Workspace-scoped API: the segment names the workspace, and the middleware
   // resolves who you are inside it. This is the path the app uses.
   app.use('/api/v1/w/:workspace/*', requireWorkspace())
-  app.route('/api/v1/w/:workspace', apiRoutes(store))
+  app.route(
+    '/api/v1/w/:workspace',
+    apiRoutes(store, { remoteFetchDeps: opts.remoteFetchDeps }),
+  )
 
   // The same API without a workspace segment, meaning "the workspace this
   // token was minted in". Agent tokens, the MCP server and the importers all
   // address Acta this way, and a token is a grant on one workspace, so there
   // is nothing for them to choose.
   app.use('/api/v1/*', requireAuth())
-  app.route('/api/v1', apiRoutes(store))
+  app.route(
+    '/api/v1',
+    apiRoutes(store, { remoteFetchDeps: opts.remoteFetchDeps }),
+  )
 
   /**
    * CORS for the MCP endpoint.

@@ -29,9 +29,25 @@ export interface IFakeAttachment {
   url?: string
 }
 
+/** A picture on another site, and whether that site lets a browser read it. */
+export interface IFakeRemote {
+  bytes: Uint8Array
+  mime: string
+  cors: boolean
+}
+
 export class FakeActa {
   docs: IFakeDoc[] = []
   attachments: IFakeAttachment[] = []
+  /** The web, by URL. Anything not here cannot be fetched by anyone. */
+  web = new Map<string, IFakeRemote>()
+  /** Every URL the browser tried to read, in order. */
+  browserReads: string[] = []
+  /** Every URL the server was asked to copy, in order. */
+  serverCopies: string[] = []
+  /** The most server copies that were running at the same moment. */
+  maxConcurrentCopies = 0
+  private copiesRunning = 0
   private seq = 0
 
   addDoc(doc: Partial<IFakeDoc> & { slug: string; title: string }): IFakeDoc {
@@ -117,7 +133,30 @@ export class FakeActa {
         const bytes = new Uint8Array(await file.arrayBuffer())
         return this.addAttachment(owner.doc, file.name, bytes, file.type)
       },
-      fetchRemote: async () => null,
+      fetchRemote: async (url) => {
+        this.browserReads.push(url)
+        const found = this.web.get(url)
+        return found?.cors ? { bytes: found.bytes, mime: found.mime } : null
+      },
+      attachmentFetchRemote: async (owner, url) => {
+        this.serverCopies.push(url)
+        this.copiesRunning++
+        this.maxConcurrentCopies = Math.max(
+          this.maxConcurrentCopies,
+          this.copiesRunning,
+        )
+        try {
+          // A real request takes a moment, which is what lets the concurrency
+          // cap be observed at all.
+          await new Promise((resolve) => setTimeout(resolve, 1))
+          const found = this.web.get(url)
+          if (!found) throw new Error('422 could not fetch that image')
+          const name = url.split('/').pop() || 'image'
+          return this.addAttachment(owner.doc, name, found.bytes, found.mime)
+        } finally {
+          this.copiesRunning--
+        }
+      },
     }
   }
 

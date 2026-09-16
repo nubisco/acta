@@ -46,6 +46,11 @@ import {
   type AttachmentStore,
 } from '../services/attachments'
 import { linkPreviewGet, zLinkPreviewRequest } from '../services/linkPreviews'
+import {
+  attachmentFetchRemote,
+  zAttachmentFetch,
+} from '../services/remoteImages'
+import type { IFetchDeps } from '../core/safeFetch'
 import { ruleList, ruleWrite, zRuleWrite } from '../services/rules'
 import {
   connectionList,
@@ -88,7 +93,18 @@ function requireScope(ctx: ICtx, scope: string): void {
 /** Avatars are small by nature; 2 MB is generous for a cropped square. */
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024
 
-export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
+export interface IApiRouteOptions {
+  /**
+   * Resolver and fetch for requests to addresses users supply. Tests pass
+   * their own, so no test touches the network.
+   */
+  remoteFetchDeps?: IFetchDeps
+}
+
+export function apiRoutes(
+  store: AttachmentStore,
+  options: IApiRouteOptions = {},
+): Hono<IAuthEnv> {
   const app = new Hono<IAuthEnv>()
 
   app.onError((err, c) => {
@@ -359,7 +375,23 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     return c.json(await attachmentAdd(ctx, store, body))
   })
 
-  // Binary upload path: metadata in the query, the body is the file itself.
+  /**
+   * A picture on another site, copied into an attachment on a page.
+   *
+   * The import's fallback for images the browser is not allowed to read. It
+   * goes through the SSRF guard, and every failure answers with the same 422
+   * so it cannot be used to tell which internal addresses exist. See
+   * services/remoteImages.ts.
+   */
+  app.post('/attachments/fetch', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'write')
+    const body = zAttachmentFetch.parse(await c.req.json())
+    return c.json(
+      await attachmentFetchRemote(ctx, store, body, options.remoteFetchDeps),
+    )
+  })
+
   app.post('/attachments/batch', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
@@ -367,6 +399,7 @@ export function apiRoutes(store: AttachmentStore): Hono<IAuthEnv> {
     return c.json(await attachmentAddBatch(ctx, store, body))
   })
 
+  // Binary upload path: metadata in the query, the body is the file itself.
   app.post('/attachments/raw', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')

@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { zipSync, strToU8 } from 'fflate'
 import { prepareImport, readInputs } from '@/lib/transfer/sources'
-import { runImport } from '@/lib/transfer/importer'
+import { IMPORT_CONCURRENCY, runImport } from '@/lib/transfer/importer'
 import { collectTree, exportMarkdown } from '@/lib/transfer/exporter'
 import { serializeOnce } from '@/lib/transfer/normalize'
 import { asFile, bytesFile, FakeActa, PNG, textFile } from './transfer-fakes'
@@ -120,6 +120,120 @@ describe('markdown import', () => {
     ])
     expect(acta.doc('alpha').body).toBe('See [[doc:beta|the beta page]].')
     expect(acta.doc('beta').body).toBe('Back to [[doc:alpha]].')
+    expectStable(acta)
+  })
+})
+
+describe('pictures on the web', () => {
+  const LOGO = 'https://cdn.example.com/brand/logo.png'
+
+  it('copies a picture the browser may read, without asking the server', async () => {
+    const acta = new FakeActa()
+    acta.web.set(LOGO, { bytes: PNG, mime: 'image/png', cors: true })
+    const result = await importFiles(acta, [
+      textFile('open.md', `![Logo](${LOGO})`),
+    ])
+    const [attachment] = acta.attachments
+    expect(acta.doc('open').body).toBe(`![Logo](attachment:${attachment.id})`)
+    expect(acta.serverCopies).toEqual([])
+    expect(result.issues).toEqual([])
+    expectStable(acta)
+  })
+
+  it('falls back to the server when the browser may not read it', async () => {
+    const acta = new FakeActa()
+    acta.web.set(LOGO, { bytes: PNG, mime: 'image/png', cors: false })
+    const result = await importFiles(acta, [
+      textFile(
+        'closed.html',
+        `<h1>Closed</h1><p>Our mark:</p><p><img src="${LOGO}" alt="Logo"></p>`,
+      ),
+    ])
+    // The browser went first, and the server finished the job.
+    expect(acta.browserReads).toEqual([LOGO])
+    expect(acta.serverCopies).toEqual([LOGO])
+    const [attachment] = acta.attachments
+    expect(attachment.doc).toBe('closed')
+    const body = acta.doc('closed').body
+    expect(body).toContain(`![Logo](attachment:${attachment.id})`)
+    expect(body).not.toContain('https://')
+    expect(result.issues).toEqual([])
+    expectStable(acta)
+  })
+
+  it('leaves a picture neither can read pointing at its address, and says so', async () => {
+    const acta = new FakeActa()
+    const gone = 'https://gone.example.com/lost.png'
+    const result = await importFiles(acta, [
+      textFile('gone.md', `Before\n\n![Lost](${gone})\n\nAfter`),
+    ])
+    expect(acta.browserReads).toEqual([gone])
+    expect(acta.serverCopies).toEqual([gone])
+    expect(acta.attachments).toEqual([])
+    expect(acta.doc('gone').body).toBe(`Before\n\n![Lost](${gone})\n\nAfter`)
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0]).toContain(gone)
+    expect(result.issues[0]).toMatch(/still points at the original address/)
+    expectStable(acta)
+  })
+
+  it('fetches a repeated address once across the whole import', async () => {
+    const acta = new FakeActa()
+    const open = 'https://cdn.example.com/open.png'
+    acta.web.set(LOGO, { bytes: PNG, mime: 'image/png', cors: false })
+    acta.web.set(open, { bytes: PNG, mime: 'image/png', cors: true })
+    const gone = 'https://gone.example.com/lost.png'
+    const page = `![a](${LOGO}) ![b](${LOGO}) ![c](${open}) ![d](${gone}) ![e](${gone})`
+    const result = await importFiles(acta, [
+      textFile('one.md', `# One\n\n${page}`),
+      textFile('two.md', `# Two\n\n${page}`),
+    ])
+
+    const count = (list: string[], url: string) =>
+      list.filter((seen) => seen === url).length
+    expect(count(acta.browserReads, LOGO)).toBe(1)
+    expect(count(acta.serverCopies, LOGO)).toBe(1)
+    expect(count(acta.browserReads, open)).toBe(1)
+    expect(count(acta.serverCopies, open)).toBe(0)
+    expect(count(acta.browserReads, gone)).toBe(1)
+    expect(count(acta.serverCopies, gone)).toBe(1)
+
+    // The server copy is one attachment both pages refer to. The browser read
+    // is uploaded to each page, the way a file beside the pages is.
+    const copied = acta.attachments.filter((a) => a.filename === 'logo.png')
+    expect(copied).toHaveLength(1)
+    for (const slug of ['one', 'two']) {
+      const body = acta.doc(slug).body
+      expect(body.split(`attachment:${copied[0].id}`)).toHaveLength(3)
+      expect(body).not.toContain(LOGO)
+      expect(body).not.toContain(open)
+      expect(body.split(gone)).toHaveLength(3)
+    }
+    expect(
+      acta.attachments.filter((a) => a.filename === 'open.png'),
+    ).toHaveLength(2)
+    // Reported once per page that still hotlinks it.
+    expect(result.issues.filter((issue) => issue.includes(gone))).toHaveLength(
+      2,
+    )
+    expectStable(acta)
+  })
+
+  it('never has more than a few copies running at once', async () => {
+    const acta = new FakeActa()
+    const urls = Array.from(
+      { length: 20 },
+      (_, i) => `https://cdn.example.com/pic-${i}.png`,
+    )
+    for (const url of urls)
+      acta.web.set(url, { bytes: PNG, mime: 'image/png', cors: false })
+    await importFiles(acta, [
+      textFile('many.md', urls.map((url) => `![](${url})`).join('\n\n')),
+    ])
+    expect(acta.serverCopies).toHaveLength(20)
+    expect(acta.maxConcurrentCopies).toBeGreaterThan(1)
+    expect(acta.maxConcurrentCopies).toBeLessThanOrEqual(IMPORT_CONCURRENCY)
+    expect(acta.doc('many').body).not.toContain('https://')
     expectStable(acta)
   })
 })

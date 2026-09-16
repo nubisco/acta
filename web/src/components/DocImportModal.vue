@@ -242,6 +242,8 @@ async function start(): Promise<void> {
         docWrite: (ops) => api.docWrite(ops),
         attachmentUpload: (owner, file) => api.attachmentUpload(owner, file),
         fetchRemote: importer.fetchRemoteInBrowser,
+        attachmentFetchRemote: (owner, url) =>
+          api.attachmentFetchRemote(owner, url),
       },
       (next) => (progress.value = next),
     )
