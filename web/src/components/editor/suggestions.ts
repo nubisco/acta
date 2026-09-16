@@ -138,6 +138,22 @@ function slashItems(query: string): ISuggestionItem[] {
       icon: 'check-square',
       apply: inserter('\n- [ ] first task\n'),
     },
+    {
+      id: 'math',
+      label: 'Formula',
+      icon: 'function',
+      hint: '$$',
+      // A formula somebody can read, rather than an empty box: there is
+      // something on screen to edit into what they meant.
+      apply: inserter('\n$$\nE = mc^2\n$$\n\n'),
+    },
+    {
+      id: 'diagram',
+      label: 'Diagram',
+      icon: 'tree-structure',
+      hint: 'mermaid',
+      apply: inserter('\n```mermaid\ngraph TD;\n  A-->B;\n```\n\n'),
+    },
   ]
   const needle = query.trim().toLowerCase()
   return needle

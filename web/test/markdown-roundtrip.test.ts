@@ -27,6 +27,8 @@ import { Embed } from '@/components/editor/nodes/Embed'
 import { Image } from '@/components/editor/nodes/Image'
 import { Table, TableCell, TableHeader } from '@/components/editor/nodes/Table'
 import { Details } from '@/components/editor/nodes/Details'
+import { MathBlock, MathInline, MathText } from '@/components/editor/nodes/Math'
+import { MermaidBlock } from '@/components/editor/nodes/MermaidBlock'
 
 function roundtrip(md: string): string {
   const editor = new Editor({
@@ -49,6 +51,10 @@ function roundtrip(md: string): string {
       Embed,
       Image,
       ...Details,
+      MathText,
+      MathBlock,
+      MathInline,
+      MermaidBlock,
       Markdown.configure({
         html: false,
         linkify: true,
@@ -812,5 +818,123 @@ describe('a table GFM cannot represent is flattened, never written as HTML', () 
   it('what it writes is a table it can read back', () => {
     const once = merged(src)
     expect(roundtrip(once)).toBe(once)
+  })
+})
+
+/**
+ * Maths.
+ *
+ * The reader renders `$$ ... $$` and `$...$`. These exist because the reader
+ * rendering a construct the editor's schema does not know is exactly how
+ * tables and then images were deleted from documents here: parse produces
+ * nothing, serialize writes nothing, and the formula is gone from the file
+ * after an open and a save that changed nothing.
+ */
+describe('maths survives a save', () => {
+  it('keeps a display block byte-identical', () => {
+    const src = '$$\nE = mc^2\n$$'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps a multi-line block, backslashes and all', () => {
+    const src =
+      '$$\n\\begin{aligned}\na &= b + c \\\\\nd &= e\n\\end{aligned}\n$$'
+    const out = roundtrip(src)
+    // The failure that would be invisible on screen: doubling every escape,
+    // so the second save writes `\\begin` and the formula stops parsing.
+    expect(out).not.toContain('\\\\begin')
+    expect(out).toBe(src)
+  })
+
+  it('keeps inline maths and the prose around it', () => {
+    const src = 'The identity $e^{i\\pi} + 1 = 0$ is the pretty one.'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps a block sitting between prose', () => {
+    const src = '## Energy\n\n$$\nE = mc^2\n$$\n\nAnd so on.'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('is stable on a second save', () => {
+    const src = 'Given $x$:\n\n$$\n\\int_0^1 x^2 dx\n$$'
+    const once = roundtrip(src)
+    expect(roundtrip(once)).toBe(once)
+  })
+
+  /*
+   * The false positives. Each of these is ordinary prose that a loose
+   * detector turns into a formula, which would both look wrong and rewrite
+   * the author's line in the file.
+   */
+  it('leaves prices alone', () => {
+    for (const src of [
+      'It costs $5 and $10.',
+      'Between $5-$10 depending on the day.',
+      'They charge $100 and I charge $200.',
+      'Refund of $5.',
+    ]) {
+      expect(roundtrip(src), src).toBe(src)
+    }
+  })
+
+  it('leaves shell variables alone', () => {
+    for (const src of [
+      'Add it to $PATH first.',
+      'Export $PATH and $HOME before running it.',
+      'Use $1 for the first argument.',
+    ]) {
+      expect(roundtrip(src), src).toBe(src)
+    }
+  })
+
+  it('leaves a dollar in code alone', () => {
+    expect(roundtrip('Run `echo $PATH` to check.')).toBe(
+      'Run `echo $PATH` to check.',
+    )
+    const fence = '```sh\nexport PATH=$PATH:/usr/local/bin\necho "$5"\n```'
+    expect(roundtrip(fence)).toBe(fence)
+  })
+
+  it('leaves an escaped dollar alone', () => {
+    const src = 'A literal \\$x\\$ pair.'
+    expect(roundtrip(src)).toContain('\\$')
+    expect(roundtrip(roundtrip(src))).toBe(roundtrip(src))
+  })
+
+  it('leaves an unclosed block as the prose it reads as', () => {
+    // Swallowing the rest of a document because somebody typed two dollars
+    // is a far worse failure than leaving the line alone.
+    const out = roundtrip('$$\nE = mc^2\n\nStill writing.')
+    expect(out).toContain('Still writing.')
+  })
+})
+
+/**
+ * Diagrams.
+ *
+ * A mermaid fence is a code block, and always was. These pin that down so the
+ * node view added to draw it can never quietly become a node change.
+ */
+describe('mermaid diagrams survive a save', () => {
+  it('keeps the fence and its language byte-identical', () => {
+    const src = '```mermaid\ngraph TD;\n  A-->B;\n```'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps a diagram between prose', () => {
+    const src =
+      'Before.\n\n```mermaid\nsequenceDiagram\n  A->>B: hi\n```\n\nAfter.'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps an ordinary fence working as it always did', () => {
+    const src = '```ts\nconst x = 1\n```'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('is stable on a second save', () => {
+    const src = '```mermaid\ngraph LR;\n  A-->B;\n```'
+    expect(roundtrip(roundtrip(src))).toBe(src)
   })
 })

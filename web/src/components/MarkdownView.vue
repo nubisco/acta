@@ -47,11 +47,14 @@ import { DOC_NAV_KEY } from '@/lib/keys'
 import { wpath } from '@/lib/paths'
 import { safeUrl } from '@/lib/safeUrl'
 import { imageClass, imageStyle, parseImageAttrs } from '@/lib/imageAttrs'
+import { mathPlugin } from '@/lib/math'
 import { sectionMap } from '@nubisco/acta-shared'
 import { CALLOUT_TYPES, calloutIconSvg as calloutIcon } from '@/lib/callouts'
 import { detailsPlugin } from '@/lib/details'
 import { isDarkColor, parseColor } from '@/components/decorations/colors'
 import { highlight, resolveLanguage } from '@/components/decorations/highlight'
+import { renderMath } from '@/components/decorations/katex'
+import { renderDiagram } from '@/components/decorations/mermaid'
 import {
   itemChip,
   itemChipHtml,
@@ -138,6 +141,10 @@ const docNav = inject(DOC_NAV_KEY, null)
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true }).use(
   detailsPlugin,
 )
+// `$$ ... $$` and `$...$`. The same plugin the editor hands to
+// tiptap-markdown, so the two surfaces cannot disagree about what is a
+// formula: see lib/math.ts for the detection rule and why it is that strict.
+md.use(mathPlugin)
 
 /**
  * Enhanced-Markdown extensions (design-spec §2), applied as source and output
@@ -382,6 +389,71 @@ async function hydrateCodeBlocks(): Promise<void> {
 }
 
 /**
+ * Formulas get KaTeX, once KaTeX has arrived.
+ *
+ * The markdown pass emits the LaTeX as both an attribute and the element's
+ * text, so an un-hydrated formula reads as the source somebody typed rather
+ * than as a gap. This replaces the text with the rendering, or with the
+ * parse error, which is a thing a reader can act on. Never a blank space.
+ */
+async function hydrateMath(): Promise<void> {
+  const root = rootEl.value
+  if (!root) return
+  const nodes = root.querySelectorAll<HTMLElement>(
+    '[data-math-block], [data-math-inline]',
+  )
+  for (const el of nodes) {
+    if (el.dataset.mathRendered === '1') continue
+    el.dataset.mathRendered = '1'
+    const latex = el.getAttribute('data-math') ?? ''
+    const result = await renderMath(latex, el.hasAttribute('data-math-block'))
+    // The document may have been replaced while KaTeX was in flight, in which
+    // case this result belongs to a formula nobody is looking at. Asked of
+    // the root rather than of the document, because a block being measured
+    // off-screen is still the block on the page.
+    if (!root.contains(el)) continue
+    if ('html' in result) {
+      el.innerHTML = result.html
+      continue
+    }
+    el.textContent = result.error
+    el.classList.add('md__math-error')
+  }
+}
+
+/**
+ * Mermaid fences become diagrams, once Mermaid has arrived.
+ *
+ * The `<pre>` keeps the source as its content until then, and keeps it
+ * permanently when the diagram will not parse: an error that replaces the text
+ * with a message leaves the author with nothing to compare the message to.
+ */
+async function hydrateDiagrams(): Promise<void> {
+  const root = rootEl.value
+  if (!root) return
+  for (const pre of root.querySelectorAll<HTMLElement>('.md__mermaid')) {
+    if (pre.dataset.diagram === '1') continue
+    pre.dataset.diagram = '1'
+    const source = pre.textContent ?? ''
+    const result = await renderDiagram(source)
+    if (!root.contains(pre)) continue
+    if ('svg' in result) {
+      const figure = document.createElement('div')
+      figure.className = 'md__diagram-figure'
+      figure.setAttribute('role', 'img')
+      figure.innerHTML = result.svg
+      pre.replaceWith(figure)
+      continue
+    }
+    const note = document.createElement('div')
+    note.className = 'md__diagram-error'
+    note.textContent = result.error
+    pre.classList.add('md__mermaid--failed')
+    pre.prepend(note)
+  }
+}
+
+/**
  * Headings get an id and a link you can copy.
  *
  * The slug comes from the shared `sectionMap`, which is the same one
@@ -463,8 +535,10 @@ const html = computed(() => {
   out = renderDriveLinks(out)
   out = renderImageAttrs(out)
   out = renderAttachments(out)
-  // Mermaid fences render as marked code blocks for now (diagram rendering
-  // is a follow-up; the source stays intact and legible).
+  // A mermaid fence is marked here and drawn by `hydrateDiagrams` once
+  // Mermaid has loaded. Until then it is the source, which is the correct
+  // content either way: the picture is an enhancement arriving a frame later,
+  // not the thing that makes the block readable.
   out = out.replace(
     /<pre><code class="language-mermaid">/g,
     '<pre class="md__mermaid"><code>',
@@ -594,6 +668,8 @@ watch(
       hydrateMentions()
       hydrateColors()
       void hydrateCodeBlocks()
+      void hydrateMath()
+      void hydrateDiagrams()
       hydrateHeadings()
       void measure()
     }),

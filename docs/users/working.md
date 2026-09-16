@@ -85,6 +85,35 @@ The last one is a **live embed**: the matching cards render in the page and
 stay current. It is how a status page stops being a lie a week after it was
 written.
 
+### Maths and diagrams
+
+Formulas are LaTeX, and diagrams are Mermaid. Both render in the page and in
+the editor.
+
+````md
+The identity $e^{i\pi} + 1 = 0$, inline.
+
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
+
+```mermaid
+graph TD;
+  Draft-->Review;
+  Review-->Published;
+```
+````
+
+Click a formula to edit its source, click away to see it drawn. For a diagram,
+put the caret in the block to get the source back. Something that will not
+parse shows the error where the drawing would be, so a typo is visible and
+fixable rather than a gap in the page.
+
+Inline maths is deliberately strict about what counts as a formula, so ordinary
+prose is left alone: `$5 and $10`, `$PATH` and anything inside backticks or a
+fenced block are never read as maths. A single dollar you want kept literal can
+be written `\$`.
+
 ## Search
 
 `Cmd/Ctrl + K` anywhere. It covers card titles and descriptions, comments and

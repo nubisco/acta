@@ -144,4 +144,118 @@
     outline-offset: 1px;
     border-radius: var(--nb-radius-xs);
   }
+/* Maths and diagrams. Shared for the same reason everything else here is: a
+   formula that renders in the document and turns back into `$\alpha$` the
+   moment somebody clicks into the page reads as damage, not as a mode. */
+
+.md__math {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-block: var(--nb-spacing-16);
+  text-align: center;
+}
+
+.md__math-inline {
+  display: inline;
+}
+
+/* Before KaTeX arrives, and whenever it refuses, the source is what is shown.
+   Monospaced so it reads as source rather than as mangled prose. */
+.md__math-source {
+  font-family: var(--nb-font-family-mono);
+  font-size: var(--nb-type-code-sm-size);
+  color: var(--nb-c-text-muted);
+}
+
+/* A formula that will not parse says so, in the place the formula would be.
+   A blank gap is indistinguishable from a rendering fault, and it gives the
+   author nothing to correct. */
+.md__math-error,
+.md__diagram-error {
+  display: inline-block;
+  padding: var(--nb-spacing-2) var(--nb-spacing-8);
+  border-radius: var(--nb-radius-sm);
+  background: color-mix(in srgb, var(--nb-c-danger) 12%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--nb-c-danger) 40%, transparent);
+  color: var(--nb-c-text);
+  font-family: var(--nb-font-family-mono);
+  font-size: var(--nb-type-code-sm-size);
+  white-space: pre-wrap;
+  text-align: start;
+}
+
+.md__diagram-error {
+  display: block;
+  margin-block-end: var(--nb-spacing-8);
+}
+
+/* The editable source, while a formula is selected. Sized to the text so an
+   inline formula does not push the line it sits in around. */
+.md__math-input {
+  display: inline-block;
+  inline-size: 100%;
+  min-inline-size: 6rem;
+  padding: var(--nb-spacing-4) var(--nb-spacing-8);
+  border: 1px solid var(--nb-c-focus-ring);
+  border-radius: var(--nb-radius-sm);
+  background: var(--nb-c-surface);
+  color: var(--nb-c-text);
+  font-family: var(--nb-font-family-mono);
+  font-size: var(--nb-type-code-sm-size);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.md__math-inline .md__math-input {
+  inline-size: auto;
+  vertical-align: baseline;
+}
+
+/* A selected formula is about to be replaced by whatever gets typed next, so
+   it has to look selected. Same treatment an image gets. */
+.ProseMirror .md__math.ProseMirror-selectednode,
+.ProseMirror .md__math-inline.ProseMirror-selectednode {
+  outline: 2px solid var(--nb-c-focus-ring);
+  outline-offset: 2px;
+}
+
+/* A mermaid diagram. The drawing is centred and allowed to scroll rather than
+   being squashed: a flowchart shrunk to the column width is unreadable. */
+.md__diagram,
+.md__mermaid {
+  margin-block: var(--nb-spacing-16);
+}
+
+.md__diagram-figure {
+  overflow-x: auto;
+  text-align: center;
+  cursor: text;
+
+  svg {
+    max-inline-size: 100%;
+    block-size: auto;
+  }
+}
+
+.md__diagram-pending {
+  color: var(--nb-c-text-subtle);
+  font-size: var(--nb-type-body-sm-size);
+}
+
+/* In the editor: source while the caret is inside the block, diagram when it
+   is not. The source is hidden, never removed, which is what makes the switch
+   incapable of losing a line of it. */
+.md__diagram .md__diagram-source {
+  display: none;
+}
+
+.md__diagram.is-editing .md__diagram-source {
+  display: block;
+}
+
+.md__diagram.is-editing .md__diagram-figure,
+.md__diagram.is-editing .md__diagram-pending {
+  display: none;
 }

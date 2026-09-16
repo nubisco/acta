@@ -22,6 +22,7 @@ import * as checkSquare from '@nubisco/ui/icons/check-square'
 import * as clockCounterClockwise from '@nubisco/ui/icons/clock-counter-clockwise'
 import * as code from '@nubisco/ui/icons/code'
 import * as fileText from '@nubisco/ui/icons/file-text'
+import * as fn from '@nubisco/ui/icons/function'
 import * as house from '@nubisco/ui/icons/house'
 import * as info from '@nubisco/ui/icons/info'
 import * as kanban from '@nubisco/ui/icons/kanban'
@@ -41,6 +42,7 @@ import * as textHTwo from '@nubisco/ui/icons/text-h-two'
 import * as textItalic from '@nubisco/ui/icons/text-italic'
 import * as textStrikethrough from '@nubisco/ui/icons/text-strikethrough'
 import * as trash from '@nubisco/ui/icons/trash'
+import * as treeStructure from '@nubisco/ui/icons/tree-structure'
 import * as user from '@nubisco/ui/icons/user'
 import * as warning from '@nubisco/ui/icons/warning'
 
@@ -69,6 +71,9 @@ export function registerActaIcons(): void {
     info,
     'caret-down': caretDown,
     'check-square': checkSquare,
+    // `function` is a reserved word, so the import is named for what it draws.
+    function: fn,
+    'tree-structure': treeStructure,
     // The @ typeahead's rows, one icon per kind of actor.
     user,
     robot,

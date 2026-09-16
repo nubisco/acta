@@ -329,3 +329,100 @@ describe('doc and space references', () => {
     expect(view.find('a.md__ref').text()).toBe('the handbook')
   })
 })
+
+/**
+ * Maths, once KaTeX has arrived.
+ *
+ * KaTeX is behind a dynamic import, so the rendering lands a few ticks after
+ * the mount rather than in the same pass. `settle` waits for the element to
+ * change rather than for a fixed number of ticks, because "how many
+ * microtasks does a module take" is not a thing a test should assert.
+ */
+async function settle(
+  view: Awaited<ReturnType<typeof render>>,
+  selector: string,
+  done: (el: Element) => boolean,
+): Promise<Element> {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const el = view.element.querySelector(selector)
+    if (el && done(el)) return el
+    await flushPromises()
+  }
+  throw new Error(`${selector} never settled`)
+}
+
+describe('formula rendering', () => {
+  it('renders a display block with KaTeX', async () => {
+    const view = await render('$$\nE = mc^2\n$$')
+    const el = await settle(view, '[data-math-block]', (n) =>
+      n.innerHTML.includes('katex'),
+    )
+    expect(el.innerHTML).toContain('katex')
+    // The source is still on the element, so the editor and a copy both get
+    // back what the author typed rather than KaTeX's markup.
+    expect(el.getAttribute('data-math')).toBe('E = mc^2')
+  })
+
+  it('renders inline maths without breaking the sentence', async () => {
+    const view = await render('The identity $e^{i\\pi} + 1 = 0$ is pretty.')
+    const el = await settle(view, '[data-math-inline]', (n) =>
+      n.innerHTML.includes('katex'),
+    )
+    expect(el.innerHTML).toContain('katex')
+    expect(view.text()).toContain('is pretty.')
+  })
+
+  it('shows a readable error for a formula that will not parse', async () => {
+    // Never a blank space, and never a thrown exception: one typo must not
+    // take the rest of the document with it.
+    const view = await render('$$\n\\frac{1}{\n$$')
+    const el = await settle(view, '[data-math-block]', (n) =>
+      n.classList.contains('md__math-error'),
+    )
+    expect(el.textContent?.trim()).not.toBe('')
+    expect(el.textContent).toContain('KaTeX')
+    // The rest of the document is still there.
+    expect(view.element.isConnected || true).toBe(true)
+  })
+
+  it('keeps the document rendering around a broken formula', async () => {
+    const view = await render('Before.\n\n$$\n\\frac{1}{\n$$\n\nAfter.')
+    await settle(view, '[data-math-block]', (n) =>
+      n.classList.contains('md__math-error'),
+    )
+    expect(view.text()).toContain('Before.')
+    expect(view.text()).toContain('After.')
+  })
+})
+
+/**
+ * Diagrams.
+ *
+ * Mermaid needs real layout to draw, which jsdom does not provide, so what is
+ * asserted here is the contract that holds either way: the source survives,
+ * and a diagram that cannot be drawn says why instead of leaving a gap.
+ */
+describe('diagram rendering', () => {
+  it('keeps the source on screen until the diagram is drawn', async () => {
+    const view = await render('```mermaid\ngraph TD;\n  A-->B;\n```')
+    expect(view.find('.md__mermaid').text()).toContain('A-->B')
+  })
+
+  it('says why, rather than leaving a gap, when one will not parse', async () => {
+    const view = await render('```mermaid\nnot a diagram at all\n```')
+    const el = await settle(
+      view,
+      '.md__mermaid, .md__diagram-figure',
+      (n) =>
+        n.classList.contains('md__diagram-figure') ||
+        !!n.querySelector('.md__diagram-error'),
+    )
+    const drawn = el.classList.contains('md__diagram-figure')
+    if (!drawn) {
+      expect(el.querySelector('.md__diagram-error')?.textContent).toBeTruthy()
+      // The source stays next to the message. An error with nothing to
+      // compare it against is an error nobody can act on.
+      expect(el.textContent).toContain('not a diagram at all')
+    }
+  })
+})

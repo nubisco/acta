@@ -802,3 +802,102 @@ describe('table grip drag', () => {
     editor.destroy()
   })
 })
+
+/**
+ * Maths and diagrams in the editor.
+ *
+ * The reader renders all three constructs. A construct the reader renders and
+ * the editor's schema does not know is deleted from the file by an open and a
+ * save that changed nothing, which has shipped here twice. These are the
+ * tests that say it has not shipped a third time.
+ */
+describe('MarkdownEditor keeps maths and diagrams', () => {
+  it('keeps a display block byte-identical', async () => {
+    expect(await roundTrip('$$\nE = mc^2\n$$')).toBe('$$\nE = mc^2\n$$')
+  })
+
+  it('keeps inline maths and the prose around it', async () => {
+    const src = 'The identity $e^{i\\pi} + 1 = 0$ is the pretty one.'
+    expect(await roundTrip(src)).toBe(src)
+  })
+
+  it('keeps a mermaid fence byte-identical', async () => {
+    const src = '```mermaid\ngraph TD;\n  A-->B;\n```'
+    expect(await roundTrip(src)).toBe(src)
+  })
+
+  it('leaves prices and shell variables as prose', async () => {
+    for (const src of [
+      'It costs $5 and $10.',
+      'Between $5-$10 depending on the day.',
+      'Add it to $PATH first.',
+      'Export $PATH and $HOME before running it.',
+    ]) {
+      expect(await roundTrip(src), src).toBe(src)
+    }
+  })
+
+  it('leaves a dollar in code alone', async () => {
+    expect(await roundTrip('Run `echo $PATH` to check.')).toBe(
+      'Run `echo $PATH` to check.',
+    )
+    const fence = '```sh\nexport PATH=$PATH:/usr/local/bin\n```'
+    expect(await roundTrip(fence)).toBe(fence)
+  })
+
+  it('shows the formula rendered, and its source when it is selected', async () => {
+    // The editing contract: rendered when the node is not selected, source
+    // when it is. Both are views of the same attribute, which is what makes
+    // switching between them incapable of losing the formula.
+    const view = mount(MarkdownEditor, {
+      // Prose first, so the caret starts somewhere other than the formula.
+      props: { modelValue: 'Intro.\n\n$$\nE = mc^2\n$$' },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    const editor = (
+      view.vm as unknown as {
+        editor: {
+          commands: { setNodeSelection: (pos: number) => boolean }
+          state: {
+            doc: {
+              descendants: (
+                fn: (node: { type: { name: string } }, pos: number) => void,
+              ) => void
+            }
+          }
+          storage: { markdown: { getMarkdown(): string } }
+        }
+      }
+    ).editor
+
+    expect(view.find('.md__math').exists()).toBe(true)
+    expect(view.find('.md__math-input').exists()).toBe(false)
+
+    let mathPos = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'mathBlock') mathPos = pos
+    })
+    expect(mathPos).toBeGreaterThan(-1)
+    editor.commands.setNodeSelection(mathPos)
+    await flushPromises()
+    const field = view.find<HTMLTextAreaElement>('.md__math-input')
+    expect(field.exists()).toBe(true)
+    expect(field.element.value).toBe('E = mc^2')
+
+    // Editing writes through to the document, so what is on screen and what
+    // will be saved are never two different things.
+    await field.setValue('E = mc^3')
+    expect(editor.storage.markdown.getMarkdown().trim()).toBe(
+      'Intro.\n\n$$\nE = mc^3\n$$',
+    )
+    view.unmount()
+  })
+
+  it('keeps a formula that will not parse, rather than dropping it', async () => {
+    // A typo is something to click into and fix. If a broken formula were
+    // dropped on parse, the save after the typo would delete it.
+    const src = '$$\n\\frac{1}{\n$$'
+    expect(await roundTrip(src)).toBe(src)
+  })
+})

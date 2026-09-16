@@ -260,3 +260,79 @@ describe('MarkdownView tables', () => {
     expect(html.match(/<td/g)?.length).toBe(2)
   })
 })
+
+/**
+ * Maths in the reader.
+ *
+ * The markdown pass is synchronous and KaTeX is not, so these assert the
+ * marked-up element the pass produces. What KaTeX then does with it is
+ * `katex.ts`'s business and is covered where the hydration is awaited.
+ */
+describe('maths in the reader', () => {
+  it('marks a display block and carries its source', () => {
+    const html = render('$$\nE = mc^2\n$$').html()
+    expect(html).toContain('data-math-block')
+    expect(html).toContain('E = mc^2')
+  })
+
+  it('marks inline maths inside a sentence', () => {
+    const html = render('The identity $e^{i\\pi} + 1 = 0$ is pretty.').html()
+    expect(html).toContain('data-math-inline')
+    expect(html).toContain('is pretty.')
+  })
+
+  it('shows the source until KaTeX arrives, rather than a gap', () => {
+    // An empty element is indistinguishable from a rendering fault. The
+    // formula as typed is the correct content either way.
+    const view = render('$$\nE = mc^2\n$$')
+    expect(view.find('[data-math-block]').text()).toBe('E = mc^2')
+  })
+
+  /*
+   * The false positives, on the surface people actually read. Every one of
+   * these is ordinary prose that a loose detector turns into a formula.
+   */
+  it('leaves prices as prose', () => {
+    for (const source of [
+      'It costs $5 and $10.',
+      'Between $5-$10 depending on the day.',
+      'They charge $100 and I charge $200.',
+    ]) {
+      expect(render(source).html(), source).not.toContain('data-math')
+    }
+  })
+
+  it('leaves shell variables as prose', () => {
+    for (const source of [
+      'Add it to $PATH first.',
+      'Export $PATH and $HOME before running it.',
+      'Use $1 for the first argument.',
+    ]) {
+      expect(render(source).html(), source).not.toContain('data-math')
+    }
+  })
+
+  it('leaves a dollar inside inline code alone', () => {
+    const html = render('Run `echo $PATH` to check.').html()
+    expect(html).not.toContain('data-math')
+    expect(html).toContain('echo $PATH')
+  })
+
+  it('leaves a dollar inside a fence alone', () => {
+    const html = render(
+      '```sh\nexport PATH=$PATH:/usr/local/bin\necho "$5"\n```',
+    ).html()
+    expect(html).not.toContain('data-math')
+  })
+
+  it('leaves an unclosed block as the prose it reads as', () => {
+    const html = render('$$\nE = mc^2\n\nStill writing.').html()
+    expect(html).not.toContain('data-math-block')
+    expect(html).toContain('Still writing.')
+  })
+
+  it('refuses an empty formula', () => {
+    expect(render('A $ $ B').html()).not.toContain('data-math')
+    expect(render('$$\n\n$$').html()).not.toContain('data-math')
+  })
+})

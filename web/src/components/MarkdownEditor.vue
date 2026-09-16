@@ -150,6 +150,8 @@ import {
 } from '@/components/editor/nodes/Table'
 import type { TTableAlignment } from '@/components/editor/nodes/Table'
 import { TableGrips, selectedTableBand } from '@/components/editor/tableGrips'
+import { MathBlock, MathInline, MathText } from '@/components/editor/nodes/Math'
+import { MermaidBlock } from '@/components/editor/nodes/MermaidBlock'
 import { ColorSwatches } from '@/components/editor/decorations'
 
 const props = defineProps<{
@@ -292,8 +294,15 @@ const editor = new Editor({
   extensions: [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4] },
-      codeBlock: {},
+      // Replaced below by the same code block carrying a node view, so a
+      // mermaid fence draws its diagram. The node, its parse rule and its
+      // serializer are untouched.
+      codeBlock: false,
+      // Replaced below by the same text node, so an escaped dollar stays
+      // escaped and is not read back as a formula. See nodes/Math.ts.
+      text: false,
     }),
+    MermaidBlock,
     Link.configure({ openOnClick: false }),
     // The reader renders GFM tables and task lists. Without the matching
     // nodes here the editor did not merely fail to CREATE them: opening a
@@ -317,6 +326,12 @@ const editor = new Editor({
     Ref,
     Embed,
     Image,
+    // The reader renders `$$ ... $$` and `$...$`. Without these the editor
+    // would parse a formula to nothing and write nothing back, which is how
+    // tables and then images were silently deleted from documents here.
+    MathText,
+    MathBlock,
+    MathInline,
     ColorSwatches,
     Placeholder.configure({
       placeholder: props.placeholder ?? 'Type here...',
