@@ -1,3 +1,20 @@
+# [1.23.0](https://github.com/nubisco/acta/compare/v1.22.2...v1.23.0) (2026-09-16)
+
+
+### Bug Fixes
+
+* **editor:** give callouts their styling back while editing ([0156c80](https://github.com/nubisco/acta/commit/0156c80a61573e88a7f1a11791e2b04e8eb2be2a))
+* **web:** close the toggle caret rule, and stop a lazy-import test flaking ([f9336d2](https://github.com/nubisco/acta/commit/f9336d2e65b3b241c5ba3be0c2ec919677ec6e00))
+
+
+### Features
+
+* **docs:** render a bare URL on its own line as a link preview card ([0634f95](https://github.com/nubisco/acta/commit/0634f9519a8edbeaeff0f4aad45c9c22fde84bb8))
+* **editor:** align and resize an image, and keep it in the markdown ([b230183](https://github.com/nubisco/acta/commit/b230183131f2f977254e9313e7875f327067c1e0))
+* **editor:** make :::details a real disclosure on both surfaces ([26efd4b](https://github.com/nubisco/acta/commit/26efd4b24e9f162144d2f4a6d546cbafbc7b42f8))
+* **editor:** render maths and Mermaid diagrams on both surfaces ([3ce7b4b](https://github.com/nubisco/acta/commit/3ce7b4b621c12757187b020e1eeceac59bb0cd49))
+* **editor:** table grips, and stop saves corrupting tables ([99b24c8](https://github.com/nubisco/acta/commit/99b24c8882902615b0e150554fdae05eee6e4a46))
+
 ## [1.22.2](https://github.com/nubisco/acta/compare/v1.22.1...v1.22.2) (2026-09-16)
 
 
