@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@nubisco/acta-shared": "workspace:*",
-    "@nubisco/ui": "^5.1.0",
+    "@nubisco/ui": "^5.3.0",
     "@tiptap/core": "^2.27.3",
     "@tiptap/extension-bubble-menu": "^2.27.3",
     "@tiptap/extension-code-block": "^2.27.3",
