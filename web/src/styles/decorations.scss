@@ -513,3 +513,31 @@
   background-color: color-mix(in srgb, var(--nb-c-warning) 42%, transparent);
   text-decoration: underline 2px var(--nb-c-warning);
 }
+
+/* The block a block link landed on, marked for a moment so the eye finds it
+   after the scroll. Added and removed by DocsView.vue, never written to the
+   document. An outline rather than a background, so a callout or a code block
+   keeps its own colour underneath. */
+.md__block-target {
+  border-radius: var(--nb-radius-sm);
+  outline: 2px solid color-mix(in srgb, var(--nb-c-primary) 60%, transparent);
+  outline-offset: 4px;
+  animation: md-block-target 2.4s ease-out forwards;
+}
+
+@keyframes md-block-target {
+  0%,
+  60% {
+    outline-color: color-mix(in srgb, var(--nb-c-primary) 60%, transparent);
+  }
+
+  100% {
+    outline-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .md__block-target {
+    animation: none;
+  }
+}

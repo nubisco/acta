@@ -131,7 +131,10 @@
           placeholder="Start writing. Headings, lists, quotes and code all form as you type. Drop an image to attach it."
           class="docs__editor"
           :owner="{ doc: doc.slug }"
+          commentable
+          block-tools
           @attached="reloadAttachments"
+          @comment="startInlineComment"
         />
         <template v-else-if="viewingOld">
           <NbBanner
@@ -205,6 +208,7 @@
 import {
   computed,
   defineAsyncComponent,
+  nextTick,
   onBeforeUnmount,
   onMounted,
   provide,
@@ -212,7 +216,12 @@ import {
   watch,
 } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
-import { useConfirm, useShellSlot, useToast } from '@nubisco/ui'
+import {
+  prefersReducedMotion,
+  useConfirm,
+  useShellSlot,
+  useToast,
+} from '@nubisco/ui'
 import { useWorkspace } from '@/stores/workspace'
 import { useDocChrome } from '@/lib/docChrome'
 import { documentOutline, documentStats, tocWorthShowing } from '@/lib/docText'
@@ -232,6 +241,11 @@ import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
 import { wpath } from '@/lib/paths'
+import {
+  findLinkedBlock,
+  isBlockFragment,
+  parseBlockFragment,
+} from '@/lib/blockLinks'
 
 // Monaco is heavy; the diff surface loads only when a version is compared.
 const DocDiff = defineAsyncComponent(() => import('@/components/DocDiff.vue'))
@@ -625,6 +639,70 @@ function startInlineComment(anchor: IAnchor): void {
   pendingAnchor.value = anchor
   activeCommentId.value = null
 }
+
+/*
+ * Block links (`#block=...`, made by the editor's grip menu).
+ *
+ * Followed on the reader once the document has rendered, and again when the
+ * fragment changes on a page already open. The block is found by its text,
+ * so the link still lands after the page has been edited around it. When the
+ * block cannot be found, the page opens at the top and says so, rather than
+ * leaving somebody wherever the page happened to load, or guessing.
+ *
+ * Nothing here writes: the highlight is a class on the rendered element, taken
+ * off again, and the reader's HTML is rebuilt from the markdown regardless.
+ */
+const BLOCK_HIGHLIGHT = 'md__block-target'
+const BLOCK_HIGHLIGHT_MS = 2400
+let followedBlockLink = ''
+
+function followBlockLink(): void {
+  const fragment = window.location.hash
+  if (!isBlockFragment(fragment) || !doc.value || editing.value) return
+  const key = `${doc.value.slug}|${fragment}`
+  if (followedBlockLink === key) return
+  const el = bodyReader.value?.$el
+  const root =
+    el instanceof HTMLElement
+      ? (el.querySelector<HTMLElement>('.md') ?? el)
+      : null
+  if (!root) return
+  followedBlockLink = key
+  const anchor = parseBlockFragment(fragment)
+  const target = anchor ? findLinkedBlock(root, anchor) : null
+  if (!target) {
+    docsEl.value?.scrollIntoView?.({ block: 'start' })
+    toast.warning(
+      anchor
+        ? 'The linked block has moved or been removed. Showing the top of the page instead.'
+        : 'This block link is incomplete, so the top of the page is shown instead.',
+      { title: 'Block not found' },
+    )
+    return
+  }
+  target.scrollIntoView?.({
+    behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+    block: 'center',
+  })
+  target.classList.add(BLOCK_HIGHLIGHT)
+  window.setTimeout(
+    () => target.classList.remove(BLOCK_HIGHLIGHT),
+    BLOCK_HIGHLIGHT_MS,
+  )
+}
+
+watch(
+  [() => doc.value?.slug, () => doc.value?.body, bodyReader, editing],
+  () => void nextTick(followBlockLink),
+  { flush: 'post' },
+)
+
+function onHashChange(): void {
+  followedBlockLink = ''
+  followBlockLink()
+}
+onMounted(() => window.addEventListener('hashchange', onHashChange))
+onBeforeUnmount(() => window.removeEventListener('hashchange', onHashChange))
 
 async function resolveComment(id: string, resolved: boolean): Promise<void> {
   if (!doc.value) return

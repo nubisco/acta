@@ -1,8 +1,13 @@
 <template>
   <!--
-    The comment action for a text selection. A floating toolbar because it
-    never takes focus and swallows the mousedown, so clicking it leaves the
-    selection exactly as it was: the anchor is read from that selection.
+    The comment action for a text selection in the reader. A floating toolbar
+    because it never takes focus and swallows the mousedown, so clicking it
+    leaves the selection exactly as it was: the anchor is read from that
+    selection.
+
+    Reader only. A selection in the editor gets the editor's own toolbar
+    (editor/SelectionToolbar.vue), which carries this action beside the
+    formatting. Two toolbars for one selection drew on top of each other.
   -->
   <NbFloatingToolbar
     :open="!!selection"
@@ -24,13 +29,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Editor } from '@tiptap/core'
-import {
-  anchorFromDocRange,
-  anchorFromDomRange,
-  docTextIndex,
-  domTextIndex,
-  type IAnchor,
-} from '@/lib/anchors'
+import { anchorFromDomRange, domTextIndex, type IAnchor } from '@/lib/anchors'
 import {
   COMMENT_OPEN_EVENT,
   setCommentHighlights,
@@ -118,23 +117,17 @@ function readSelection(): void {
   }
   const range = sel.getRangeAt(0).cloneRange()
   const common = range.commonAncestorContainer
-  const editor = props.editor
   const root = readerRoot()
-  let anchor: (() => IAnchor | null) | null = null
-  if (editor && !editor.isDestroyed && editor.view.dom.contains(common)) {
-    const { from, to } = editor.state.selection
-    if (from === to) {
-      selection.value = null
-      return
-    }
-    anchor = () => anchorFromDocRange(docTextIndex(editor.state.doc), from, to)
-  } else if (root && root.contains(common)) {
-    anchor = () => anchorFromDomRange(domTextIndex(root), range)
-  }
-  if (!anchor || !range.toString().trim()) {
+  const inReader =
+    !!root &&
+    !props.editor &&
+    root.contains(common) &&
+    !!range.toString().trim()
+  if (!inReader) {
     selection.value = null
     return
   }
+  const anchor = () => anchorFromDomRange(domTextIndex(root), range)
   // A live rectangle, so the action follows the selection when the page
   // scrolls rather than staying where the selection used to be.
   selection.value = {

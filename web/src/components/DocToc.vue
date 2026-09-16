@@ -43,6 +43,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { NbPanel, prefersReducedMotion } from '@nubisco/ui'
 import DocTocList from '@/components/DocTocList.vue'
+import { isBlockFragment } from '@/lib/blockLinks'
 import { useDocChrome } from '@/lib/docChrome'
 import {
   activeHeadingIndex,
@@ -232,7 +233,8 @@ let hashHandled = false
 function followHash(): void {
   if (hashHandled || !visible.value) return
   const slug = decodeURIComponent(window.location.hash.slice(1))
-  if (!slug) {
+  // A block link is followed by the page, not by the contents.
+  if (!slug || isBlockFragment(slug)) {
     hashHandled = true
     return
   }

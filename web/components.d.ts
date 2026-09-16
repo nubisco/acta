@@ -27,6 +27,7 @@ declare module 'vue' {
     NbDataTable: typeof import('@nubisco/ui/components/DataTable')['NbDataTable']
     NbDatePicker: typeof import('@nubisco/ui/components/DatePicker')['NbDatePicker']
     NbDefinitionList: typeof import('@nubisco/ui/components/DefinitionList')['NbDefinitionList']
+    NbDragHandle: typeof import('@nubisco/ui/components/DragHandle')['NbDragHandle']
     NbEmptyState: typeof import('@nubisco/ui/components/EmptyState')['NbEmptyState']
     NbField: typeof import('@nubisco/ui/components/Field')['NbField']
     NbFileUploader: typeof import('@nubisco/ui/components/FileUploader')['NbFileUploader']

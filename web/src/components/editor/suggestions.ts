@@ -100,7 +100,11 @@ async function refItems(query: string): Promise<ISuggestionItem[]> {
   return out
 }
 
-function slashItems(query: string): ISuggestionItem[] {
+/**
+ * The `/` insert menu's entries. Exported so the block gutter's `+` offers the
+ * same list, rather than a second one that drifts from this.
+ */
+export function slashItems(query: string): ISuggestionItem[] {
   const all: ISuggestionItem[] = [
     {
       id: 'doc',

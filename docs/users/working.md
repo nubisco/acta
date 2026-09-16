@@ -136,6 +136,29 @@ addresses: an intranet or `localhost` URL is refused, and so is any name that
 resolves to a private address. When there is nothing to show, for that reason
 or because the site publishes no metadata, the link simply stays a link.
 
+### Blocks
+
+While editing, the margin beside each block (a paragraph, a list, a table, a
+callout) shows a `+` and a grip:
+
+- **`+`** opens the insert menu for a new block below. Nothing is added until
+  you pick something, so closing the menu leaves the page as it was.
+- **Drag the grip** to move the block. From the keyboard, focus the grip, press
+  `Space` to pick the block up, the arrow keys to move it, and `Space` again to
+  drop it. `Escape` puts it back.
+- **Click the grip**, or press `Enter` on it, for its actions: turn it into
+  another kind of block, duplicate it, copy a link to it, or delete it.
+
+The grip acts on whole blocks at the top of the page. A list moves as one list,
+not item by item. **Turn into** only offers what keeps your words, and says so
+when a change drops formatting or clears ticked tasks.
+
+**Copy link to block** gives you a link that scrolls straight to that block and
+marks it for a moment. It finds the block by its text, so it keeps working
+after the page is edited around it. If the block has since been removed, the
+page opens at the top and tells you. Nothing about the link is stored in the
+page itself.
+
 ## Search
 
 `Cmd/Ctrl + K` anywhere. It covers card titles and descriptions, comments and

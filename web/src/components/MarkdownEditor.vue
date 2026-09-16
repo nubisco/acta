@@ -1,22 +1,12 @@
 <template>
-  <BubbleMenu
+  <!-- Formatting, and commenting where the page takes comments, for a text
+       selection. One toolbar: see SelectionToolbar.vue for the two it
+       replaced. -->
+  <SelectionToolbar
     :editor="editor"
-    :tippy-options="{ duration: 120 }"
-    class="md-editor__bubble"
-  >
-    <button
-      v-for="action in bubbleActions"
-      :key="action.label"
-      type="button"
-      class="md-editor__bubble-btn"
-      :class="{ 'is-active': action.isActive() }"
-      :aria-label="action.label"
-      :aria-pressed="action.isActive()"
-      @click="action.run"
-    >
-      <NbIcon :name="action.icon" :size="15" />
-    </button>
-  </BubbleMenu>
+    :commentable="commentable"
+    @comment="emit('comment', $event)"
+  />
   <!--
     Table row and column controls.
 
@@ -108,18 +98,21 @@
   <!-- The positioning context the image controls measure against. They are
        absolutely placed over whichever picture is hovered or selected, so
        they need a frame that does not move when the page scrolls. -->
-  <div class="md-editor__frame">
+  <div ref="frameEl" class="md-editor__frame">
     <EditorContent :editor="editor" class="md-editor" />
     <ImageTools
       :editor="editor"
       :upload="owner ? uploadReplacement : undefined"
     />
+    <!-- After the text in the DOM, so Tab from the editor reaches the grip of
+         the block the caret is in. -->
+    <BlockGutter v-if="blockTools" :editor="editor" :frame="frameEl" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
-import { BubbleMenu, Editor, EditorContent } from '@tiptap/vue-3'
+import { Editor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -141,6 +134,9 @@ import { Ref } from '@/components/editor/nodes/Ref'
 import { Embed } from '@/components/editor/nodes/Embed'
 import { Image } from '@/components/editor/nodes/Image'
 import ImageTools from '@/components/editor/ImageTools.vue'
+import SelectionToolbar from '@/components/editor/SelectionToolbar.vue'
+import BlockGutter from '@/components/editor/BlockGutter.vue'
+import type { IAnchor } from '@/lib/anchors'
 import { Details } from '@/components/editor/nodes/Details'
 import {
   Table,
@@ -169,6 +165,13 @@ const props = defineProps<{
   owner?: { item?: string; doc?: string }
   /** Dim every block but the caret's. Presentation only, see focusMode.ts. */
   focusMode?: boolean
+  /** Offer "Comment on this text" on a selection. */
+  commentable?: boolean
+  /**
+   * The grip and `+` beside each top-level block. For a document page, which
+   * has a margin to put them in, not for a card description or a comment box.
+   */
+  blockTools?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -176,6 +179,8 @@ const emit = defineEmits<{
   blur: []
   /** An upload finished, so the owner can refresh its attachment list. */
   attached: []
+  /** A comment was asked for on the selected text. */
+  comment: [anchor: IAnchor]
 }>()
 
 /**
@@ -262,6 +267,7 @@ const toast = useToast()
  * because the editor is not reactive: a selection change does not re-render
  * anything unless something tells Vue it happened.
  */
+const frameEl = ref<HTMLElement | null>(null)
 const rowControls = ref<HTMLElement | null>(null)
 const columnControls = ref<HTMLElement | null>(null)
 const columnAlignment = ref<TTableAlignment | null>(null)
@@ -425,105 +431,9 @@ defineExpose({
   /** The element headings render into, for the document's contents. */
   root: () => editor.view.dom as HTMLElement,
 })
-
-/* The selection bubble: inline styling first, block moves after. */
-const bubbleActions = [
-  {
-    label: 'Bold',
-    icon: 'text-b',
-    isActive: () => editor.isActive('bold'),
-    run: () => editor.chain().focus().toggleBold().run(),
-  },
-  {
-    label: 'Italic',
-    icon: 'text-italic',
-    isActive: () => editor.isActive('italic'),
-    run: () => editor.chain().focus().toggleItalic().run(),
-  },
-  {
-    label: 'Strikethrough',
-    icon: 'text-strikethrough',
-    isActive: () => editor.isActive('strike'),
-    run: () => editor.chain().focus().toggleStrike().run(),
-  },
-  {
-    label: 'Inline code',
-    icon: 'code',
-    isActive: () => editor.isActive('code'),
-    run: () => editor.chain().focus().toggleCode().run(),
-  },
-  {
-    label: 'Heading 2',
-    icon: 'text-h-two',
-    isActive: () => editor.isActive('heading', { level: 2 }),
-    run: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-  },
-  {
-    label: 'Heading 3',
-    icon: 'text-h-three',
-    isActive: () => editor.isActive('heading', { level: 3 }),
-    run: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-  },
-  {
-    label: 'Bullet list',
-    icon: 'list-bullets',
-    isActive: () => editor.isActive('bulletList'),
-    run: () => editor.chain().focus().toggleBulletList().run(),
-  },
-  {
-    label: 'Numbered list',
-    icon: 'list-numbers',
-    isActive: () => editor.isActive('orderedList'),
-    run: () => editor.chain().focus().toggleOrderedList().run(),
-  },
-  {
-    label: 'Quote',
-    icon: 'quotes',
-    isActive: () => editor.isActive('blockquote'),
-    run: () => editor.chain().focus().toggleBlockquote().run(),
-  },
-]
 </script>
 
 <style scoped lang="scss">
-.md-editor__bubble {
-  display: flex;
-  gap: 2px;
-  padding: var(--nb-spacing-2);
-  background: var(--nb-c-layer-3);
-  border: 1px solid var(--nb-c-layer-border-3);
-  border-radius: var(--nb-radius-md);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
-  z-index: var(--nb-zindex-dropdown);
-}
-
-.md-editor__bubble-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: 28px;
-  block-size: 28px;
-  border: 0;
-  border-radius: var(--nb-radius-sm);
-  background: transparent;
-  color: var(--nb-c-text);
-  cursor: pointer;
-
-  &:hover {
-    background: var(--nb-c-surface-hover);
-  }
-
-  &.is-active {
-    background: var(--nb-c-primary);
-    color: var(--nb-c-primary-a11y);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--nb-c-focus-ring);
-    outline-offset: 1px;
-  }
-}
-
 /* The frame the image controls are measured and placed against. */
 .md-editor__frame {
   position: relative;

@@ -578,10 +578,8 @@ describe('MarkdownEditor table grips', () => {
  * band from the keyboard puts the same controls on screen.
  *
  * Driven against a bare editor carrying the same extensions rather than the
- * mounted component, because tiptap's bubble menu calls tippy on every
- * selection change and tippy needs a layout engine jsdom does not have. What
- * is under test here is the keymap and what it writes, and both are the same
- * either way.
+ * mounted component. What is under test here is the keymap and what it
+ * writes, and both are the same either way.
  */
 describe('table keyboard path', () => {
   const table = '| a | b |\n| --- | --- |\n| 1 | 2 |'
@@ -925,11 +923,6 @@ describe('MarkdownEditor link cards', () => {
     const view = mount(MarkdownEditor, {
       props: { modelValue: source },
       attachTo: document.body,
-      // The selection bubble positions itself with tippy, which needs a
-      // layout engine jsdom does not have, and it runs on every transaction.
-      // Stubbed so that acting on the document here fails for reasons to do
-      // with the document.
-      global: { stubs: { BubbleMenu: true } },
     })
     await flushPromises()
     await nextTick()
