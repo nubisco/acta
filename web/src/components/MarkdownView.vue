@@ -1021,75 +1021,7 @@ onMounted(() => {
 
   /* Callouts wear their kind: a solid accent bar and a soft tint of the
    * same hue, the way Confluence panels read. */
-  /* A grid rather than absolute positioning, so the icon belongs to the
-     first line instead of floating at a guessed offset from the top. The
-     icon occupies row 1 of its own column and everything else stacks in
-     column 2, which keeps several paragraphs, lists and code inside a
-     callout laying out normally. */
-  :deep(.md__callout) {
-    --callout-accent: var(--nb-c-info);
-    display: grid;
-    grid-template-columns: auto 1fr;
-    column-gap: var(--nb-spacing-12);
-    align-items: start;
-    margin-block: var(--nb-spacing-16);
-    margin-inline: 0;
-    padding: var(--nb-spacing-12) var(--nb-spacing-16);
-    border: 0;
-    border-inline-start: 3px solid var(--callout-accent);
-    border-radius: var(--nb-radius-xs);
-    background: color-mix(in srgb, var(--callout-accent) 9%, transparent);
-    color: var(--nb-c-text);
-
-    > :not(.md__callout-icon) {
-      grid-column: 2;
-      min-inline-size: 0;
-    }
-
-    p:first-of-type {
-      margin-block-start: 0;
-    }
-
-    p:last-child {
-      margin-block-end: 0;
-    }
-  }
-
-  /* The box is one line tall, the glyph is 20px. An SVG letterboxes rather
-     than stretching, so the artwork sits optically centred on the first line
-     whatever the callout's height: centred-looking when there is one line,
-     and level with the first line when there are ten. The old rule nudged a
-     20px box down by 0.2em, which was right at one font size only. */
-  :deep(.md__callout-icon) {
-    grid-column: 1;
-    grid-row: 1;
-    align-self: start;
-    inline-size: 20px;
-    block-size: 1.65em;
-    color: var(--callout-accent);
-  }
-
-  :deep(.md__callout--note) {
-    --callout-accent: var(--nb-c-primary);
-  }
-
-  :deep(.md__callout--tip) {
-    --callout-accent: var(--nb-c-success);
-  }
-
-  :deep(.md__callout--warning) {
-    --callout-accent: var(--nb-c-warning);
-  }
-
-  :deep(.md__callout--danger) {
-    --callout-accent: var(--nb-c-danger);
-  }
-
-  :deep(.md__callout-title) {
-    display: block;
-    margin-block-end: var(--nb-spacing-4);
-    color: var(--callout-accent);
-  }
+  /* Callout styling is shared with the editor: styles/decorations.scss */
 
   /* Toggle styling is shared with the editor: styles/decorations.scss */
 

@@ -25,6 +25,7 @@ import { Markdown } from 'tiptap-markdown'
 import { Table, TableCell, TableHeader } from '@/components/editor/nodes/Table'
 import { TableGrips, tableGripsKey } from '@/components/editor/tableGrips'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import MarkdownView from '@/components/MarkdownView.vue'
 import { imageSrc } from '@/components/editor/nodes/Image'
 import { useLinkPreviews } from '@/stores/linkPreviews'
 import {
@@ -1003,5 +1004,75 @@ describe('MarkdownEditor link cards', () => {
     expect(out).not.toContain(url)
     expect(out).toContain('Keep this.')
     view.unmount()
+  })
+})
+
+/**
+ * The editor has to look like the reader.
+ *
+ * Reported from the app: toggling a document into edit mode made decorations
+ * disappear, which reads as the page being damaged rather than as a change of
+ * mode. The cause is never the markup, it is where the CSS lives: a rule kept
+ * inside the reader's scoped block matches nothing in the editor, even though
+ * both surfaces emit the same class names.
+ *
+ * So this asserts the contract that makes one shared stylesheet possible.
+ * Whether the rules are actually applied is not something jsdom can answer, it
+ * has no cascade, but class names drifting apart is the failure that has
+ * actually happened, twice.
+ */
+describe('the editor emits the reader’s class names', () => {
+  /*
+   * Each surface mounted with the props it actually takes, so the helper stays
+   * typed. The editor is given markdown as `modelValue`, the reader as
+   * `source`.
+   */
+  async function classesIn(surface: 'editor' | 'reader', source: string) {
+    const view =
+      surface === 'editor'
+        ? mount(MarkdownEditor, {
+            props: { modelValue: source },
+            attachTo: document.body,
+          })
+        : mount(MarkdownView, {
+            props: { source },
+            attachTo: document.body,
+          })
+    await flushPromises()
+    const root = view.element as HTMLElement
+    const names = {
+      callout: root.querySelector('.md__callout')?.className ?? null,
+      icon: Boolean(root.querySelector('.md__callout-icon')),
+    }
+    view.unmount()
+    return names
+  }
+
+  it('renders a callout the same way in both surfaces', async () => {
+    const source = '> [!WARNING] Careful\n> Body.'
+    const editor = await classesIn('editor', source)
+    const reader = await classesIn('reader', source)
+
+    expect(editor.callout).toBe('md__callout md__callout--warning')
+    // The kind modifier carries the accent colour, so a callout that keeps the
+    // base class but loses the modifier is a callout that renders grey.
+    expect(editor.callout).toBe(reader.callout)
+    expect(editor.icon).toBe(true)
+    expect(editor.icon).toBe(reader.icon)
+  })
+
+  it('carries the kind through for every callout it accepts', async () => {
+    for (const [keyword, kind] of [
+      ['NOTE', 'note'],
+      ['TIP', 'tip'],
+      ['WARNING', 'warning'],
+      ['DANGER', 'danger'],
+    ]) {
+      const source = `> [!${keyword}]\n> Body.`
+      const editor = await classesIn('editor', source)
+      const reader = await classesIn('reader', source)
+      expect(editor.callout, keyword).toContain(`md__callout--${kind}`)
+      expect(editor.callout, keyword).toBe(reader.callout)
+    }
   })
 })
