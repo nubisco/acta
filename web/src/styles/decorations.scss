@@ -43,6 +43,23 @@
   border-radius: var(--nb-radius-sm);
 }
 
+/* Where the picture sits in its column, from `{align=...}`.
+   Margins rather than `float`, so an aligned picture keeps a block of its own
+   and the prose after it stays after it. `left` is written out rather than
+   left to the default, because the document it came from said so explicitly
+   and a later change to the default must not silently move it. */
+.md__img--left {
+  margin-inline: 0 auto;
+}
+
+.md__img--center {
+  margin-inline: auto;
+}
+
+.md__img--right {
+  margin-inline: auto 0;
+}
+
 /* Selected in the editor. ProseMirror marks the selected atom node, and
    without a visible state there is no way to tell an image is about to be
    replaced by whatever you type next. */

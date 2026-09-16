@@ -17,7 +17,16 @@
       <NbIcon :name="action.icon" :size="15" />
     </button>
   </BubbleMenu>
-  <EditorContent :editor="editor" class="md-editor" />
+  <!-- The positioning context the image controls measure against. They are
+       absolutely placed over whichever picture is hovered or selected, so
+       they need a frame that does not move when the page scrolls. -->
+  <div class="md-editor__frame">
+    <EditorContent :editor="editor" class="md-editor" />
+    <ImageTools
+      :editor="editor"
+      :upload="owner ? uploadReplacement : undefined"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -46,6 +55,7 @@ import { Emphasis } from '@/components/editor/nodes/Emphasis'
 import { Ref } from '@/components/editor/nodes/Ref'
 import { Embed } from '@/components/editor/nodes/Embed'
 import { Image } from '@/components/editor/nodes/Image'
+import ImageTools from '@/components/editor/ImageTools.vue'
 import { ColorSwatches } from '@/components/editor/decorations'
 
 const props = defineProps<{
@@ -108,6 +118,27 @@ async function attachFiles(files: File[], at?: number): Promise<void> {
     }
   }
   emit('attached')
+}
+
+/**
+ * A file chosen to replace a picture already in the document.
+ *
+ * Answers with the markdown `src`, not with a URL and not by editing the
+ * document: the image controls own the node they are pointing at, and this
+ * owns knowing where a file goes. Null when the upload failed, so nothing is
+ * written and the old picture stays where it was.
+ */
+async function uploadReplacement(file: File): Promise<string | null> {
+  const owner = props.owner
+  if (!owner) return null
+  try {
+    const made = await api.attachmentUpload(owner, file)
+    emit('attached')
+    return `attachment:${made.id}`
+  } catch (err) {
+    toast.error(humanise(err), { title: `Could not attach ${file.name}` })
+    return null
+  }
 }
 
 /** Images only. A dropped folder or archive is not something to embed. */
@@ -311,6 +342,11 @@ const bubbleActions = [
     outline: 2px solid var(--nb-c-focus-ring);
     outline-offset: 1px;
   }
+}
+
+/* The frame the image controls are measured and placed against. */
+.md-editor__frame {
+  position: relative;
 }
 
 .md-editor {

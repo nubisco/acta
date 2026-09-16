@@ -2,6 +2,14 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import type { MarkdownSerializerState } from '@tiptap/pm/markdown'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { safeUrl } from '@/lib/safeUrl'
+import {
+  formatImageAttrs,
+  imageClass,
+  imageStyle,
+  matchImageAttrs,
+  parseImageAttrs,
+  type TImageAlign,
+} from '@/lib/imageAttrs'
 
 /**
  * `![alt](src)`, shown as the picture it names.
@@ -68,6 +76,37 @@ export const Image = Node.create({
         renderHTML: (attrs) =>
           attrs.title ? { title: String(attrs.title) } : {},
       },
+      /*
+       * The attribute block, kept as three separate attributes so the toolbar
+       * can set one without reading and rewriting the others.
+       *
+       * Each is mirrored onto a `data-` attribute rather than inferred from
+       * the class or the style, so a copy inside the editor and a paste back
+       * recovers the same values. The class and the style are presentation
+       * and are rebuilt from these, never read back out of.
+       */
+      align: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('data-align'),
+        renderHTML: (attrs) =>
+          attrs.align ? { 'data-align': String(attrs.align) } : {},
+      },
+      width: {
+        default: null,
+        parseHTML: (el) => {
+          const raw = el.getAttribute('data-width') ?? ''
+          return /^[1-9][0-9]*$/.test(raw) ? Number(raw) : null
+        },
+        renderHTML: (attrs) =>
+          attrs.width ? { 'data-width': String(attrs.width) } : {},
+      },
+      /** Attributes another tool wrote, carried verbatim. */
+      extra: {
+        default: '',
+        parseHTML: (el) => el.getAttribute('data-extra') ?? '',
+        renderHTML: (attrs) =>
+          attrs.extra ? { 'data-extra': String(attrs.extra) } : {},
+      },
     }
   },
 
@@ -78,16 +117,18 @@ export const Image = Node.create({
   renderHTML({ HTMLAttributes, node }) {
     const raw = String(node.attrs.src ?? '')
     const resolved = imageSrc(raw)
+    const style = imageStyle(node.attrs.width as number | null)
     // A refused or empty source still renders an element, so the image is
     // selectable and deletable rather than an invisible node someone cannot
     // get rid of.
     return [
       'img',
       mergeAttributes(HTMLAttributes, {
-        class: 'md__img',
+        class: imageClass(node.attrs.align as TImageAlign | null),
         'data-src': raw,
         loading: 'lazy',
         ...(resolved ? { src: resolved } : {}),
+        ...(style ? { style } : {}),
       }),
     ]
   },
@@ -104,8 +145,49 @@ export const Image = Node.create({
           const title = node.attrs.title
             ? ` "${String(node.attrs.title).replace(/"/g, '\\"')}"`
             : ''
-          state.write(`![${state.esc(alt)}](${src}${title})`)
+          // Empty when there is nothing to say, so an untouched image is
+          // written back as the plain `![alt](src)` it was read as, with no
+          // trailing `{}` accumulating in the file.
+          const attrs = formatImageAttrs({
+            align: node.attrs.align as TImageAlign | null,
+            width: node.attrs.width as number | null,
+            extra: String(node.attrs.extra ?? ''),
+          })
+          state.write(`![${state.esc(alt)}](${src}${title})${attrs}`)
           state.closeBlock(node)
+        },
+
+        parse: {
+          /**
+           * Hoists `{align=center width=640}` off the text that follows an
+           * image and onto the image itself.
+           *
+           * markdown-it has no idea the block belongs to the picture, so it
+           * renders it as literal text after the `<img>`. Left there it does
+           * not merely look wrong: the image is a block node, so the
+           * paragraph splits around it and the braces survive a save as a
+           * stray paragraph of their own, growing a line of noise in the file
+           * every time somebody opens the document.
+           *
+           * Adjacency is the whole rule. Only a block that starts at the very
+           * first character after the image is the image's, which is what
+           * leaves `{align=center}` written in ordinary prose alone.
+           */
+          updateDOM(element: HTMLElement) {
+            for (const img of Array.from(element.querySelectorAll('img'))) {
+              const next = img.nextSibling
+              if (!next || next.nodeType !== 3) continue
+              const text = next.nodeValue ?? ''
+              const block = matchImageAttrs(text)
+              if (!block) continue
+              const attrs = parseImageAttrs(block)
+              if (attrs.align) img.setAttribute('data-align', attrs.align)
+              if (attrs.width)
+                img.setAttribute('data-width', String(attrs.width))
+              if (attrs.extra) img.setAttribute('data-extra', attrs.extra)
+              next.nodeValue = text.slice(block.length)
+            }
+          },
         },
       },
     }

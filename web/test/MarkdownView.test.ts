@@ -71,6 +71,56 @@ describe('MarkdownView', () => {
 })
 
 /**
+ * Image alignment and width, which is the half of this feature most people
+ * see: the editor is where a picture is placed, the reader is where it is
+ * looked at. A block the reader does not understand is a picture that lands
+ * differently on the two surfaces and a row of braces printed under it.
+ */
+describe('MarkdownView image attributes', () => {
+  it('gives every picture the shared image class', () => {
+    const html = render('![Icon](https://example.test/a.png)').html()
+    expect(html).toContain('class="md__img"')
+  })
+
+  it('aligns from the attribute block', () => {
+    const html = render(
+      '![Icon](https://example.test/a.png){align=center}',
+    ).html()
+    expect(html).toContain('md__img--center')
+    // The braces are the instruction, never content.
+    expect(html).not.toContain('{align=center}')
+  })
+
+  it('sets the width the block asks for', () => {
+    const html = render('![Icon](https://example.test/a.png){width=640}').html()
+    expect(html).toContain('inline-size:640px')
+    expect(html).not.toContain('{width=640}')
+  })
+
+  it('reads both together, in the shape the editor writes', () => {
+    const html = render(
+      '![Icon](attachment:att_x){align=center width=640}',
+    ).html()
+    expect(html).toContain('md__img--center')
+    expect(html).toContain('inline-size:640px')
+    expect(html).toContain('/api/v1/attachments/att_x')
+  })
+
+  it('ignores a block that is not attached to a picture', () => {
+    const html = render('Some prose {align=center} in the middle.').html()
+    expect(html).toContain('{align=center}')
+  })
+
+  it('draws nothing for an attribute it does not know', () => {
+    const html = render(
+      '![Icon](https://example.test/a.png){caption="a b"}',
+    ).html()
+    expect(html).toContain('class="md__img"')
+    expect(html).not.toContain('caption')
+  })
+})
+
+/**
  * Google Drive links, as pills.
  *
  * A pasted Drive URL is forty-odd characters of noise in the middle of a

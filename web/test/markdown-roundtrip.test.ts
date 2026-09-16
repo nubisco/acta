@@ -345,3 +345,92 @@ describe('images survive a save', () => {
     expect(roundtrip(roundtrip(src))).toBe(src)
   })
 })
+
+/**
+ * The attribute block after an image: `![alt](src){align=center width=640}`.
+ *
+ * Alignment and width have to live in the markdown, because markdown is the
+ * storage format and the reader renders from it. The risk this suite exists
+ * for is the same one that deleted every image an hour ago, in a quieter
+ * form: an attribute the pair does not agree on is a save that silently
+ * rewrites somebody's file.
+ */
+describe('image attributes survive a save', () => {
+  it('writes no braces at all when there are no attributes', () => {
+    // The most likely regression here: an image with nothing on it picking
+    // up an empty `{}` that every later read then has to parse around.
+    const src = '![Icon](attachment:att_x)'
+    const out = roundtrip(src)
+    expect(out).not.toContain('{')
+    expect(out).toBe(src)
+  })
+
+  it('keeps align on its own', () => {
+    const src = '![Icon](attachment:att_x){align=center}'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps every alignment it accepts', () => {
+    for (const align of ['left', 'center', 'right']) {
+      const src = `![Icon](attachment:att_x){align=${align}}`
+      expect(roundtrip(src), align).toBe(src)
+    }
+  })
+
+  it('keeps width on its own', () => {
+    const src = '![Icon](attachment:att_x){width=640}'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps align and width together', () => {
+    const src = '![Stagewright icon](attachment:att_x){align=center width=640}'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('preserves an attribute it does not know', () => {
+    // Another tool may add one. Dropping it on save destroys data we were
+    // only asked to store.
+    const src = '![Icon](attachment:att_x){align=right caption="a b" loop}'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('preserves an unknown value on a key it does know', () => {
+    // `align=top` is not an alignment this renders, so it is carried
+    // verbatim rather than silently corrected or dropped.
+    const src = '![Icon](attachment:att_x){align=top}'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('is stable on a second save', () => {
+    const src = '![Icon](attachment:att_x){align=left width=320 theme=dark}'
+    expect(roundtrip(src)).toBe(src)
+    expect(roundtrip(roundtrip(src))).toBe(src)
+  })
+
+  it('normalises to a form it can read back, and then holds still', () => {
+    // Order is fixed and quotes come off a value that never needed them.
+    // What matters is that the second save is a no-op.
+    const once = roundtrip(
+      '![Icon](attachment:att_x){width="640" align=center}',
+    )
+    expect(once).toBe('![Icon](attachment:att_x){align=center width=640}')
+    expect(roundtrip(once)).toBe(once)
+  })
+
+  it('drops an empty attribute block rather than carrying it forever', () => {
+    expect(roundtrip('![Icon](attachment:att_x){}')).toBe(
+      '![Icon](attachment:att_x)',
+    )
+  })
+
+  it('leaves a brace block that is not attached to an image alone', () => {
+    const src = 'Some prose {align=center} in the middle.'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps the attributes on an image sitting between prose', () => {
+    const src =
+      '### Stagewright\n\n![Stagewright icon](attachment:att_x){align=center width=640}\n\n**the patch, as shipped**'
+    expect(roundtrip(src)).toBe(src)
+  })
+})

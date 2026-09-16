@@ -46,5 +46,21 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./test/setup.ts'],
     include: ['test/**/*.test.ts'],
+    server: {
+      deps: {
+        /*
+         * tippy.js has no `exports` map, so outside the bundler vitest loads
+         * its CommonJS build, whose `exports.default` is not marked as an ES
+         * module. Node's interop then hands the importer the whole namespace
+         * object, and the bubble menu fails with "tippy is not a function"
+         * the first time a selection asks for one.
+         *
+         * Inlining it puts the file through Vite's own resolver, which picks
+         * the `module` entry: the same build the app ships, rather than a
+         * mock that would let a real fault through.
+         */
+        inline: ['tippy.js'],
+      },
+    },
   },
 })

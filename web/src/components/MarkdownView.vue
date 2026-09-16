@@ -46,6 +46,7 @@ import { chartColorFor } from '@/lib/colors'
 import { DOC_NAV_KEY } from '@/lib/keys'
 import { wpath } from '@/lib/paths'
 import { safeUrl } from '@/lib/safeUrl'
+import { imageClass, imageStyle, parseImageAttrs } from '@/lib/imageAttrs'
 import { sectionMap } from '@nubisco/acta-shared'
 import { CALLOUT_TYPES, calloutIconSvg as calloutIcon } from '@/lib/callouts'
 import { isDarkColor, parseColor } from '@/components/decorations/colors'
@@ -228,6 +229,40 @@ function driveGlyph(kind: TDriveKind): string {
     `<path fill="${DRIVE_COLORS[kind]}" d="M14 2H6.5A1.5 1.5 0 0 0 5 3.5v17A1.5 1.5 0 0 0 6.5 22h11a1.5 1.5 0 0 0 1.5-1.5V7l-5-5Z"/>` +
     `<path fill="#fff" fill-opacity=".35" d="M14 2l5 5h-5V2Z"/>` +
     `</svg>`
+  )
+}
+
+/**
+ * `![alt](src){align=center width=640}` becomes a placed, sized picture.
+ *
+ * markdown-it has no idea the block belongs to the image, so it renders it as
+ * literal text after the `<img>`. Applied here, to the rendered HTML rather
+ * than to the source, for the same reason the Drive pills are: it catches the
+ * element markdown-it actually produced instead of re-implementing its parser.
+ *
+ * Adjacency is the rule, and it is what keeps `{align=center}` written in the
+ * middle of a sentence as the prose it is.
+ *
+ * Every picture picks up `md__img` whether or not it carries attributes. That
+ * class is the shared styling the editor already applied, and until now the
+ * reader was the surface not getting it, which is the surface most people
+ * see. The class and the style both come from `imageAttrs`, so the two
+ * surfaces are identical by construction rather than by inspection.
+ *
+ * Runs before the attachment pass, so a non-image attachment that becomes a
+ * download chip takes its braces with it rather than stranding them.
+ */
+function renderImageAttrs(html: string): string {
+  return html.replace(
+    /<img\b([^>]*)>(\{[^{}]*\})?/g,
+    (_raw, attrs: string, block: string | undefined) => {
+      const parsed = parseImageAttrs(block ?? '')
+      const style = imageStyle(parsed.width)
+      return (
+        `<img${attrs} class="${imageClass(parsed.align)}"` +
+        `${style ? ` style="${style}"` : ''}>`
+      )
+    },
   )
 }
 
@@ -447,6 +482,7 @@ const html = computed(() => {
   out = renderCallouts(out)
   out = renderRefs(out)
   out = renderDriveLinks(out)
+  out = renderImageAttrs(out)
   out = renderAttachments(out)
   // Mermaid fences render as marked code blocks for now (diagram rendering
   // is a follow-up; the source stays intact and legible).

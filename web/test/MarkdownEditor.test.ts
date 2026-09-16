@@ -17,6 +17,11 @@ vi.mock('@/api/client', () => ({
 
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { imageSrc } from '@/components/editor/nodes/Image'
+import {
+  IMAGE_MAX_WIDTH,
+  IMAGE_MIN_WIDTH,
+  resizedWidth,
+} from '@/lib/imageAttrs'
 
 /** A literal NUL, built rather than typed so it survives editing. */
 const NUL = String.fromCharCode(0)
@@ -165,5 +170,187 @@ describe('imageSrc', () => {
   it('refuses an empty attachment id rather than serving the collection', () => {
     expect(imageSrc('attachment:')).toBeNull()
     expect(imageSrc('attachment:   ')).toBeNull()
+  })
+})
+
+/**
+ * The arithmetic every drag-resize depends on.
+ *
+ * Asserted on the function rather than through the DOM on purpose: jsdom has
+ * no layout engine, so every box it reports is zero and a resize driven
+ * through pointer events would assert nothing at all.
+ */
+describe('resizedWidth', () => {
+  it('follows the pointer from a right-hand handle', () => {
+    expect(resizedWidth(400, 120, 'right')).toBe(520)
+    expect(resizedWidth(400, -120, 'right')).toBe(280)
+  })
+
+  it('grows the other way from a left-hand handle', () => {
+    // Dragging the left edge leftwards makes the picture wider, which is the
+    // opposite sign and the thing most likely to be got backwards.
+    expect(resizedWidth(400, -120, 'left')).toBe(520)
+    expect(resizedWidth(400, 120, 'left')).toBe(280)
+  })
+
+  it('will not shrink a picture below something you can still grab', () => {
+    expect(resizedWidth(400, -10000, 'right')).toBe(IMAGE_MIN_WIDTH)
+  })
+
+  it('stops at the column it is in', () => {
+    expect(resizedWidth(400, 10000, 'right', 720)).toBe(720)
+  })
+
+  it('stops at the absolute ceiling when there is no column to ask', () => {
+    expect(resizedWidth(400, 100000, 'right')).toBe(IMAGE_MAX_WIDTH)
+  })
+
+  it('answers in whole pixels, because the attribute is an integer', () => {
+    expect(resizedWidth(400.4, 0.2, 'right')).toBe(401)
+    expect(Number.isInteger(resizedWidth(123.45, 6.78, 'right'))).toBe(true)
+  })
+})
+
+/**
+ * The attribute block, as the editor draws it and as its controls change it.
+ *
+ * The grammar itself is covered by the round-trip suite, which is where a
+ * disagreement between the parser and the serializer would show up as damage
+ * to a file. These assert the other half: that what is stored is what is
+ * drawn, and that pressing a control changes the document rather than only
+ * the picture on screen.
+ */
+describe('MarkdownEditor image attributes', () => {
+  async function open(source: string) {
+    const view = mount(MarkdownEditor, {
+      props: { modelValue: source },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    return view
+  }
+
+  it('draws the alignment the markdown asked for', async () => {
+    const view = await open('![Icon](attachment:att_x){align=center}')
+    const img = view.element.querySelector('img')
+    expect(img?.getAttribute('class')).toContain('md__img--center')
+    // Mirrored onto data so a copy and a paste inside the editor keeps it.
+    expect(img?.getAttribute('data-align')).toBe('center')
+    view.unmount()
+  })
+
+  it('draws the width the markdown asked for', async () => {
+    const view = await open('![Icon](attachment:att_x){width=640}')
+    const img = view.element.querySelector('img') as HTMLImageElement
+    // Read off the parsed style rather than the attribute text, which the
+    // DOM reformats (`inline-size: 640px;`) as it takes it in.
+    expect(img.style.inlineSize).toBe('640px')
+    expect(img.getAttribute('data-width')).toBe('640')
+    view.unmount()
+  })
+
+  it('leaves no braces in the document text', async () => {
+    const view = await open('![Icon](attachment:att_x){align=center width=640}')
+    // The block is an instruction to the renderer, never prose. Before it was
+    // hoisted onto the node it survived a save as a stray paragraph, adding a
+    // line of braces to the file every time the document was opened.
+    expect(view.text()).not.toContain('{')
+    view.unmount()
+  })
+
+  it('shows its controls on the selected picture', async () => {
+    const view = await open('![Icon](attachment:att_x)')
+    const editor = (
+      view.vm as unknown as {
+        editor: { commands: { setNodeSelection(p: number): void } }
+      }
+    ).editor
+    editor.commands.setNodeSelection(0)
+    await flushPromises()
+    expect(view.find('[data-testid="image-tools"]').exists()).toBe(true)
+    // Four corners, so a picture can be grabbed from whichever side has room.
+    expect(view.findAll('[data-testid^="image-handle-"]').length).toBe(4)
+    view.unmount()
+  })
+
+  it('writes an alignment into the markdown when the control is pressed', async () => {
+    const view = await open('![Icon](attachment:att_x)')
+    const editor = (
+      view.vm as unknown as {
+        editor: {
+          commands: { setNodeSelection(p: number): void }
+          storage: { markdown: { getMarkdown(): string } }
+        }
+      }
+    ).editor
+    editor.commands.setNodeSelection(0)
+    await flushPromises()
+    await view.get('[aria-label="Align centre"]').trigger('click')
+    await flushPromises()
+    expect(editor.storage.markdown.getMarkdown()).toBe(
+      '![Icon](attachment:att_x){align=center}',
+    )
+    view.unmount()
+  })
+
+  it('takes the alignment back off when the same control is pressed again', async () => {
+    const view = await open('![Icon](attachment:att_x){align=center}')
+    const editor = (
+      view.vm as unknown as {
+        editor: {
+          commands: { setNodeSelection(p: number): void }
+          storage: { markdown: { getMarkdown(): string } }
+        }
+      }
+    ).editor
+    editor.commands.setNodeSelection(0)
+    await flushPromises()
+    await view.get('[aria-label="Align centre"]').trigger('click')
+    await flushPromises()
+    // Back to a plain image, with no empty braces left behind.
+    expect(editor.storage.markdown.getMarkdown()).toBe(
+      '![Icon](attachment:att_x)',
+    )
+    view.unmount()
+  })
+
+  it('resets the width without disturbing the alignment', async () => {
+    const view = await open('![Icon](attachment:att_x){align=right width=640}')
+    const editor = (
+      view.vm as unknown as {
+        editor: {
+          commands: { setNodeSelection(p: number): void }
+          storage: { markdown: { getMarkdown(): string } }
+        }
+      }
+    ).editor
+    editor.commands.setNodeSelection(0)
+    await flushPromises()
+    await view.get('[aria-label="Reset width"]').trigger('click')
+    await flushPromises()
+    expect(editor.storage.markdown.getMarkdown()).toBe(
+      '![Icon](attachment:att_x){align=right}',
+    )
+    view.unmount()
+  })
+
+  it('keeps an attribute it does not understand while changing one it does', async () => {
+    const view = await open('![Icon](attachment:att_x){caption="a b"}')
+    const editor = (
+      view.vm as unknown as {
+        editor: {
+          commands: { setNodeSelection(p: number): void }
+          storage: { markdown: { getMarkdown(): string } }
+        }
+      }
+    ).editor
+    editor.commands.setNodeSelection(0)
+    await flushPromises()
+    await view.get('[aria-label="Align left"]').trigger('click')
+    await flushPromises()
+    expect(editor.storage.markdown.getMarkdown()).toBe(
+      '![Icon](attachment:att_x){align=left caption="a b"}',
+    )
+    view.unmount()
   })
 })
