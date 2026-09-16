@@ -689,4 +689,12 @@ export const ADDITIVE_COLUMNS = [
   // already had 'personal' in its CHECK and so skips it.
   'ALTER TABLE auth_token ADD COLUMN label TEXT',
   'ALTER TABLE auth_token ADD COLUMN last_used_at INTEGER',
+  // Inline comments. The anchor is JSON (a text quote plus a position hint,
+  // see shared/src/anchors.ts) and lives here rather than in the document, so
+  // commenting on a page never changes a byte of its markdown. Null is a
+  // comment on the page as a whole, which every existing row is.
+  'ALTER TABLE doc_comment ADD COLUMN anchor TEXT',
+  // Resolved is a state, not a deletion: the comment and its anchor stay.
+  'ALTER TABLE doc_comment ADD COLUMN resolved_at INTEGER',
+  'ALTER TABLE doc_comment ADD COLUMN resolved_by TEXT',
 ]

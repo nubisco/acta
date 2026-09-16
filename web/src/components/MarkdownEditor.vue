@@ -154,6 +154,7 @@ import { MathBlock, MathInline, MathText } from '@/components/editor/nodes/Math'
 import { MermaidBlock } from '@/components/editor/nodes/MermaidBlock'
 import { LinkCard } from '@/components/editor/nodes/LinkCard'
 import { ColorSwatches } from '@/components/editor/decorations'
+import { CommentHighlights } from '@/components/comments/commentHighlights'
 
 const props = defineProps<{
   modelValue: string
@@ -339,6 +340,8 @@ const editor = new Editor({
     // which is not: the two surfaces would disagree about the text.
     LinkCard,
     ColorSwatches,
+    // Inline comment highlights: decorations only, never document content.
+    CommentHighlights,
     Placeholder.configure({
       placeholder: props.placeholder ?? 'Type here...',
     }),
@@ -404,7 +407,9 @@ watch(
 
 onBeforeUnmount(() => editor.destroy())
 
-defineExpose({ focus: () => editor.commands.focus('end') })
+// `editor` so a page can decorate the document it shows (inline comments)
+// without this component knowing about them.
+defineExpose({ focus: () => editor.commands.focus('end'), editor })
 
 /* The selection bubble: inline styling first, block moves after. */
 const bubbleActions = [

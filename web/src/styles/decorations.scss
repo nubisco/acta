@@ -481,3 +481,35 @@
   margin-block-end: var(--nb-spacing-4);
   color: var(--callout-accent);
 }
+
+/* Inline comment highlights.
+
+   The editor draws them as ProseMirror decorations (`.md__comment-anchor`),
+   the reader as registered CSS highlights (`::highlight(acta-comment)`),
+   because the reader's HTML is rewritten by hydration and an element wrapped
+   around the text would not survive it. Neither is document content. Same
+   colours on both, so a highlight does not change when the page goes into
+   edit mode. Background and underline only: a highlight pseudo-element
+   accepts nothing that would move the text. */
+.md__comment-anchor {
+  background: color-mix(in srgb, var(--nb-c-warning) 22%, transparent);
+  text-decoration: underline 2px
+    color-mix(in srgb, var(--nb-c-warning) 70%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.md__comment-anchor--active {
+  background: color-mix(in srgb, var(--nb-c-warning) 42%, transparent);
+}
+
+::highlight(acta-comment) {
+  background-color: color-mix(in srgb, var(--nb-c-warning) 22%, transparent);
+  text-decoration: underline 2px
+    color-mix(in srgb, var(--nb-c-warning) 70%, transparent);
+}
+
+::highlight(acta-comment-active) {
+  background-color: color-mix(in srgb, var(--nb-c-warning) 42%, transparent);
+  text-decoration: underline 2px var(--nb-c-warning);
+}

@@ -1,5 +1,7 @@
 /** Shapes mirrored from the compact server responses (conventions/types.md). */
 
+import type { IAnchor, TAnchorStatus } from '@nubisco/acta-shared'
+
 export interface IOverview {
   workspace: { id: string; name: string }
   spaces: {
@@ -46,6 +48,12 @@ export interface ICommentRow {
   ts: number
   body: string
   imported?: IImportedMeta
+  /** Document comments only: the text an inline comment is anchored to. */
+  anchor?: IAnchor
+  /** Whether that text is still in the document. Absent on page comments. */
+  anchor_status?: TAnchorStatus
+  /** Set once resolved. A resolved comment is kept, just not highlighted. */
+  resolved?: { ts: number; by?: string }
 }
 
 export interface ISpaceItemRow {

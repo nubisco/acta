@@ -6,6 +6,7 @@
 
 import { z } from 'zod'
 import { SPACE_KEY_RE, DOC_SLUG_RE, ITEM_KEY_RE } from './keys'
+import { ANCHOR_CONTEXT_LENGTH, ANCHOR_MAX_LENGTH } from './anchors'
 
 export const zSpaceKey = z.string().regex(SPACE_KEY_RE)
 export const zItemKey = z.string().regex(ITEM_KEY_RE)
@@ -277,6 +278,37 @@ export const zSpaceWrite = z.object({ ops: z.array(zSpaceOp).min(1).max(50) })
 // doc_write ops
 // --------------------------------------------------------------------------
 
+/**
+ * Where an inline comment points, as a W3C text quote plus a position hint.
+ * See anchors.ts for how it is resolved.
+ *
+ * `exact` alone is how an agent asks: quote the text, and add `prefix` or
+ * `suffix` if the phrase repeats. `start` and `end` are what the app sends
+ * with them, having seen the text it selected. Stored beside the document,
+ * never in its markdown.
+ */
+export const zAnchorInput = z
+  .object({
+    exact: z.string().min(1).max(ANCHOR_MAX_LENGTH),
+    prefix: z
+      .string()
+      .max(ANCHOR_CONTEXT_LENGTH * 4)
+      .optional(),
+    suffix: z
+      .string()
+      .max(ANCHOR_CONTEXT_LENGTH * 4)
+      .optional(),
+    start: z.number().int().min(0).optional(),
+    end: z.number().int().min(0).optional(),
+  })
+  .refine(
+    (a) =>
+      (a.start === undefined) === (a.end === undefined) &&
+      (a.start === undefined || (a.end ?? 0) >= a.start),
+    { message: 'start and end come together, with end >= start' },
+  )
+export type TAnchorInput = z.infer<typeof zAnchorInput>
+
 export const zDocOp = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('create'),
@@ -295,7 +327,17 @@ export const zDocOp = z.discriminatedUnion('op', [
     op_id: zOpId,
     ref: zDocSlug,
     body: z.string().min(1).max(50_000),
+    /** Anchors the comment to a stretch of the text. Omit for a page comment. */
+    anchor: zAnchorInput.optional(),
     imported_meta: zImportedMeta.optional(),
+  }),
+  z.object({
+    op: z.literal('comment_resolve'),
+    op_id: zOpId,
+    ref: zDocSlug,
+    comment_id: z.string().min(1),
+    /** false reopens a resolved comment. */
+    resolved: z.boolean().default(true),
   }),
   z.object({
     op: z.literal('comment_update'),
@@ -481,6 +523,8 @@ export interface IOpOk {
   slug?: string
   id?: string
   rev?: number
+  /** Inline comments: whether the anchor was found in the current text. */
+  anchor_status?: 'anchored' | 'detached'
 }
 
 export interface IOpErr {

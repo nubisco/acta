@@ -12,8 +12,9 @@ import type {
 } from '@nubisco/acta-shared'
 import { now, type ICtx } from '../core/ctx'
 import { docBySlug, spaceByKey, itemByKey, type IItemRow } from '../core/store'
+import { anchorStatus, parseAnchor } from './anchors'
 import { attachmentUrl } from './attachments'
-import { sectionMap } from '@nubisco/acta-shared'
+import { anchorTextFromMarkdown, sectionMap } from '@nubisco/acta-shared'
 
 type TSpaceGet = z.infer<typeof zSpaceGet>
 type TItemGet = z.infer<typeof zItemGet>
@@ -507,6 +508,7 @@ export async function docGet(
   // what the body refers to.
   out.attachments = await attachmentsFor(ctx, 'doc', doc.id)
   if (include.has('comments')) {
+    let anchorText: string | null = null
     out.comments = (
       await ctx.db.query<{
         id: string
@@ -515,19 +517,42 @@ export async function docGet(
         handle: string
         kind: string
         imported_meta: string | null
+        anchor: string | null
+        resolved_at: number | null
+        resolved_handle: string | null
       }>(
-        `SELECT c.id, c.body, c.created_at, a.handle, a.kind, c.imported_meta FROM doc_comment c
-           JOIN actor a ON a.id = c.actor_id WHERE c.document_id = ? ORDER BY c.created_at`,
+        `SELECT c.id, c.body, c.created_at, a.handle, a.kind, c.imported_meta,
+                c.anchor, c.resolved_at, r.handle AS resolved_handle
+           FROM doc_comment c
+           JOIN actor a ON a.id = c.actor_id
+           LEFT JOIN actor r ON r.id = c.resolved_by
+          WHERE c.document_id = ? ORDER BY c.created_at`,
         [doc.id],
       )
-    ).map((c) => ({
-      id: c.id,
-      by: c.handle,
-      agent: c.kind === 'agent' || undefined,
-      ts: c.created_at,
-      body: c.body,
-      imported: parseImportedMeta(c.imported_meta),
-    }))
+    ).map((c) => {
+      const anchor = parseAnchor(c.anchor)
+      // Projected once for the whole thread, and only if something needs it.
+      if (anchor && anchorText === null)
+        anchorText = anchorTextFromMarkdown(body)
+      return {
+        id: c.id,
+        by: c.handle,
+        agent: c.kind === 'agent' || undefined,
+        ts: c.created_at,
+        body: c.body,
+        imported: parseImportedMeta(c.imported_meta),
+        // Against the body being returned, so a comment read at an old
+        // version reports whether it anchors in that version.
+        anchor: anchor ?? undefined,
+        anchor_status: anchor
+          ? anchorStatus(anchorText ?? '', anchor)
+          : undefined,
+        resolved:
+          c.resolved_at !== null
+            ? { ts: c.resolved_at, by: c.resolved_handle ?? undefined }
+            : undefined,
+      }
+    })
   }
   if (include.has('sections')) {
     out.sections = sectionMap(body).map((s) => ({

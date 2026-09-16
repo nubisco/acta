@@ -1,4 +1,5 @@
 import {
+  anchorTextFromMarkdown,
   applySectionEdit,
   extractRefs,
   newId,
@@ -12,6 +13,7 @@ import { emitEvent } from '../core/events'
 import { ftsDelete, ftsUpsert } from '../core/fts'
 import { withOp } from '../core/ops'
 import { spaceByKey, docBySlug, type IDocRow } from '../core/store'
+import { anchorForComment, anchorStatus } from './anchors'
 import type { AttachmentStore } from './attachments'
 
 export async function docWrite(
@@ -70,7 +72,12 @@ async function applyDocOp(
   ctx: ICtx,
   op: TDocOp,
   store?: AttachmentStore,
-): Promise<{ slug?: string; id?: string; rev?: number }> {
+): Promise<{
+  slug?: string
+  id?: string
+  rev?: number
+  anchor_status?: 'anchored' | 'detached'
+}> {
   const ts = now()
   switch (op.op) {
     case 'create': {
@@ -117,8 +124,11 @@ async function applyDocOp(
     case 'comment': {
       const doc = await docBySlug(ctx, op.ref)
       const id = newId('cmt')
+      // Out of band: the anchor goes in this row, and the document is not
+      // written at all, so its rev and its markdown are exactly as they were.
+      const anchor = op.anchor ? anchorForComment(doc.body, op.anchor) : null
       await ctx.db.run(
-        'INSERT INTO doc_comment (id, workspace_id, document_id, actor_id, body, created_at, imported_meta) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO doc_comment (id, workspace_id, document_id, actor_id, body, created_at, imported_meta, anchor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [
           id,
           ctx.workspaceId,
@@ -127,6 +137,7 @@ async function applyDocOp(
           op.body,
           ts,
           op.imported_meta ? JSON.stringify(op.imported_meta) : null,
+          anchor ? JSON.stringify(anchor) : null,
         ],
       )
       await ftsUpsert(ctx, 'comment', id, doc.slug, op.body)
@@ -144,7 +155,45 @@ async function applyDocOp(
         doc.id,
         `commented on ${doc.slug}`,
       )
-      return { slug: doc.slug, id, rev: doc.rev }
+      return {
+        slug: doc.slug,
+        id,
+        rev: doc.rev,
+        anchor_status: anchor
+          ? anchorStatus(anchorTextFromMarkdown(doc.body), anchor)
+          : undefined,
+      }
+    }
+    case 'comment_resolve': {
+      const doc = await docBySlug(ctx, op.ref)
+      const existing = (
+        await ctx.db.query<{ id: string; resolved_at: number | null }>(
+          'SELECT id, resolved_at FROM doc_comment WHERE id = ? AND document_id = ?',
+          [op.comment_id, doc.id],
+        )
+      )[0]
+      if (!existing)
+        throw new ApiError(404, `comment ${op.comment_id} not on ${doc.slug}`)
+      // Already in the requested state: nothing to write and nothing to
+      // announce, so resolving twice does not tell everyone twice.
+      if ((existing.resolved_at !== null) === op.resolved)
+        return { slug: doc.slug, id: existing.id, rev: doc.rev }
+      await ctx.db.run(
+        'UPDATE doc_comment SET resolved_at = ?, resolved_by = ? WHERE id = ?',
+        [
+          op.resolved ? ts : null,
+          op.resolved ? ctx.actor.id : null,
+          existing.id,
+        ],
+      )
+      await emitEvent(
+        ctx,
+        op.resolved ? 'comment.resolved' : 'comment.reopened',
+        'doc',
+        doc.id,
+        `${op.resolved ? 'resolved' : 'reopened'} a comment on ${doc.slug}`,
+      )
+      return { slug: doc.slug, id: existing.id, rev: doc.rev }
     }
     case 'comment_update': {
       const doc = await docBySlug(ctx, op.ref)

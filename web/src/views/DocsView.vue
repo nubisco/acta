@@ -107,6 +107,7 @@
 
         <MarkdownEditor
           v-if="editing"
+          ref="bodyEditor"
           v-model="draft"
           autofocus
           placeholder="Start writing. Headings, lists, quotes and code all form as you type. Drop an image to attach it."
@@ -124,6 +125,7 @@
         </template>
         <MarkdownView
           v-else
+          ref="bodyReader"
           :source="doc.body"
           :wide="doc.layout === 'wide'"
           :attachments="doc.attachments"
@@ -137,7 +139,18 @@
           <NbDefinitionList :items="backlinkFacts" layout="columns" />
         </footer>
 
-        <section v-if="!editing && !viewingOld" class="docs__comments">
+        <DocCommentLayer
+          v-if="!viewingOld"
+          :reader="bodyReader?.$el ?? null"
+          :editor="bodyEditor?.editor ?? null"
+          :comments="doc.comments ?? []"
+          :pending="pendingAnchor"
+          :active-id="activeCommentId"
+          @compose="startInlineComment"
+          @open="activeCommentId = $event"
+        />
+
+        <section v-if="!viewingOld" class="docs__comments">
           <h2>
             Comments
             <span v-if="doc.comments && doc.comments.length > 0">
@@ -148,7 +161,12 @@
             v-model="commentDraft"
             :comments="doc.comments ?? []"
             :commenting="commenting"
+            :active-id="activeCommentId"
+            :quote="pendingAnchor?.exact ?? null"
+            resolvable
             @submit="submitComment"
+            @resolve="resolveComment"
+            @clear-quote="pendingAnchor = null"
           />
         </section>
       </article>
@@ -166,6 +184,8 @@ import { humanise, relativeTime, useLoadState } from '@/lib/state'
 import { DOC_NAV_KEY } from '@/lib/keys'
 import { useViewCommands } from '@/lib/commands'
 import CommentThread from '@/components/CommentThread.vue'
+import DocCommentLayer from '@/components/comments/DocCommentLayer.vue'
+import type { IAnchor } from '@/lib/anchors'
 import DocsTreePanel from '@/components/DocsTreePanel.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
@@ -438,6 +458,45 @@ function backToCurrent(): void {
 const commentDraft = ref('')
 const commenting = ref(false)
 
+const bodyReader = ref<InstanceType<typeof MarkdownView> | null>(null)
+const bodyEditor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
+/** The text the comment being written is about, if it is an inline one. */
+const pendingAnchor = ref<IAnchor | null>(null)
+/** The inline comment whose highlight was last clicked. */
+const activeCommentId = ref<string | null>(null)
+
+watch(slug, () => {
+  pendingAnchor.value = null
+  activeCommentId.value = null
+})
+
+function startInlineComment(anchor: IAnchor): void {
+  pendingAnchor.value = anchor
+  activeCommentId.value = null
+}
+
+async function resolveComment(id: string, resolved: boolean): Promise<void> {
+  if (!doc.value) return
+  try {
+    const { results } = await api.docWrite([
+      {
+        op: 'comment_resolve',
+        op_id: newOpId(),
+        ref: doc.value.slug,
+        comment_id: id,
+        resolved,
+      },
+    ])
+    if (!results[0].ok) throw new Error((results[0] as { error: string }).error)
+    const refreshed = await api.docGet(doc.value.slug, ['comments'])
+    doc.value = { ...doc.value, comments: refreshed.comments }
+  } catch (err) {
+    toast.error(humanise(err), {
+      title: resolved ? 'Resolve failed' : 'Reopen failed',
+    })
+  }
+}
+
 async function submitComment(): Promise<void> {
   if (!doc.value || !commentDraft.value.trim()) return
   commenting.value = true
@@ -448,10 +507,13 @@ async function submitComment(): Promise<void> {
         op_id: newOpId(),
         ref: doc.value.slug,
         body: commentDraft.value.trim(),
+        // Stored with the comment, never written into the document.
+        ...(pendingAnchor.value ? { anchor: pendingAnchor.value } : {}),
       },
     ])
     if (!results[0].ok) throw new Error((results[0] as { error: string }).error)
     commentDraft.value = ''
+    pendingAnchor.value = null
     const refreshed = await api.docGet(doc.value.slug, [
       'backlinks',
       'versions',

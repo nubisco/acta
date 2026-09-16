@@ -4,22 +4,22 @@ Thirteen tools, plus `attachment_add` when the instance has an attachment
 store configured (it does in every standard deployment). Those marked
 **write** require a token with the write scope.
 
-| Tool                 |           | Does                                                                                                                                                                                                     |
-| -------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `workspace_overview` |           | One-call bootstrap: workspace name, every space with its lists and item counts, label groups, members (human and agent), document tree roots. Call this first.                                           |
-| `space_get`          |           | Items of one space as compact rows. Filter by list, label, assignee, state, free text, or `updated_since` for delta reads. `detail=full` adds descriptions.                                              |
-| `item_get`           |           | Full detail for up to 50 items by key: description, comments, checklists, links and backlinks, attachments, optionally the activity tail. Old keys from cross-space moves resolve automatically.         |
-| `item_write`         | **write** | Batch item mutations. See below.                                                                                                                                                                         |
-| `space_write`        | **write** | Create and change spaces and lists: `create` (with the `kanban6` template), `update`, `archive`, `list_create`, `list_update`, `list_archive`.                                                           |
-| `doc_tree`           |           | The document hierarchy as a flat, depth-annotated list. Optionally scoped to a subtree.                                                                                                                  |
-| `doc_get`            |           | One document: frontmatter, body, `rev`. `include: ["sections"]` adds the heading map with per-section hashes; `"versions"` the history; `"backlinks"` the referrers. `at_version` reads an old revision. |
-| `doc_write`          | **write** | Batch document mutations. See below.                                                                                                                                                                     |
-| `search`             |           | Full-text across item titles and descriptions, comments and documents. Returns type, key or slug, title, snippet.                                                                                        |
-| `activity_query`     |           | The audit trail. Filter by entity, actor, `actor_kind`, verb pattern (`item.*`), and `since` for a cheap delta.                                                                                          |
-| `label_write`        | **write** | `group_create`, `label_create`, `label_update`, `label_merge` (folds one label into another and reassigns every item), `label_delete`.                                                                   |
-| `webhook_write`      | **write** | Outbound webhooks: `create` (url plus event patterns, optional HMAC secret), `update`, `delete`.                                                                                                         |
-| `rule_write`         | **write** | Automation rules from a fixed catalogue. See below.                                                                                                                                                      |
-| `attachment_add`     | **write** | Attach a URL, or inline base64 up to 1 MB, to an item or document.                                                                                                                                       |
+| Tool                 |           | Does                                                                                                                                                                                                                                                                    |
+| -------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workspace_overview` |           | One-call bootstrap: workspace name, every space with its lists and item counts, label groups, members (human and agent), document tree roots. Call this first.                                                                                                          |
+| `space_get`          |           | Items of one space as compact rows. Filter by list, label, assignee, state, free text, or `updated_since` for delta reads. `detail=full` adds descriptions.                                                                                                             |
+| `item_get`           |           | Full detail for up to 50 items by key: description, comments, checklists, links and backlinks, attachments, optionally the activity tail. Old keys from cross-space moves resolve automatically.                                                                        |
+| `item_write`         | **write** | Batch item mutations. See below.                                                                                                                                                                                                                                        |
+| `space_write`        | **write** | Create and change spaces and lists: `create` (with the `kanban6` template), `update`, `archive`, `list_create`, `list_update`, `list_archive`.                                                                                                                          |
+| `doc_tree`           |           | The document hierarchy as a flat, depth-annotated list. Optionally scoped to a subtree.                                                                                                                                                                                 |
+| `doc_get`            |           | One document: frontmatter, body, `rev`. `include: ["sections"]` adds the heading map with per-section hashes; `"versions"` the history; `"backlinks"` the referrers; `"comments"` the comments, with anchor status for inline ones. `at_version` reads an old revision. |
+| `doc_write`          | **write** | Batch document mutations. See below.                                                                                                                                                                                                                                    |
+| `search`             |           | Full-text across item titles and descriptions, comments and documents. Returns type, key or slug, title, snippet.                                                                                                                                                       |
+| `activity_query`     |           | The audit trail. Filter by entity, actor, `actor_kind`, verb pattern (`item.*`), and `since` for a cheap delta.                                                                                                                                                         |
+| `label_write`        | **write** | `group_create`, `label_create`, `label_update`, `label_merge` (folds one label into another and reassigns every item), `label_delete`.                                                                                                                                  |
+| `webhook_write`      | **write** | Outbound webhooks: `create` (url plus event patterns, optional HMAC secret), `update`, `delete`.                                                                                                                                                                        |
+| `rule_write`         | **write** | Automation rules from a fixed catalogue. See below.                                                                                                                                                                                                                     |
+| `attachment_add`     | **write** | Attach a URL, or inline base64 up to 1 MB, to an item or document.                                                                                                                                                                                                      |
 
 ## Writing items
 
@@ -65,15 +65,18 @@ work once, so a retry after a timeout is safe:
 
 ## Writing documents
 
-| Op               | Notes                                                                                               |
-| ---------------- | --------------------------------------------------------------------------------------------------- |
-| `create`         |                                                                                                     |
-| `replace`        | Needs `if_rev`.                                                                                     |
-| `patch_section`  | Needs the section slug and `if_hash` from `doc_get`. Conflicts only when that same section changed. |
-| `append`         | No read needed. Ideal for logs and running notes.                                                   |
-| `move`, `rename` |                                                                                                     |
-| `archive`        |                                                                                                     |
-| `delete`         | Hard delete, leaf pages only.                                                                       |
+| Op                | Notes                                                                                               |
+| ----------------- | --------------------------------------------------------------------------------------------------- |
+| `create`          |                                                                                                     |
+| `replace`         | Needs `if_rev`.                                                                                     |
+| `patch_section`   | Needs the section slug and `if_hash` from `doc_get`. Conflicts only when that same section changed. |
+| `append`          | No read needed. Ideal for logs and running notes.                                                   |
+| `move`, `rename`  |                                                                                                     |
+| `archive`         |                                                                                                     |
+| `delete`          | Hard delete, leaf pages only.                                                                       |
+| `comment`         | A page comment, or an inline one with `anchor`. Never changes the document or its `rev`.            |
+| `comment_update`  | Edits a comment's body.                                                                             |
+| `comment_resolve` | Resolves an inline comment. `resolved: false` reopens it.                                           |
 
 `patch_section` is the one worth learning. Read with sections, change one, send
 it back:
@@ -94,6 +97,36 @@ it back:
 ```
 
 Two agents editing different sections of the same page both succeed.
+
+### Inline comments
+
+An inline comment is anchored to text by quoting it. The quote must be in the
+page as it reads now, and if the phrase appears more than once, `prefix` or
+`suffix` says which one. A quote that is missing or ambiguous is refused with
+the reason, so nothing is created pointing at nothing.
+
+```json
+{
+  "ops": [
+    {
+      "op": "comment",
+      "op_id": "c1",
+      "ref": "manual/runbook",
+      "body": "Should this drain step have a timeout?",
+      "anchor": { "exact": "Drain first", "suffix": ", then" }
+    }
+  ]
+}
+```
+
+The anchor is stored with the comment, never in the markdown, so commenting
+leaves the page byte for byte as it was. `doc_get` with
+`include: ["comments"]` returns each inline comment's `anchor` and an
+`anchor_status`: `anchored`, or `detached` when the quoted text has since been
+deleted or rewritten beyond recognition. A detached comment is kept and still
+listed. Light edits, text inserted around the quote and repeated phrases are
+all followed. Resolve with `comment_resolve`, which keeps the comment and
+marks it `resolved`.
 
 ## Automation rules
 

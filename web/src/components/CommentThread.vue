@@ -1,7 +1,15 @@
 <template>
   <div class="thread">
-    <ul class="thread__list" aria-label="Comments">
-      <li v-for="comment in comments" :key="comment.id">
+    <ul ref="listEl" class="thread__list" aria-label="Comments">
+      <li
+        v-for="comment in comments"
+        :key="comment.id"
+        :data-comment-id="comment.id"
+        :class="{
+          'thread__item--active': comment.id === activeId,
+          'thread__item--resolved': !!comment.resolved,
+        }"
+      >
         <div class="thread__head">
           <!-- An avatar on every comment, imported or not. Without one the
                imported half of a thread was a wall of identical bold names
@@ -30,12 +38,61 @@
           <time :datetime="timestampIso(comment)">
             {{ timestampLabel(comment) }}
           </time>
+          <NbBadge
+            v-if="comment.anchor_status === 'detached'"
+            v-nb-tooltip="{
+              body: 'The text this comment was on has been changed or removed. The comment is kept.',
+            }"
+            size="sm"
+            variant="orange"
+          >
+            detached
+          </NbBadge>
+          <NbBadge v-if="comment.resolved" size="sm" variant="green">
+            resolved
+          </NbBadge>
+          <NbButton
+            v-if="resolvable && comment.anchor"
+            v-nb-tooltip="{ body: comment.resolved ? 'Reopen' : 'Resolve' }"
+            class="thread__resolve"
+            size="xxs"
+            variant="ghost"
+            :icon="comment.resolved ? 'arrow-counter-clockwise' : 'check'"
+            :aria-label="
+              comment.resolved ? 'Reopen comment' : 'Resolve comment'
+            "
+            @click="emit('resolve', comment.id, !comment.resolved)"
+          />
         </div>
+        <!-- The text an inline comment is about, as it was quoted. Shown
+             whether or not it is still in the document, because a detached
+             comment only makes sense next to what it was about. -->
+        <blockquote
+          v-if="comment.anchor"
+          class="thread__quote"
+          :class="{
+            'thread__quote--detached': comment.anchor_status === 'detached',
+          }"
+        >
+          {{ comment.anchor.exact }}
+        </blockquote>
         <MarkdownView :source="comment.body" class="thread__body nb-layer-2" />
       </li>
     </ul>
     <NbForm class="thread__composer" @submit.prevent="emit('submit')">
+      <div v-if="quote" class="thread__pending">
+        <blockquote class="thread__quote">{{ quote }}</blockquote>
+        <NbButton
+          v-nb-tooltip="{ body: 'Comment on the whole page instead' }"
+          size="xxs"
+          variant="ghost"
+          icon="x"
+          aria-label="Stop commenting on this text"
+          @click="emit('clear-quote')"
+        />
+      </div>
       <MarkdownEditor
+        ref="composer"
         v-model="draft"
         placeholder="Write a comment... @handle to mention"
         class="thread__editor"
@@ -55,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { relativeTime } from '@/lib/state'
 import { useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'
@@ -69,6 +126,10 @@ interface ICommentView {
   ts: number
   body: string
   imported?: { source: string; author?: string; created_at?: string }
+  /** Inline comments: the quoted text, kept even once it is detached. */
+  anchor?: { exact: string }
+  anchor_status?: 'anchored' | 'detached'
+  resolved?: { ts: number; by?: string }
 }
 
 /** Imported comments keep their original timestamp, not the import's. */
@@ -123,12 +184,44 @@ const props = defineProps<{
   comments: ICommentView[]
   modelValue: string
   commenting: boolean
+  /** The comment to bring into view and mark, such as a clicked highlight. */
+  activeId?: string | null
+  /** Text the comment being written will be anchored to. */
+  quote?: string | null
+  /** Offer resolve and reopen on inline comments. */
+  resolvable?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   submit: []
+  resolve: [id: string, resolved: boolean]
+  'clear-quote': []
 }>()
+
+const composer = ref<InstanceType<typeof MarkdownEditor> | null>(null)
+const listEl = ref<HTMLElement | null>(null)
+
+// Starting an inline comment puts the cursor where the comment is typed.
+watch(
+  () => props.quote,
+  (quote) => {
+    if (quote) void nextTick(() => composer.value?.focus())
+  },
+)
+
+// A clicked highlight brings its comment into view.
+watch(
+  () => props.activeId,
+  (id) => {
+    if (!id) return
+    void nextTick(() =>
+      listEl.value
+        ?.querySelector(`[data-comment-id="${CSS.escape(id)}"]`)
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }),
+    )
+  },
+)
 
 const draft = computed({
   get: () => props.modelValue,
@@ -155,6 +248,48 @@ const draft = computed({
     > li {
       display: grid;
       gap: var(--nb-spacing-4);
+    }
+  }
+
+  &__item--active > .thread__body {
+    box-shadow: inset 3px 0 0 var(--nb-c-primary);
+  }
+
+  &__item--resolved > .thread__body {
+    opacity: 0.7;
+  }
+
+  &__resolve {
+    margin-inline-start: auto;
+  }
+
+  /* The quoted text an inline comment is about, clipped to three lines. */
+  &__quote {
+    margin: 0;
+    padding-inline-start: var(--nb-spacing-8);
+    border-inline-start: 2px solid var(--nb-c-border);
+    color: var(--nb-c-text-muted);
+    font-size: var(--nb-type-label-sm-size);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  &__quote--detached {
+    font-style: italic;
+  }
+
+  &__pending {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--nb-spacing-8);
+    margin-block-end: var(--nb-spacing-8);
+
+    .thread__quote {
+      flex: 1;
     }
   }
 

@@ -30,6 +30,7 @@ declare module 'vue' {
     NbEmptyState: typeof import('@nubisco/ui/components/EmptyState')['NbEmptyState']
     NbField: typeof import('@nubisco/ui/components/Field')['NbField']
     NbFileUploader: typeof import('@nubisco/ui/components/FileUploader')['NbFileUploader']
+    NbFloatingToolbar: typeof import('@nubisco/ui/components/FloatingToolbar')['NbFloatingToolbar']
     NbForm: typeof import('@nubisco/ui/components/Form')['NbForm']
     NbGanttChart: typeof import('@nubisco/ui/components/Charts/GanttChart')['NbGanttChart']
     NbIcon: typeof import('@nubisco/ui/components/Icon')['NbIcon']

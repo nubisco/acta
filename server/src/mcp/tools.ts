@@ -58,7 +58,9 @@ const zDocTree = z.object({
 const zDocGet = z.object({
   ref: zDocSlug,
   at_version: z.number().int().optional(),
-  include: z.array(z.enum(['backlinks', 'versions', 'sections'])).optional(),
+  include: z
+    .array(z.enum(['backlinks', 'versions', 'sections', 'comments']))
+    .optional(),
 })
 
 export const MCP_TOOLS: IMcpTool[] = [
@@ -118,7 +120,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'doc_get',
     description:
-      'One document: frontmatter fields, markdown body, rev. include=["sections"] returns the heading map with per-section content hashes for surgical edits via doc_write patch_section; "versions" lists history; "backlinks" lists referrers. at_version reads an old revision.',
+      'One document: frontmatter fields, markdown body, rev. include=["sections"] returns the heading map with per-section content hashes for surgical edits via doc_write patch_section; "versions" lists history; "backlinks" lists referrers; "comments" lists comments, where an inline one carries its anchor (quoted text with prefix/suffix context), anchor_status (anchored, or detached when the quoted text is gone: the comment is kept either way) and resolved {by, ts} once resolved. at_version reads an old revision.',
     schema: zDocGet,
     handler: (ctx, args) => {
       const p = args as z.infer<typeof zDocGet>
@@ -131,7 +133,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'doc_write',
     description:
-      'Batch document mutations, idempotent via op_id. Ops: create, replace (needs if_rev), patch_section (needs section slug + if_hash from doc_get sections; conflicts only when the same section changed), append (no read needed, ideal for logs), move, rename, archive, delete (hard delete, leaf pages only). Section edits transfer only the changed section, not the whole document.',
+      'Batch document mutations, idempotent via op_id. Ops: create, replace (needs if_rev), patch_section (needs section slug + if_hash from doc_get sections; conflicts only when the same section changed), append (no read needed, ideal for logs), move, rename, archive, delete (hard delete, leaf pages only), comment (a page comment; add anchor {exact, prefix?, suffix?} to comment inline on quoted text, which must appear in the document, with prefix or suffix to pick one repeat; never changes the document), comment_update, comment_resolve (resolved: false reopens). Section edits transfer only the changed section, not the whole document.',
     schema: zDocWrite,
     write: true,
     handler: async (ctx, args) => {
