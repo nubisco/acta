@@ -50,7 +50,11 @@ import { sectionMap } from '@nubisco/acta-shared'
 import { CALLOUT_TYPES, calloutIconSvg as calloutIcon } from '@/lib/callouts'
 import { isDarkColor, parseColor } from '@/components/decorations/colors'
 import { highlight, resolveLanguage } from '@/components/decorations/highlight'
-import { itemChip, itemChipHtml } from '@/components/decorations/refs'
+import {
+  itemChip,
+  itemChipHtml,
+  refIconSvg,
+} from '@/components/decorations/refs'
 import {
   DRIVE_COLORS,
   DRIVE_LABELS,
@@ -158,9 +162,9 @@ function renderRefs(html: string): string {
       if (target.startsWith('@'))
         return `<span class="md__mention" data-handle="${esc(target.slice(1))}">${esc(target)}</span>`
       if (target.startsWith('space:'))
-        return `<a class="md__ref" data-ref-type="space" data-ref="${esc(target.slice(6))}" href="/s/${esc(target.slice(6))}">${esc(alias ?? target.slice(6))}</a>`
+        return `<a class="md__ref md__ref--link" data-ref-type="space" data-ref="${esc(target.slice(6))}" href="${esc(wpath(`/s/${target.slice(6)}`))}">${refIconSvg('space')}<span>${esc(alias ?? target.slice(6))}</span></a>`
       if (target.startsWith('doc:'))
-        return `<a class="md__ref" data-ref-type="doc" data-ref="${esc(target.slice(4))}" href="/docs/${esc(target.slice(4))}">${esc(alias ?? target.slice(4))}</a>`
+        return `<a class="md__ref md__ref--link" data-ref-type="doc" data-ref="${esc(target.slice(4))}" href="${esc(wpath(`/docs/${target.slice(4)}`))}">${refIconSvg('doc')}<span>${esc(alias ?? target.slice(4))}</span></a>`
       if (/^[A-Z][A-Z0-9]{1,4}-\d+$/.test(target))
         return `<button type="button" class="md__ref md__ref--item" data-ref-type="item" data-ref="${esc(target)}">${esc(alias ?? target)}</button>`
       return esc(raw)
@@ -393,8 +397,12 @@ function renderTaskLists(html: string): string {
 function renderCallouts(html: string): string {
   // markdown-it renders "> [!INFO] Title\n> body" as a blockquote whose first
   // paragraph starts with [!INFO]. Rewrite those blockquotes.
+  // The trailing `<br>` is consumed with the marker. With `breaks: true`,
+  // `> [!NOTE]\n> Body` is ONE paragraph holding a hard break, so leaving the
+  // break behind opened every callout with a blank line and stranded the icon
+  // on a row of its own.
   return html.replace(
-    /<blockquote>\s*<p>\[!(INFO|NOTE|TIP|IMPORTANT|WARNING|CAUTION|DANGER)\]([^<\n]*)/g,
+    /<blockquote>\s*<p>\[!(INFO|NOTE|TIP|IMPORTANT|WARNING|CAUTION|DANGER)\]([^<\n]*)(?:\s*<br>\s*)?/g,
     (_m, type: string, title: string) => {
       const kind = CALLOUT_TYPES[type]
       const heading = title.trim()
@@ -986,6 +994,25 @@ onMounted(() => {
     color: var(--nb-c-primary);
     text-decoration: none;
     border-block-end: 1px dashed currentColor;
+  }
+
+  /* A doc or space reference is a link, so it says so: a glyph, the pointer,
+     and a shape that matches the card chips beside it. It used to render as
+     a bare underlined word, indistinguishable from prose. */
+  :deep(.md__ref--link) {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3em;
+    cursor: pointer;
+    border-block-end: 1px solid
+      color-mix(in srgb, currentColor 40%, transparent);
+  }
+
+  :deep(.md__ref-icon) {
+    align-self: center;
+    inline-size: 0.95em;
+    block-size: 0.95em;
+    flex: none;
   }
 
   :deep(button.md__ref) {

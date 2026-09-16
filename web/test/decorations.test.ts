@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import MarkdownView from '@/components/MarkdownView.vue'
+import { setWorkspaceSlug } from '@/api/client'
 
 /**
  * Decorations are applied to the rendered DOM after the markdown pass, so a
@@ -278,5 +279,53 @@ describe('attachment chips never link to something that executes', () => {
     expect(view.find('.md__file').attributes('href')).toBe(
       'https://example.test/spec.pdf',
     )
+  })
+})
+
+/**
+ * Faults visible on the Icon System page and the manual.
+ */
+describe('callout body starts where it should', () => {
+  it('opens on the first line of text, not on a blank one', async () => {
+    // `breaks: true` makes `> [!NOTE]\n> Body` ONE paragraph holding a hard
+    // break. Leaving that break behind opened every callout in the workspace
+    // with an empty line and stranded the icon on a row of its own.
+    const view = await render('> [!NOTE]\n> Acta documents cannot yet embed.')
+    const p = view.find('.md__callout p')
+    expect(p.html()).not.toContain('<br>')
+    expect(p.text()).toBe('Acta documents cannot yet embed.')
+  })
+
+  it('keeps a break that belongs to the body', async () => {
+    const view = await render('> [!NOTE]\n> First line.\n> Second line.')
+    expect(view.find('.md__callout p').html()).toContain('<br>')
+  })
+})
+
+describe('doc and space references', () => {
+  it('links inside the workspace, not to a path that 404s', async () => {
+    // The href had no workspace segment, so it pointed at /docs/x while the
+    // application lives at /<workspace>/docs/x. Clicking worked because the
+    // handler intercepted it, but cmd-click and "open in new tab" did not,
+    // which is exactly how somebody opens a reference they want to keep.
+    setWorkspaceSlug('nubisco')
+    try {
+      const view = await render('See [[doc:handbook]].')
+      expect(view.find('a.md__ref').attributes('href')).toBe(
+        '/nubisco/docs/handbook',
+      )
+    } finally {
+      setWorkspaceSlug('')
+    }
+  })
+
+  it('shows a glyph, as the editor does for the same reference', async () => {
+    const view = await render('See [[doc:handbook]] and [[space:ENG]].')
+    expect(view.findAll('.md__ref-icon')).toHaveLength(2)
+  })
+
+  it('keeps the alias somebody wrote', async () => {
+    const view = await render('See [[doc:handbook|the handbook]].')
+    expect(view.find('a.md__ref').text()).toBe('the handbook')
   })
 })

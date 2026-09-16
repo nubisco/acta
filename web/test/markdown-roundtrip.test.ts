@@ -273,3 +273,32 @@ describe('unmodelled constructs are preserved, not corrupted', () => {
     expect(out).not.toContain('\\:')
   })
 })
+
+/**
+ * The two callout tables are easy to confuse and have very different jobs.
+ *
+ * One maps a style to the keyword written back into markdown, the other maps
+ * it to path data for the icon. Swapping them is not a visual glitch: the
+ * serializer starts writing an SVG path where `NOTE` belongs, and every
+ * callout in the workspace is destroyed on its next save. That happened once,
+ * while replacing the icon, and only a round-trip test caught it.
+ */
+describe('callout tables are not interchangeable', () => {
+  it('writes keywords, never artwork', async () => {
+    const { CALLOUT_KEYWORD, CALLOUT_ICON_PATHS } =
+      await import('@/lib/callouts')
+    for (const [kind, keyword] of Object.entries(CALLOUT_KEYWORD)) {
+      expect(keyword, kind).toMatch(/^[A-Z]+$/)
+    }
+    for (const [kind, d] of Object.entries(CALLOUT_ICON_PATHS)) {
+      expect(d, kind).toMatch(/^M[\d.,-]/)
+    }
+  })
+
+  it('has an icon for every keyword it can write', async () => {
+    const { CALLOUT_KEYWORD, CALLOUT_ICON_PATHS } =
+      await import('@/lib/callouts')
+    for (const kind of Object.keys(CALLOUT_KEYWORD))
+      expect(CALLOUT_ICON_PATHS[kind], kind).toBeTruthy()
+  })
+})
