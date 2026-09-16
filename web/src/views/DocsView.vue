@@ -33,7 +33,12 @@
           <NbButton size="sm" variant="secondary" @click="cancelEdit">
             Cancel
           </NbButton>
-          <NbButton size="sm" variant="primary" :loading="saving" @click="save">
+          <NbButton
+            size="sm"
+            variant="primary"
+            :loading="saving"
+            @click="save()"
+          >
             Save changes
           </NbButton>
         </template>
@@ -384,6 +389,28 @@ onBeforeUnmount(() => {
   releaseSurface?.()
 })
 
+/**
+ * Cmd/Ctrl+S saves while editing and keeps the editor open.
+ *
+ * There was no way to save from the keyboard, and page focus mode hides the
+ * topbar the Save button lives in, so somebody writing in focus mode had to
+ * leave it to save. Only while editing: a reader pressing it gets the
+ * browser's own behaviour. The browser's save dialog is suppressed even when
+ * there is nothing to save, because a download prompt in the middle of writing
+ * is never what the keystroke meant.
+ */
+function onSaveShortcut(event: KeyboardEvent): void {
+  if (!editing.value) return
+  if (event.key.toLowerCase() !== 's') return
+  if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey)
+    return
+  event.preventDefault()
+  if (saving.value || !isDirty.value) return
+  void save({ keepEditing: true })
+}
+onMounted(() => window.addEventListener('keydown', onSaveShortcut))
+onBeforeUnmount(() => window.removeEventListener('keydown', onSaveShortcut))
+
 const versionColumns = [
   { key: 'version', header: 'Version' },
   { key: 'by', header: 'By' },
@@ -442,13 +469,26 @@ async function reloadAttachments(): Promise<void> {
   }
 }
 
+/**
+ * Set while a keyboard save reloads the page, so the reload does not close the
+ * editor. The Save button means "save and close", and closing unmounts the
+ * editor and loses the caret. A save shortcut that did that would be worse
+ * than none. A flag rather than a parameter, because `watch(slug, loadDoc)`
+ * calls this with the new slug as its first argument.
+ */
+let keepEditorOpen = false
+
 async function loadDoc(): Promise<void> {
   if (!slug.value) {
     doc.value = null
     return
   }
+  // Read once, before the request: the flag belongs to the save that asked.
+  const keepOpen = keepEditorOpen
   try {
-    load.state.value = 'loading'
+    // Not while an editor is open. The loading state swaps the page for a
+    // placeholder, which unmounts the editor exactly as closing it would.
+    if (!keepOpen) load.state.value = 'loading'
     doc.value = await api.docGet(slug.value, [
       'backlinks',
       'versions',
@@ -456,11 +496,14 @@ async function loadDoc(): Promise<void> {
     ])
     viewedVersion.value = doc.value.rev
     viewedBody.value = doc.value.body
-    editing.value = false
+    if (!keepOpen) editing.value = false
     showHistory.value = false
     conflict.value = false
     load.state.value = 'ready'
   } catch (err) {
+    // With an editor open, never clear the page: the draft on screen is the
+    // only copy of whatever was typed since the save. Let the caller report it.
+    if (keepOpen) throw err
     doc.value = null
     load.state.value =
       err instanceof ApiHttpError && err.status === 403 ? 'forbidden' : 'error'
@@ -507,7 +550,7 @@ onBeforeRouteLeave(async () => {
   return leave
 })
 
-async function save(): Promise<void> {
+async function save(options: { keepEditing?: boolean } = {}): Promise<void> {
   if (!doc.value) return
   saving.value = true
   try {
@@ -524,7 +567,12 @@ async function save(): Promise<void> {
       conflict.value = true
       return
     }
-    await loadDoc()
+    keepEditorOpen = options.keepEditing === true
+    try {
+      await loadDoc()
+    } finally {
+      keepEditorOpen = false
+    }
   } catch {
     conflict.value = true
   } finally {

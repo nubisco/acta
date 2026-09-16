@@ -401,3 +401,124 @@ describe('round trip', () => {
     expect(docGet).toHaveBeenCalledTimes(1)
   })
 })
+
+/**
+ * Saving from the keyboard.
+ *
+ * There was no save shortcut at all, and page focus mode hides the topbar the
+ * Save button lives in, so somebody writing in focus mode had to leave it to
+ * save. The button means "save and close". The shortcut must not: closing
+ * unmounts the editor and loses the caret, which would make it worse than no
+ * shortcut.
+ */
+describe('Cmd/Ctrl+S', () => {
+  /** Dispatches the keystroke and says whether the page claimed it. */
+  function pressSave(init: KeyboardEventInit = { metaKey: true }): boolean {
+    const event = new KeyboardEvent('keydown', {
+      key: 's',
+      code: 'KeyS',
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    })
+    window.dispatchEvent(event)
+    return event.defaultPrevented
+  }
+
+  async function editPage(): Promise<VueWrapper> {
+    const view = await openPage()
+    const edit = view.findAll('button').find((b) => b.text() === 'Edit')!
+    await edit.trigger('click')
+    await flushPromises()
+    return view
+  }
+
+  it('saves the draft and keeps the same editor open', async () => {
+    const view = await editPage()
+    const before = view.get('.ProseMirror').element
+    editorOf(view).commands.insertContentAt(1, 'Edited. ')
+    await flushPromises()
+
+    expect(pressSave()).toBe(true)
+    await flushPromises()
+
+    const replaces = docWrite.mock.calls
+      .flatMap(([ops]) => ops as { op: string; body?: string }[])
+      .filter((op) => op.op === 'replace')
+    expect(replaces).toHaveLength(1)
+    expect(replaces[0].body).toContain('Edited.')
+    // Same element: the editor was never unmounted, so the caret survives.
+    expect(view.get('.ProseMirror').element).toBe(before)
+  })
+
+  it('works with Ctrl as well as Cmd', async () => {
+    const view = await editPage()
+    editorOf(view).commands.insertContentAt(1, 'Edited. ')
+    await flushPromises()
+    expect(pressSave({ ctrlKey: true })).toBe(true)
+    await flushPromises()
+    expect(docWrite).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves in page focus mode, where the Save button is hidden', async () => {
+    const view = await editPage()
+    await button(view, 'Focus mode').trigger('click')
+    await flushPromises()
+    editorOf(view).commands.insertContentAt(1, 'Edited. ')
+    await flushPromises()
+
+    expect(pressSave()).toBe(true)
+    await flushPromises()
+    expect(bodiesWritten()).toHaveLength(1)
+  })
+
+  it('writes nothing when nothing changed, and still keeps the browser dialog away', async () => {
+    await editPage()
+    expect(pressSave()).toBe(true)
+    await flushPromises()
+    expect(docWrite).not.toHaveBeenCalled()
+  })
+
+  it('leaves the keystroke to the browser while reading', async () => {
+    await openPage()
+    expect(pressSave()).toBe(false)
+    await flushPromises()
+    expect(docWrite).not.toHaveBeenCalled()
+  })
+
+  it('ignores Shift and Alt variants, which mean something else', async () => {
+    const view = await editPage()
+    editorOf(view).commands.insertContentAt(1, 'Edited. ')
+    await flushPromises()
+    expect(pressSave({ metaKey: true, shiftKey: true })).toBe(false)
+    expect(pressSave({ metaKey: true, altKey: true })).toBe(false)
+    await flushPromises()
+    expect(docWrite).not.toHaveBeenCalled()
+  })
+})
+
+describe('Cmd/Ctrl+S when the page cannot be refreshed', () => {
+  it('keeps the page and the draft on screen rather than clearing them', async () => {
+    const view = await openPage()
+    const edit = view.findAll('button').find((b) => b.text() === 'Edit')!
+    await edit.trigger('click')
+    await flushPromises()
+    editorOf(view).commands.insertContentAt(1, 'Unsaved thought. ')
+    await flushPromises()
+
+    // The write lands, the refresh after it fails.
+    docGet.mockRejectedValueOnce(new Error('network down'))
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 's',
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    await flushPromises()
+
+    expect(view.find('.ProseMirror').exists()).toBe(true)
+    expect(markdownOf(editorOf(view))).toContain('Unsaved thought.')
+  })
+})
