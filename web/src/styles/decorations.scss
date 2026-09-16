@@ -144,6 +144,8 @@
     outline-offset: 1px;
     border-radius: var(--nb-radius-xs);
   }
+}
+
 /* Maths and diagrams. Shared for the same reason everything else here is: a
    formula that renders in the document and turns back into `$\alpha$` the
    moment somebody clicks into the page reads as damage, not as a mode. */

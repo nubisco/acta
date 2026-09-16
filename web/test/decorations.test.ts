@@ -347,6 +347,15 @@ async function settle(
     const el = view.element.querySelector(selector)
     if (el && done(el)) return el
     await flushPromises()
+    /*
+     * Real time, not just a microtask drain. `flushPromises` settles what is
+     * already queued, and sixty of them can finish in well under a
+     * millisecond, so the loop used to expire before a dynamic import had
+     * been read from disk. That made this pass on a warm module cache and
+     * fail on a cold one, which is the worst kind of test: it fails on
+     * somebody else's machine, or on the first run after a merge.
+     */
+    await new Promise((resolve) => setTimeout(resolve, 5))
   }
   throw new Error(`${selector} never settled`)
 }
