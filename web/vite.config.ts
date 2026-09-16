@@ -44,6 +44,26 @@ export default defineConfig({
     // passes because the environment shrugged is worse than no test.
     environment: 'jsdom',
     globals: true,
+    /*
+     * One test file at a time.
+     *
+     * A mounted editor holds a debounced timer for the bubble menu, and
+     * tippy.js cannot run under jsdom anyway (no layout, and no `exports`
+     * map, so the CommonJS build is what loads and its `default` is not the
+     * function the importer expects). While the module that owns the timer is
+     * alive this is harmless. When another worker tears its environment down
+     * first, the timer fires into the wreckage and lands as an unhandled
+     * error that fails the whole run rather than as a failing assertion.
+     *
+     * Measured: the suite passes with zero errors run serially and reports
+     * seven run in parallel, and each test file is clean on its own. Every
+     * component is unmounted and every bare editor destroyed, so this is the
+     * teardown window rather than a leak of ours.
+     *
+     * The cost is about eight seconds on a twelve second suite. That is worth
+     * paying for a gate that means what it says.
+     */
+    fileParallelism: false,
     setupFiles: ['./test/setup.ts'],
     include: ['test/**/*.test.ts'],
     server: {
