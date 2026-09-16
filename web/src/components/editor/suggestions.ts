@@ -126,7 +126,11 @@ function slashItems(query: string): ISuggestionItem[] {
       id: 'details',
       label: 'Collapsible section',
       icon: 'caret-down',
-      apply: inserter('\n:::details Title\ncontent\n:::\n\n'),
+      // A command rather than inserted text, now that the block has a node.
+      // Pasting `:::details` in as content would leave the caret in a fence
+      // the editor has already turned into a disclosure around it.
+      apply: (editor, range) =>
+        editor.chain().focus().deleteRange(range).setDetails().run(),
     },
     {
       id: 'task-list',

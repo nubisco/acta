@@ -71,7 +71,9 @@ On top of CommonMark and GFM:
 > Callouts, in the GitHub style.
 
 :::details Click to expand
-Collapsible content.
+
+Collapsible content, including lists, code and another toggle.
+
 :::
 
 See [[ENG-142]] and [[doc:manual/vision|the vision]].

@@ -49,6 +49,7 @@ import { safeUrl } from '@/lib/safeUrl'
 import { imageClass, imageStyle, parseImageAttrs } from '@/lib/imageAttrs'
 import { sectionMap } from '@nubisco/acta-shared'
 import { CALLOUT_TYPES, calloutIconSvg as calloutIcon } from '@/lib/callouts'
+import { detailsPlugin } from '@/lib/details'
 import { isDarkColor, parseColor } from '@/components/decorations/colors'
 import { highlight, resolveLanguage } from '@/components/decorations/highlight'
 import {
@@ -134,7 +135,9 @@ const docNav = inject(DOC_NAV_KEY, null)
 // separate fields with single newlines. CommonMark would join those into one
 // paragraph, so "**From:** a\n**Email:** b" ran together on one line. Trello,
 // Slack and GitHub comments all break on a single newline for the same reason.
-const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
+const md = new MarkdownIt({ html: false, linkify: true, breaks: true }).use(
+  detailsPlugin,
+)
 
 /**
  * Enhanced-Markdown extensions (design-spec §2), applied as source and output
@@ -449,35 +452,11 @@ function renderCallouts(html: string): string {
 }
 
 const html = computed(() => {
-  const source = props.source
-  // :::details handling: split into segments.
-  const parts: string[] = []
-  const lines = source.split('\n')
-  let buffer: string[] = []
-  let details: { title: string; lines: string[] } | null = null
-  const flush = () => {
-    if (buffer.length > 0) parts.push(md.render(buffer.join('\n')))
-    buffer = []
-  }
-  for (const line of lines) {
-    const open = /^:::details\s+(.*)$/.exec(line)
-    if (open && !details) {
-      flush()
-      details = { title: open[1], lines: [] }
-    } else if (line.trim() === ':::' && details) {
-      parts.push(
-        `<details class="md__details"><summary>${esc(details.title)}</summary>${md.render(details.lines.join('\n'))}</details>`,
-      )
-      details = null
-    } else if (details) {
-      details.lines.push(line)
-    } else {
-      buffer.push(line)
-    }
-  }
-  if (details) buffer.push(`:::details ${details.title}`, ...details.lines)
-  flush()
-  let out = parts.join('')
+  // Toggles are a markdown-it block rule now (see lib/details), shared with
+  // the editor. It replaced a line-by-line split of the source that ran around
+  // the parser: it could not nest, it took the first `:::` as the end even
+  // inside a code fence, and it was a second opinion about what the syntax is.
+  let out = md.render(props.source)
   out = renderTaskLists(out)
   out = renderCallouts(out)
   out = renderRefs(out)
@@ -993,17 +972,7 @@ onMounted(() => {
     color: var(--callout-accent);
   }
 
-  :deep(.md__details) {
-    margin-block: var(--nb-spacing-8);
-    border: 1px solid var(--nb-c-border);
-    border-radius: var(--nb-radius-sm);
-    padding: var(--nb-spacing-8);
-
-    summary {
-      cursor: pointer;
-      font-weight: var(--nb-type-label-lg-weight);
-    }
-  }
+  /* Toggle styling is shared with the editor: styles/decorations.scss */
 
   :deep(.md__ref) {
     color: var(--nb-c-primary);

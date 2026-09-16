@@ -139,6 +139,84 @@ describe('MarkdownEditor decorations', () => {
     // write a dot into somebody's file.
     expect(await roundTrip('Colors: `#69bb63`')).toBe('Colors: `#69bb63`')
   })
+
+  it('shows a toggle as a disclosure, with the title in the summary', async () => {
+    const view = await render(':::details How it works\n\nSome body.\n\n:::')
+    const el = view.element.querySelector('.md__details')
+    expect(el).not.toBeNull()
+    // Not the literal fence it used to show.
+    expect(view.text()).not.toContain(':::')
+    expect(el?.querySelector('summary')?.textContent?.trim()).toBe(
+      'How it works',
+    )
+    expect(el?.textContent).toContain('Some body.')
+    // The title is document text, so the caret can go into it and the words
+    // can be edited. Only the control beside it is inert.
+    expect(
+      el?.querySelector('summary')?.closest('[contenteditable="false"]'),
+    ).toBeNull()
+    expect(el?.querySelector('.md__details-caret')).not.toBeNull()
+    view.unmount()
+  })
+
+  it('shows a nested toggle inside its parent', async () => {
+    const view = await render(
+      ':::details Outer\n\n:::details Inner\n\nDeep.\n\n:::\n\n:::',
+    )
+    expect(
+      view.element.querySelectorAll('.md__details .md__details').length,
+    ).toBe(1)
+    view.unmount()
+  })
+})
+
+/**
+ * Opening and closing a toggle while editing.
+ *
+ * Whether a section is open is how somebody is reading the document, not
+ * something the document says. If it were a node attribute, every click on a
+ * caret would be a transaction, the editor would emit an update, and a page
+ * nobody edited would come back dirty. So the state lives in the node view
+ * and is asserted to reach neither the markdown nor the document.
+ */
+describe('MarkdownEditor toggle state is not content', () => {
+  const source = ':::details How it works\n\nSome body.\n\n:::'
+
+  it('opens and closes without touching the markdown', async () => {
+    const view = mount(MarkdownEditor, {
+      props: { modelValue: source },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    const editor = (
+      view.vm as unknown as {
+        editor: {
+          storage: { markdown: { getMarkdown(): string } }
+          state: { doc: { toJSON(): unknown } }
+        }
+      }
+    ).editor
+    const before = editor.state.doc.toJSON()
+    const emittedBefore = view.emitted('update:modelValue')?.length ?? 0
+
+    const caret = view.element.querySelector(
+      '.md__details-caret',
+    ) as HTMLElement
+    expect(caret).not.toBeNull()
+    expect(caret.getAttribute('aria-expanded')).toBe('false')
+    caret.click()
+    await flushPromises()
+
+    expect(caret.getAttribute('aria-expanded')).toBe('true')
+    expect(
+      view.element.querySelector('.md__details')?.getAttribute('data-open'),
+    ).toBe('true')
+    // Nothing was written: not the document, not the markdown, not an event.
+    expect(editor.state.doc.toJSON()).toEqual(before)
+    expect(editor.storage.markdown.getMarkdown().trim()).toBe(source)
+    expect(view.emitted('update:modelValue')?.length ?? 0).toBe(emittedBefore)
+    view.unmount()
+  })
 })
 
 /**

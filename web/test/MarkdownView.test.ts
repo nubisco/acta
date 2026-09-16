@@ -59,6 +59,69 @@ describe('MarkdownView', () => {
     expect(html).toContain('type="checkbox"')
   })
 
+  it('renders a toggle as a real disclosure', () => {
+    const view = render(':::details How it works\n\nSome body text.\n\n:::')
+    const el = view.element.querySelector('details')
+    expect(el).not.toBeNull()
+    expect(el?.querySelector('summary')?.textContent?.trim()).toBe(
+      'How it works',
+    )
+    // Closed to begin with, which is the whole point of a toggle.
+    expect(el?.hasAttribute('open')).toBe(false)
+    expect(el?.textContent).toContain('Some body text.')
+  })
+
+  it('renders markdown inside a toggle rather than its source', () => {
+    const view = render(':::details Steps\n\n- one\n- two\n\n:::')
+    expect(view.element.querySelector('details ul li')).not.toBeNull()
+    expect(view.text()).not.toContain(':::')
+  })
+
+  it('nests toggles', () => {
+    const view = render(
+      ':::details Outer\n\n:::details Inner\n\nDeep.\n\n:::\n\n:::',
+    )
+    const outer = view.element.querySelector('details')
+    expect(outer?.querySelector('summary')?.textContent?.trim()).toBe('Outer')
+    const inner = outer?.querySelector('details')
+    expect(inner?.querySelector('summary')?.textContent?.trim()).toBe('Inner')
+    expect(view.element.querySelectorAll('details').length).toBe(2)
+  })
+
+  it('still decorates what is inside a toggle', () => {
+    // The callout, reference and Drive passes run over the rendered HTML, so
+    // a construct inside a toggle must come out as decorated as one outside.
+    const html = render(
+      ':::details Detail\n\n> [!TIP]\n> Nested advice.\n\nSee [[SU-12]].\n\n:::',
+    ).html()
+    expect(html).toContain('md__callout--tip')
+    expect(html).toContain('data-ref="SU-12"')
+  })
+
+  it('leaves an unterminated toggle as the text somebody typed', () => {
+    // Half a toggle is not a toggle. Swallowing the rest of the page into a
+    // block nobody closed is worse than showing the marker.
+    const view = render(':::details Unclosed\n\nBody.')
+    expect(view.element.querySelector('details')).toBeNull()
+    expect(view.text()).toContain(':::details Unclosed')
+  })
+
+  it('does not treat a fence inside a code block as the end of a toggle', () => {
+    const view = render(':::details How to close one\n\n```md\n:::\n```\n\n:::')
+    expect(view.element.querySelectorAll('details').length).toBe(1)
+    expect(view.element.querySelector('details pre')).not.toBeNull()
+  })
+
+  it('does not render markup smuggled through a toggle title', () => {
+    const view = render(
+      ':::details <img src=x onerror=alert(1)>\n\nBody.\n\n:::',
+    )
+    expect(view.find('img').exists()).toBe(false)
+    expect(view.element.querySelector('summary')?.textContent).toContain(
+      'onerror',
+    )
+  })
+
   it('does not render raw HTML from user content', () => {
     // markdown-it runs with html:false, so the markup is escaped into text.
     // The assertion is that no element was created, not that the characters

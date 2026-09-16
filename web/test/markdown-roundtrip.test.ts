@@ -28,6 +28,7 @@ import { Emphasis } from '@/components/editor/nodes/Emphasis'
 import { Ref } from '@/components/editor/nodes/Ref'
 import { Embed } from '@/components/editor/nodes/Embed'
 import { Image } from '@/components/editor/nodes/Image'
+import { Details } from '@/components/editor/nodes/Details'
 
 function roundtrip(md: string): string {
   const editor = new Editor({
@@ -49,6 +50,7 @@ function roundtrip(md: string): string {
       Ref,
       Embed,
       Image,
+      ...Details,
       Markdown.configure({
         html: false,
         linkify: true,
@@ -256,15 +258,16 @@ describe('references survive a save', () => {
 })
 
 /**
- * Constructs the editor does not model yet.
+ * Toggles (`:::details`).
  *
- * `:::details` is not used in any document in the workspace, so it has no
- * node and still appears as its literal text while editing. That is a gap in
- * the editing experience, not damage: the point of this test is that it comes
- * back byte-identical, so nobody's collapsible section is destroyed by a save
- * while it waits for a node view.
+ * This block used to be the one enhanced construct with no node at all. It
+ * survived a save only because nothing claimed it, which is a bad kind of
+ * safety: the text came back because it was never understood, and the first
+ * thing to touch it would have destroyed it exactly as the callout marker was
+ * destroyed. It now has a node, and the assertion it was pinned by (the same
+ * source, back byte-identical) is kept and tightened.
  */
-describe('unmodelled constructs are preserved, not corrupted', () => {
+describe('toggles survive a save', () => {
   it('round-trips a details block unchanged', () => {
     const src = ':::details How it works\n\nSome body text.\n\n:::'
     const out = roundtrip(src)
@@ -273,6 +276,104 @@ describe('unmodelled constructs are preserved, not corrupted', () => {
     expect(out).toContain(':::')
     // Nothing escaped, which is what went wrong with callouts.
     expect(out).not.toContain('\\:')
+    expect(out).toBe(src)
+  })
+
+  it('keeps a toggle with no title', () => {
+    const src = ':::details\n\nBody.\n\n:::'
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  /**
+   * The tight form is what the insert menu used to write and what anybody
+   * typing one would produce. `breaks: true` turns it into a SINGLE paragraph
+   * holding two hard breaks, measured, not assumed, so it has to be claimed
+   * before inline parsing or it is not recoverable at all.
+   */
+  it('normalises the tight form and is then stable', () => {
+    const once = roundtrip(':::details Title\ncontent\n:::')
+    expect(once).toBe(':::details Title\n\ncontent\n\n:::')
+    expect(roundtrip(once)).toBe(once)
+  })
+
+  it('keeps lists, a code block and a callout inside a toggle', () => {
+    const src = [
+      ':::details Everything at once',
+      '',
+      '- one',
+      '- two',
+      '',
+      '```ts',
+      'const x = 1',
+      '```',
+      '',
+      '> [!TIP]',
+      '> Nested advice.',
+      '',
+      ':::',
+    ].join('\n')
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('keeps a table inside a toggle', () => {
+    const src = [
+      ':::details Numbers',
+      '',
+      '| Name | Value |',
+      '| --- | --- |',
+      '| Spec | 2 |',
+      '',
+      ':::',
+    ].join('\n')
+    const out = roundtrip(src)
+    expect(out).toContain('| Spec | 2 |')
+    expect(roundtrip(out)).toBe(out)
+  })
+
+  it('nests', () => {
+    const src = [
+      ':::details Outer',
+      '',
+      'Before.',
+      '',
+      ':::details Inner',
+      '',
+      'Deep body.',
+      '',
+      ':::',
+      '',
+      ':::',
+    ].join('\n')
+    const out = roundtrip(src)
+    expect(out).toBe(src)
+    expect(roundtrip(out)).toBe(out)
+  })
+
+  it('leaves a lone closing fence as the text it is', () => {
+    // An unterminated opener is not a toggle. It stays prose rather than
+    // swallowing the rest of the document into a block nobody closed.
+    const src = ':::details Unclosed\n\nBody.'
+    const out = roundtrip(src)
+    expect(out).toContain(':::details Unclosed')
+    expect(out).not.toContain('\\:')
+  })
+
+  it('does not treat a fence inside a code block as the end of the toggle', () => {
+    const src = [
+      ':::details How to close one',
+      '',
+      '```md',
+      ':::',
+      '```',
+      '',
+      ':::',
+    ].join('\n')
+    expect(roundtrip(src)).toBe(src)
+  })
+
+  it('is idempotent, so saving twice changes nothing', () => {
+    const src = ':::details How it works\n\nSome body text.\n\n:::'
+    expect(roundtrip(roundtrip(src))).toBe(roundtrip(src))
   })
 })
 

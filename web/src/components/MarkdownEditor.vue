@@ -56,6 +56,7 @@ import { Ref } from '@/components/editor/nodes/Ref'
 import { Embed } from '@/components/editor/nodes/Embed'
 import { Image } from '@/components/editor/nodes/Image'
 import ImageTools from '@/components/editor/ImageTools.vue'
+import { Details } from '@/components/editor/nodes/Details'
 import { ColorSwatches } from '@/components/editor/decorations'
 
 const props = defineProps<{
@@ -148,9 +149,9 @@ function imagesFrom(list: FileList | null | undefined): File[] {
 
 /**
  * The document IS the editing surface (Typora-style): markdown in, markdown
- * out, WYSIWYG in between. Constructs the editor cannot represent (callouts,
- * :::details, [[refs]]) survive as their literal text, so the enhanced-
- * Markdown contract is never destroyed by an edit.
+ * out, WYSIWYG in between. Every enhanced construct the reader renders has a
+ * node here (callouts, toggles, [[refs]], embeds, images), because a node the
+ * schema does not know is a node the serializer cannot write back.
  */
 const toast = useToast()
 
@@ -176,6 +177,10 @@ const editor = new Editor({
     // Before the typeaheads, so `> [!NOTE] ` is claimed as a callout rather
     // than left to the blockquote it came from.
     Callout,
+    // `:::details` is a block the schema has to know, for the same reason as
+    // the tables above: unclaimed, it travelled as literal fence text that any
+    // edit could escape or lose.
+    ...Details,
     Emphasis,
     Ref,
     Embed,
