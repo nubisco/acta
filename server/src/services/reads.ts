@@ -419,9 +419,16 @@ export async function docTree(ctx: ICtx, root?: string, depth = 10) {
     rev: number
     updated: number
   }[] = []
+  // Each page is listed at most once. Moves refuse a cycle now, but a parent
+  // chain that already loops (left by an older build) would otherwise repeat
+  // for as long as `depth` allows, and `depth` comes straight from a query
+  // string, where `NaN` never compares greater than anything.
+  const visited = new Set<string>()
   const walk = (parentId: string | null, level: number) => {
     if (level > depth) return
     for (const node of all.filter((d) => d.parent_id === parentId)) {
+      if (visited.has(node.id)) continue
+      visited.add(node.id)
       out.push({
         slug: node.slug,
         title: node.title,

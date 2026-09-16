@@ -68,6 +68,33 @@ async function syncDocDerived(
   }
 }
 
+/**
+ * Whether `ancestorId` is `docId` itself or anywhere on the parent chain above
+ * it.
+ *
+ * One recursive query rather than a loop of lookups, so it costs one round
+ * trip on D1 however deep the tree is. `UNION` (not `UNION ALL`) is what bounds
+ * it: SQLite never queues a row it has already queued, so a chain that already
+ * loops back on itself stops after visiting each page once instead of walking
+ * round forever.
+ */
+async function isAncestorOrSelf(
+  ctx: ICtx,
+  ancestorId: string,
+  docId: string,
+): Promise<boolean> {
+  const rows = await ctx.db.query<{ hit: number }>(
+    `WITH RECURSIVE chain(id, parent_id) AS (
+       SELECT id, parent_id FROM document WHERE id = ? AND workspace_id = ?
+       UNION
+       SELECT d.id, d.parent_id FROM document d JOIN chain ON d.id = chain.parent_id
+     )
+     SELECT 1 AS hit FROM chain WHERE id = ? LIMIT 1`,
+    [docId, ctx.workspaceId, ancestorId],
+  )
+  return rows.length > 0
+}
+
 async function applyDocOp(
   ctx: ICtx,
   op: TDocOp,
@@ -330,6 +357,11 @@ async function applyDocOp(
           const parent = await docBySlug(ctx, op.parent)
           if (parent.id === doc.id)
             throw new ApiError(400, 'doc cannot be its own parent')
+          if (await isAncestorOrSelf(ctx, doc.id, parent.id))
+            throw new ApiError(
+              400,
+              `cannot move ${doc.slug} into ${parent.slug}: that is one of its own subpages`,
+            )
           parentId = parent.id
         }
       }
