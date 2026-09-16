@@ -1,3 +1,10 @@
+# [1.24.0](https://github.com/nubisco/acta/compare/v1.23.0...v1.24.0) (2026-09-16)
+
+
+### Features
+
+* **docs:** inline comments anchored to a text range ([0bb8f24](https://github.com/nubisco/acta/commit/0bb8f2447de801d9a511393df37efbeaabb56e9d))
+
 # [1.23.0](https://github.com/nubisco/acta/compare/v1.22.2...v1.23.0) (2026-09-16)
 
 
