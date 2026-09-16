@@ -45,8 +45,10 @@ import { useRefCards } from '@/stores/refs'
 import { chartColorFor } from '@/lib/colors'
 import { DOC_NAV_KEY } from '@/lib/keys'
 import { wpath } from '@/lib/paths'
+import { sectionMap } from '@nubisco/acta-shared'
 import { CALLOUT_TYPES, calloutIconSvg as calloutIcon } from '@/lib/callouts'
 import { isDarkColor, parseColor } from '@/components/decorations/colors'
+import { highlight, resolveLanguage } from '@/components/decorations/highlight'
 import { itemChip, itemChipHtml } from '@/components/decorations/refs'
 import {
   DRIVE_COLORS,
@@ -269,6 +271,108 @@ function formatSize(bytes: number | undefined): string {
   return `${value < 10 && unit > 0 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`
 }
 
+/**
+ * Code blocks get a language label, a copy button, and highlighting.
+ *
+ * Applied to the rendered DOM rather than the markdown, because the language
+ * is already on the element as the class markdown-it puts there, and because
+ * highlighting arrives asynchronously and must be able to land on a block
+ * that is already on screen.
+ *
+ * Copy is the part worth having whatever else happens: it works before any
+ * grammar has loaded, and it copies the source rather than the highlighted
+ * markup.
+ */
+async function hydrateCodeBlocks(): Promise<void> {
+  const root = rootEl.value
+  if (!root) return
+  for (const pre of root.querySelectorAll<HTMLElement>('pre')) {
+    if (pre.dataset.decorated === '1') continue
+    if (pre.classList.contains('md__mermaid')) continue
+    const code = pre.querySelector('code')
+    if (!code) continue
+    pre.dataset.decorated = '1'
+    pre.classList.add('md__code')
+
+    const written = /language-([\w+#-]+)/.exec(code.className)?.[1] ?? ''
+    const source = code.textContent ?? ''
+
+    const bar = document.createElement('div')
+    bar.className = 'md__code-bar'
+    // A fence with no language still gets a bar, because the copy button is
+    // the reason most people look at one.
+    const label = document.createElement('span')
+    label.className = 'md__code-lang'
+    label.textContent = written || 'text'
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'md__code-copy'
+    button.textContent = 'Copy'
+    button.setAttribute('aria-label', 'Copy code')
+    button.addEventListener('click', () => {
+      void navigator.clipboard.writeText(source).then(
+        () => {
+          button.textContent = 'Copied'
+          setTimeout(() => (button.textContent = 'Copy'), 1500)
+        },
+        () => (button.textContent = 'Press ctrl+C'),
+      )
+    })
+    bar.append(label, button)
+    pre.prepend(bar)
+
+    const lang = resolveLanguage(written)
+    if (!lang) continue
+    const html = await highlight(source, lang)
+    // The block may have been replaced while the grammar was in flight, in
+    // which case this result belongs to a document nobody is looking at.
+    if (!html || !pre.isConnected) continue
+    const holder = document.createElement('div')
+    holder.innerHTML = html
+    const highlighted = holder.querySelector('code')
+    if (highlighted) code.replaceWith(highlighted)
+  }
+}
+
+/**
+ * Headings get an id and a link you can copy.
+ *
+ * The slug comes from the shared `sectionMap`, which is the same one
+ * `doc_write patch_section` addresses sections by, including how it
+ * de-duplicates a repeated heading with `~2`. Computing a second slug here
+ * would produce links that look right and point at a section the API does not
+ * recognise, which is worse than having no anchors.
+ */
+function hydrateHeadings(): void {
+  const root = rootEl.value
+  if (!root) return
+  const sections = sectionMap(props.source)
+  const headings = root.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6')
+  headings.forEach((el, index) => {
+    if (el.dataset.anchored === '1') return
+    const section = sections[index]
+    if (!section) return
+    el.dataset.anchored = '1'
+    el.id = section.slug
+    el.classList.add('md__heading')
+
+    const link = document.createElement('button')
+    link.type = 'button'
+    link.className = 'md__anchor'
+    link.title = 'Copy link to this section'
+    link.setAttribute('aria-label', `Copy link to ${section.heading}`)
+    link.textContent = '#'
+    link.addEventListener('click', () => {
+      const url = `${window.location.origin}${window.location.pathname}#${section.slug}`
+      void navigator.clipboard.writeText(url).then(() => {
+        link.classList.add('md__anchor--copied')
+        setTimeout(() => link.classList.remove('md__anchor--copied'), 1200)
+      })
+    })
+    el.append(link)
+  })
+}
+
 function renderTaskLists(html: string): string {
   // GFM task syntax: "- [ ] text" / "- [x] text". markdown-it leaves the
   // brackets as literal text at the start of the list item.
@@ -461,6 +565,8 @@ watch(
       hydrateItemRefs()
       hydrateMentions()
       hydrateColors()
+      void hydrateCodeBlocks()
+      hydrateHeadings()
       void measure()
     }),
   { immediate: true, flush: 'post' },
@@ -621,6 +727,111 @@ onMounted(() => {
   :deep(.md__color-dot--light) {
     box-shadow: inset 0 0 0 1px
       color-mix(in srgb, currentColor 55%, transparent);
+  }
+
+  /* The bar sits inside the block so it scrolls with nothing and stays put
+     when the code scrolls sideways. */
+  /* The anchor appears on hover or focus, so a heading reads as a heading
+     until somebody wants the link. It stays visible once focused, or it
+     cannot be reached from the keyboard. */
+  :deep(.md__heading) {
+    scroll-margin-block-start: var(--nb-spacing-32);
+  }
+
+  :deep(.md__anchor) {
+    margin-inline-start: var(--nb-spacing-8);
+    padding: 0 var(--nb-spacing-4);
+    background: none;
+    border: 0;
+    color: var(--nb-c-text-subtle);
+    font: inherit;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 120ms ease;
+
+    &:focus-visible {
+      opacity: 1;
+      outline: 1px solid var(--nb-c-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+
+  :deep(.md__heading:hover) .md__anchor {
+    opacity: 1;
+  }
+
+  :deep(.md__anchor--copied) {
+    opacity: 1;
+    color: var(--nb-c-success);
+  }
+
+  :deep(.md__code) {
+    position: relative;
+    padding-block-start: var(--nb-spacing-32);
+  }
+
+  :deep(.md__code-bar) {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--nb-spacing-8);
+    padding: var(--nb-spacing-4) var(--nb-spacing-8);
+    border-block-end: 1px solid var(--nb-c-border);
+    background: var(--nb-c-surface);
+    border-start-start-radius: var(--nb-radius-sm);
+    border-start-end-radius: var(--nb-radius-sm);
+  }
+
+  :deep(.md__code-lang) {
+    color: var(--nb-c-text-subtle);
+    font-family: var(--nb-font-family-mono);
+    font-size: var(--nb-type-code-sm-size);
+  }
+
+  :deep(.md__code-copy) {
+    padding: 0 var(--nb-spacing-8);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--nb-radius-xs);
+    color: var(--nb-c-text-subtle);
+    font: inherit;
+    font-size: var(--nb-type-body-sm-size);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--nb-c-text);
+      border-color: var(--nb-c-border);
+    }
+
+    &:focus-visible {
+      outline: 1px solid var(--nb-c-focus-ring);
+      outline-offset: 1px;
+    }
+  }
+
+  /* Shiki emits both themes as custom properties, so the same markup follows
+     the page into dark mode without being highlighted again. */
+  :deep(.shiki),
+  :deep(.shiki span) {
+    color: var(--nb-shiki-light);
+    background-color: transparent;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :deep(.shiki),
+    :deep(.shiki span) {
+      color: var(--nb-shiki-dark);
+    }
+  }
+
+  :root[data-theme='dark'] & {
+    :deep(.shiki),
+    :deep(.shiki span) {
+      color: var(--nb-shiki-dark);
+    }
   }
 
   :deep(code) {
