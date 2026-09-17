@@ -319,3 +319,39 @@ describe('who may move', () => {
     expect(await outline()).toEqual(before)
   })
 })
+
+/**
+ * Reading a document says where it actually lives.
+ *
+ * A slug keeps the path it was created with, so after a move it no longer
+ * describes the page's place in the tree. Anything that needs the parent (the
+ * app, after deleting a page, and an agent working out where a page sits) has
+ * to be told it, not left to derive it from the slug.
+ */
+describe('doc_get reports the real parent', () => {
+  async function parentOf(slug: string): Promise<unknown> {
+    const res = await app.request(`/api/v1/docs/${slug}`, {
+      headers: as(writer),
+    })
+    expect(res.status).toBe(200)
+    return ((await res.json()) as { parent?: unknown }).parent
+  }
+
+  it('returns the parent slug, or null at the top level', async () => {
+    await create('home', 'Home')
+    await create('home/manual', 'Manual', 'home')
+    expect(await parentOf('home/manual')).toBe('home')
+    expect(await parentOf('home')).toBeNull()
+  })
+
+  it('follows a move rather than the slug', async () => {
+    await create('home', 'Home')
+    await create('other', 'Other')
+    await create('home/manual', 'Manual', 'home')
+    expect((await move({ ref: 'home/manual', parent: 'other' })).ok).toBe(true)
+    // The slug still says home, the page now lives under other.
+    expect(await parentOf('home/manual')).toBe('other')
+    expect((await move({ ref: 'home/manual', parent: null })).ok).toBe(true)
+    expect(await parentOf('home/manual')).toBeNull()
+  })
+})

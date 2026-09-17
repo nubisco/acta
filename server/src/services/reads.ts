@@ -500,9 +500,18 @@ export async function docGet(
       rev = v[0].rev
     }
   }
+  // The real parent, not one read off the slug: a slug keeps the path it was
+  // created with, so after a move it no longer says where the page lives.
+  const parentRows = doc.parent_id
+    ? await ctx.db.query<{ slug: string }>(
+        'SELECT slug FROM document WHERE id = ?',
+        [doc.parent_id],
+      )
+    : []
   const out: Record<string, unknown> = {
     slug: doc.slug,
     title: doc.title,
+    parent: parentRows[0]?.slug ?? null,
     layout: doc.layout === 'wide' ? 'wide' : undefined,
     tags: JSON.parse(doc.tags),
     rev,

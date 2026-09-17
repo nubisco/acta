@@ -140,6 +140,11 @@ export interface IDocNode {
 export interface IDocDetail {
   slug: string
   title: string
+  /**
+   * The parent page's slug, or null at the top level. Read this rather than
+   * the slug's path, which still describes where the page was created.
+   */
+  parent?: string | null
   layout?: 'wide'
   tags: string[]
   rev: number

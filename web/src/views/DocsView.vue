@@ -340,8 +340,11 @@ function removeDoc(): void {
           return
         }
         toast.success(`Deleted "${current.title}"`)
-        const parent = current.slug.split('/').slice(0, -1).join('/')
-        void router.push(parent ? `/docs/${parent}` : '/docs')
+        // The real parent, which a move can make differ from the slug's
+        // path, and through `wpath` like every other navigation here, since
+        // documents live under the workspace segment.
+        const parent = current.parent ?? null
+        void router.push(wpath(parent ? `/docs/${parent}` : '/docs'))
       } catch (err) {
         toast.error(humanise(err), { title: 'Delete failed' })
       }
