@@ -185,15 +185,6 @@ function onDragStart(event: DragEvent): void {
   if (!node?.dataset.slug) return
   dragEl = node
   dragSource.value = node.dataset.slug
-  // NbTreeNode (@nubisco/ui 5.3.0) lets `dragstart` bubble, so every ancestor
-  // row runs its own handler after the dragged one and the tree ends up
-  // dragging the outermost ancestor: grabbing "Icon System" moved all of
-  // "Nubisco Home". Registered now, during capture, this runs on the dragged
-  // row just after the node's own handler and stops the event there. Remove
-  // it once the library stops the propagation itself.
-  node.addEventListener('dragstart', (e) => e.stopPropagation(), {
-    once: true,
-  })
 }
 
 function guardDragOver(event: DragEvent): void {
@@ -290,20 +281,6 @@ function onCreated(slug: string): void {
 </script>
 
 <style scoped lang="scss">
-/*
- * A page with no subpages shows no expand caret.
- *
- * Every row is given NbTreeNode's children slot, because the library only
- * accepts a drop *inside* a row that has one, and a page must be droppable
- * into a page with no subpages yet. The same library draws its caret for any
- * slot, so a leaf's caret is hidden here, keeping its space so labels stay
- * aligned. Remove this once @nubisco/ui separates "can accept children" from
- * "has children".
- */
-:deep([data-leaf='true'] .nb-tree-node__toggle-icon) {
-  visibility: hidden;
-}
-
 .doc-tree {
   /* Placement, width and scrolling belong to the shell's contextbar; the
    * panel only lays out its own header and tree. */

@@ -232,8 +232,8 @@ describe('dropping a page in the tree', () => {
   })
 
   it('drags the node that was grabbed, not its outermost ancestor', async () => {
-    // NbTreeNode lets dragstart bubble, so without the panel stopping it the
-    // tree would report "home" as the source here.
+    // dragstart bubbles through every ancestor row. The tree must still
+    // report the grabbed page as the source, not "home".
     const panel = await openPanel()
     await drag(panel, 'home/manual/icons', 'runbook', 'inside')
     expect(sentOp()).toMatchObject({
