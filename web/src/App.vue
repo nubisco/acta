@@ -440,29 +440,46 @@ function openSpaceFromMenu(key: string): void {
   void router.push(wpath(`/s/${key}`))
 }
 
-const navEntries = computed(() => [
-  {
-    to: '/',
-    label: 'Home',
-    icon: 'house',
-    tour: 'nav-home',
-    active: route.name === 'home',
-  },
-  {
-    to: '/docs',
-    label: 'Docs',
-    icon: 'book-open',
-    tour: 'nav-docs',
-    active: route.name === 'docs',
-  },
-  {
-    to: '/activity',
-    label: 'Activity',
-    icon: 'pulse',
-    tour: 'nav-activity',
-    active: route.name === 'activity',
-  },
-])
+/*
+ * Built with `wpath`, like every other link in the frame.
+ *
+ * `/` is not Home. It is the workspace picker, which is frameless, so a Home
+ * link pointing there unmounted the whole app frame, showed the picker, and
+ * rebuilt the frame on the way back into the workspace, refetching the
+ * overview and notifications as a cold start does. Measured in a browser: the
+ * one navigation that replaced every shell element was Home. That is what made
+ * moving around the app feel like a page reload.
+ *
+ * `wpath` reads a plain value rather than reactive state, so the workspace
+ * param is read here to rebuild the links when the workspace changes, even
+ * between two routes with the same name.
+ */
+const navEntries = computed(() => {
+  void route.params.workspace
+  return [
+    {
+      to: wpath('/'),
+      label: 'Home',
+      icon: 'house',
+      tour: 'nav-home',
+      active: route.name === 'home',
+    },
+    {
+      to: wpath('/docs'),
+      label: 'Docs',
+      icon: 'book-open',
+      tour: 'nav-docs',
+      active: route.name === 'docs',
+    },
+    {
+      to: wpath('/activity'),
+      label: 'Activity',
+      icon: 'pulse',
+      tour: 'nav-activity',
+      active: route.name === 'activity',
+    },
+  ]
+})
 
 function openCount(space: {
   lists: { role?: string; items: number }[]
