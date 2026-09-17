@@ -1,3 +1,11 @@
+## [1.27.1](https://github.com/nubisco/acta/compare/v1.27.0...v1.27.1) (2026-09-17)
+
+
+### Bug Fixes
+
+* **app:** give Home's activity button an icon that exists ([ee1e8db](https://github.com/nubisco/acta/commit/ee1e8db5699578158d42d4a549ca60db372e2b99))
+* **editor:** register the icons the Turn into menu names at runtime ([89021b4](https://github.com/nubisco/acta/commit/89021b48713f8bfb0cef0bc1c55b83b80f738045))
+
 # [1.27.0](https://github.com/nubisco/acta/compare/v1.26.0...v1.27.0) (2026-09-17)
 
 
