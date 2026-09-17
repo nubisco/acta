@@ -328,13 +328,52 @@ describe('contents on the page', () => {
   it('is shown for a long document and hidden while comparing versions', async () => {
     const view = await openPage()
     expect(view.find('nav[aria-label="Table of contents"]').exists()).toBe(true)
-    expect(view.findAll('.doc-toc a').map((a) => a.text())).toEqual([
+    expect(view.findAll('.nb-toc a').map((a) => a.text())).toEqual([
       'Overview',
       'Install',
       'Requirements',
       'Configure',
       'Operate',
     ])
+  })
+
+  it('is hidden entirely on a short document', async () => {
+    docGet.mockResolvedValueOnce({
+      ...(await docGet()),
+      body: '# One\n\n## Two\n\n## Three\n\nShort.',
+    })
+    docGet.mockClear()
+    const view = await openPage()
+    expect(view.findComponent(MarkdownView).props('source')).toContain('Short.')
+    expect(view.find('.nb-toc').exists()).toBe(false)
+    expect(view.find('button[aria-label="Show contents"]').exists()).toBe(false)
+  })
+
+  it('collapses to a button, and remembers that for this viewer', async () => {
+    const view = await openPage()
+    await button(view, 'Hide contents').trigger('click')
+    expect(view.find('nav[aria-label="Table of contents"]').exists()).toBe(
+      false,
+    )
+    expect(useDocChrome().prefs.tocClosed).toBe(true)
+    await flushPromises()
+    expect(
+      JSON.parse(window.localStorage.getItem(DOC_CHROME_STORAGE_KEY)!),
+    ).toMatchObject({ tocClosed: true })
+
+    // A reload, and the next page: still closed.
+    view.unmount()
+    mounted.splice(mounted.indexOf(view), 1)
+    useDocChrome().reload()
+    const again = await openPage()
+    expect(again.find('nav[aria-label="Table of contents"]').exists()).toBe(
+      false,
+    )
+    await button(again, 'Show contents').trigger('click')
+    expect(again.find('nav[aria-label="Table of contents"]').exists()).toBe(
+      true,
+    )
+    expect(useDocChrome().prefs.tocClosed).toBe(false)
   })
 })
 
@@ -350,7 +389,7 @@ describe('round trip', () => {
         reader().element as HTMLElement
       ).querySelector<HTMLElement>(`#${slug}`)!
       heading.scrollIntoView = vi.fn()
-      await view.get(`.doc-toc a[href="#${slug}"]`).trigger('click')
+      await view.get(`.nb-toc a[href="#${slug}"]`).trigger('click')
     }
     window.dispatchEvent(new Event('scroll'))
     await button(view, 'Wide page').trigger('click')
@@ -383,8 +422,8 @@ describe('round trip', () => {
       '.ProseMirror h1, .ProseMirror h2, .ProseMirror h3',
     )
     headings.forEach((h) => (h.scrollIntoView = vi.fn()))
-    await view.get('.doc-toc a[href="#operate"]').trigger('click')
-    await view.get('.doc-toc a[href="#install"]').trigger('click')
+    await view.get('.nb-toc a[href="#operate"]').trigger('click')
+    await view.get('.nb-toc a[href="#install"]').trigger('click')
     await button(view, 'Wide page').trigger('click')
     await flushPromises()
     key({ key: 'Escape' })

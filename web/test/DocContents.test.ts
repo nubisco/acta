@@ -1,5 +1,9 @@
 /**
- * The floating table of contents, against real rendered headings.
+ * The table of contents as DocsView wires it: NbTableOfContents fed by Acta's
+ * outline and heading lookup, against real rendered headings.
+ *
+ * Whether the contents show on a short page and whether a reader's choice to
+ * hide them is remembered are page decisions, tested in DocsView.chrome.
  *
  * jsdom has no layout, so where a test needs a heading to be somewhere on the
  * page it says where, by giving that heading a bounding box. Everything else
@@ -15,11 +19,10 @@ vi.mock('@/api/client', () => ({
   ApiHttpError: class extends Error {},
 }))
 
-import DocToc from '@/components/DocToc.vue'
+import { NbTableOfContents } from '@nubisco/ui'
 import MarkdownView from '@/components/MarkdownView.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
-import { documentStats } from '@/lib/docText'
-import { useDocChrome } from '@/lib/docChrome'
+import { headingByIndex, tocItems } from '@/lib/docToc'
 
 const PROSE = 'Words that a reader actually reads on the page. '.repeat(40)
 
@@ -44,7 +47,6 @@ function track<T extends VueWrapper>(wrapper: T): T {
 
 afterEach(() => {
   while (mounted.length) mounted.pop()?.unmount()
-  useDocChrome().prefs.tocClosed = false
   document.body.innerHTML = ''
 })
 
@@ -60,12 +62,14 @@ async function readerWithToc(source: string) {
     mount(MarkdownView, { props: { source }, attachTo: document.body }),
   )
   await flushPromises()
+  const root = reader.element as HTMLElement
   const toc = track(
-    mount(DocToc, {
+    mount(NbTableOfContents, {
       props: {
-        source,
-        root: reader.element as HTMLElement,
-        words: documentStats(source).words,
+        items: tocItems(source),
+        root,
+        resolveTarget: headingByIndex(() => root),
+        followHash: true,
       },
       attachTo: document.body,
     }),
@@ -81,7 +85,7 @@ function placeHeadings(root: Element, tops: number[]): void {
   })
 }
 
-describe('DocToc', () => {
+describe('contents', () => {
   it('nests sections by heading level', async () => {
     const { toc } = await readerWithToc(LONG)
     const nav = toc.get('nav[aria-label="Table of contents"]')
@@ -163,21 +167,6 @@ describe('DocToc', () => {
     }
   })
 
-  it('is hidden entirely on a short document', async () => {
-    const { toc } = await readerWithToc('# One\n\n## Two\n\n## Three\n\nShort.')
-    expect(toc.find('nav').exists()).toBe(false)
-    expect(toc.find('button').exists()).toBe(false)
-  })
-
-  it('collapses to a button, and remembers that for this viewer', async () => {
-    const { toc } = await readerWithToc(LONG)
-    await toc.get('button[aria-label="Hide contents"]').trigger('click')
-    expect(toc.find('nav').exists()).toBe(false)
-    expect(useDocChrome().prefs.tocClosed).toBe(true)
-    await toc.get('button[aria-label="Show contents"]').trigger('click')
-    expect(toc.find('nav').exists()).toBe(true)
-  })
-
   it('follows headings as they are typed in the editor', async () => {
     const editorView = track(
       mount(MarkdownEditor, {
@@ -190,8 +179,12 @@ describe('DocToc', () => {
       editorView.vm as unknown as { root: () => HTMLElement }
     ).root()
     const toc = track(
-      mount(DocToc, {
-        props: { source: LONG, root, words: documentStats(LONG).words },
+      mount(NbTableOfContents, {
+        props: {
+          items: tocItems(LONG),
+          root,
+          resolveTarget: headingByIndex(() => root),
+        },
         attachTo: document.body,
       }),
     )
@@ -215,7 +208,7 @@ describe('DocToc', () => {
     await flushPromises()
     const draft = editorView.emitted('update:modelValue')!.at(-1)![0] as string
     expect(draft).toContain('## Rollback plan')
-    await toc.setProps({ source: draft })
+    await toc.setProps({ items: tocItems(draft) })
     await frame()
 
     const link = toc.get('a[href="#rollback-plan"]')

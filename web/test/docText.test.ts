@@ -8,11 +8,9 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
-  activeHeadingIndex,
   countWords,
   documentOutline,
   documentStats,
-  outlineTree,
   readableBlocks,
   tocWorthShowing,
   TOC_MIN_WORDS,
@@ -125,10 +123,6 @@ describe('document outline', () => {
       ['Top', 0],
       ['Setup', 1],
     ])
-    const tree = outlineTree(outline)
-    expect(tree.map((n) => n.text)).toEqual(['Intro', 'Setup', 'Top'])
-    expect(tree[0].children[0].children[0].text).toBe('Detail')
-    expect(tree[2].children[0].text).toBe('Setup')
   })
 
   it('uses the same slugs the reader anchors headings with', () => {
@@ -171,22 +165,5 @@ describe('document outline', () => {
         longCode,
       ),
     ).toBe(true)
-  })
-})
-
-describe('active heading', () => {
-  it('is the last heading scrolled past the threshold', () => {
-    expect(activeHeadingIndex([200, 900, 1600], 96)).toBe(-1)
-    expect(activeHeadingIndex([40, 700, 1400], 96)).toBe(0)
-    expect(activeHeadingIndex([-600, 90, 800], 96)).toBe(1)
-  })
-
-  it('is the last heading on screen once the page cannot scroll further', () => {
-    expect(
-      activeHeadingIndex([-900, 20, 500], 96, {
-        atBottom: true,
-        viewportHeight: 800,
-      }),
-    ).toBe(2)
   })
 })

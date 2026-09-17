@@ -207,11 +207,14 @@
     </div>
 
     <div v-if="tocShown" class="docs__toc">
-      <DocToc
-        :source="shownSource"
+      <NbTableOfContents
+        :items="tocEntries"
         :root="bodyRoot"
-        :words="stats.words"
-        :overlay="tocOverlay"
+        :resolve-target="tocTarget"
+        :variant="tocOverlay ? 'floating' : 'docked'"
+        :open="tocOpen"
+        follow-hash
+        @update:open="setTocOpen"
       />
     </div>
 
@@ -245,6 +248,7 @@ import {
 } from '@nubisco/ui'
 import { useWorkspace } from '@/stores/workspace'
 import { useDocChrome } from '@/lib/docChrome'
+import { headingByIndex, tocItems } from '@/lib/docToc'
 import { documentOutline, documentStats, tocWorthShowing } from '@/lib/docText'
 import { api, newOpId, ApiHttpError } from '@/api/client'
 import type { IDocDetail } from '@/types/api'
@@ -255,7 +259,6 @@ import CommentThread from '@/components/CommentThread.vue'
 import DocCommentLayer from '@/components/comments/DocCommentLayer.vue'
 import type { IAnchor } from '@/lib/anchors'
 import DocChromeBar from '@/components/DocChromeBar.vue'
-import DocToc from '@/components/DocToc.vue'
 import DocsTreeSlot from '@/components/DocsTreeSlot.vue'
 import DocTransferMenu from '@/components/DocTransferMenu.vue'
 import DocMoveModal from '@/components/DocMoveModal.vue'
@@ -396,6 +399,40 @@ const tocShown = computed(
     ),
 )
 
+/*
+ * The contents. NbTableOfContents does the list, the scroll spy and the
+ * scrolling. What stays here is when they show (above), where they sit
+ * (`tocOverlay` below) and whether a reader has closed them.
+ *
+ * The entries are rebuilt only when the headings change, not on every
+ * keystroke of a draft, so the contents do not re-attach as somebody types.
+ * `follow-hash` is safe beside block links: a block fragment never matches a
+ * heading slug, so the contents leave it to `followBlockLink`.
+ */
+let tocKey = ''
+let tocCache: ReturnType<typeof tocItems> = []
+const tocEntries = computed(() => {
+  const items = tocItems(shownSource.value)
+  const key = JSON.stringify(items)
+  if (key !== tocKey) {
+    tocKey = key
+    tocCache = items
+  }
+  return tocCache
+})
+const tocTarget = headingByIndex(() => bodyRoot.value)
+/** The floating contents open only on request, and close again after. */
+const tocOverlayOpen = ref(false)
+const tocOpen = computed(() =>
+  tocOverlay.value ? tocOverlayOpen.value : !chrome.prefs.tocClosed,
+)
+function setTocOpen(open: boolean): void {
+  // Closing the floating one is momentary. Closing the docked one is a
+  // preference the reader expects to stay closed on the next page.
+  if (tocOverlay.value) tocOverlayOpen.value = open
+  else chrome.prefs.tocClosed = !open
+}
+
 function setWide(wide: boolean): void {
   if (doc.value) doc.value.layout = wide ? 'wide' : undefined
 }
@@ -433,6 +470,7 @@ const tocOverlay = computed(() => {
   )
   return docsWidth.value < (COLUMN_MIN_REM + TOC_RAIL_REM) * rem
 })
+watch(tocOverlay, () => (tocOverlayOpen.value = false))
 let resizeObserver: ResizeObserver | null = null
 let releaseSurface: (() => void) | null = null
 onMounted(() => {
@@ -879,6 +917,13 @@ async function restoreVersion(): Promise<void> {
     inline-size: 0;
     padding: 0;
     z-index: 1;
+  }
+
+  /* The floating contents sit at the column's top right corner. */
+  &--toc-overlay &__toc :deep(.nb-toc--floating) {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
   }
 
   &--toc-overlay:has(.docs__toc) &__content {

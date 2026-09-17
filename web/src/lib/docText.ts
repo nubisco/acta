@@ -215,24 +215,6 @@ export function documentOutline(markdown: string): IOutlineEntry[] {
   })
 }
 
-export interface IOutlineNode extends IOutlineEntry {
-  children: IOutlineNode[]
-}
-
-/** The flat outline as a tree, for a nested list. */
-export function outlineTree(entries: IOutlineEntry[]): IOutlineNode[] {
-  const roots: IOutlineNode[] = []
-  const stack: IOutlineNode[] = []
-  for (const entry of entries) {
-    const node: IOutlineNode = { ...entry, children: [] }
-    while (stack.length > entry.depth) stack.pop()
-    if (stack.length === 0) roots.push(node)
-    else stack[stack.length - 1].children.push(node)
-    stack.push(node)
-  }
-  return roots
-}
-
 /** Whether a table of contents earns its place. See the thresholds above. */
 export function tocWorthShowing(
   outline: IOutlineEntry[],
@@ -242,33 +224,4 @@ export function tocWorthShowing(
   if (outline.length < TOC_MIN_HEADINGS) return false
   if (words >= TOC_MIN_WORDS) return true
   return markdown.split('\n').length >= TOC_MIN_LINES
-}
-
-/**
- * Which section is being read.
- *
- * `tops` are each heading's distance from the top of the scroll viewport, in
- * document order. The active section is the last heading that has scrolled
- * up past `threshold`. At the bottom of the page the last heading on screen
- * wins instead, because a short final section can never scroll far enough to
- * reach the threshold and would otherwise never be highlighted.
- *
- * -1 means the reader is above the first heading.
- */
-export function activeHeadingIndex(
-  tops: number[],
-  threshold: number,
-  opts: { atBottom?: boolean; viewportHeight?: number } = {},
-): number {
-  if (opts.atBottom && opts.viewportHeight !== undefined) {
-    for (let i = tops.length - 1; i >= 0; i--) {
-      if (tops[i] < opts.viewportHeight) return i
-    }
-  }
-  let active = -1
-  for (let i = 0; i < tops.length; i++) {
-    if (tops[i] <= threshold) active = i
-    else break
-  }
-  return active
 }
