@@ -290,6 +290,20 @@ function onCreated(slug: string): void {
 </script>
 
 <style scoped lang="scss">
+/*
+ * A page with no subpages shows no expand caret.
+ *
+ * Every row is given NbTreeNode's children slot, because the library only
+ * accepts a drop *inside* a row that has one, and a page must be droppable
+ * into a page with no subpages yet. The same library draws its caret for any
+ * slot, so a leaf's caret is hidden here, keeping its space so labels stay
+ * aligned. Remove this once @nubisco/ui separates "can accept children" from
+ * "has children".
+ */
+:deep([data-leaf='true'] .nb-tree-node__toggle-icon) {
+  visibility: hidden;
+}
+
 .doc-tree {
   /* Placement, width and scrolling belong to the shell's contextbar; the
    * panel only lays out its own header and tree. */
