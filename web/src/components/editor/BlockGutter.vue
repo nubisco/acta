@@ -59,33 +59,12 @@
   />
 
   <NbMenu ref="menuRef" :open="menuOpen" size="sm" @close="onMenuClose">
-    <template v-if="menuView === 'main'">
-      <NbMenuItem
-        v-if="conversions.length > 0"
-        icon="arrows-clockwise"
-        label="Turn into"
-        data-testid="block-turn-into"
-        @select="nextView = 'turnInto'"
-      >
-        <template #trailing>
-          <NbIcon name="caret-right" :size="14" aria-hidden="true" />
-        </template>
-      </NbMenuItem>
-      <NbMenuItem icon="copy" label="Duplicate" @select="duplicate" />
-      <NbMenuItem
-        icon="link"
-        :label="
-          linkable ? 'Copy link to block' : 'Copy link to block (no text)'
-        "
-        :disabled="!linkable"
-        @select="copyLink"
-      />
-      <NbMenuDivider />
-      <NbMenuItem icon="trash" label="Delete" danger @select="remove" />
-    </template>
-    <template v-else>
-      <NbMenuItem icon="arrow-left" label="Back" @select="nextView = 'main'" />
-      <NbMenuDivider />
+    <NbSubmenu
+      v-if="conversions.length > 0"
+      icon="arrows-clockwise"
+      label="Turn into"
+      data-testid="block-turn-into"
+    >
       <NbMenuItem
         v-for="option in conversions"
         :key="option.target"
@@ -96,7 +75,16 @@
         :data-target="option.target"
         @select="convert(option.target)"
       />
-    </template>
+    </NbSubmenu>
+    <NbMenuItem icon="copy" label="Duplicate" @select="duplicate" />
+    <NbMenuItem
+      icon="link"
+      :label="linkable ? 'Copy link to block' : 'Copy link to block (no text)'"
+      :disabled="!linkable"
+      @select="copyLink"
+    />
+    <NbMenuDivider />
+    <NbMenuItem icon="trash" label="Delete" danger @select="remove" />
   </NbMenu>
 
   <NbMenu ref="insertRef" :open="insertOpen" size="sm" @close="onInsertClose">
@@ -360,10 +348,6 @@ const linkable = ref(false)
 // The actions menu
 // ---------------------------------------------------------------------------
 
-type TMenuView = 'main' | 'turnInto'
-const menuView = ref<TMenuView>('main')
-/** Set by an item that swaps the menu's contents rather than acting. */
-const nextView = ref<TMenuView | null>(null)
 /** Whether the last menu closed because something was done. */
 let acted = false
 
@@ -378,7 +362,6 @@ function openMenu(): void {
   conversions.value = blockConversions(props.editor.state, index)
   const block = topBlock(props.editor.state.doc, index)
   linkable.value = !!block && !!blockAnchor(props.editor.state.doc, block.pos)
-  menuView.value = 'main'
   acted = false
   const handle = handleElement()
   if (handle) menuRef.value?.setPosition(handle.getBoundingClientRect())
@@ -394,16 +377,6 @@ function onHandleKeydown(event: KeyboardEvent): void {
 
 function onMenuClose(): void {
   menuOpen.value = false
-  if (nextView.value) {
-    // An item that leads to more choices: the menu closes as every item
-    // makes it, and reopens where it was with the other list, which also
-    // puts focus on its first entry.
-    const view = nextView.value
-    nextView.value = null
-    menuView.value = view
-    void nextTick(() => (menuOpen.value = true))
-    return
-  }
   heldIndex.value = null
   if (!acted) restoreFocus(handleElement())
 }

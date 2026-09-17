@@ -651,14 +651,58 @@ describe('the gutter', () => {
     await g.hover(0)
     g.handle().click()
     await flushPromises()
-    g.menuItem('Turn into')!.click()
+    const trigger = g.menuItem('Turn into')!
+    trigger.click()
     await flushPromises()
     await nextTick()
-    expect(g.menuItems()[0]).toBe('Back')
+    // A submenu beside the actions, not a second list in their place.
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    expect(g.menuItems()).not.toContain('Back')
+    expect(g.menuItems()).toContain('Duplicate')
     expect(g.menuItems()).toContain('Task list')
     expect(g.menuItems()).not.toContain('Paragraph')
     g.menuItem('Task list')!.click()
     await flushPromises()
+    expect(markdownOf(g.editor)).toBe(
+      GUTTER_DOC.replace(
+        'First paragraph of the page.',
+        '- [ ] First paragraph of the page.',
+      ),
+    )
+  })
+
+  it('turns a block into another by keyboard alone', async () => {
+    const g = await gutterEditor()
+    await g.hover(0)
+    await g.key(g.handle(), 'Enter')
+    const trigger = g.menuItem('Turn into')!
+    await g.key(trigger, 'ArrowRight')
+    await nextTick()
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    const submenu = document.querySelector<HTMLElement>('.nb-submenu')!
+    const items = Array.from(
+      submenu.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    )
+    // Focus lands on the first choice.
+    expect(document.activeElement).toBe(items[0])
+
+    // ArrowLeft closes that level and returns to its trigger.
+    await g.key(items[0], 'ArrowLeft')
+    await nextTick()
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(trigger)
+
+    await g.key(trigger, 'Enter')
+    await nextTick()
+    const target = Array.from(
+      document.querySelectorAll<HTMLElement>('.nb-submenu [role="menuitem"]'),
+    ).findIndex((el) => el.textContent?.trim() === 'Task list')
+    expect(target).toBeGreaterThan(0)
+    for (let i = 0; i < target; i++)
+      await g.key(document.activeElement as HTMLElement, 'ArrowDown')
+    expect(document.activeElement?.textContent?.trim()).toBe('Task list')
+    await g.key(document.activeElement as HTMLElement, 'Enter')
+    expect(document.querySelector('[role="menu"]')).toBeNull()
     expect(markdownOf(g.editor)).toBe(
       GUTTER_DOC.replace(
         'First paragraph of the page.',
@@ -949,8 +993,10 @@ describe('round trip', () => {
     g.menuItem('Turn into')!.click()
     await flushPromises()
     await nextTick()
-    g.menuItem('Back')!.click()
-    await flushPromises()
+    await g.key(
+      document.querySelector<HTMLElement>('.nb-submenu [role="menuitem"]')!,
+      'Escape',
+    )
     await nextTick()
     await g.key(document.querySelector('[role="menu"]')!, 'Escape')
 
