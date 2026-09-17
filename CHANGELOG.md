@@ -1,3 +1,20 @@
+# [1.27.0](https://github.com/nubisco/acta/compare/v1.26.0...v1.27.0) (2026-09-17)
+
+
+### Bug Fixes
+
+* **app:** stop Home rebuilding the whole app frame ([12fcce3](https://github.com/nubisco/acta/commit/12fcce35cd347258e74aa14dbe8618342bbefbf0))
+* **docs:** give every page its own copy of an imported remote image ([e463cd5](https://github.com/nubisco/acta/commit/e463cd50b4be200995dfd7d5a163c17ab290f10b))
+* **docs:** no expand caret on pages without subpages ([06e9340](https://github.com/nubisco/acta/commit/06e9340a2e458b59bbef4c4d166e7a654cf8a44b))
+* **docs:** refuse moving a document under its own subpages ([0e77738](https://github.com/nubisco/acta/commit/0e77738855807a33511fcba0f18f5d584ad39f68))
+* **docs:** return a page's real parent, and land somewhere real after delete ([1a898d7](https://github.com/nubisco/acta/commit/1a898d75e196a7a79b6148a6386a896715f46779))
+
+
+### Features
+
+* **docs:** copy remote images into attachments on import ([908bbb5](https://github.com/nubisco/acta/commit/908bbb572be141629a5278a4f4d5ac0e1aa3aab3))
+* **docs:** reorganise the document tree by dragging ([f77426e](https://github.com/nubisco/acta/commit/f77426eb6b4dbcf144351fef55e8a2a986633e5d))
+
 # [1.26.0](https://github.com/nubisco/acta/compare/v1.25.0...v1.26.0) (2026-09-16)
 
 
