@@ -140,7 +140,7 @@
       <NbButton
         size="sm"
         variant="ghost"
-        icon="activity"
+        icon="pulse"
         :href="wpath('/activity')"
       >
         See everything happening in this workspace

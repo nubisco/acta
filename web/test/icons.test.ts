@@ -11,7 +11,7 @@
  * Found in a real browser: the block grip's "Turn into" choices rendered
  * nothing, because `text-h-one` and eight others were never registered.
  */
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { BLOCK_TARGETS } from '@/components/editor/blockOps'
@@ -39,6 +39,57 @@ describe('registerActaIcons', () => {
     const missing = slashItems('')
       .map((item) => item.icon)
       .filter((name) => !registered.has(name))
+    expect(missing).toEqual([])
+  })
+})
+
+/**
+ * Literal icon names must exist in the library.
+ *
+ * A literal in a template is linked at build time, so it needs no
+ * registration, but a name the library does not ship still throws while
+ * rendering. Found on Home: the "See everything happening in this workspace"
+ * button asked for `activity`, which @nubisco/ui has never had, so the button
+ * failed to render. Checked against the icons the installed library actually
+ * ships, so a misspelling or a removed icon fails here instead of in front of
+ * somebody.
+ */
+describe('literal icon names', () => {
+  const libraryIcons = new Set(
+    readdirSync(
+      resolve(
+        realpathSync(resolve(__dirname, '../node_modules/@nubisco/ui')),
+        'dist/icons',
+      ),
+    ).map((file) => file.replace(/\.(d\.ts|mjs|cjs|js)$/, '')),
+  )
+
+  const literals = new Map<string, string[]>()
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = resolve(dir, entry.name)
+      if (entry.isDirectory()) walk(path)
+      else if (entry.name.endsWith('.vue'))
+        for (const match of readFileSync(path, 'utf8').matchAll(
+          /(?<![:\w-])icon="([a-z0-9-]+)"/g,
+        ))
+          literals.set(match[1], [
+            ...(literals.get(match[1]) ?? []),
+            path.slice(path.indexOf('/src/') + 1),
+          ])
+    }
+  }
+  walk(resolve(__dirname, '../src'))
+
+  it('finds the library icons and the template names to check', () => {
+    expect(libraryIcons.size).toBeGreaterThan(100)
+    expect(literals.size).toBeGreaterThan(10)
+  })
+
+  it('uses only icons the library ships', () => {
+    const missing = [...literals]
+      .filter(([name]) => !libraryIcons.has(name))
+      .map(([name, files]) => `${name} in ${[...new Set(files)].join(', ')}`)
     expect(missing).toEqual([])
   })
 })
