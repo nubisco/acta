@@ -15,12 +15,15 @@
 import { registerIcons } from '@nubisco/ui'
 
 import * as archive from '@nubisco/ui/icons/archive'
+import * as arrowElbowDownRight from '@nubisco/ui/icons/arrow-elbow-down-right'
 import * as bookOpen from '@nubisco/ui/icons/book-open'
+import * as caretCircleRight from '@nubisco/ui/icons/caret-circle-right'
 import * as caretDown from '@nubisco/ui/icons/caret-down'
 import * as chatCircle from '@nubisco/ui/icons/chat-circle'
 import * as checkSquare from '@nubisco/ui/icons/check-square'
 import * as clockCounterClockwise from '@nubisco/ui/icons/clock-counter-clockwise'
 import * as code from '@nubisco/ui/icons/code'
+import * as codeBlock from '@nubisco/ui/icons/code-block'
 import * as cornersOut from '@nubisco/ui/icons/corners-out'
 import * as crosshairSimple from '@nubisco/ui/icons/crosshair-simple'
 import * as fileText from '@nubisco/ui/icons/file-text'
@@ -28,10 +31,13 @@ import * as fn from '@nubisco/ui/icons/function'
 import * as house from '@nubisco/ui/icons/house'
 import * as info from '@nubisco/ui/icons/info'
 import * as kanban from '@nubisco/ui/icons/kanban'
+import * as lightbulb from '@nubisco/ui/icons/lightbulb'
 import * as listBullets from '@nubisco/ui/icons/list-bullets'
+import * as listChecks from '@nubisco/ui/icons/list-checks'
 import * as listNumbers from '@nubisco/ui/icons/list-numbers'
 import * as magnifyingGlass from '@nubisco/ui/icons/magnifying-glass'
 import * as moon from '@nubisco/ui/icons/moon'
+import * as note from '@nubisco/ui/icons/note'
 import * as pencilSimple from '@nubisco/ui/icons/pencil-simple'
 import * as plus from '@nubisco/ui/icons/plus'
 import * as pulse from '@nubisco/ui/icons/pulse'
@@ -39,14 +45,18 @@ import * as quotes from '@nubisco/ui/icons/quotes'
 import * as robot from '@nubisco/ui/icons/robot'
 import * as sidebarSimple from '@nubisco/ui/icons/sidebar-simple'
 import * as textB from '@nubisco/ui/icons/text-b'
+import * as textHFour from '@nubisco/ui/icons/text-h-four'
+import * as textHOne from '@nubisco/ui/icons/text-h-one'
 import * as textHThree from '@nubisco/ui/icons/text-h-three'
 import * as textHTwo from '@nubisco/ui/icons/text-h-two'
 import * as textItalic from '@nubisco/ui/icons/text-italic'
 import * as textStrikethrough from '@nubisco/ui/icons/text-strikethrough'
+import * as textT from '@nubisco/ui/icons/text-t'
 import * as trash from '@nubisco/ui/icons/trash'
 import * as treeStructure from '@nubisco/ui/icons/tree-structure'
 import * as user from '@nubisco/ui/icons/user'
 import * as warning from '@nubisco/ui/icons/warning'
+import * as warningOctagon from '@nubisco/ui/icons/warning-octagon'
 
 export function registerActaIcons(): void {
   registerIcons({
@@ -87,6 +97,18 @@ export function registerActaIcons(): void {
     'pencil-simple': pencilSimple,
     trash,
     'clock-counter-clockwise': clockCounterClockwise,
+    'arrow-elbow-down-right': arrowElbowDownRight,
+    // The block grip's "Turn into" choices (BLOCK_TARGETS in blockOps.ts)
+    // not already listed above.
+    'text-t': textT,
+    'text-h-one': textHOne,
+    'text-h-four': textHFour,
+    'list-checks': listChecks,
+    note,
+    lightbulb,
+    'warning-octagon': warningOctagon,
+    'code-block': codeBlock,
+    'caret-circle-right': caretCircleRight,
     // Document chrome commands (DocChromeBar.vue).
     'corners-out': cornersOut,
     'crosshair-simple': crosshairSimple,

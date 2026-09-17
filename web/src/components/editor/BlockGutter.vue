@@ -63,7 +63,6 @@
       v-if="conversions.length > 0"
       icon="arrows-clockwise"
       label="Turn into"
-      data-testid="block-turn-into"
     >
       <NbMenuItem
         v-for="option in conversions"
