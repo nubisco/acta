@@ -340,7 +340,13 @@ describe('turn into', () => {
     }
     // Enough of the matrix ran that a regression cannot hide in it.
     expect(checked).toBeGreaterThan(80)
-  })
+    // Over eighty conversions, each one a full parse, convert and serialise
+    // through a mounted editor. That is around a second here and timed out at
+    // the 5s default on CI, where the runner is slower and the rest of the
+    // suite is running beside it. The work is real, so the budget is what is
+    // wrong: this says what the test actually costs rather than trimming the
+    // matrix it exists to cover.
+  }, 30_000)
 
   const EXPECTED: [string, TBlockKind, string][] = [
     ['paragraph', 'taskList', '- [ ] Ship the **audio host** on Friday.'],
