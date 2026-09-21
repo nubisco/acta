@@ -1,3 +1,10 @@
+# [1.28.0](https://github.com/nubisco/acta/compare/v1.27.1...v1.28.0) (2026-09-21)
+
+
+### Features
+
+* **auth:** keep Acta in step with the identity provider ([cb978b4](https://github.com/nubisco/acta/commit/cb978b47a57312fdba4b0e26301c0fd54701351e))
+
 ## [1.27.1](https://github.com/nubisco/acta/compare/v1.27.0...v1.27.1) (2026-09-17)
 
 
