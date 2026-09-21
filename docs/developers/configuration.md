@@ -71,6 +71,37 @@ have; prefer OIDC for anything new, and note that OIDC wins if both are set.
 | `ACTA_SSO_AUTO_PROVISION` | `true`                   | As above.                                          |
 | `ACTA_SSO_LABEL`          | `single sign-on`         | As above.                                          |
 
+### Provider webhooks
+
+A provider that keeps its own record of who your members are can push changes
+to Acta between sign-ins: an avatar that was replaced, or a person who was
+removed from the app. Without this, removing someone at the provider stops
+them signing in again but leaves what they already hold working, their session
+until it expires and any personal or agent token indefinitely.
+
+| Variable                  | Default | What it does                                                                      |
+| ------------------------- | ------- | --------------------------------------------------------------------------------- |
+| `PLATFORM_WEBHOOK_SECRET` | _unset_ | Shared secret each delivery is signed with. Unset means the endpoint answers 404. |
+
+Register this URL with your provider, substituting your own host:
+
+```
+https://acta.nubisco.io/api/v1/platform/webhook
+```
+
+Deliveries are `POST`s carrying `X-Nubisco-Signature: sha256=<hex>`, an
+HMAC-SHA256 of the raw body under the secret. Acta verifies the signature
+before parsing, refuses anything more than five minutes old, and answers 2xx
+to events it does not act on. Delivery is best effort and never retried, so
+nothing depends on it: sign-in refreshes the avatar too, and every token
+expires on its own.
+
+On Cloudflare Workers this is a secret, not a var:
+
+```sh
+wrangler secret put PLATFORM_WEBHOOK_SECRET
+```
+
 ## Importer variables
 
 Used by the [migration CLIs](/developers/migrate-trello), not by the server.

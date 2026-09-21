@@ -25,6 +25,10 @@ services:
       ACTA_ADMIN_EMAIL: you@example.com
       ACTA_ADMIN_HANDLE: you
       ACTA_ADMIN_NAME: Your Name
+      # Only with an identity provider that pushes changes. Register
+      # https://<your-acta-host>/api/v1/platform/webhook with it, and put the
+      # secret it generates here. Unset, the endpoint answers 404.
+      # PLATFORM_WEBHOOK_SECRET: ''
     volumes:
       - acta-data:/data
     healthcheck:

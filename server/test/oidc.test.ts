@@ -303,6 +303,9 @@ describe('openid connect', () => {
       sso: true,
       otp: false,
       sso_label: 'Test OIDC',
+      // A test issuer, not a nubisco.io host, so the account menu's platform
+      // parts stay off and no platform_url is offered.
+      nubisco_platform: false,
     })
   })
 })

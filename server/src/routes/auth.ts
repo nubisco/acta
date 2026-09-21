@@ -16,6 +16,7 @@ import {
 import { now, type IActorCtx, type ICtx } from '../core/ctx'
 import { emitEvent, flushPendingEvents } from '../core/events'
 import { JwksVerifier, type ISsoClaims, type ISsoConfig } from '../core/sso'
+import { acceptedPicture, isNubiscoPlatform } from '../core/avatar'
 import { OidcClient, type IOidcConfig } from '../core/oidc'
 import { resolveOauthToken } from '../core/oauth'
 import type { ISqlDriver } from '../db'
@@ -89,6 +90,7 @@ async function signInWithClaims(
   c: Context<IAuthEnv>,
   claims: ISsoClaims,
   autoProvision: boolean,
+  issuer?: string,
 ): Promise<Response> {
   const db = c.get('db')
   const workspaceId = c.get('workspaceId')
@@ -167,6 +169,33 @@ async function signInWithClaims(
     flushPendingEvents()
     member = { id, disabled: 0 }
   }
+  // Bind the provider's own id for this person. Email is how the member was
+  // found above and is a poor key afterwards: the platform's webhooks name a
+  // user by id, and an email address can change.
+  await db.run(
+    `UPDATE actor SET platform_user_id = ?
+      WHERE id = ? AND platform_user_id IS NOT ?`,
+    [claims.sub, member.id, claims.sub],
+  )
+
+  // Every sign-in refreshes the avatar, because the webhook that reports a
+  // change is delivered once and never retried. An absent claim clears it: the
+  // provider omits `picture` for someone with no avatar, and never sends null
+  // or an empty string.
+  //
+  // A picture the person uploaded here is theirs and survives: avatar_source
+  // records that choice, and the seed path in routes/api.ts makes the same
+  // exception. Take that away and every sign-in would quietly undo it.
+  await db.run(
+    `UPDATE actor SET avatar_url = ?
+      WHERE id = ? AND avatar_source != 'upload' AND avatar_url IS NOT ?`,
+    [
+      acceptedPicture(claims.picture, issuer),
+      member.id,
+      acceptedPicture(claims.picture, issuer),
+    ],
+  )
+
   const memberRole = (
     await db.query<{ role: string }>('SELECT role FROM actor WHERE id = ?', [
       member.id,
@@ -228,6 +257,16 @@ export function authRoutes(
       // Platform" told every self-hosted instance to sign in with a product
       // its users have no account on.
       sso_label: sso?.config.label ?? 'single sign-on',
+      // Whether sign-in goes through Nubisco Platform, which decides whether
+      // the account menu shows account actions, Profile and the platform
+      // lockup. An instance pointed at its own provider has neither page, and
+      // must not be told about infrastructure it is not using.
+      nubisco_platform: isNubiscoPlatform(sso?.config.issuer),
+      // Where the account menu reads the browser's other signed-in accounts
+      // from, and where Profile opens. Only for Nubisco Platform.
+      platform_url: isNubiscoPlatform(sso?.config.issuer)
+        ? sso!.config.issuer.replace(/\/$/, '')
+        : undefined,
     }),
   )
 
@@ -294,6 +333,21 @@ export function authRoutes(
     url.searchParams.set('app_id', sso.config.appId)
     url.searchParams.set('redirect_uri', redirectUriOf(c.req.url))
     url.searchParams.set('state', state)
+    // Switching and adding accounts from the account menu. Both are forwarded
+    // only in the shapes the provider understands, so the query string here
+    // cannot be used to smuggle other parameters into the authorize URL.
+    const prompt = c.req.query('prompt')
+    if (prompt === 'login' || prompt === 'select_account') {
+      url.searchParams.set('prompt', prompt)
+    }
+    const loginHint = c.req.query('login_hint')
+    if (
+      typeof loginHint === 'string' &&
+      loginHint.length <= 254 &&
+      /^[^\s@]+@[^\s@]+$/.test(loginHint)
+    ) {
+      url.searchParams.set('login_hint', loginHint)
+    }
     return c.redirect(url.toString(), 302)
   })
 
@@ -355,7 +409,12 @@ export function authRoutes(
     }
 
     if (!claims.email) return c.redirect('/login?error=sso_no_email')
-    return signInWithClaims(c, claims, sso.config.autoProvision)
+    return signInWithClaims(
+      c,
+      claims,
+      sso.config.autoProvision,
+      sso.config.issuer,
+    )
   })
 
   app.post('/otp', async (c) => {
@@ -467,8 +526,14 @@ export function authRoutes(
       await c.get('db').query<{
         email: string | null
         name: string
+        avatar_url: string | null
+        platform_user_id: string | null
         onboarded_at: number | null
-      }>('SELECT email, name, onboarded_at FROM actor WHERE id = ?', [actor.id])
+      }>(
+        `SELECT email, name, avatar_url, platform_user_id, onboarded_at
+           FROM actor WHERE id = ?`,
+        [actor.id],
+      )
     )[0]
     return c.json({
       id: actor.id,
@@ -478,6 +543,12 @@ export function authRoutes(
       scopes: actor.scopes,
       email: row?.email ?? undefined,
       name: row?.name ?? undefined,
+      // Absent rather than null when there is no avatar, so the account menu
+      // falls back to initials on the same test everywhere else uses.
+      picture: row?.avatar_url ?? undefined,
+      // Lets the account menu mark which of the browser's signed-in accounts
+      // this session belongs to.
+      platform_user_id: row?.platform_user_id ?? undefined,
       onboarded: row?.onboarded_at !== null && row?.onboarded_at !== undefined,
     })
   })

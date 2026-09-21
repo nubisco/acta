@@ -52,6 +52,12 @@ interface IWorkerEnv {
   ACTA_OTP_FALLBACK?: string
   /** Public address, used to link back from outbound messages. */
   ACTA_BASE_URL?: string
+  /**
+   * Shared secret the identity provider signs webhook deliveries with. A
+   * secret, so it is set with `wrangler secret put PLATFORM_WEBHOOK_SECRET`
+   * and never in wrangler.toml. Unset means the webhook answers 404.
+   */
+  PLATFORM_WEBHOOK_SECRET?: string
 }
 
 interface IExecutionContext {
@@ -101,6 +107,7 @@ function getApp(env: IWorkerEnv, origin: string): Promise<Hono<IAppEnv>> {
           env as unknown as Record<string, string | undefined>,
         ) ?? undefined,
       otpFallback: env.ACTA_OTP_FALLBACK === 'true',
+      platformWebhookSecret: env.PLATFORM_WEBHOOK_SECRET,
       bootstrap: {
         workspaceName: env.ACTA_WORKSPACE ?? 'Workspace',
         adminEmail: env.ACTA_ADMIN_EMAIL,

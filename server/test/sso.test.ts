@@ -91,6 +91,9 @@ describe('external sso', () => {
       sso: true,
       otp: false,
       sso_label: 'Test IdP',
+      // The test issuer is not a nubisco.io host, so the account menu's
+      // platform parts stay off and no platform_url is offered at all.
+      nubisco_platform: false,
     })
   })
 
@@ -131,6 +134,7 @@ describe('external sso', () => {
       sso: true,
       otp: true,
       sso_label: 'Test IdP',
+      nubisco_platform: false,
     })
   })
 

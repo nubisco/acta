@@ -13,6 +13,7 @@ import {
   type TSsoRuntime,
 } from './routes/auth'
 import { hookRoutes } from './routes/hooks'
+import { platformWebhookRoutes } from './routes/platform-webhook'
 import {
   oauthRoutes,
   protectedResourceMetadata,
@@ -70,6 +71,13 @@ export interface IAppOptions {
    * sign in, and the default sender prints the code to the log.
    */
   otpFallback?: boolean
+  /**
+   * Shared secret the identity provider signs its webhook deliveries with
+   * (PLATFORM_WEBHOOK_SECRET). Unset means the webhook endpoint answers 404,
+   * which is the self-hosted default: an instance with no provider has
+   * nothing to receive.
+   */
+  platformWebhookSecret?: string
   /** Overridable for tests. */
   fetchImpl?: typeof fetch
   /**
@@ -202,6 +210,15 @@ export async function createApp(
   // Provider webhooks authenticate by signature, not by session, so they
   // mount before requireAuth.
   app.route('/api/v1/hooks', hookRoutes())
+  // Identity-provider events (avatar changes, membership). Signature
+  // authenticated for the same reason, and 404 when no secret is set.
+  app.route(
+    '/api/v1/platform',
+    platformWebhookRoutes(
+      opts.platformWebhookSecret,
+      ssoRuntime?.config.issuer,
+    ),
+  )
   // Workspace-scoped API: the segment names the workspace, and the middleware
   // resolves who you are inside it. This is the path the app uses.
   app.use('/api/v1/w/:workspace/*', requireWorkspace())

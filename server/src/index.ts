@@ -18,6 +18,7 @@ const app = await createApp(db, {
   sso: ssoConfigFromEnv(process.env) ?? undefined,
   oidc: oidcConfigFromEnv(process.env) ?? undefined,
   otpFallback: process.env.ACTA_OTP_FALLBACK === 'true',
+  platformWebhookSecret: process.env.PLATFORM_WEBHOOK_SECRET,
   bootstrap: {
     workspaceName: process.env.ACTA_WORKSPACE ?? 'Nubisco',
     adminEmail: process.env.ACTA_ADMIN_EMAIL,

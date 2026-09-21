@@ -171,10 +171,20 @@
         :user="{
           email: ws.me.value.email ?? ws.me.value.handle,
           name: ws.me.value.name,
+          picture: ws.me.value.picture,
         }"
-        :show-account-actions="false"
-        :show-profile="false"
+        :brand="ws.signsInThroughNubisco.value ? 'footer' : 'none'"
+        :accounts="accounts.accounts.value"
+        :accounts-unknown="accounts.accountsUnknown.value"
+        :show-account-actions="ws.signsInThroughNubisco.value"
+        :show-profile="ws.platformUrl.value !== null"
         placement="right-end"
+        @open="loadAccounts"
+        @switch="accounts.switchTo"
+        @switch-account="accounts.chooseAccount"
+        @add-account="accounts.addAccount"
+        @remove="removeAccount"
+        @profile="openProfile"
         @sign-out="signOut"
       >
         <!-- The design system's slot for product rows. Theme lived in the
@@ -277,7 +287,8 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCommandPalette, useTheme, useWalkthrough } from '@nubisco/ui'
-import type { NbMenu, NbShell, TTheme } from '@nubisco/ui'
+import type { IUserMenuAccount, NbMenu, NbShell, TTheme } from '@nubisco/ui'
+import { useAccounts } from '@/stores/accounts'
 import { introTour, tourLabels } from '@/lib/tour'
 import {
   sidebarDefaultFor,
@@ -308,6 +319,28 @@ const suggestFromWorkspace = createPaletteSuggester({
   openItem: (key) => inspector.open(key),
 })
 const theme = useTheme()
+const accounts = useAccounts()
+
+// Read when the menu opens rather than at boot: the list changes whenever the
+// person signs an account in or out on another Nubisco app.
+function loadAccounts(): void {
+  if (!ws.signsInThroughNubisco.value) return
+  void accounts.load(ws.platformUrl.value, ws.me.value)
+}
+
+function removeAccount(account: IUserMenuAccount): void {
+  void accounts.remove(account, ws.platformUrl.value, ws.me.value)
+}
+
+// The profile lives on the provider, one page for every app that signs in
+// through it. A new tab, so leaving to change a picture does not lose the
+// work open here.
+function openProfile(): void {
+  const base = ws.platformUrl.value
+  if (!base) return
+  window.open(new URL('/profile', base).toString(), '_blank', 'noopener')
+}
+
 // The same three choices the welcome modal offers, worded the same way, so
 // the two places cannot drift into describing different things.
 const themeOptions = [

@@ -35,6 +35,13 @@ CREATE TABLE IF NOT EXISTS actor (
   role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
   on_behalf_of TEXT REFERENCES actor(id),
   disabled INTEGER NOT NULL DEFAULT 0,
+  -- Who disabled them: 'platform' when the provider's membership.removed did.
+  -- See ADDITIVE_COLUMNS for existing databases.
+  disabled_source TEXT,
+  -- The provider's own id for this person (the OIDC sub claim), bound at
+  -- every SSO sign-in. Null for agents, system accounts and anyone who has
+  -- only ever signed in with a one-time code.
+  platform_user_id TEXT,
   created_at INTEGER NOT NULL,
   UNIQUE (workspace_id, handle)
 );
@@ -697,4 +704,15 @@ export const ADDITIVE_COLUMNS = [
   // Resolved is a state, not a deletion: the comment and its anchor stay.
   'ALTER TABLE doc_comment ADD COLUMN resolved_at INTEGER',
   'ALTER TABLE doc_comment ADD COLUMN resolved_by TEXT',
+  // The provider's own id for this person (the `sub` claim), bound at every
+  // SSO sign-in. Email is how a member is found at sign-in and is a poor key
+  // afterwards: the platform webhook names a user by id, and a person who
+  // changes their email address would otherwise become unreachable by it.
+  'ALTER TABLE actor ADD COLUMN platform_user_id TEXT',
+  // Who disabled this actor: 'platform' when a membership.removed webhook did.
+  // Null covers both "not disabled" and "an admin disabled them here", and the
+  // distinction matters because membership.added re-enables only what the
+  // platform itself disabled.
+  'ALTER TABLE actor ADD COLUMN disabled_source TEXT',
+  'CREATE INDEX IF NOT EXISTS idx_actor_platform_user ON actor(platform_user_id)',
 ]

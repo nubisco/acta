@@ -34,9 +34,19 @@ import { computed, ref } from 'vue'
 import { chartColorFor } from '@/lib/colors'
 import { useWorkspace } from '@/stores/workspace'
 
-// A generic avatar belongs in @nubisco/ui eventually (no NbAvatar exists
-// yet); this is the minimal domain stand-in: initials on a deterministic
-// chart-token color, with the user info hint (name, handle, kind) on hover.
+// The domain avatar: it resolves a handle against the workspace directory,
+// hints name, handle and kind on hover, and colours the initials fallback per
+// person from a chart token, which is what makes a row of faces in the actor
+// filter tellable apart.
+//
+// @nubisco/ui does now ship NbAvatar (5.4.0), and per AGENTS.md the generic
+// picture-with-initials-fallback belongs there rather than here. It is not
+// used yet because it takes a four-step size scale (20/24/28/40) where Acta
+// passes 16, 18, 20, 22, 24, 26 and 56, and paints one background
+// (--nb-c-primary) where Acta paints one per person. Adopting it as it stands
+// would resize six call sites and flatten every avatar to the same colour.
+// The library needs a size and a background it can be told, and then this
+// should render NbAvatar and keep only the lookup and the tooltip.
 const props = withDefaults(
   defineProps<{
     handle: string

@@ -51,6 +51,8 @@ describe('server skeleton', () => {
       sso: false,
       otp: true,
       sso_label: 'single sign-on',
+      // No provider at all, so nothing platform-specific is offered.
+      nubisco_platform: false,
     })
 
     const otp = await app.request('/api/v1/auth/otp', {

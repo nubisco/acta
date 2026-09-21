@@ -111,9 +111,47 @@ export const auth = {
       scopes: string[]
       email?: string
       name?: string
+      /**
+       * The avatar the provider published for this person, absent when they
+       * have none. Already checked server-side to be on the issuer's origin.
+       */
+      picture?: string
+      /** The provider's own id, so the account menu can mark which of the
+          browser's signed-in accounts this session belongs to. */
+      platform_user_id?: string
       /** False until the welcome has been dismissed once, by this person. */
       onboarded?: boolean
     }>('/auth/me'),
+
+  /**
+   * How this instance signs people in. Read once at boot: it decides whether
+   * the account menu shows the platform's account actions and Profile, which
+   * an instance pointed at another provider must not be told about.
+   */
+  config: () =>
+    req<{
+      sso: boolean
+      otp: boolean
+      sso_label?: string
+      nubisco_platform?: boolean
+      platform_url?: string
+    }>('/auth/config'),
+
+  /**
+   * A fresh sign-in through Acta's own SSO start. Switching accounts is
+   * always this, never local state: the provider's session alone does not
+   * change who Acta thinks is signed in, only a new callback does.
+   */
+  signInUrl: (
+    to?: string,
+    opts: { loginHint?: string; prompt?: 'login' | 'select_account' } = {},
+  ): string => {
+    const url = new URL('/api/v1/auth/sso/start', location.origin)
+    if (to) url.searchParams.set('to', to)
+    if (opts.loginHint) url.searchParams.set('login_hint', opts.loginHint)
+    if (opts.prompt) url.searchParams.set('prompt', opts.prompt)
+    return url.toString()
+  },
 
   markOnboarded: () =>
     req<{ ok: boolean }>('/auth/me/onboarded', { method: 'POST' }),

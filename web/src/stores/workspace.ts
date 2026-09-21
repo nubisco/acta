@@ -28,6 +28,13 @@ export interface IMe {
   scopes: string[]
   email?: string
   name?: string
+  /**
+   * The avatar the provider published, absent when this person has none. The
+   * server has already checked it is on the issuer's origin.
+   */
+  picture?: string
+  /** The provider's own id, for matching against the browser's accounts. */
+  platform_user_id?: string
   /** False until this person has been through the welcome, on any device. */
   onboarded?: boolean
 }
@@ -94,10 +101,33 @@ const announced = new Set<string>()
  */
 let inboxLoaded = false
 
+/**
+ * How this instance signs people in. Null until read, and read once: it does
+ * not change while the app is open.
+ */
+const authConfig = ref<{
+  nubisco_platform?: boolean
+  platform_url?: string
+} | null>(null)
+
+async function loadAuthConfig(): Promise<void> {
+  if (authConfig.value) return
+  try {
+    authConfig.value = await auth.config()
+  } catch {
+    // Left null, which reads as "not the platform" everywhere below, so a
+    // failed read hides the platform parts rather than showing broken ones.
+    authConfig.value = null
+  }
+}
+
 export function useWorkspace() {
   async function loadMe(): Promise<boolean> {
     try {
       me.value = (await auth.me()) as IMe
+      // Cheap and cached for the session. The account menu needs it before it
+      // can decide whether to offer account actions at all.
+      void loadAuthConfig()
       return true
     } catch {
       me.value = null
@@ -275,6 +305,13 @@ export function useWorkspace() {
     overview: computed(() => overview.value),
     me: computed(() => me.value),
     isAdmin: computed(() => me.value?.role === 'admin'),
+    /** Whether sign-in goes through Nubisco Platform. Gates the account
+        menu's platform-specific parts, per AGENTS.md. */
+    signsInThroughNubisco: computed(
+      () => authConfig.value?.nubisco_platform === true,
+    ),
+    /** Nubisco Platform's address, or null when sign-in goes elsewhere. */
+    platformUrl: computed(() => authConfig.value?.platform_url ?? null),
     connectionDown: computed(() => connectionDown.value),
     workspaceSlug: computed(() => workspaceSlug.value),
     workspaces: computed(() => workspaces.value),
