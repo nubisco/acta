@@ -1,3 +1,17 @@
+# [1.29.0](https://github.com/nubisco/acta/compare/v1.28.0...v1.29.0) (2026-09-24)
+
+
+### Bug Fixes
+
+* **editor:** chip every reference, not only the ones a global regex allowed ([9f9e558](https://github.com/nubisco/acta/commit/9f9e558c99cc5be03e02fad108517c1706d27ae7))
+* **notifications:** do not ship a Nubisco sender in an open-source product ([e7cba19](https://github.com/nubisco/acta/commit/e7cba1907f2d07bd46a0f5b8a6ee574cbc7e4de8))
+
+
+### Features
+
+* **app:** a person is an avatar, wherever they appear ([5c40437](https://github.com/nubisco/acta/commit/5c404372bd1c72b3c81f42d879ed62d4068a495c))
+* **notifications:** tell people what concerns them, and chase what they miss ([10f4605](https://github.com/nubisco/acta/commit/10f460525288d8d2001d5d474d5b65278d5b8066))
+
 # [1.28.0](https://github.com/nubisco/acta/compare/v1.27.1...v1.28.0) (2026-09-21)
 
 
