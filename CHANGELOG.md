@@ -1,3 +1,10 @@
+## [1.29.1](https://github.com/nubisco/acta/compare/v1.29.0...v1.29.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* **mentions:** read [@handle](https://github.com/handle), which is what people actually write ([4fde8d4](https://github.com/nubisco/acta/commit/4fde8d4fbc3ae0f334c0d1884a2f63de735a4b55))
+
 # [1.29.0](https://github.com/nubisco/acta/compare/v1.28.0...v1.29.0) (2026-09-24)
 
 
