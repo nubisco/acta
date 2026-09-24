@@ -1,8 +1,9 @@
-import { Node, mergeAttributes } from '@tiptap/core'
+import { InputRule, Node, mergeAttributes } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import type { MarkdownSerializerState } from '@tiptap/pm/markdown'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import RefChip from '@/components/decorations/RefChip.vue'
+import { useWorkspace } from '@/stores/workspace'
 
 /**
  * `[[SU-12]]`, `[[doc:handbook]]`, `[[@jose]]` as a single inline object.
@@ -56,6 +57,43 @@ export const Ref = Node.create({
 
   addNodeView() {
     return VueNodeViewRenderer(RefChip)
+  },
+
+  /**
+   * Typing `@handle` and carrying on makes a mention, without going near the
+   * typeahead.
+   *
+   * The typeahead inserts `[[@handle]]` when you pick somebody from it. The
+   * evidence is that nobody does: of every mention in our own workspace, not
+   * one was bracketed. People type `@ivan` and keep going, and until now that
+   * stayed grey text that notified nobody.
+   *
+   * Only a handle that names somebody converts, which is what keeps a stray
+   * `@` in prose, or a handle from an imported tool, as the text it is. The
+   * boundary character that triggered the rule is put back, so typing does
+   * not eat the space or the comma after the name.
+   */
+  addInputRules() {
+    return [
+      new InputRule({
+        find: /(^|[^A-Za-z0-9._%+\-/@])@([a-z0-9][a-z0-9-]{1,39})([\s,.;:!?])$/i,
+        handler: ({ range, match, chain }) => {
+          const lead = match[1] ?? ''
+          const handle = match[2].toLowerCase()
+          const boundary = match[3] ?? ''
+          const known = useWorkspace().overview.value?.actors ?? []
+          if (!known.some((a) => a.handle.toLowerCase() === handle)) return null
+          chain()
+            .deleteRange({ from: range.from + lead.length, to: range.to })
+            .insertContent([
+              { type: 'ref', attrs: { target: `@${handle}`, alias: null } },
+              { type: 'text', text: boundary },
+            ])
+            .run()
+          return undefined
+        },
+      }),
+    ]
   },
 
   addStorage() {

@@ -136,9 +136,18 @@ describe('notifications', () => {
     expect(top.summary).toContain('ST-1')
   })
 
-  // Prose that merely looks like a mention is not one, which is exactly the
-  // bug the @ typeahead shipped with.
-  it('does not treat bare @handle as a mention', async () => {
+  /*
+   * This used to assert the opposite, on the grounds that prose which merely
+   * looks like a mention is not one. It was a reasonable rule and it was
+   * wrong: `[[@handle]]` is what the typeahead inserts and it is not what
+   * anybody writes. Of every mention in our own workspace, not one was
+   * bracketed, so in practice the rule meant no mention had ever produced a
+   * notification at all.
+   *
+   * What the old test was really protecting against is below: the shapes
+   * that must never become a mention however they are written.
+   */
+  it('treats a bare @handle as a mention, because that is what people type', async () => {
     await itemWrite(
       jose,
       [{ op: 'create', op_id: 'i1', list: 'To Do', title: 'Ship it' }],
@@ -149,7 +158,46 @@ describe('notifications', () => {
       [{ op: 'comment', op_id: 'c1', key: 'ST-1', body: 'hey @daniela' }],
       'ST',
     )
+    const [top] = await inbox(daniela)
+    expect(top.reason).toBe('mention')
+  })
+
+  it('does not read an address, a URL or code as a mention', async () => {
+    await itemWrite(
+      jose,
+      [{ op: 'create', op_id: 'i1', list: 'To Do', title: 'Ship it' }],
+      'ST',
+    )
+    await itemWrite(
+      ivan,
+      [
+        {
+          op: 'comment',
+          op_id: 'c1',
+          key: 'ST-1',
+          body: 'write to daniela@nubisco.io, see https://x.com/@daniela, and `@daniela` in the template',
+        },
+      ],
+      'ST',
+    )
     expect(await unread(daniela)).toBe(0)
+  })
+
+  it('does not invent a person from a handle nobody holds', async () => {
+    await itemWrite(
+      jose,
+      [{ op: 'create', op_id: 'i1', list: 'To Do', title: 'Ship it' }],
+      'ST',
+    )
+    // The shape is read, and then it resolves to nobody. This is what keeps
+    // an imported @someusername from another tool out of the inbox.
+    await itemWrite(
+      ivan,
+      [{ op: 'comment', op_id: 'c1', key: 'ST-1', body: 'hey @nosuchperson' }],
+      'ST',
+    )
+    expect(await unread(daniela)).toBe(0)
+    expect(await unread(jose)).toBe(0)
   })
 
   it('keeps telling someone who has taken part', async () => {

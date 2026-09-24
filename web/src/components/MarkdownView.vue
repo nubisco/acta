@@ -660,6 +660,84 @@ function hydrateLinkCards(): void {
  */
 const mentionMounts: HTMLElement[] = []
 
+/**
+ * `@handle`, as anybody actually writes it, mirroring the rule in
+ * `shared/src/markdown.ts`. Kept in step with it by the tests on both sides.
+ */
+const BARE_MENTION =
+  /(^|[^A-Za-z0-9._%+\-/@])@([a-z0-9][a-z0-9-]{1,39})(?![a-z0-9-]*\.[A-Za-z])/gi
+
+/**
+ * Wrap plain `@handle` text in the placeholder the pill mounts into.
+ *
+ * Done over text nodes rather than over the rendered HTML, because the HTML
+ * carries `href="mailto:..."` and link targets full of the same characters,
+ * and a regex across that mangles attributes. Code and links are skipped for
+ * the same reason: `@handle` inside either is what the author meant to write.
+ *
+ * **Only handles that name somebody are wrapped.** That is what keeps an
+ * imported `@someusername` from another tool, or a typo, as ordinary text
+ * rather than a pill for a person who does not exist. It is the same rule
+ * the server applies when deciding who to notify, so what you see and who
+ * hears about it cannot disagree.
+ */
+function wrapBareMentions(root: HTMLElement): void {
+  const actors = ws.overview.value?.actors
+  if (!actors) return
+  const known = new Set(actors.map((a) => a.handle.toLowerCase()))
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      let parent = node.parentElement
+      while (parent && parent !== root) {
+        const tag = parent.tagName
+        if (tag === 'CODE' || tag === 'PRE' || tag === 'A')
+          return NodeFilter.FILTER_REJECT
+        if (parent.classList.contains('md__mention'))
+          return NodeFilter.FILTER_REJECT
+        parent = parent.parentElement
+      }
+      BARE_MENTION.lastIndex = 0
+      return BARE_MENTION.test(node.nodeValue ?? '')
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT
+    },
+  })
+
+  const texts: Text[] = []
+  let current = walker.nextNode()
+  while (current) {
+    texts.push(current as Text)
+    current = walker.nextNode()
+  }
+
+  for (const text of texts) {
+    const source = text.nodeValue ?? ''
+    const fragment = document.createDocumentFragment()
+    let last = 0
+    BARE_MENTION.lastIndex = 0
+    let match = BARE_MENTION.exec(source)
+    while (match) {
+      const lead = match[1] ?? ''
+      const handle = match[2].toLowerCase()
+      const at = match.index + lead.length
+      if (known.has(handle)) {
+        if (at > last) fragment.append(source.slice(last, at))
+        const span = document.createElement('span')
+        span.className = 'md__mention'
+        span.setAttribute('data-handle', handle)
+        span.textContent = `@${match[2]}`
+        fragment.append(span)
+        last = match.index + match[0].length
+      }
+      match = BARE_MENTION.exec(source)
+    }
+    if (last === 0) continue
+    if (last < source.length) fragment.append(source.slice(last))
+    text.replaceWith(fragment)
+  }
+}
+
 function hydrateMentions(): void {
   const root = rootEl.value
   // v-html replaces the body wholesale, so a pill from the previous render is
@@ -674,6 +752,7 @@ function hydrateMentions(): void {
     mentionMounts.splice(i, 1)
   }
   if (!root) return
+  wrapBareMentions(root)
   for (const el of root.querySelectorAll<HTMLElement>('.md__mention')) {
     const handle = el.getAttribute('data-handle')
     if (!handle || el.dataset.hydrated === '1') continue

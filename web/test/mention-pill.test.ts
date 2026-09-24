@@ -141,3 +141,58 @@ describe('the two surfaces', () => {
     expect(read.find('.md__mention').text()).toContain('Ivan Petrov')
   })
 })
+
+/**
+ * `@ivan`, which is what people actually write.
+ *
+ * `[[@ivan]]` is what the typeahead inserts, and for a long time it was the
+ * only thing that rendered. It is not what anybody types: in our own
+ * workspace not one mention was ever bracketed, so every mention ever
+ * written showed as grey text and notified nobody. Jose sent a screenshot of
+ * exactly that, five hours after writing the comment.
+ */
+describe('a mention written the way people write it', () => {
+  it('draws a pill for a plain @handle', async () => {
+    overview.value = { actors: [IVAN] }
+    const view = reader('@ivan could you review this draft?')
+    await flushPromises()
+    const pill = view.find('.md__mention')
+    expect(pill.exists()).toBe(true)
+    expect(pill.text()).toContain('Ivan Petrov')
+  })
+
+  it('leaves the rest of the sentence exactly where it was', async () => {
+    overview.value = { actors: [IVAN] }
+    const view = reader('hey @ivan, ship it')
+    await flushPromises()
+    expect(view.text()).toContain('hey')
+    expect(view.text()).toContain(', ship it')
+  })
+
+  it('leaves an address, a link and code alone', async () => {
+    overview.value = { actors: [IVAN] }
+    const view = reader(
+      'mail ivan@nubisco.io, see [the thread](https://x.com/@ivan), use `@ivan` in the template',
+    )
+    await flushPromises()
+    expect(view.findAll('.md__mention')).toHaveLength(0)
+  })
+
+  it('leaves a handle nobody holds as ordinary text', async () => {
+    overview.value = { actors: [IVAN] }
+    const view = reader('@ivanmarjanovic said so')
+    await flushPromises()
+    expect(view.findAll('.md__mention')).toHaveLength(0)
+    expect(view.text()).toContain('@ivanmarjanovic')
+  })
+
+  it('draws the same pill for both forms', async () => {
+    overview.value = { actors: [IVAN] }
+    const bare = reader('@ivan')
+    const bracketed = reader('[[@ivan]]')
+    await flushPromises()
+    expect(bare.find('.md__mention').text()).toBe(
+      bracketed.find('.md__mention').text(),
+    )
+  })
+})

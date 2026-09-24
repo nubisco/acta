@@ -179,9 +179,63 @@ export interface IRef {
   /** Character offset of the reference in the body. */
   offset: number
   raw: string
+  /**
+   * Written as a plain `@handle` rather than `[[@handle]]`.
+   *
+   * Actors only, because a person is the one thing people name without
+   * thinking about syntax. It matters to callers that write the reference
+   * back out, or that index it, because the bracketed form is a deliberate
+   * reference and this is somebody typing.
+   */
+  bare?: true
 }
 
 const REF_RE = /(!?)\[\[([^\][]+)\]\]/g
+
+/**
+ * `@handle`, as anybody actually writes it.
+ *
+ * `[[@handle]]` is what the typeahead inserts, and for a long time it was the
+ * only thing that counted. It is not what people type: of every mention in
+ * our own workspace, not one was bracketed, so no mention had ever produced
+ * a notification or rendered as anything but grey text.
+ *
+ * Deliberately narrow, because this runs over prose:
+ *
+ * - The character before must not be one that could belong to an email local
+ *   part, so `someone@example.com` is not a mention of `example`, and must
+ *   not be `/`, so a URL ending in `/@someone` is not either.
+ * - Handles are what `slugify` produces, `[a-z0-9-]`, so a dot cannot be
+ *   swallowed and `@acme.com` yields at most `@acme`.
+ * - A trailing `.` followed by letters means a domain rather than a person,
+ *   so it is left alone entirely.
+ *
+ * None of this decides whether the handle names anybody. That is the
+ * caller's job, and it is what stops an imported `@someusername` from a
+ * different tool becoming a mention of nobody.
+ */
+const BARE_MENTION_RE =
+  /(^|[^A-Za-z0-9._%+\-/@])@([a-z0-9][a-z0-9-]{1,39})(?![a-z0-9-]*\.[A-Za-z])/gi
+
+/**
+ * Plain `@handle` mentions, over a body whose bracketed references have been
+ * blanked out so `[[@ivan]]` is not also counted as a bare `@ivan`.
+ */
+function bareMentions(clean: string): IRef[] {
+  const withoutRefs = clean.replace(REF_RE, (m) => ' '.repeat(m.length))
+  const refs: IRef[] = []
+  for (const m of withoutRefs.matchAll(BARE_MENTION_RE)) {
+    const lead = m[1] ?? ''
+    refs.push({
+      type: 'actor',
+      target: m[2].toLowerCase(),
+      offset: m.index + lead.length,
+      raw: `@${m[2]}`,
+      bare: true,
+    })
+  }
+  return refs
+}
 
 function stripCode(body: string): string {
   // Blank out fenced blocks and inline code so offsets are preserved.
@@ -193,6 +247,7 @@ function stripCode(body: string): string {
 export function extractRefs(body: string): IRef[] {
   const clean = stripCode(body)
   const refs: IRef[] = []
+  for (const ref of bareMentions(clean)) refs.push(ref)
   for (const m of clean.matchAll(REF_RE)) {
     const raw = m[0]
     const inner = m[2].trim()

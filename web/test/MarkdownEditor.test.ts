@@ -13,6 +13,29 @@ import type { NodeSelection } from '@tiptap/pm/state'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { mount, flushPromises } from '@vue/test-utils'
 
+vi.mock('@/stores/workspace', async (orig) => {
+  const actual = (await orig()) as Record<string, unknown>
+  const { ref } = await import('vue')
+  const overview = ref({
+    actors: [
+      {
+        id: 'a1',
+        handle: 'ivan',
+        kind: 'human',
+        name: 'Ivan Petrov',
+        role: 'member',
+      },
+    ],
+  })
+  return {
+    ...actual,
+    useWorkspace: () => ({
+      ...(actual.useWorkspace as () => object)(),
+      overview,
+    }),
+  }
+})
+
 vi.mock('@/api/client', () => ({
   api: { search: vi.fn(async () => ({ results: [] })) },
   ApiHttpError: class extends Error {},
@@ -1116,5 +1139,64 @@ describe('MarkdownEditor references', () => {
   it('chips a run of short paragraphs', async () => {
     const n = await chipCount('[[ST-1]] and [[ST-2]]\n\n[[ST-3]]\n\n[[ST-4]]')
     expect(n).toBe(4)
+  })
+})
+
+/**
+ * Typing `@handle` makes a mention, without going near the typeahead.
+ *
+ * The typeahead inserts the bracketed form when you pick somebody from it,
+ * and the evidence from our own workspace is that nobody does: every mention
+ * ever written there was typed straight through as `@name`.
+ */
+describe('MarkdownEditor typed mentions', () => {
+  const typed = async (text: string): Promise<string> => {
+    const view = mount(MarkdownEditor, {
+      props: { modelValue: '' },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    const editor = (view.vm as unknown as { editor?: Editor }).editor!
+    editor.commands.focus()
+    // Character by character through handleTextInput, because that is what
+    // an input rule listens to. insertContent goes round it, and round the
+    // whitespace handling too, which is how the first cut of this test
+    // produced "hey@ivan".
+    for (const ch of text) {
+      const { from, to } = editor.state.selection
+      const handled = editor.view.someProp('handleTextInput', (f) =>
+        // The fifth argument is ProseMirror's "what would plain insertion
+        // do" callback, which an input rule never calls but the type
+        // requires.
+        f(editor.view, from, to, ch, () => editor.state.tr),
+      )
+      if (!handled) {
+        editor.view.dispatch(editor.state.tr.insertText(ch, from, to))
+      }
+    }
+    await flushPromises()
+    const out = editor.storage.markdown.getMarkdown()
+    view.unmount()
+    return out
+  }
+
+  it('turns a typed @handle into a reference', async () => {
+    expect(await typed('hey @ivan ')).toContain('[[@ivan]]')
+  })
+
+  it('keeps the character that ended the name', async () => {
+    const out = await typed('hey @ivan, ship it')
+    expect(out).toContain('[[@ivan]],')
+  })
+
+  it('leaves a handle nobody holds as plain text', async () => {
+    const out = await typed('hey @nosuchperson ')
+    expect(out).toContain('@nosuchperson')
+    expect(out).not.toContain('[[')
+  })
+
+  it('does not eat an email address', async () => {
+    const out = await typed('write to ivan@nubisco.io ')
+    expect(out).not.toContain('[[')
   })
 })
