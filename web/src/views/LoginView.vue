@@ -43,7 +43,7 @@
           v-model="email"
           type="email"
           label="Workspace email"
-          placeholder="you@nubisco.io"
+          placeholder="you@example.com"
           :error="errors.email"
           @blur="validateEmail"
         />

@@ -114,10 +114,10 @@ Both of these are optional. Without a key nothing is emailed and the bell is
 the whole feature, which is the self-hosted default rather than a broken
 state.
 
-| Variable              | Default                  | What it does                                                             |
-| --------------------- | ------------------------ | ------------------------------------------------------------------------ |
-| `ACTA_RESEND_API_KEY` | _unset_                  | [Resend](https://resend.com) API key. Unset means no email is ever sent. |
-| `ACTA_EMAIL_FROM`     | `Acta <acta@nubisco.io>` | The From address. Must be a sender your Resend account has verified.     |
+| Variable              | Default | What it does                                                                                                                                                                                                                                                          |
+| --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ACTA_RESEND_API_KEY` | _unset_ | [Resend](https://resend.com) API key. Unset means no email is ever sent.                                                                                                                                                                                              |
+| `ACTA_EMAIL_FROM`     | _unset_ | The From address, for example `Acta <notifications@example.com>`. Required alongside the key, and there is no default: a sender baked into an open-source product is the wrong one on every instance of it that is not ours. Must be verified in your Resend account. |
 
 `ACTA_BASE_URL` matters here too: without it the digest has no links in it,
 because a link that lands somewhere other than the thing being described is

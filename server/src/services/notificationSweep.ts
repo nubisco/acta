@@ -413,17 +413,26 @@ function linkFor(
  * return immediately without touching a row, so notifications stay pending
  * rather than being stamped as reminded by a sweep that could not remind
  * anybody.
+ *
+ * Both variables are required together, and there is deliberately no default
+ * address. Acta is open source and most instances of it are not ours, so a
+ * fallback naming a Nubisco address would be the wrong sender on every one of
+ * them: rejected by the operator's own provider if they are lucky, and
+ * delivered under somebody else's domain if they are not. A key with no From
+ * is a misconfiguration, so it says so and sends nothing rather than guessing.
  */
 export function channelsFromEnv(
   env: Record<string, string | undefined>,
+  warn: (message: string) => void = (m) => console.warn(m),
 ): INotificationChannel[] {
   if (!env.ACTA_RESEND_API_KEY) return []
+  if (!env.ACTA_EMAIL_FROM) {
+    warn(
+      '[acta] ACTA_RESEND_API_KEY is set but ACTA_EMAIL_FROM is not, so no notification email will be sent. Set it to a verified sender, for example "Acta <notifications@example.com>".',
+    )
+    return []
+  }
   return [
-    emailChannel(
-      resendSender(
-        env.ACTA_RESEND_API_KEY,
-        env.ACTA_EMAIL_FROM ?? 'Acta <acta@nubisco.io>',
-      ),
-    ),
+    emailChannel(resendSender(env.ACTA_RESEND_API_KEY, env.ACTA_EMAIL_FROM)),
   ]
 }

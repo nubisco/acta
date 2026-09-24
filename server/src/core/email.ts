@@ -37,9 +37,9 @@ export function escapeHtml(value: string): string {
 /**
  * A sender that posts to Resend.
  *
- * `from` is configurable because a self-hoster running this with their own
- * key is not sending mail from nubisco.io, and a hard-coded address would
- * mean their key is rejected by their own domain verification.
+ * `from` is an argument, with no default anywhere, because Acta is open
+ * source and most instances of it are not ours. An address baked in here
+ * would be the wrong sender on every one of them.
  */
 export function resendSender(apiKey: string, from: string): TEmailSender {
   return async ({ to, subject, html, text }) => {

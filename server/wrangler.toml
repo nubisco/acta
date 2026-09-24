@@ -29,6 +29,15 @@ ACTA_WORKSPACE = "Nubisco"
 # users have no account on; it now comes from here, so this instance has to say
 # so explicitly.
 ACTA_SSO_LABEL = "Nubisco Platform"
+# Who notification digests come from. Not a secret, and it belongs here
+# rather than in the code: this file is Nubisco's own deployment, and an
+# address baked into an open-source product is the wrong sender on every
+# instance of it that is not ours.
+#
+# The address already exists and is already a verified Resend sender: the
+# corporate contact form sends as it. The product name in front of it is what
+# tells a recipient which app is writing, so each product sets its own.
+ACTA_EMAIL_FROM = "Acta <notifications@nubisco.io>"
 # No ACTA_ADMIN_* here: identity comes from platform.nubisco.io via SSO, and
 # the first person to sign in to a fresh workspace is made its admin. These
 # remain supported, and are still required, for an instance running on email

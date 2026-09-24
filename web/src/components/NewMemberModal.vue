@@ -19,7 +19,7 @@
         v-model="email"
         type="email"
         label="Email"
-        placeholder="daniela@nubisco.io"
+        placeholder="name@example.com"
         :error="errors.email"
         @blur="validateEmail"
       />

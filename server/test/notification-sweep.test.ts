@@ -19,6 +19,7 @@ import {
   notificationRead,
 } from '../src/services/notifications'
 import {
+  channelsFromEnv,
   emailChannel,
   notificationSweep,
   reminderSweep,
@@ -388,5 +389,48 @@ describe('the whole sweep', () => {
     expect(out.reminded).toBe(1)
     expect(sent).toHaveLength(1)
     expect(sent[0].text).toContain('overdue')
+  })
+})
+
+/**
+ * Acta is open source, and most instances of it are not ours.
+ *
+ * The first cut of this defaulted the From address to a nubisco.io mailbox,
+ * which is the wrong sender on every instance we do not run: rejected by the
+ * operator's own provider if they are lucky, and sent under our domain if
+ * they are not. The address is now required alongside the key, and this is
+ * here so it cannot come back as a convenience.
+ */
+describe('what an instance is configured to send as', () => {
+  it('sends nothing at all with no key, which is the self-hosted default', () => {
+    expect(channelsFromEnv({}, () => {})).toHaveLength(0)
+  })
+
+  it('refuses a key with no From address, and says why', () => {
+    const said: string[] = []
+    const channels = channelsFromEnv({ ACTA_RESEND_API_KEY: 'test' }, (m) =>
+      said.push(m),
+    )
+    expect(channels).toHaveLength(0)
+    expect(said.join(' ')).toContain('ACTA_EMAIL_FROM')
+  })
+
+  it('never falls back to an address of ours', () => {
+    const said: string[] = []
+    channelsFromEnv({ ACTA_RESEND_API_KEY: 'test' }, (m) => said.push(m))
+    // Including in the message it prints: an example naming our own domain
+    // is how a self-hoster ends up pasting it in.
+    expect(said.join(' ')).not.toContain('nubisco')
+  })
+
+  it('takes the address it is given', () => {
+    const channels = channelsFromEnv(
+      {
+        ACTA_RESEND_API_KEY: 'test',
+        ACTA_EMAIL_FROM: 'Acta <notifications@example.com>',
+      },
+      () => {},
+    )
+    expect(channels.map((c) => c.id)).toEqual(['email'])
   })
 })
