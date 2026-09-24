@@ -16,7 +16,13 @@ import { createToken } from '../core/auth'
 import { emitEvent, flushPendingEvents, onEvent } from '../core/events'
 import { spaceWrite } from '../services/spaces'
 import { docWrite } from '../services/docs'
-import { notificationList, notificationRead } from '../services/notifications'
+import {
+  notificationList,
+  notificationPrefs,
+  notificationPrefsSet,
+  notificationRead,
+  REMINDER_DELAYS,
+} from '../services/notifications'
 import { sequenceGet } from '../services/sequence'
 import { itemWrite } from '../services/items'
 import { labelWrite } from '../services/labels'
@@ -239,6 +245,33 @@ export function apiRoutes(
   app.post('/notifications/read', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { id?: string }
     return c.json(await notificationRead(ctxOf(c), body.id))
+  })
+
+  /**
+   * How long this person's unread notifications wait before Acta reaches
+   * them some other way. Their own setting, so no scope check beyond being
+   * signed in: there is nobody else's preference to read or write here.
+   */
+  app.get('/notifications/prefs', async (c) =>
+    c.json(await notificationPrefs(ctxOf(c))),
+  )
+
+  app.put('/notifications/prefs', async (c) => {
+    const body = z
+      .object({
+        // A closed set, not a free number. The sweep runs on a fixed tick,
+        // so a value between two of these would only look precise.
+        notify_after_seconds: z
+          .number()
+          .int()
+          .refine((n) => (REMINDER_DELAYS as readonly number[]).includes(n), {
+            message: `expected one of ${REMINDER_DELAYS.join(', ')}`,
+          }),
+      })
+      .parse(await c.req.json())
+    return c.json(
+      await notificationPrefsSet(ctxOf(c), body.notify_after_seconds),
+    )
   })
 
   app.post('/labels/write', async (c) => {
@@ -643,7 +676,19 @@ export function apiRoutes(
       'member.updated',
       'actor',
       c.req.param('id'),
-      'updated member',
+      body.role
+        ? `you are now ${body.role === 'admin' ? 'an admin' : 'a member'}`
+        : 'updated member',
+      undefined,
+      // Only a role change, and only to the person it happened to. Being
+      // made an admin changes what the app will let you do, so finding out
+      // by trying something and having it work is the wrong way round. A
+      // renamed member or a new avatar is not news to anybody.
+      body.role
+        ? {
+            to: [{ actorId: c.req.param('id'), reason: 'assigned' as const }],
+          }
+        : undefined,
     )
     flushPendingEvents()
     return c.json({ ok: true })

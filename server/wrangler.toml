@@ -34,6 +34,13 @@ ACTA_SSO_LABEL = "Nubisco Platform"
 # remain supported, and are still required, for an instance running on email
 # one-time codes alone, where there is no provider to vouch for anyone.
 
+# The time-driven half of notifications: due dates arriving, and unread
+# notifications going unread long enough to be worth an email. Five minutes
+# against a shortest window of ten, so a reminder is at most half a window
+# late. Both queries are indexed and return nothing almost every time.
+[triggers]
+crons = ["*/5 * * * *"]
+
 [observability]
 enabled = true
 

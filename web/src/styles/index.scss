@@ -32,3 +32,20 @@ body {
   flex-wrap: wrap;
   min-inline-size: 0;
 }
+
+/* NbNotificationCenter's panel sits at z-index 15 and NbShell's sidebar at
+ * 100, so a notification centre placed in the sidebar (which is where a bell
+ * belongs, and where NbShell's own layout puts it) is painted over by the
+ * sidebar it springs from. Measured in a real browser at 1440x900: the panel
+ * is laid out correctly at x 8 to 368, and the first 240 of that is covered.
+ *
+ * Reaching into a library class is not something to copy. It is here because
+ * the alternative is a feature nobody can read, and it is deliberately the
+ * narrowest possible rule. Remove it when @nubisco/ui raises the panel above
+ * the shell, which is the real fix and is filed. */
+/* The `body >` is not decoration: the library's own rule has the same
+ * specificity and is loaded after this file, so a bare class selector loses.
+ * The panel is teleported to the body, so it is genuinely a direct child. */
+body > .nb-notification-center__panel {
+  z-index: var(--nb-zindex-modal);
+}

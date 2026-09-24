@@ -102,6 +102,50 @@ On Cloudflare Workers this is a secret, not a var:
 wrangler secret put PLATFORM_WEBHOOK_SECRET
 ```
 
+## Notification email
+
+Acta tells people about work they are part of in the bell. If a notification
+has been sitting there unread for longer than that person's own setting, it
+also reaches them by email, as one digest rather than one message per
+notification. Opening the bell is what stops it, so a morning spent in Acta
+sends nothing at all.
+
+Both of these are optional. Without a key nothing is emailed and the bell is
+the whole feature, which is the self-hosted default rather than a broken
+state.
+
+| Variable              | Default                  | What it does                                                             |
+| --------------------- | ------------------------ | ------------------------------------------------------------------------ |
+| `ACTA_RESEND_API_KEY` | _unset_                  | [Resend](https://resend.com) API key. Unset means no email is ever sent. |
+| `ACTA_EMAIL_FROM`     | `Acta <acta@nubisco.io>` | The From address. Must be a sender your Resend account has verified.     |
+
+`ACTA_BASE_URL` matters here too: without it the digest has no links in it,
+because a link that lands somewhere other than the thing being described is
+worse than no link.
+
+On Cloudflare Workers the key is a secret, not a var:
+
+```sh
+wrangler secret put ACTA_RESEND_API_KEY
+```
+
+### The sweep
+
+Two things are driven by time rather than by somebody writing: a due date
+arriving, and a notification going unread long enough to be worth an email.
+Both run in one sweep.
+
+- **On Cloudflare** a cron trigger runs it every five minutes. It is declared
+  in `server/wrangler.toml` under `[triggers]`, and the Worker's `scheduled`
+  handler is what receives it.
+- **On Bun or Docker** the same function runs on a one-minute interval from
+  `server/src/index.ts`. Nothing to configure.
+
+Both call `notificationSweep`, so the two deployments have the same feature.
+Every step in it is idempotent, which is what makes a retried cron or a
+second isolate harmless: due-date events are keyed on the card and the date,
+and a reminder is stamped in the same statement that selects it.
+
 ## Importer variables
 
 Used by the [migration CLIs](/developers/migrate-trello), not by the server.

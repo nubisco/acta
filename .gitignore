@@ -9,6 +9,10 @@ docs/.vitepress/dist/
 coverage/
 .env
 .env.*
+# The one exception: the example is documentation, and a template nobody can
+# see is a template nobody fills in. AGENTS.md asks for the platform webhook
+# URL to live here, beside the secret it goes with.
+!.env.example
 
 # Internal design documents: contain Nubisco-internal infrastructure and
 # migration data. Kept local, never published.

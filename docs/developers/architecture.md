@@ -47,6 +47,28 @@ committed by the time they run.
 Rule-triggered changes are attributed to the system actor and never re-trigger
 rules, which is what stops two rules from looping.
 
+## The clock
+
+Two things happen because time passed rather than because somebody wrote: a
+due date arriving, and a notification going unread long enough to be worth an
+email. `services/notificationSweep.ts` is both, in one function, called from a
+cron trigger on Workers (`scheduled` in `worker.ts`) and from an interval on
+Bun (`index.ts`). Writing it once is the point, because a reminder that only
+fired on the hosted instance would be a feature self-hosters are told they
+have and do not.
+
+It has to be safe to run twice, since two isolates, a retried cron and a
+restart can all cause that. Due-date events carry an op id built from the card
+and the date, so moving a date earns one fresh reminder and leaving it alone
+earns none. A reminder stamps `reminded_at` in the same statement that
+selected the rows.
+
+Reaching somebody outside the app goes through `INotificationChannel`. Email
+is the one that exists. The seam is there because an instant channel, Slack,
+changes the arithmetic rather than adding to it: a Slack message that links
+back marks the notification read when the link is followed, and the email is
+then never owed at all.
+
 ## The database
 
 SQLite, or D1 which is SQLite. There is no ORM and no migration files:

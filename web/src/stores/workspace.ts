@@ -44,8 +44,18 @@ export interface IAppNotification {
   title: string
   /** Why this reached you: mentioned, assigned, or already taking part. */
   reason: 'mention' | 'assigned' | 'involved'
+  /** What happened, so the row can carry an icon that says which. */
+  verb: string
   /** The card to open, when there is one. */
   itemKey: string | null
+  /** The page to open, for everything that happened on a document. */
+  docSlug: string | null
+  /**
+   * Who did it. A person is represented by their avatar wherever they
+   * appear, and an inbox is a list of things people did, so a row without a
+   * face is the one place in the app that breaks that.
+   */
+  actorHandle: string | null
   timestamp: string
   read: boolean
 }
@@ -76,9 +86,23 @@ let unsubscribe: (() => void) | null = null
  * the server's list on purpose: this only decides whether to re-read, and
  * the server decides who is actually told.
  */
+/**
+ * Coalesce the re-reads.
+ *
+ * The stream is workspace-wide, so a burst of writes by one person is a burst
+ * of events at everybody, and one GET per event per open tab is a lot of
+ * requests to answer the same question. Saving a document repeatedly is the
+ * shape that makes it obvious. The window is short enough that the bell still
+ * feels live.
+ */
+let reloadTimer: ReturnType<typeof setTimeout> | null = null
+
 const NOTIFY_VERBS = new Set([
   'comment.created',
+  'comment.updated',
+  'comment.resolved',
   'item.assigned',
+  'item.unassigned',
   'item.created',
   'item.updated',
   'item.archived',
@@ -86,7 +110,13 @@ const NOTIFY_VERBS = new Set([
   'item.completed',
   'item.reopened',
   'item.moved',
-  'doc.comment_created',
+  'item.blocked',
+  'item.unblocked',
+  'item.due_soon',
+  'item.overdue',
+  'doc.created',
+  'doc.updated',
+  'member.updated',
 ])
 
 /** Ids already shown as a desktop notification, so a re-read never repeats one. */
@@ -119,6 +149,23 @@ async function loadAuthConfig(): Promise<void> {
     // failed read hides the platform parts rather than showing broken ones.
     authConfig.value = null
   }
+}
+
+/**
+ * Where a notification opens.
+ *
+ * A card opens as an inspector over its own space, and a card key carries
+ * that space in front of the dash. A document opens as a page. Everything
+ * else has nowhere to go and says so by returning null, which is what makes
+ * the row inert rather than a button that does nothing.
+ */
+export function notificationPath(n: IAppNotification): string | null {
+  const slug = getWorkspaceSlug()
+  if (!slug) return null
+  if (n.itemKey)
+    return `/${slug}/s/${n.itemKey.split('-')[0]}?item=${n.itemKey}`
+  if (n.docSlug) return `/${slug}/docs/${n.docSlug}`
+  return null
 }
 
 export function useWorkspace() {
@@ -188,7 +235,7 @@ export function useWorkspace() {
         // Anything might have produced a notification for this person, and
         // the server is the one that knows. Re-reading is cheap and means
         // the bell shows the same thing in every tab.
-        if (NOTIFY_VERBS.has(event.verb)) void loadNotifications()
+        if (NOTIFY_VERBS.has(event.verb)) reloadNotificationsSoon()
         for (const listener of listeners) listener(event)
       },
       (down) => {
@@ -220,14 +267,28 @@ export function useWorkspace() {
    * The browser's own notification is the point of the exercise: a bell you
    * have to be looking at to notice is a bell for people already looking.
    */
-  async function loadNotifications(): Promise<void> {
+  function reloadNotificationsSoon(): void {
+    if (reloadTimer) clearTimeout(reloadTimer)
+    reloadTimer = setTimeout(() => {
+      reloadTimer = null
+      void loadNotifications()
+    }, 300)
+  }
+
+  async function loadNotifications(): Promise<boolean> {
+    // Reported rather than swallowed. An inbox that renders "nothing waiting
+    // on you" because the request failed is the one wrong answer the bell can
+    // give, so the caller has to be able to tell the two apart.
     const res = await api.notifications().catch(() => null)
-    if (!res) return
+    if (!res) return false
     const fresh: IAppNotification[] = res.notifications.map((n) => ({
       id: n.id,
-      title: n.summary,
+      title: n.actor_name ? `${n.actor_name} ${n.summary}` : n.summary,
       reason: n.reason,
+      verb: n.verb,
       itemKey: n.item_key,
+      docSlug: n.doc_slug,
+      actorHandle: n.actor_handle,
       timestamp: new Date(n.created_at).toISOString(),
       read: n.read_at !== null,
     }))
@@ -241,6 +302,7 @@ export function useWorkspace() {
       announced.add(n.id)
       if (!first) announce(n)
     }
+    return true
   }
 
   /** The OS-level notification, when the person has allowed them. */
@@ -262,10 +324,8 @@ export function useWorkspace() {
     })
     notice.onclick = () => {
       window.focus()
-      if (n.itemKey) {
-        const slug = getWorkspaceSlug()
-        window.location.href = `/${slug}/s/${n.itemKey.split('-')[0]}?item=${n.itemKey}`
-      }
+      const target = notificationPath(n)
+      if (target) window.location.href = target
       notice.close()
     }
   }

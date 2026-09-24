@@ -90,7 +90,14 @@ failed op can be retried with the same id.
 
 **`notification`** Per-actor, unique on `(actor_id, event_id)` so one event
 cannot notify someone twice. `reason` is `mention`, `assigned` or `involved`,
-in that order of precedence.
+in that order of precedence. `item_key` or `doc_slug` says what it opens.
+
+`remind_at` is when it becomes eligible to be chased outside the app, stamped
+at write time from the recipient's own `actor.notify_after_seconds` rather
+than read from that setting later: changing your preference should govern what
+happens next, not silently re-time a week of notifications you already have.
+`reminded_at` and `reminded_via` are set once, by the sweep, so a reminder
+cannot repeat every five minutes for as long as the row stays unread.
 
 **`webhook`, `webhook_delivery`, `rule`** Outbound delivery with a failure
 count, and the automation catalogue.

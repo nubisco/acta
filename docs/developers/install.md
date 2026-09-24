@@ -85,6 +85,9 @@ acta.example.com {
 Set `ACTA_BASE_URL=https://acta.example.com` so links in outbound
 notifications point somewhere that works.
 
+`.env.example` in the repository root lists every variable the server reads,
+with the optional ones left blank and a note on what each one turns on.
+
 ## On Cloudflare Workers
 
 Acta also runs on Workers with D1 for the database and R2 for attachments.

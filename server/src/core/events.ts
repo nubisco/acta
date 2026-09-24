@@ -1,5 +1,5 @@
 import { newId } from '@nubisco/acta-shared'
-import { notifyForEvent } from '../services/notifications'
+import { notifyForEvent, type INotifyHints } from '../services/notifications'
 import { defer } from './defer'
 import type { ICtx } from './ctx'
 import { now } from './ctx'
@@ -37,11 +37,14 @@ export async function emitEvent(
   summary: string,
   payload?: unknown,
   /**
-   * The text that was just written, when there is any, so mentions in it can
-   * be found. Only the comment and description paths have one; everything
-   * else notifies on involvement alone.
+   * What this write knows about who it concerns, beyond who happens to be on
+   * the thing already. A bare string is the text that was just written, so
+   * mentions in it can be found, which is the common case and the shape most
+   * of these call sites were written in. The object form also names people
+   * directly, for the events that are about a person rather than about a
+   * card: being assigned, being unassigned, having your comment resolved.
    */
-  notifyBody?: string,
+  notify?: string | INotifyHints,
 ): Promise<IEvent> {
   const event: IEvent = {
     id: newId('evt'),
@@ -80,7 +83,7 @@ export async function emitEvent(
   // happened. Failure here is swallowed for the opposite reason, that a bell
   // is never worth failing a write over.
   try {
-    await notifyForEvent(ctx, event, notifyBody)
+    await notifyForEvent(ctx, event, notify)
   } catch {
     // Deliberately silent: see above.
   }

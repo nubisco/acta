@@ -288,8 +288,12 @@ export const api = {
         verb: string
         summary: string
         item_key: string | null
+        doc_slug: string | null
         created_at: number
         read_at: number | null
+        actor_handle: string | null
+        actor_name: string | null
+        actor_avatar_url: string | null
       }[]
       unread: number
     }>('/notifications'),
@@ -299,6 +303,16 @@ export const api = {
     req<{ ok: boolean }>('/notifications/read', {
       method: 'POST',
       body: JSON.stringify(id ? { id } : {}),
+    }),
+
+  /** Seconds an unread notification waits before Acta emails about it. */
+  notificationPrefs: () =>
+    req<{ notify_after_seconds: number }>('/notifications/prefs'),
+
+  setNotificationPrefs: (seconds: number) =>
+    req<{ notify_after_seconds: number }>('/notifications/prefs', {
+      method: 'PUT',
+      body: JSON.stringify({ notify_after_seconds: seconds }),
     }),
 
   docTree: () => req<{ docs: IDocNode[] }>('/docs'),

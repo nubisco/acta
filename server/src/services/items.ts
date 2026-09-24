@@ -8,6 +8,7 @@ import {
 import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
 import { emitEvent } from '../core/events'
+import { newMentions } from './notifications'
 import { ftsDelete, ftsUpsert } from '../core/fts'
 import { withOp } from '../core/ops'
 import type { AttachmentStore } from './attachments'
@@ -125,23 +126,20 @@ async function syncLinks(
 }
 
 /**
- * The mentions that are new in this text, as a body a notifier can scan.
- *
- * Editing a description must not ring for everyone named in it every time.
- * Only handles that were not there before are worth telling, so the diff is
- * taken here and the result handed on as if it were freshly written text.
+ * The people holding a card, as recipients of an event about a different
+ * card. Dependencies are the only place this is needed: the news lands on
+ * the blocked card, and the people who have to act on it are on the other
+ * end of the edge.
  */
-function newMentions(before: string, after: string): string {
-  const had = new Set(
-    extractRefs(before)
-      .filter((r) => r.type === 'actor')
-      .map((r) => r.target.toLowerCase()),
+async function assigneeHints(
+  ctx: ICtx,
+  itemId: string,
+): Promise<Array<{ actorId: string; reason: 'assigned' }>> {
+  const rows = await ctx.db.query<{ actor_id: string }>(
+    'SELECT actor_id FROM item_assignee WHERE item_id = ?',
+    [itemId],
   )
-  return extractRefs(after)
-    .filter((r) => r.type === 'actor')
-    .filter((r) => !had.has(r.target.toLowerCase()))
-    .map((r) => `[[@${r.target}]]`)
-    .join(' ')
+  return rows.map((r) => ({ actorId: r.actor_id, reason: 'assigned' as const }))
 }
 
 async function applyItemOp(
@@ -473,6 +471,12 @@ async function applyItemOp(
           'item',
           item.id,
           `edited a comment on ${item.key}`,
+          undefined,
+          // Only the names that were not there before. Editing a typo in a
+          // comment that already mentions three people must not ring for
+          // them again, and forgetting to add someone and coming back for
+          // it is how half of all mentions actually get written.
+          { body: newMentions(existing.body, body) },
         )
       }
       return { key: item.key, id: existing.id, rev: item.rev }
@@ -513,6 +517,12 @@ async function applyItemOp(
         'item',
         blocked.id,
         `${blocked.key} now waits on ${blocker.key}`,
+        undefined,
+        // Whoever is holding the blocker now has work queued behind them,
+        // which is not visible from their own card at all. The blocked
+        // card's own people are reached by involvement, the way every other
+        // change to that card is.
+        { to: await assigneeHints(ctx, blocker.id) },
       )
       return { key: blocked.key, rev: blocked.rev }
     }
@@ -529,6 +539,8 @@ async function applyItemOp(
         'item',
         blocked.id,
         `${blocked.key} no longer waits on ${blocker.key}`,
+        undefined,
+        { to: await assigneeHints(ctx, blocker.id) },
       )
       return { key: blocked.key, rev: blocked.rev }
     }
@@ -549,12 +561,15 @@ async function applyItemOp(
     }
     case 'assign': {
       const item = await itemByKey(ctx, op.key)
+      const added: string[] = []
+      const removed: string[] = []
       for (const ref of op.add ?? []) {
         const actor = await actorByRef(ctx, ref)
         await ctx.db.run(
           'INSERT OR IGNORE INTO item_assignee (item_id, actor_id) VALUES (?, ?)',
           [item.id, actor.id],
         )
+        added.push(actor.id)
       }
       for (const ref of op.remove ?? []) {
         const actor = await actorByRef(ctx, ref)
@@ -562,6 +577,7 @@ async function applyItemOp(
           'DELETE FROM item_assignee WHERE item_id = ? AND actor_id = ?',
           [item.id, actor.id],
         )
+        removed.push(actor.id)
       }
       const rev = await bumpRev(ctx, item)
       await emitEvent(
@@ -570,7 +586,35 @@ async function applyItemOp(
         'item',
         item.id,
         `assignees changed on ${item.key}`,
+        { added, removed },
+        // Involvement cannot express either end of this. Somebody just
+        // added is on the card by the time the event is emitted, so they
+        // would be told "assignees changed" rather than "this is yours", and
+        // somebody just removed is not on the card at all, so they were
+        // never told anything.
+        {
+          to: added.map((actorId) => ({
+            actorId,
+            reason: 'assigned' as const,
+          })),
+        },
       )
+      if (removed.length > 0) {
+        await emitEvent(
+          ctx,
+          'item.unassigned',
+          'item',
+          item.id,
+          `taken off ${item.key}`,
+          { removed },
+          {
+            to: removed.map((actorId) => ({
+              actorId,
+              reason: 'assigned' as const,
+            })),
+          },
+        )
+      }
       return { key: item.key, rev }
     }
     case 'archive':

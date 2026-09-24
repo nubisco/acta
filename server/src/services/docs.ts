@@ -10,6 +10,7 @@ import {
 import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
 import { emitEvent } from '../core/events'
+import { newMentions } from './notifications'
 import { ftsDelete, ftsUpsert } from '../core/fts'
 import { withOp } from '../core/ops'
 import { spaceByKey, docBySlug, type IDocRow } from '../core/store'
@@ -196,7 +197,18 @@ async function applyDocOp(
         [newId('doc'), id, op.body, op.title, ctx.actor.id, ts],
       )
       await syncDocDerived(ctx, id, op.slug, op.title, op.body)
-      await emitEvent(ctx, 'doc.created', 'doc', id, `created doc ${op.slug}`)
+      await emitEvent(
+        ctx,
+        'doc.created',
+        'doc',
+        id,
+        `created doc ${op.slug}`,
+        undefined,
+        // A page often arrives with the people it concerns already named in
+        // it. Cards have done this since they were fixed; documents never
+        // did, so being written into a brand new page told nobody.
+        { body: op.body },
+      )
       return { slug: op.slug, id, rev: 1 }
     }
     case 'comment': {
@@ -232,6 +244,8 @@ async function applyDocOp(
         'doc',
         doc.id,
         `commented on ${doc.slug}`,
+        undefined,
+        op.body,
       )
       return {
         slug: doc.slug,
@@ -245,8 +259,12 @@ async function applyDocOp(
     case 'comment_resolve': {
       const doc = await docBySlug(ctx, op.ref)
       const existing = (
-        await ctx.db.query<{ id: string; resolved_at: number | null }>(
-          'SELECT id, resolved_at FROM doc_comment WHERE id = ? AND document_id = ?',
+        await ctx.db.query<{
+          id: string
+          resolved_at: number | null
+          actor_id: string
+        }>(
+          'SELECT id, resolved_at, actor_id FROM doc_comment WHERE id = ? AND document_id = ?',
           [op.comment_id, doc.id],
         )
       )[0]
@@ -270,6 +288,12 @@ async function applyDocOp(
         'doc',
         doc.id,
         `${op.resolved ? 'resolved' : 'reopened'} a comment on ${doc.slug}`,
+        undefined,
+        // The person who raised it, by name. They are a participant on the
+        // page too, but somebody closing your question is about you, and
+        // arriving in the same breath as everyone else who ever commented
+        // is not the same message.
+        { to: [{ actorId: existing.actor_id, reason: 'involved' as const }] },
       )
       return { slug: doc.slug, id: existing.id, rev: doc.rev }
     }
@@ -304,6 +328,8 @@ async function applyDocOp(
           'doc',
           doc.id,
           `edited a comment on ${doc.slug}`,
+          undefined,
+          { body: newMentions(existing.body, body) },
         )
       }
       return { slug: doc.slug, id: existing.id, rev: doc.rev }
@@ -346,7 +372,18 @@ async function applyDocOp(
           rev: doc.rev,
         })
       const rev = await saveVersion(ctx, doc, op.body, doc.title)
-      await emitEvent(ctx, 'doc.updated', 'doc', doc.id, `replaced ${doc.slug}`)
+      await emitEvent(
+        ctx,
+        'doc.updated',
+        'doc',
+        doc.id,
+        `replaced ${doc.slug}`,
+        undefined,
+        // Mentions only, and only the new ones. A page nobody is named in
+        // can be saved a hundred times in an afternoon without ringing once,
+        // which is why doc.updated is not a verb involvement reacts to.
+        { body: newMentions(doc.body, op.body) },
+      )
       return { slug: doc.slug, rev }
     }
     case 'patch_section': {
@@ -379,6 +416,8 @@ async function applyDocOp(
         'doc',
         doc.id,
         `patched ${doc.slug}#${op.section}`,
+        undefined,
+        { body: newMentions(doc.body, body) },
       )
       return { slug: doc.slug, rev }
     }
@@ -395,6 +434,8 @@ async function applyDocOp(
         'doc',
         doc.id,
         `appended to ${doc.slug}`,
+        undefined,
+        { body: newMentions(doc.body, body) },
       )
       return { slug: doc.slug, rev }
     }

@@ -188,13 +188,35 @@ documents in one index, and it is also how you jump to a card by key.
 The bell shows what you were mentioned in, assigned to, or are involved in.
 Involvement means you commented, were assigned, or created the thing.
 
-Browser notifications must be granted from a real click, so the first time you
-enable them Acta asks. Without permission the bell still works, you simply have
-to look at it.
+You hear about it when somebody names you with `@`, in a card, in a comment or
+in the body of a document. You hear about a card being handed to you and about
+one being taken away again. You hear about the conversation on a card or a page
+you have already taken part in, about a card of yours being finished, reopened
+or archived, about a card of yours becoming blocked or stopping being blocked,
+and about a due date a day before it arrives and again once it has passed.
+
+You never hear about your own actions, and you are not told twice for the same
+thing. Editing a comment that already named three people does not ring for them
+again, only for anybody you have just added.
+
+### Being chased
+
+If a notification sits unread for a while, Acta emails you the ones you have
+missed. It is one message covering everything, never one per notification, and
+repeats of the same thing are folded into a line with a count.
+
+Opening the bell is what stops it. A morning spent in Acta never produces an
+email at all, which is the point: the email is what happens when you were not
+looking.
+
+Choose the window, or turn it off, under **Settings → Notifications**. Ten
+minutes is the default. The same page is where you allow desktop
+notifications, which arrive the moment something happens while Acta is open in
+a tab. Browsers only accept that request from a real click, so Acta has to ask.
 
 ## Settings
 
-Four sections, grouped by what you are trying to do.
+Five sections, grouped by what you are trying to do.
 
 **People** is who can sign in. Only people can be assigned work or mentioned.
 
@@ -207,8 +229,12 @@ form, **connections** let a provider like GitHub push signed events in,
 to itself, and **agent tokens** are credentials for a script that acts under
 its own name.
 
-**Your account** is the only one that is not administrative, and every member
-has it. It holds your own **access tokens**, which let a tool act as _you_
+**Notifications** is how much Acta chases you: the window before an unread
+notification turns into an email, or never, and whether this browser may show
+desktop notifications.
+
+**Your account** is the other one every member has, administrator or not. It
+holds your own **access tokens**, which let a tool act as _you_
 rather than as a bot, and your **connected applications**, which is where you
 disconnect something like Claude that you signed in through.
 

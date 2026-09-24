@@ -43,6 +43,8 @@ declare module 'vue' {
     NbMenuDivider: typeof import('@nubisco/ui/components/MenuDivider')['NbMenuDivider']
     NbMenuItem: typeof import('@nubisco/ui/components/MenuItem')['NbMenuItem']
     NbModal: typeof import('@nubisco/ui/components/Modal')['NbModal']
+    NbNotificationCenter: typeof import('@nubisco/ui/components/NotificationCenter')['NbNotificationCenter']
+    NbNotificationCenterItem: typeof import('@nubisco/ui/components/NotificationCenterItem')['NbNotificationCenterItem']
     NbNubiscoMark: typeof import('@nubisco/ui/components/NubiscoMark')['NbNubiscoMark']
     NbPanel: typeof import('@nubisco/ui/components/Panel')['NbPanel']
     NbProgressBar: typeof import('@nubisco/ui/components/ProgressBar')['NbProgressBar']

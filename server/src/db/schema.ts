@@ -42,6 +42,11 @@ CREATE TABLE IF NOT EXISTS actor (
   -- every SSO sign-in. Null for agents, system accounts and anyone who has
   -- only ever signed in with a one-time code.
   platform_user_id TEXT,
+  -- How long an unread notification may sit before we reach the person some
+  -- other way. Seconds; 0 turns it off. The default is on, because the
+  -- failure people actually report is missing the thing, not being told
+  -- twice. See ADDITIVE_COLUMNS for existing databases.
+  notify_after_seconds INTEGER NOT NULL DEFAULT 600,
   created_at INTEGER NOT NULL,
   UNIQUE (workspace_id, handle)
 );
@@ -465,10 +470,24 @@ CREATE TABLE IF NOT EXISTS notification (
   doc_slug TEXT,
   created_at INTEGER NOT NULL,
   read_at INTEGER,
+  -- When this becomes eligible for a nudge outside the app, stamped from the
+  -- recipient's own setting at the moment it was written rather than read
+  -- from the setting later: changing your preference should govern what
+  -- happens next, not silently re-time a week of notifications you already
+  -- have. Null means never nudge this person about this.
+  remind_at INTEGER,
+  -- When we did, and by what. Set once, so a second sweep skips the row even
+  -- if it is still unread; a reminder repeated every five minutes is how a
+  -- person learns to filter the sender.
+  reminded_at INTEGER,
+  reminded_via TEXT,
   UNIQUE (actor_id, event_id)
 );
 CREATE INDEX IF NOT EXISTS idx_notification_inbox
   ON notification(actor_id, read_at, created_at DESC);
+-- The sweep's own index is in ADDITIVE_COLUMNS, beside the columns it
+-- names: this block runs before that list, so an index declared here would
+-- name a column an existing database does not have yet.
 
 -- Open Graph metadata behind a link preview card, cached with a TTL.
 --
@@ -715,4 +734,19 @@ export const ADDITIVE_COLUMNS = [
   // platform itself disabled.
   'ALTER TABLE actor ADD COLUMN disabled_source TEXT',
   'CREATE INDEX IF NOT EXISTS idx_actor_platform_user ON actor(platform_user_id)',
+  // Which document a notification opens. Declared in SCHEMA_SQL from the day
+  // doc comments shipped and never listed here, so every database older than
+  // that line lacks the column: the notification write below names it, and on
+  // those databases the INSERT would fail. Nothing read it before, which is
+  // why the gap survived.
+  'ALTER TABLE notification ADD COLUMN doc_slug TEXT',
+  // Reminder bookkeeping: when a notification is owed a nudge outside the
+  // app, and when one was sent.
+  'ALTER TABLE notification ADD COLUMN remind_at INTEGER',
+  'ALTER TABLE notification ADD COLUMN reminded_at INTEGER',
+  'ALTER TABLE notification ADD COLUMN reminded_via TEXT',
+  'CREATE INDEX IF NOT EXISTS idx_notification_reminder ON notification(remind_at) WHERE read_at IS NULL AND reminded_at IS NULL AND remind_at IS NOT NULL',
+  // How long this person's unread notifications wait before they are nudged.
+  // Seconds, 0 for off. Existing members get the same default as new ones.
+  'ALTER TABLE actor ADD COLUMN notify_after_seconds INTEGER NOT NULL DEFAULT 600',
 ]
