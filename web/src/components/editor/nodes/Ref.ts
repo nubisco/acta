@@ -87,6 +87,15 @@ export const Ref = Node.create({
                       return NodeFilter.FILTER_REJECT
                     parent = parent.parentElement
                   }
+                  // Reset before the test, not only before the replacement
+                  // below. `test` on a global regex advances `lastIndex` and
+                  // the walker calls this once per text node, so the position
+                  // left behind by one paragraph decided where the search
+                  // started in the next. A reference late in a long paragraph
+                  // therefore hid every reference in the short paragraph after
+                  // it, which rendered as raw `[[@handle]]` in the editor while
+                  // the reader showed a pill for the same text.
+                  REF_PATTERN.lastIndex = 0
                   return REF_PATTERN.test(node.nodeValue ?? '')
                     ? NodeFilter.FILTER_ACCEPT
                     : NodeFilter.FILTER_REJECT

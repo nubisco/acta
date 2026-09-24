@@ -10,6 +10,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import type { NodeSelection } from '@tiptap/pm/state'
+import type { Node as PMNode } from '@tiptap/pm/model'
 import { mount, flushPromises } from '@vue/test-utils'
 
 vi.mock('@/api/client', () => ({
@@ -1067,5 +1068,53 @@ describe('the editor emits the reader’s class names', () => {
       expect(editor.callout, keyword).toContain(`md__callout--${kind}`)
       expect(editor.callout, keyword).toBe(reader.callout)
     }
+  })
+})
+
+/**
+ * Every reference in a document becomes a chip, whichever paragraph it is in.
+ *
+ * `REF_PATTERN` is a global regex and the parser's TreeWalker used it to test
+ * one text node after another. `test` on a global regex advances `lastIndex`,
+ * so where the search started in one paragraph was decided by where the last
+ * match ended in the paragraph before it. A reference late in a long
+ * paragraph hid every reference in the short paragraph after it, and those
+ * rendered as raw `[[@handle]]` in the editor while the reader showed a pill
+ * for the same text. Found in a browser, not by the suite, because both
+ * surfaces are green on a document with one paragraph in it.
+ */
+describe('MarkdownEditor references', () => {
+  /** How many `ref` nodes the parser actually built, not how many it drew. */
+  const chipCount = async (source: string): Promise<number> => {
+    const view = mount(MarkdownEditor, {
+      props: { modelValue: source },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    const editor = (
+      view.vm as unknown as {
+        editor?: {
+          state: { doc: { descendants(f: (n: PMNode) => void): void } }
+        }
+      }
+    ).editor
+    let n = 0
+    editor?.state.doc.descendants((node) => {
+      if (node.type.name === 'ref') n += 1
+    })
+    view.unmount()
+    return n
+  }
+
+  it('chips a reference in a later, shorter paragraph', async () => {
+    const n = await chipCount(
+      'The on-call rota is [[@local]] this week, with [[@daniela]] as backup.\n\nSomeone who left: [[@ghost]].',
+    )
+    expect(n).toBe(3)
+  })
+
+  it('chips a run of short paragraphs', async () => {
+    const n = await chipCount('[[ST-1]] and [[ST-2]]\n\n[[ST-3]]\n\n[[ST-4]]')
+    expect(n).toBe(4)
   })
 })
