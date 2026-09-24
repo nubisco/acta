@@ -8,11 +8,13 @@
     :data-ref="target.value"
   >
     <!-- A mention is a person: avatar and display name, never the handle,
-         which is storage rather than presentation. -->
-    <template v-if="target.kind === 'actor'">
-      <ActorAvatar :handle="target.value" :size="16" />
-      <span class="md__chip-title">{{ actorName }}</span>
-    </template>
+         which is storage rather than presentation. The same ActorChip the
+         reader mounts, so the two surfaces cannot drift apart. -->
+    <ActorChip
+      v-if="target.kind === 'actor'"
+      :handle="target.value"
+      :size="16"
+    />
 
     <template v-else-if="chip">
       <span v-if="!chip.gone" class="md__chip-dot" aria-hidden="true" />
@@ -43,9 +45,8 @@
  */
 import { computed } from 'vue'
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/vue-3'
-import ActorAvatar from '@/components/ActorAvatar.vue'
+import ActorChip from '@/components/ActorChip.vue'
 import { useRefCards } from '@/stores/refs'
-import { useWorkspace } from '@/stores/workspace'
 import { classifyRef, itemChip } from '@/components/decorations/refs'
 
 /* eslint-disable-next-line vue/prop-name-casing --
@@ -54,7 +55,6 @@ import { classifyRef, itemChip } from '@/components/decorations/refs'
 const props = defineProps<NodeViewProps>()
 
 const refCards = useRefCards()
-const ws = useWorkspace()
 
 const target = computed(() =>
   classifyRef(String(props.node.attrs.target ?? '')),
@@ -74,12 +74,6 @@ const chip = computed(() => {
   )
 })
 
-const actorName = computed(
-  () =>
-    ws.overview.value?.actors.find((a) => a.handle === target.value.value)
-      ?.name ?? `@${target.value.value}`,
-)
-
 const label = computed(() => alias.value?.trim() || target.value.value)
 
 const glyph = computed(() =>
@@ -91,8 +85,11 @@ const chipClasses = computed(() => {
   return chip.value?.classes ?? []
 })
 
+// No native title on a mention. ActorAvatar already carries a tooltip with
+// the name, the handle and what kind of actor it is, and a title on top of
+// it is a second, slower box that says less.
 const tooltip = computed(() => {
-  if (target.value.kind === 'actor') return `@${target.value.value}`
+  if (target.value.kind === 'actor') return undefined
   return chip.value?.title ?? ''
 })
 </script>

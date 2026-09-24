@@ -25,6 +25,14 @@ export interface ISuggestionItem {
   label: string
   icon: string
   hint?: string
+  /**
+   * A person's handle, when the row is a person. The row then wears their
+   * avatar instead of the glyph: a list of people under one identical `user`
+   * icon is a list you have to read rather than recognise. Optional because
+   * the other two typeaheads offer documents, cards and blocks, which have
+   * no face.
+   */
+  avatarHandle?: string
   apply: (editor: Editor, range: Range) => void
 }
 
@@ -282,6 +290,7 @@ function mentionItems(query: string): ISuggestionItem[] {
         id: `actor:${a.handle}`,
         label: a.name,
         icon: 'user',
+        avatarHandle: a.handle,
         hint: `@${a.handle}`,
         // [[@handle]], not @handle. A mention is a reference: extractRefs only
         // sees the bracketed form, the reader only renders that as a mention,

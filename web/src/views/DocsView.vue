@@ -124,7 +124,13 @@
             size="sm"
             aria-label="Version history. Select a version to compare it with the current one."
             @row-click="viewVersion"
-          />
+          >
+            <!-- Who saved a version is a person, so it is a face and a name
+                 rather than the handle the revision happens to be keyed by. -->
+            <template #cell-by="{ row }">
+              <ActorChip :handle="String(row.handle)" />
+            </template>
+          </NbDataTable>
           <div v-if="viewingOld" class="docs__history-actions">
             <NbButton size="sm" variant="primary" @click="restoreVersion">
               Restore v{{ viewedVersion }}
@@ -255,6 +261,7 @@ import type { IDocDetail } from '@/types/api'
 import { humanise, relativeTime, useLoadState } from '@/lib/state'
 import { DOC_NAV_KEY } from '@/lib/keys'
 import { useViewCommands } from '@/lib/commands'
+import ActorChip from '@/components/ActorChip.vue'
 import CommentThread from '@/components/CommentThread.vue'
 import DocCommentLayer from '@/components/comments/DocCommentLayer.vue'
 import type { IAnchor } from '@/lib/anchors'
@@ -518,7 +525,12 @@ const versionRows = computed(() =>
   (doc.value?.versions ?? []).map((v) => ({
     rev: v.rev,
     version: `v${v.rev}`,
-    by: `@${v.handle}`,
+    handle: v.handle,
+    // The name, not the handle: the cell slot draws the pill, and this is
+    // what the column reads as without it.
+    by:
+      ws.overview.value?.actors.find((a) => a.handle === v.handle)?.name ??
+      `@${v.handle}`,
     when: relativeTime(v.created_at),
   })),
 )

@@ -17,6 +17,13 @@ const props = withDefaults(defineProps<{ handle: string; size?: number }>(), {
 })
 
 const ws = useWorkspace()
+/**
+ * A handle the directory cannot answer for still reads as a person: the pill
+ * keeps its shape and shows `@handle`. Somebody who has left the workspace,
+ * or a mention typed before the directory arrived, was still a mention, and
+ * falling back to raw text in the middle of a sentence reads as a rendering
+ * fault rather than as a name.
+ */
 const displayName = computed(
   () =>
     ws.overview.value?.actors.find((a) => a.handle === props.handle)?.name ??

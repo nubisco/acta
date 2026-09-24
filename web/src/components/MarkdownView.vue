@@ -31,11 +31,14 @@
 <script setup lang="ts">
 import {
   computed,
+  getCurrentInstance,
+  h,
   inject,
   nextTick,
   onBeforeUnmount,
   onMounted,
   ref,
+  render,
   watch,
 } from 'vue'
 import MarkdownIt from 'markdown-it'
@@ -43,9 +46,9 @@ import { useRouter } from 'vue-router'
 import { useDocPreview, useInspector, useWorkspace } from '@/stores/workspace'
 import { useRefCards } from '@/stores/refs'
 import { useLinkPreviews } from '@/stores/linkPreviews'
-import { chartColorFor } from '@/lib/colors'
 import { DOC_NAV_KEY } from '@/lib/keys'
 import { wpath } from '@/lib/paths'
+import ActorChip from '@/components/ActorChip.vue'
 import { safeUrl } from '@/lib/safeUrl'
 import { imageClass, imageStyle, parseImageAttrs } from '@/lib/imageAttrs'
 import { mathPlugin } from '@/lib/math'
@@ -104,6 +107,7 @@ const refCards = useRefCards()
 const linkPreviews = useLinkPreviews()
 const ws = useWorkspace()
 const rootEl = ref<HTMLElement | null>(null)
+const instance = getCurrentInstance()
 
 const expanded = ref(false)
 const overflows = ref(false)
@@ -642,34 +646,52 @@ function hydrateLinkCards(): void {
 }
 
 /**
- * @mentions render as avatar + display name (the @handle is storage, never
- * presentation): a tiny initials-or-image disc from the same actor data the
- * rest of the app uses.
+ * @mentions become the same pill the editor draws.
+ *
+ * Mounted as a real component rather than patched in as a string of HTML.
+ * The pill is now ActorChip on both surfaces, so the avatar's image-failure
+ * fallback and its tooltip come with it and a change to one surface cannot
+ * miss the other. The reader renders through v-html, so there is no Vue tree
+ * to slot into and the component is mounted into the placeholder the renderer
+ * left behind. That is the price of one pill instead of two.
+ *
+ * A handle nobody answers to is still drawn as a pill, showing `@handle`.
+ * See ActorChip for why.
  */
+const mentionMounts: HTMLElement[] = []
+
 function hydrateMentions(): void {
   const root = rootEl.value
-  const actors = ws.overview.value?.actors
-  if (!root || !actors) return
+  // v-html replaces the body wholesale, so a pill from the previous render is
+  // no longer under the root. Unmounting it is the only thing that stops the
+  // component inside it watching the workspace for ever. Asked of the root
+  // rather than of the document, because a block that has not been inserted
+  // yet is not a block whose pills are stale.
+  for (let i = mentionMounts.length - 1; i >= 0; i--) {
+    const mounted = mentionMounts[i]
+    if (root?.contains(mounted)) continue
+    render(null, mounted)
+    mentionMounts.splice(i, 1)
+  }
+  if (!root) return
   for (const el of root.querySelectorAll<HTMLElement>('.md__mention')) {
     const handle = el.getAttribute('data-handle')
     if (!handle || el.dataset.hydrated === '1') continue
-    const actor = actors.find((a) => a.handle === handle)
-    if (!actor) continue
     el.dataset.hydrated = '1'
-    const initials = actor.name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join('')
-      .toUpperCase()
-    const disc = actor.avatar_url
-      ? `<img class="md__mention-avatar" src="${esc(actor.avatar_url)}" alt="">`
-      : `<span class="md__mention-avatar" style="background:${esc(chartColorFor(handle))}">${esc(initials)}</span>`
-    el.innerHTML = `${disc}${esc(actor.name)}`
-    el.title = `@${handle}`
+    el.textContent = ''
+    const vnode = h(ActorChip, { handle, size: 16 })
+    // Without the app context a standalone render() resolves no directives,
+    // and the avatar's tooltip is a directive.
+    vnode.appContext = instance?.appContext ?? null
+    render(vnode, el)
+    mentionMounts.push(el)
   }
 }
+
+onBeforeUnmount(() => {
+  for (const mounted of mentionMounts) render(null, mounted)
+  mentionMounts.length = 0
+})
 
 /**
  * Inline code holding a colour gets the colour shown next to it.

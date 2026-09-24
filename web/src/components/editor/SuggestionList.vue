@@ -12,7 +12,14 @@
       @mouseenter="active = index"
       @click="select(index)"
     >
-      <NbIcon :name="item.icon" :size="14" class="sug__icon" />
+      <!-- A person is their face first. The glyph stays for everything else
+           the two other typeaheads offer, and as the fallback. -->
+      <ActorAvatar
+        v-if="item.avatarHandle"
+        :handle="item.avatarHandle"
+        :size="18"
+      />
+      <NbIcon v-else :name="item.icon" :size="14" class="sug__icon" />
       <span class="sug__label">{{ item.label }}</span>
       <span v-if="item.hint" class="sug__hint">{{ item.hint }}</span>
     </button>
@@ -24,6 +31,7 @@
 // [[ reference search). Keyboard handling is driven by the suggestion
 // plugin through onKeyDown, exposed here for the VueRenderer bridge.
 import { ref, watch } from 'vue'
+import ActorAvatar from '@/components/ActorAvatar.vue'
 import type { ISuggestionItem } from '@/components/editor/suggestions'
 
 const props = defineProps<{

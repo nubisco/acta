@@ -331,3 +331,43 @@ describe('SpaceView card menu', () => {
     expect(panel.element.closest('.nb-menu')).not.toBeNull()
   })
 })
+
+/**
+ * A lane grouped by assignee is a lane about a person, and it used to be
+ * headed by the raw `@handle` the storage uses.
+ */
+describe('SpaceView swimlanes', () => {
+  async function grouped() {
+    spaceGet.mockResolvedValue({
+      items: [{ ...items[0], assignees: ['jose'] }],
+      cursor: undefined,
+    })
+    const view = mount(SpaceView, {
+      props: { spaceKey: 'SU' },
+      global: { stubs: { teleport: true } },
+    })
+    await flushPromises()
+
+    // Driven through the select rather than through its dropdown, which
+    // teleports out of the view and needs a real layout to open.
+    const swimlanes = view
+      .findAllComponents({ name: 'Select' })
+      .find((s) =>
+        (s.props('options') as { value: string }[]).some(
+          (o) => o.value === 'assignee',
+        ),
+      )!
+    swimlanes.vm.$emit('update:modelValue', 'assignee')
+    await flushPromises()
+    return view
+  }
+
+  it('heads an assignee lane with the person, not their handle', async () => {
+    const view = await grouped()
+    const header = view.find('.nb-board__lane-header')
+    expect(header.exists()).toBe(true)
+    expect(header.text()).toContain('Jose')
+    expect(header.text()).not.toContain('@jose')
+    expect(header.find('.avatar').exists()).toBe(true)
+  })
+})

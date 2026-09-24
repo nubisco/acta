@@ -151,6 +151,18 @@
       :items="spaceItems"
       @move="onMove"
     >
+      <!-- A lane keyed by a person wears their face. The library's own
+           label class is kept so the header's type does not change with
+           what the lane happens to be grouped by. -->
+      <template #lane-header="{ lane }">
+        <span class="nb-board__lane-label">
+          <ActorChip
+            v-if="swimlane === 'assignee' && lane.id"
+            :handle="lane.id"
+          />
+          <template v-else>{{ lane.label }}</template>
+        </span>
+      </template>
       <template #column-footer="{ column }">
         <NbButton
           size="sm"
@@ -327,6 +339,7 @@ import { roleColor } from '@/lib/colors'
 import { useInspector, useUiState, useWorkspace } from '@/stores/workspace'
 import type { NbMenu } from '@nubisco/ui'
 import ActorAvatar from '@/components/ActorAvatar.vue'
+import ActorChip from '@/components/ActorChip.vue'
 import NewItemModal from '@/components/NewItemModal.vue'
 import CalendarView from '@/components/views/CalendarView.vue'
 import TableView from '@/components/views/TableView.vue'
@@ -608,7 +621,14 @@ const lanes = computed(() => {
   return [
     ...named.map((key) => ({
       id: key,
-      label: swimlane.value === 'assignee' ? `@${key}` : key,
+      // The label is the fallback and the accessible name: the lane header
+      // slot draws a person as an ActorChip, and this is what it reads as
+      // anywhere the slot is not in play.
+      label:
+        swimlane.value === 'assignee'
+          ? (ws.overview.value?.actors.find((a) => a.handle === key)?.name ??
+            `@${key}`)
+          : key,
     })),
     // Last, and only when something lands in it: a permanently empty
     // "Unassigned" band is a row of six empty cells on every space.

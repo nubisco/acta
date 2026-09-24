@@ -35,6 +35,14 @@ config.global.plugins = [NubiscoUI as never, i18n as never]
 Object.defineProperty(HTMLElement.prototype, 'offsetParent', {
   get: () => document.body,
 })
+// Opening a select scrolls its highlighted option into view, and jsdom has
+// no such method at all: without this the click handler throws and the
+// dropdown never opens, which reads as "the options are not there".
+// On Element rather than HTMLElement: a test that installs its own spy does
+// so on Element.prototype, and a stub further down the chain would shadow it.
+if (!Element.prototype.scrollIntoView)
+  Element.prototype.scrollIntoView = vi.fn()
+
 if (!window.matchMedia) {
   window.matchMedia = ((query: string) => ({
     matches: false,

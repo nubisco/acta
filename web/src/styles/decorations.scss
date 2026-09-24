@@ -835,23 +835,26 @@ button.md__ref {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  vertical-align: -0.3em;
+  /* Measured, not guessed. The pill is an inline-flex box holding a 16px
+     avatar beside 13px text, so its own baseline is not the sentence's. At
+     the -0.3em this used to carry, the name sat 6.3px below the surrounding
+     text and pushed the line box from 23.8px to 29.4px, which is why a
+     mention read as a subscript and why a paragraph containing one was
+     visibly taller than the one under it. `middle` measures 0.7px off the
+     sentence and leaves the line height alone. */
+  vertical-align: middle;
   color: var(--nb-c-primary);
   font-weight: var(--nb-type-label-lg-weight);
 
-  .md__mention-avatar {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    inline-size: 16px;
-    block-size: 16px;
-    border-radius: 50%;
-    overflow: hidden;
-    object-fit: cover;
-    flex: none;
-    font-size: 8px;
-    font-weight: var(--nb-type-label-lg-weight);
-    color: var(--nb-c-bg);
+  /* Both surfaces put an ActorChip inside this wrapper, so the mention's
+     own spacing and type live here rather than in either of them. */
+  .actor-chip {
+    gap: inherit;
+  }
+
+  .actor-chip__name {
+    font-family: var(--nb-font-family-sans);
+    font-size: var(--nb-font-size-13);
   }
 }
 

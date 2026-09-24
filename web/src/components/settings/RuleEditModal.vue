@@ -61,13 +61,26 @@
             placeholder="Any label"
             :options="labelOptions"
           />
+          <!-- A person is an avatar and a name here as everywhere else, in
+               the list and in the closed control. -->
           <NbSelect
             :id="`${formId}-assignee`"
             v-model="condition.assignee"
             label="Assignee"
             placeholder="Anyone"
             :options="assigneeOptions"
-          />
+          >
+            <template #option="{ option }">
+              <ActorChip :handle="String(option.value)" />
+            </template>
+            <template #value="{ values }">
+              <ActorChip
+                v-for="handle in values"
+                :key="String(handle)"
+                :handle="String(handle)"
+              />
+            </template>
+          </NbSelect>
           <NbSelect
             :id="`${formId}-state`"
             v-model="condition.state"
@@ -111,7 +124,18 @@
         :options="assigneeOptions"
         :error="errors.action"
         @change="errors.action = undefined"
-      />
+      >
+        <template #option="{ option }">
+          <ActorChip :handle="String(option.value)" />
+        </template>
+        <template #value="{ values }">
+          <ActorChip
+            v-for="handle in values"
+            :key="String(handle)"
+            :handle="String(handle)"
+          />
+        </template>
+      </NbSelect>
       <NbTextInput
         v-else-if="actionKind === 'comment'"
         :id="`${formId}-action-body`"
@@ -171,6 +195,7 @@ import { useToast } from '@nubisco/ui'
 import { api, newOpId as opId } from '@/api/client'
 import { humanise } from '@/lib/state'
 import { useWorkspace } from '@/stores/workspace'
+import ActorChip from '@/components/ActorChip.vue'
 import {
   RULE_ACTIONS,
   RULE_TRIGGERS,
