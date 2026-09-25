@@ -1,3 +1,16 @@
+# [1.30.0](https://github.com/nubisco/acta/compare/v1.29.1...v1.30.0) (2026-09-25)
+
+
+### Bug Fixes
+
+* **comments:** the composer did not look like an input ([bbfc330](https://github.com/nubisco/acta/commit/bbfc330f240b38e378e349c18aba3afbf3db2c5b))
+
+
+### Features
+
+* **comments:** edit and delete a comment, and decide who may ([b8a2b8c](https://github.com/nubisco/acta/commit/b8a2b8c43d81bf80cfb649c1a357d761f297ae63))
+* **items:** a card can be part of another card ([e8ca255](https://github.com/nubisco/acta/commit/e8ca255c1c75cf40d48d30760447a23aad498344))
+
 ## [1.29.1](https://github.com/nubisco/acta/compare/v1.29.0...v1.29.1) (2026-09-24)
 
 
