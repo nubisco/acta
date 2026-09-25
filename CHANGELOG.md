@@ -1,3 +1,10 @@
+# [1.32.0](https://github.com/nubisco/acta/compare/v1.31.0...v1.32.0) (2026-09-25)
+
+
+### Features
+
+* **items:** drag a card onto another to make it part of it ([8497475](https://github.com/nubisco/acta/commit/8497475d7a4a186f31fb4333205f7dfdc2310abc))
+
 # [1.31.0](https://github.com/nubisco/acta/compare/v1.30.0...v1.31.0) (2026-09-25)
 
 
