@@ -456,7 +456,12 @@ defineExpose({
 .md-editor {
   :deep(.tiptap) {
     outline: none;
-    min-height: 8rem;
+
+    /* A custom property rather than a bare value so a host can ask for a
+       shorter box (a comment composer is two lines, not eight). A parent
+       cannot do this with :deep(), which ties on specificity with this rule
+       and then depends on stylesheet order. */
+    min-height: var(--md-editor-min-height, 8rem);
     caret-color: var(--nb-c-primary);
 
     /* Typography, block rhythm and every decoration come from

@@ -46,5 +46,11 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./test/setup.ts'],
     include: ['test/**/*.test.ts'],
+    // Scoped styles are not applied under test by default, which means a rule
+    // that never reaches an element looks exactly like one that does. That is
+    // the bug the comment composer had for months: `class="thread__editor"`
+    // on a multi-root component, silently dropped. Processing this one
+    // component's CSS lets its test measure the box instead of trusting it.
+    css: { include: [/CommentThread\.vue/] },
   },
 })
