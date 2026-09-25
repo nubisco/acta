@@ -206,6 +206,8 @@
             resolvable
             @submit="submitComment"
             @resolve="resolveComment"
+            @edit="editComment"
+            @delete="deleteComment"
             @clear-quote="pendingAnchor = null"
           />
         </section>
@@ -798,24 +800,60 @@ onMounted(() => window.addEventListener('hashchange', onHashChange))
 onBeforeUnmount(() => window.removeEventListener('hashchange', onHashChange))
 
 async function resolveComment(id: string, resolved: boolean): Promise<void> {
-  if (!doc.value) return
+  const slug = doc.value?.slug
+  if (!slug) return
+  await writeComment(
+    {
+      op: 'comment_resolve',
+      op_id: newOpId(),
+      ref: slug,
+      comment_id: id,
+      resolved,
+    },
+    resolved ? 'Resolve failed' : 'Reopen failed',
+  )
+}
+
+/**
+ * Editing and deleting one comment. The thread has already confirmed the
+ * delete and refused an empty edit, so both are the write and the reload.
+ * Neither asks who is doing it: the row carried `can_edit` / `can_delete`
+ * from the server, and the server refuses the op too.
+ */
+async function editComment(id: string, body: string): Promise<void> {
+  const slug = doc.value?.slug
+  if (!slug) return
+  await writeComment(
+    { op: 'comment_update', op_id: newOpId(), ref: slug, comment_id: id, body },
+    'Could not save the edit',
+  )
+}
+
+async function deleteComment(id: string): Promise<void> {
+  const slug = doc.value?.slug
+  if (!slug) return
+  const done = await writeComment(
+    { op: 'comment_delete', op_id: newOpId(), ref: slug, comment_id: id },
+    'Delete failed',
+  )
+  if (done) toast.success('Comment deleted.')
+}
+
+/** One op against this page's comments, then the comments as they now are. */
+async function writeComment(
+  op: Parameters<typeof api.docWrite>[0][number],
+  failureTitle: string,
+): Promise<boolean> {
+  if (!doc.value) return false
   try {
-    const { results } = await api.docWrite([
-      {
-        op: 'comment_resolve',
-        op_id: newOpId(),
-        ref: doc.value.slug,
-        comment_id: id,
-        resolved,
-      },
-    ])
+    const { results } = await api.docWrite([op])
     if (!results[0].ok) throw new Error((results[0] as { error: string }).error)
     const refreshed = await api.docGet(doc.value.slug, ['comments'])
     doc.value = { ...doc.value, comments: refreshed.comments }
+    return true
   } catch (err) {
-    toast.error(humanise(err), {
-      title: resolved ? 'Resolve failed' : 'Reopen failed',
-    })
+    toast.error(humanise(err), { title: failureTitle })
+    return false
   }
 }
 

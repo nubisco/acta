@@ -297,6 +297,34 @@ export function useItem(itemKey: Ref<string>) {
   }
 
   /**
+   * Editing and deleting a comment. Neither checks who is asking: the server
+   * decides that and says so per comment (`can_edit` / `can_delete`), and it
+   * refuses the op as well, so a stale flag costs a toast rather than a
+   * silently applied change.
+   */
+  async function editComment(id: string, body: string): Promise<void> {
+    if (!item.value) return
+    await write({
+      op: 'comment_update',
+      op_id: newOpId(),
+      key: item.value.key,
+      comment_id: id,
+      body,
+    })
+  }
+
+  async function deleteComment(id: string): Promise<void> {
+    if (!item.value) return
+    const ok = await write({
+      op: 'comment_delete',
+      op_id: newOpId(),
+      key: item.value.key,
+      comment_id: id,
+    })
+    if (ok) toast.success('Comment deleted.')
+  }
+
+  /**
    * Permanent removal. The server refuses unless the item is archived, so
    * this is only ever reachable from an archived card; `deleted` lets the
    * caller close whatever was showing it.
@@ -368,6 +396,8 @@ export function useItem(itemKey: Ref<string>) {
     draft,
     commentDraft,
     commenting,
+    editComment,
+    deleteComment,
     listOptions,
     assigneeOptions,
     labelOptions,
