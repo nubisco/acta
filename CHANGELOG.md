@@ -1,3 +1,10 @@
+# [1.31.0](https://github.com/nubisco/acta/compare/v1.30.0...v1.31.0) (2026-09-25)
+
+
+### Features
+
+* **theme:** take the accent from the engineers category ([a056bdc](https://github.com/nubisco/acta/commit/a056bdc01f57d20af6093809719e83badf7ea401))
+
 # [1.30.0](https://github.com/nubisco/acta/compare/v1.29.1...v1.30.0) (2026-09-25)
 
 
