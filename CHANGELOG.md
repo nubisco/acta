@@ -1,3 +1,10 @@
+## [1.32.1](https://github.com/nubisco/acta/compare/v1.32.0...v1.32.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* **comments:** put the comment menu next to the comment ([c6fead9](https://github.com/nubisco/acta/commit/c6fead9ff8bc21a0e44b5eb4adbc251340ecd32c))
+
 # [1.32.0](https://github.com/nubisco/acta/compare/v1.31.0...v1.32.0) (2026-09-25)
 
 
