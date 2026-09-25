@@ -2,6 +2,7 @@ import { createApp, type Plugin } from 'vue'
 import { createI18n } from 'vue-i18n'
 import { createRouter, createWebHistory } from 'vue-router'
 import NubiscoUI, {
+  configureNamedTheme,
   configureTheme,
   dismissConfirms,
   NbCommandPalettePlugin,
@@ -15,6 +16,9 @@ import { setWorkspaceSlug } from './api/client'
 import { useWorkspace } from './stores/workspace'
 
 configureTheme({ storageKey: 'acta.theme' })
+// Acta ships one named theme, its own. This selects it; the accent behind it
+// comes from the engineers category in @nubisco/ui, not from anything here.
+configureNamedTheme({ themes: ['acta'], defaultTheme: 'acta' })
 registerActaIcons()
 
 // Acta ships no translated copy of its own yet; the catalog exists so

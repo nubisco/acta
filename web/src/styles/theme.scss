@@ -1,0 +1,13 @@
+// Acta's accent, resolved from its audience category.
+//
+// Acta is an engineers product. The category, not the hex, is what is declared
+// here: @nubisco/ui holds the four category values and knows nothing about
+// Acta, so a change to the engineers accent reaches this app through a version
+// bump rather than an edit. See AGENTS.md, "Audience categories".
+//
+// The --acta-brand-* colours in index.scss are unrelated. They are decoration
+// accents from the branding kit, not the semantic accent components read.
+
+@use '@nubisco/ui/styles/theme-api' as nb;
+
+@include nb.app-theme('acta', $category: 'engineers');
