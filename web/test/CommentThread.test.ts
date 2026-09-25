@@ -301,3 +301,29 @@ describe('an edited comment', () => {
     expect(open([{ ...BASE }]).text()).not.toContain('(edited)')
   })
 })
+
+/**
+ * The menu has to be next to the comment it acts on.
+ *
+ * It shipped with `margin-inline-start: auto` on the action group, which is
+ * a few pixels in the card inspector and 573px on a document page, where the
+ * thread is the width of the page. The control was rendered, enabled and
+ * correct, and Jose reported editing a document comment as impossible,
+ * because a 24x16 target half a screen from its comment is not findable.
+ *
+ * Right-aligning comment actions is the convention. The convention assumes a
+ * column the width of a comment.
+ */
+describe('where the comment menu sits', () => {
+  it('stays beside the meta rather than floating to the far edge', async () => {
+    const view = render([{ ...BASE, can_edit: true }])
+    await flushPromises()
+
+    const actions = view.find('.thread__actions')
+    expect(actions.exists()).toBe(true)
+    // `auto` is what put it 573px away. Any fixed small value is fine, the
+    // point is that it is not pushed by the width of whatever contains it.
+    const margin = getComputedStyle(actions.element).marginInlineStart
+    expect(margin).not.toBe('auto')
+  })
+})

@@ -84,8 +84,9 @@
                  column of buttons. -->
             <NbButton
               v-if="comment.can_edit || comment.can_delete"
+              v-nb-tooltip="{ body: 'Edit or delete this comment' }"
               class="thread__menu"
-              size="xxs"
+              size="xs"
               variant="ghost"
               icon="dots-three"
               :aria-label="`More actions on ${authorLabel(comment)}'s comment`"
@@ -453,11 +454,22 @@ function askDelete(comment: ICommentView | null): void {
 
   /* Everything that acts on the comment, pushed to the end of the head so the
      row reads as "who, when, then what you can do about it". */
+  /* Beside the comment's own meta, not pushed to the far edge.
+   *
+   * This carried `margin-inline-start: auto`, which is harmless in the card
+   * inspector and absurd on a document: measured at 1440px, it put the menu
+   * 573px from the timestamp it belongs to, a 24x16 target with a 12px glyph,
+   * separated from its comment by half a screen of nothing. Jose reported
+   * editing a document comment as impossible, and it was: the control was
+   * there and unfindable.
+   *
+   * Right-aligning is the convention, and the convention assumes a column the
+   * width of a comment. A document's thread is the width of the page. */
   &__actions {
     display: flex;
     align-items: center;
     gap: var(--nb-spacing-2);
-    margin-inline-start: auto;
+    margin-inline-start: var(--nb-spacing-4);
   }
 
   /* The quoted text an inline comment is about, clipped to three lines. */
