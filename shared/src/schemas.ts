@@ -149,6 +149,21 @@ export const zItemCommentUpdateOp = z.object({
   imported_meta: zImportedMeta.nullable().optional(),
 })
 
+export const zItemSetParentOp = z.object({
+  op: z.literal('set_parent'),
+  op_id: zOpId,
+  key: zItemKey,
+  /** The card this one becomes part of. Null detaches it. */
+  parent: zItemKey.nullable(),
+})
+
+export const zItemCommentDeleteOp = z.object({
+  op: z.literal('comment_delete'),
+  op_id: zOpId,
+  key: zItemKey,
+  comment_id: z.string().min(1),
+})
+
 export const zItemChecklistSetOp = z.object({
   op: z.literal('checklist_set'),
   op_id: zOpId,
@@ -201,6 +216,8 @@ export const zItemDeleteOp = z.object({
 export const zItemOp = z.discriminatedUnion('op', [
   zItemCreateOp,
   zItemUpdateOp,
+  zItemSetParentOp,
+  zItemCommentDeleteOp,
   zItemMoveOp,
   zItemCommentOp,
   zItemCommentUpdateOp,
@@ -347,6 +364,12 @@ export const zDocOp = z.discriminatedUnion('op', [
     body: z.string().min(1).max(50_000).optional(),
     /** undefined keeps stored provenance, null clears it. */
     imported_meta: zImportedMeta.nullable().optional(),
+  }),
+  z.object({
+    op: z.literal('comment_delete'),
+    op_id: zOpId,
+    ref: zDocSlug,
+    comment_id: z.string().min(1),
   }),
   z.object({
     op: z.literal('set_meta'),

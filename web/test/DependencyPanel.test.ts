@@ -113,6 +113,14 @@ describe('DependencyPanel', () => {
     expect(options.map((o) => o.value)).toEqual([])
   })
 
+  // The server caps `limit` at 200 and rejects anything larger outright, so
+  // asking for 500 did not merely truncate the pool: the request 400'd and
+  // the picker was empty every single time it opened.
+  it('asks for a page the server will actually serve', async () => {
+    await render()
+    expect(spaceGet).toHaveBeenCalledWith('ST', { limit: '200' })
+  })
+
   it('leaves out done and archived cards', async () => {
     const view = await render({ blockedBy: [], blocks: [] })
     const options = view.findAllComponents({ name: 'Select' })[1].props()

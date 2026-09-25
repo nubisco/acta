@@ -371,3 +371,65 @@ describe('SpaceView swimlanes', () => {
     expect(header.find('.avatar').exists()).toBe(true)
   })
 })
+
+/**
+ * Hierarchy on the board.
+ *
+ * A card that is part of something, or has parts, has to say so without being
+ * opened: that is the only way the relation is visible while working a space,
+ * and the counts come from the board read rather than from a per-card fetch.
+ */
+describe('SpaceView card hierarchy', () => {
+  async function withHierarchy() {
+    spaceGet.mockResolvedValue({
+      items: [
+        { ...items[0], parts_total: 3, parts_done: 1 },
+        { ...items[1], parent_key: 'SU-1' },
+      ],
+      cursor: undefined,
+    })
+    const view = mount(SpaceView, {
+      props: { spaceKey: 'SU' },
+      global: { stubs: { teleport: true } },
+    })
+    await flushPromises()
+    return view
+  }
+
+  it('says how much of a card is done when it has parts', async () => {
+    const view = await withHierarchy()
+    const card = view
+      .findAll('.space__card')
+      .find((c) => c.text().includes('First'))!
+    expect(card.text()).toContain('1/3')
+    const chip = card
+      .findAll('.space__card-chip')
+      .find((c) => c.attributes('aria-label')?.includes('parts done'))
+    expect(chip?.attributes('aria-label')).toBe('1 of 3 parts done')
+  })
+
+  it('names what a card is part of', async () => {
+    const view = await withHierarchy()
+    const card = view
+      .findAll('.space__card')
+      .find((c) => c.text().includes('Middle'))!
+    const chip = card
+      .findAll('.space__card-chip')
+      .find((c) => c.attributes('aria-label')?.startsWith('Part of'))
+    expect(chip?.attributes('aria-label')).toBe('Part of SU-1')
+    expect(chip?.text()).toContain('SU-1')
+  })
+
+  // Zero is noise on the many cards that are in no hierarchy at all.
+  it('says nothing on a card that is neither a part nor made of parts', async () => {
+    const view = await withHierarchy()
+    const card = view
+      .findAll('.space__card')
+      .find((c) => c.text().includes('First'))!
+    expect(
+      card
+        .findAll('.space__card-chip')
+        .some((c) => c.attributes('aria-label')?.startsWith('Part of')),
+    ).toBe(false)
+  })
+})

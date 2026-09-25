@@ -18,6 +18,12 @@ CREATE TABLE IF NOT EXISTS workspace (
   -- GitHub. Nullable so the ALTER below can add it to databases that predate
   -- it, and bootstrap backfills those from the name.
   slug TEXT,
+  -- Who may delete a comment: 'author' lets people remove their own and
+  -- admins remove any, 'admin' reserves it to admins entirely. Editing is
+  -- not configurable and never will be, because only an author may edit
+  -- their own words. See ADDITIVE_COLUMNS for existing databases.
+  comment_delete TEXT NOT NULL DEFAULT 'author'
+    CHECK (comment_delete IN ('author', 'admin')),
   created_at INTEGER NOT NULL
 );
 
@@ -171,6 +177,15 @@ CREATE TABLE IF NOT EXISTS item (
   -- A checkpoint rather than a piece of work: "we can ship" rather than
   -- something somebody does.
   is_milestone INTEGER NOT NULL DEFAULT 0,
+  -- The card this one is part of. Any card can be part of any card, at any
+  -- depth, on any board: this is a link, not a ladder, and Acta has no epic
+  -- or story or task types to keep in order. Deliberately not the same thing
+  -- as item_dependency, which says what has to happen first.
+  --
+  -- ON DELETE is not declared because SQLite would need the pragma on, and
+  -- the delete path clears it explicitly instead. See ADDITIVE_COLUMNS for
+  -- existing databases.
+  parent_id TEXT REFERENCES item(id),
   UNIQUE (workspace_id, key)
 );
 CREATE INDEX IF NOT EXISTS idx_item_list ON item(list_id, pos);
@@ -749,4 +764,16 @@ export const ADDITIVE_COLUMNS = [
   // How long this person's unread notifications wait before they are nudged.
   // Seconds, 0 for off. Existing members get the same default as new ones.
   'ALTER TABLE actor ADD COLUMN notify_after_seconds INTEGER NOT NULL DEFAULT 600',
+  // Workspace policy. A CHECK cannot be added by ALTER, so an existing
+  // database gets the column without one and the route's own validation is
+  // what holds the values to the two that mean anything. A fresh database
+  // gets the CHECK from SCHEMA_SQL. Rebuilding the workspace table to add a
+  // constraint is not worth it for a column only an admin route writes.
+  "ALTER TABLE workspace ADD COLUMN comment_delete TEXT NOT NULL DEFAULT 'author'",
+  // The card this one is part of. Nullable, which is what "not part of
+  // anything" means, so nothing has to be backfilled.
+  'ALTER TABLE item ADD COLUMN parent_id TEXT REFERENCES item(id)',
+  // Every read of a card's parts is this lookup, and every board read asks
+  // it once per card.
+  'CREATE INDEX IF NOT EXISTS idx_item_parent ON item(parent_id)',
 ]

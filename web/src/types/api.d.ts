@@ -27,7 +27,12 @@ export interface IOverview {
     avatar_url?: string | null
   }[]
   doc_roots: { slug: string; title: string; children: number }[]
+  /** Workspace-wide policy, as Settings shows it and the server enforces it. */
+  policy?: { comment_delete: TCommentDeletePolicy }
 }
+
+/** Who may delete a comment: its author, or only an admin. */
+export type TCommentDeletePolicy = 'author' | 'admin'
 
 export type TOverviewSpace = IOverview['spaces'][number]
 
@@ -54,6 +59,16 @@ export interface ICommentRow {
   anchor_status?: TAnchorStatus
   /** Set once resolved. A resolved comment is kept, just not highlighted. */
   resolved?: { ts: number; by?: string }
+  /** When it was last edited. Absent means never edited. */
+  edited?: number
+  /**
+   * The server has decided this person may edit, or delete, this comment.
+   * Authoritative: the policy (author-only editing, and a workspace setting
+   * for whether non-admins may delete) lives on the server so that no client
+   * has to re-derive it from handles and roles and get it subtly wrong.
+   */
+  can_edit?: true
+  can_delete?: true
 }
 
 export interface ISpaceItemRow {
@@ -72,12 +87,32 @@ export interface ISpaceItemRow {
   created?: number
   pos: number
   description?: string
+  /** The card this one is part of, when it is part of something. */
+  parent_key?: string
+  /** How many cards are part of this one, and how many of those are done.
+   *  Absent rather than zero, so a card with no parts carries nothing. */
+  parts_total?: number
+  parts_done?: number
 }
 
 export interface IDependencyRef {
   key: string
   title: string
   done: boolean
+}
+
+/**
+ * A card on either end of a "Part of" link.
+ *
+ * It names its space, which a dependency ref does not: a part may live on
+ * another board, and that is the point of the relation rather than an edge
+ * case, so the reader has to be told where they are being sent.
+ */
+export interface IPartRef {
+  key: string
+  title: string
+  space: string
+  done?: boolean
 }
 
 export interface IItemDetail {
@@ -98,6 +133,11 @@ export interface IItemDetail {
   /** Unitless estimate used by the sequence view. */
   size?: number
   is_milestone?: boolean
+  /** The card this one is part of. A different relation from `blocked_by`:
+   *  composition, not sequence, and the wording stays "Part of" throughout. */
+  parent?: IPartRef
+  /** The cards that are part of this one. Any depth, across spaces. */
+  parts?: IPartRef[]
   /** Cards that must finish before this one. */
   blocked_by?: IDependencyRef[]
   /** Cards waiting on this one. */

@@ -631,6 +631,24 @@ export function apiRoutes(
     })
   })
 
+  /**
+   * Workspace-wide policy. Admin only, and deliberately not part of
+   * PATCH /members: this is a fact about the workspace rather than about a
+   * person, and the two have different blast radii.
+   */
+  app.put('/workspace/policy', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    const body = z
+      .object({ comment_delete: z.enum(['author', 'admin']) })
+      .parse(await c.req.json())
+    await ctx.db.run('UPDATE workspace SET comment_delete = ? WHERE id = ?', [
+      body.comment_delete,
+      ctx.workspaceId,
+    ])
+    return c.json({ comment_delete: body.comment_delete })
+  })
+
   app.patch('/members/:id', async (c) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'admin')

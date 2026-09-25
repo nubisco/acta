@@ -109,6 +109,48 @@ describe('ItemInspector', () => {
     expect(view.text()).not.toMatch(/Attachments\s*0/)
   })
 
+  // Parts and dependencies are different relations and the model keeps them
+  // apart on purpose, so the panel has to as well: one Plan section and one
+  // Parts section, never one section holding both.
+  it('gives parts a section of their own, with the progress on the header', async () => {
+    itemGet.mockResolvedValue({
+      items: [
+        {
+          ...ITEM,
+          parts: [
+            { key: 'ST-5', title: 'Toolbar', space: 'ST', done: true },
+            { key: 'ST-6', title: 'Shortcuts', space: 'ST' },
+          ],
+        },
+      ],
+    })
+    const view = await render()
+    const headers = view.findAll('.nb-accordion-item').map((s) => s.text())
+    expect(headers.some((h) => h.includes('Parts'))).toBe(true)
+    expect(headers.some((h) => h.includes('1/2'))).toBe(true)
+    const plan = headers.find((h) => h.includes('Plan'))
+    expect(plan).not.toContain('Parts')
+  })
+
+  // The chip is context for the whole card, so it cannot be conditional on
+  // anything but the parent existing, and it must not appear without one.
+  it('shows "Part of" only when the card is part of something', async () => {
+    const view = await render()
+    expect(view.find('.part-of').exists()).toBe(false)
+
+    itemGet.mockResolvedValue({
+      items: [
+        {
+          ...ITEM,
+          parent: { key: 'ST-4', title: 'Ship the editor', space: 'ST' },
+        },
+      ],
+    })
+    const withParent = await render()
+    expect(withParent.find('.part-of').text()).toContain('Part of')
+    expect(withParent.find('.part-of').text()).toContain('ST-4')
+  })
+
   it('goes to the space the card lives on, workspace-scoped', async () => {
     const view = await render()
     const btn = view

@@ -241,7 +241,9 @@ watch(
     if (!space) return
     loadingCandidates.value = true
     try {
-      const { items } = await api.spaceGet(space, { limit: '500' })
+      // 200 is the server's cap. Asking for 500 was refused outright, so the
+      // picker was empty every time it opened rather than merely short.
+      const { items } = await api.spaceGet(space, { limit: '200' })
       pool.value = items
         .filter((row) => !row.archived && !row.done)
         .map((row) => ({ key: row.key, title: row.title }))

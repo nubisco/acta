@@ -25,6 +25,16 @@
 
     <div v-else-if="it.item.value" class="item-modal">
       <div class="item-modal__main">
+        <!-- Above the title, as in the side panel. The two surfaces show the
+             same card, so they say the same things in the same order. -->
+        <PartOfChip
+          v-if="it.item.value.parent"
+          :item-key="it.item.value.key"
+          :space="it.item.value.space"
+          :parent="it.item.value.parent"
+          @changed="it.load"
+          @open="onOpenRelated"
+        />
         <div class="item-modal__title-row">
           <NbInlineEdit
             v-model="it.draft.title"
@@ -182,6 +192,19 @@
           />
         </div>
 
+        <!-- Its own section, beside Plan. Composition and sequence are
+             different relations and stay visibly apart. -->
+        <section class="item-modal__section">
+          <h3>Parts</h3>
+          <PartsPanel
+            :item-key="it.item.value.key"
+            :space="it.item.value.space"
+            :parts="it.item.value.parts ?? []"
+            @changed="it.load"
+            @open="onOpenRelated"
+          />
+        </section>
+
         <section class="item-modal__section">
           <h3>Plan</h3>
           <DependencyPanel
@@ -307,6 +330,8 @@
             :comments="it.item.value.comments ?? []"
             :commenting="it.commenting.value"
             @submit="it.addComment"
+            @edit="it.editComment"
+            @delete="it.deleteComment"
           />
         </section>
       </aside>
@@ -328,6 +353,8 @@ import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
 import LabelBadge from '@/components/LabelBadge.vue'
 import DependencyPanel from '@/components/DependencyPanel.vue'
+import PartsPanel from '@/components/PartsPanel.vue'
+import PartOfChip from '@/components/PartOfChip.vue'
 
 const props = defineProps<{ open: boolean; itemKey: string }>()
 const emit = defineEmits<{ close: [] }>()

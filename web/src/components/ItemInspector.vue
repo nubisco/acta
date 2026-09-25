@@ -129,6 +129,15 @@
           />
         </span>
       </div>
+      <!-- Above the title, because it is what the title is a part of. -->
+      <PartOfChip
+        v-if="it.item.value.parent"
+        :item-key="it.item.value.key"
+        :space="it.item.value.space"
+        :parent="it.item.value.parent"
+        @changed="it.load"
+        @open="(key: string) => inspector.open(key)"
+      />
       <NbInlineEdit
         v-model="it.draft.title"
         label="Item title"
@@ -329,6 +338,24 @@
           />
         </NbAccordionItem>
 
+        <!-- Its own section, beside Plan rather than inside it. Composition
+             and sequence are different relations, and the model deliberately
+             keeps them apart: folding them together on the card is exactly
+             the confusion the parent link was chosen to avoid. -->
+        <NbAccordionItem
+          id="parts"
+          title="Parts"
+          :meta="partsCount(it.item.value)"
+        >
+          <PartsPanel
+            :item-key="it.item.value.key"
+            :space="it.item.value.space"
+            :parts="it.item.value.parts ?? []"
+            @changed="it.load"
+            @open="(key: string) => inspector.open(key)"
+          />
+        </NbAccordionItem>
+
         <NbAccordionItem
           id="attachments"
           title="Attachments"
@@ -368,6 +395,8 @@
           :comments="it.item.value.comments ?? []"
           :commenting="it.commenting.value"
           @submit="it.addComment"
+          @edit="it.editComment"
+          @delete="it.deleteComment"
         />
       </div>
     </div>
@@ -390,6 +419,9 @@ import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
 import LabelBadge from '@/components/LabelBadge.vue'
 import DependencyPanel from '@/components/DependencyPanel.vue'
+import PartsPanel from '@/components/PartsPanel.vue'
+import PartOfChip from '@/components/PartOfChip.vue'
+import type { IPartRef } from '@/types/api'
 
 // Outside setup, so it survives the panel unmounting between cards.
 const moduleOpenSections = ref<string[]>([
@@ -422,6 +454,17 @@ function planCount(item: {
 }): string | undefined {
   const n = (item.blocked_by?.length ?? 0) + (item.blocks?.length ?? 0)
   return n > 0 ? String(n) : undefined
+}
+
+/** Done over total, because a bare count cannot say whether the work under a
+ *  collapsed header is finished, which is the only reason to open it. The
+ *  same shape as a checklist's meta in this accordion, and deliberately not
+ *  the panel's own "1 of 3 done" sentence, which would then be on screen
+ *  twice the moment the section opened. */
+function partsCount(item: { parts?: IPartRef[] }): string | undefined {
+  const parts = item.parts ?? []
+  if (parts.length === 0) return undefined
+  return `${parts.filter((p) => p.done).length}/${parts.length}`
 }
 
 /** A count for an accordion header, or nothing when there is none to give.

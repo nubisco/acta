@@ -211,6 +211,25 @@
             >
               Overdue
             </NbBadge>
+            <!-- Hierarchy at a glance, and no more than that. A card that is
+                 part of something names what: the key is the only half of the
+                 sentence that is not already on screen. -->
+            <span
+              v-if="item.parent_key"
+              class="space__card-chip"
+              :aria-label="`Part of ${item.parent_key}`"
+            >
+              <NbIcon name="arrow-bend-left-up" /> {{ item.parent_key }}
+            </span>
+            <span
+              v-if="item.parts_total"
+              class="space__card-chip"
+              :aria-label="`${item.parts_done ?? 0} of ${item.parts_total} parts done`"
+            >
+              <NbIcon name="tree-structure" /> {{ item.parts_done ?? 0 }}/{{
+                item.parts_total
+              }}
+            </span>
             <span
               v-if="item.chk"
               class="space__card-chip"

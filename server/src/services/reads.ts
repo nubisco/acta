@@ -14,6 +14,11 @@ import { now, type ICtx } from '../core/ctx'
 import { docBySlug, spaceByKey, itemByKey, type IItemRow } from '../core/store'
 import { anchorStatus, parseAnchor } from './anchors'
 import { attachmentUrl } from './attachments'
+import {
+  canDeleteComment,
+  canEditComment,
+  commentDeletePolicy,
+} from './comments'
 import { anchorTextFromMarkdown, sectionMap } from '@nubisco/acta-shared'
 
 type TSpaceGet = z.infer<typeof zSpaceGet>
@@ -39,10 +44,13 @@ function parseImportedMeta(
 
 export async function workspaceOverview(ctx: ICtx) {
   const ws = (
-    await ctx.db.query<{ id: string; name: string }>(
-      'SELECT id, name FROM workspace WHERE id = ?',
-      [ctx.workspaceId],
-    )
+    await ctx.db.query<{
+      id: string
+      name: string
+      comment_delete: string | null
+    }>('SELECT id, name, comment_delete FROM workspace WHERE id = ?', [
+      ctx.workspaceId,
+    ])
   )[0]
   const spaces = await ctx.db.query<{
     key: string
@@ -106,6 +114,11 @@ export async function workspaceOverview(ctx: ICtx) {
   )
   return {
     workspace: { id: ws.id, name: ws.name },
+    // Workspace-wide policy, read once with everything else rather than
+    // through a call of its own: the comment menus need it on every thread.
+    policy: {
+      comment_delete: ws.comment_delete === 'admin' ? 'admin' : 'author',
+    },
     spaces: spaces.map((b) => ({
       key: b.key,
       name: b.name,
@@ -203,9 +216,15 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
       cmts: number
       chk_done: number
       chk_total: number
+      parent_key: string | null
+      parts_total: number
+      parts_done: number
     }
   >(
     `SELECT i.*, l.name AS list_name,
+            (SELECT p.key FROM item p WHERE p.id = i.parent_id) AS parent_key,
+            (SELECT COUNT(*) FROM item c WHERE c.parent_id = i.id AND c.archived = 0) AS parts_total,
+            (SELECT COUNT(*) FROM item c WHERE c.parent_id = i.id AND c.archived = 0 AND c.completed = 1) AS parts_done,
             (SELECT GROUP_CONCAT(lb.name) FROM item_label il JOIN label lb ON lb.id = il.label_id WHERE il.item_id = i.id) AS labels,
             (SELECT GROUP_CONCAT(a.handle) FROM item_assignee ia JOIN actor a ON a.id = ia.actor_id WHERE ia.item_id = i.id) AS assignees,
             (SELECT COUNT(*) FROM comment c WHERE c.item_id = i.id) AS cmts,
@@ -233,6 +252,13 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
     archived: r.archived === 1 || undefined,
     cmts: r.cmts || undefined,
     chk: r.chk_total > 0 ? `${r.chk_done}/${r.chk_total}` : undefined,
+    // What a card is part of, and how much of it is done. Counted here
+    // rather than by the browser, which would otherwise have to hold the
+    // whole board to answer it and would still be wrong for a part on
+    // another board.
+    parent_key: r.parent_key ?? undefined,
+    parts_total: r.parts_total || undefined,
+    parts_done: r.parts_total > 0 ? r.parts_done : undefined,
     rev: r.rev,
     updated: r.updated_at,
     pos: r.pos,
@@ -301,6 +327,55 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
       is_milestone: item.is_milestone === 1 || undefined,
     }
 
+    // Always, for the same reason as `blocked_by` below: what a card is part
+    // of, and what is part of it, is what the card IS rather than an extra
+    // anybody has to ask for. A board read can be hidden behind a flag; one
+    // card cannot.
+    const parentRow = item.parent_id
+      ? (
+          await ctx.db.query<{
+            key: string
+            title: string
+            completed: number
+            space_key: string
+          }>(
+            `SELECT i.key, i.title, i.completed, s.key AS space_key
+               FROM item i JOIN space s ON s.id = i.space_id
+              WHERE i.id = ?`,
+            [item.parent_id],
+          )
+        )[0]
+      : undefined
+    if (parentRow) {
+      out.parent = {
+        key: parentRow.key,
+        title: parentRow.title,
+        space: parentRow.space_key,
+        done: parentRow.completed === 1 || undefined,
+      }
+    }
+
+    const parts = (
+      await ctx.db.query<{
+        key: string
+        title: string
+        completed: number
+        space_key: string
+      }>(
+        `SELECT i.key, i.title, i.completed, s.key AS space_key
+           FROM item i JOIN space s ON s.id = i.space_id
+          WHERE i.parent_id = ? AND i.archived = 0
+          ORDER BY i.key`,
+        [item.id],
+      )
+    ).map((r) => ({
+      key: r.key,
+      title: r.title,
+      space: r.space_key,
+      done: r.completed === 1 || undefined,
+    }))
+    if (parts.length > 0) out.parts = parts
+
     // Always, not behind `include`. What a card waits on is part of what the
     // card IS, and the sequence view was showing it while the card itself
     // said nothing, which reads as two different sources of truth.
@@ -322,16 +397,23 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
     ).map((r) => ({ key: r.key, title: r.title, done: r.completed === 1 }))
 
     if (include.has('comments')) {
+      // Worked out here rather than in the browser. Whether somebody may
+      // edit or delete a comment is a rule about the workspace and about
+      // who wrote it, and a client that re-derives it is a second copy of
+      // the rule that will disagree with this one eventually.
+      const policy = await commentDeletePolicy(ctx)
       out.comments = (
         await ctx.db.query<{
           id: string
           body: string
           created_at: number
+          edited_at: number | null
+          actor_id: string
           handle: string
           kind: string
           imported_meta: string | null
         }>(
-          `SELECT c.id, c.body, c.created_at, a.handle, a.kind, c.imported_meta FROM comment c
+          `SELECT c.id, c.body, c.created_at, c.edited_at, c.actor_id, a.handle, a.kind, c.imported_meta FROM comment c
              JOIN actor a ON a.id = c.actor_id WHERE c.item_id = ? ORDER BY c.created_at`,
           [item.id],
         )
@@ -340,8 +422,11 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
         by: c.handle,
         agent: c.kind === 'agent' || undefined,
         ts: c.created_at,
+        edited: c.edited_at ?? undefined,
         body: c.body,
         imported: parseImportedMeta(c.imported_meta),
+        can_edit: canEditComment(ctx, c.actor_id) || undefined,
+        can_delete: canDeleteComment(ctx, c.actor_id, policy) || undefined,
       }))
     }
     if (include.has('checklists')) {
@@ -524,12 +609,15 @@ export async function docGet(
   // what the body refers to.
   out.attachments = await attachmentsFor(ctx, 'doc', doc.id)
   if (include.has('comments')) {
+    const docPolicy = await commentDeletePolicy(ctx)
     let anchorText: string | null = null
     out.comments = (
       await ctx.db.query<{
         id: string
         body: string
         created_at: number
+        edited_at: number | null
+        actor_id: string
         handle: string
         kind: string
         imported_meta: string | null
@@ -537,7 +625,7 @@ export async function docGet(
         resolved_at: number | null
         resolved_handle: string | null
       }>(
-        `SELECT c.id, c.body, c.created_at, a.handle, a.kind, c.imported_meta,
+        `SELECT c.id, c.body, c.created_at, c.edited_at, c.actor_id, a.handle, a.kind, c.imported_meta,
                 c.anchor, c.resolved_at, r.handle AS resolved_handle
            FROM doc_comment c
            JOIN actor a ON a.id = c.actor_id
@@ -555,8 +643,11 @@ export async function docGet(
         by: c.handle,
         agent: c.kind === 'agent' || undefined,
         ts: c.created_at,
+        edited: c.edited_at ?? undefined,
         body: c.body,
         imported: parseImportedMeta(c.imported_meta),
+        can_edit: canEditComment(ctx, c.actor_id) || undefined,
+        can_delete: canDeleteComment(ctx, c.actor_id, docPolicy) || undefined,
         // Against the body being returned, so a comment read at an old
         // version reports whether it anchors in that version.
         anchor: anchor ?? undefined,

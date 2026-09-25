@@ -44,6 +44,8 @@ export interface IItemRow {
   size: number | null
   /** A checkpoint rather than a piece of work. */
   is_milestone: number
+  /** The card this one is part of. Null means it stands on its own. */
+  parent_id: string | null
 }
 
 export interface IDocRow {

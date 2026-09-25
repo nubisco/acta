@@ -9,6 +9,11 @@ import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
 import { emitEvent } from '../core/events'
 import { newMentions } from './notifications'
+import {
+  assertCanDeleteComment,
+  assertCanEditComment,
+  commentDeletePolicy,
+} from './comments'
 import { ftsDelete, ftsUpsert } from '../core/fts'
 import { withOp } from '../core/ops'
 import type { AttachmentStore } from './attachments'
@@ -140,6 +145,37 @@ async function assigneeHints(
     [itemId],
   )
   return rows.map((r) => ({ actorId: r.actor_id, reason: 'assigned' as const }))
+}
+
+/**
+ * Is `target` somewhere inside `start`'s own parts?
+ *
+ * The same shape as `reaches` above and for the same reason, one edge type
+ * along. A card cannot be made part of something it already contains, or the
+ * tree stops being a tree: the loop detaches from every root and nothing in
+ * it can be reached from a board again.
+ */
+async function contains(
+  ctx: ICtx,
+  start: string,
+  target: string,
+): Promise<boolean> {
+  const seen = new Set<string>([start])
+  const queue = [start]
+  while (queue.length > 0) {
+    const id = queue.shift()!
+    if (id === target) return true
+    const next = await ctx.db.query<{ id: string }>(
+      'SELECT id FROM item WHERE parent_id = ?',
+      [id],
+    )
+    for (const row of next) {
+      if (seen.has(row.id)) continue
+      seen.add(row.id)
+      queue.push(row.id)
+    }
+  }
+  return false
 }
 
 async function applyItemOp(
@@ -442,13 +478,14 @@ async function applyItemOp(
     case 'comment_update': {
       const item = await itemByKey(ctx, op.key)
       const existing = (
-        await ctx.db.query<{ id: string; body: string }>(
-          'SELECT id, body FROM comment WHERE id = ? AND item_id = ?',
+        await ctx.db.query<{ id: string; body: string; actor_id: string }>(
+          'SELECT id, body, actor_id FROM comment WHERE id = ? AND item_id = ?',
           [op.comment_id, item.id],
         )
       )[0]
       if (!existing)
         throw new ApiError(404, `comment ${op.comment_id} not on ${item.key}`)
+      assertCanEditComment(ctx, existing.actor_id)
       const body = op.body ?? existing.body
       await ctx.db.run(
         `UPDATE comment SET body = ?, edited_at = CASE WHEN ? THEN ? ELSE edited_at END,
@@ -479,6 +516,85 @@ async function applyItemOp(
           { body: newMentions(existing.body, body) },
         )
       }
+      return { key: item.key, id: existing.id, rev: item.rev }
+    }
+    case 'set_parent': {
+      const item = await itemByKey(ctx, op.key)
+      if (op.parent === null) {
+        if (item.parent_id === null) return { key: item.key, rev: item.rev }
+        const rev = await bumpRev(ctx, item)
+        await ctx.db.run('UPDATE item SET parent_id = NULL WHERE id = ?', [
+          item.id,
+        ])
+        await emitEvent(
+          ctx,
+          'item.detached',
+          'item',
+          item.id,
+          `${item.key} is no longer part of anything`,
+        )
+        return { key: item.key, rev }
+      }
+
+      const parent = await itemByKey(ctx, op.parent)
+      if (parent.id === item.id)
+        throw new ApiError(400, 'a card cannot be part of itself')
+      // Refused while somebody is asserting the edge, the same way a
+      // dependency cycle is, because that is the moment they can still say
+      // what they meant.
+      if (await contains(ctx, item.id, parent.id))
+        throw new ApiError(
+          409,
+          `${op.parent} is already part of ${op.key}, directly or through others`,
+        )
+
+      const rev = await bumpRev(ctx, item)
+      await ctx.db.run('UPDATE item SET parent_id = ? WHERE id = ?', [
+        parent.id,
+        item.id,
+      ])
+      await emitEvent(
+        ctx,
+        'item.parented',
+        'item',
+        item.id,
+        `${item.key} is part of ${parent.key}`,
+        { parent: parent.key },
+      )
+      return { key: item.key, rev }
+    }
+    case 'comment_delete': {
+      const item = await itemByKey(ctx, op.key)
+      const existing = (
+        await ctx.db.query<{ id: string; actor_id: string }>(
+          'SELECT id, actor_id FROM comment WHERE id = ? AND item_id = ?',
+          [op.comment_id, item.id],
+        )
+      )[0]
+      if (!existing)
+        throw new ApiError(404, `comment ${op.comment_id} not on ${item.key}`)
+      assertCanDeleteComment(
+        ctx,
+        existing.actor_id,
+        await commentDeletePolicy(ctx),
+      )
+
+      // The search index and the link rows go with it. A comment that is
+      // gone but still answers a search, or still counts as a mention of
+      // somebody, is worse than one that was never deleted.
+      await ftsDelete(ctx, 'comment', existing.id)
+      await ctx.db.run('DELETE FROM link WHERE src_kind = ? AND src_id = ?', [
+        'comment',
+        existing.id,
+      ])
+      await ctx.db.run('DELETE FROM comment WHERE id = ?', [existing.id])
+      await emitEvent(
+        ctx,
+        'comment.deleted',
+        'item',
+        item.id,
+        `deleted a comment on ${item.key}`,
+      )
       return { key: item.key, id: existing.id, rev: item.rev }
     }
     case 'set_meta': {
@@ -705,6 +821,14 @@ async function applyItemOp(
         "DELETE FROM link WHERE src_kind = 'item' AND src_id = ?",
         [item.id],
       )
+      // Whatever was part of this now stands on its own. The column is a
+      // foreign key with no ON DELETE (SQLite would want the pragma on), so
+      // without this the children point at a row that is gone and every read
+      // of them fails. Detaching rather than cascading on purpose: deleting a
+      // card must not silently delete the work underneath it.
+      await ctx.db.run('UPDATE item SET parent_id = NULL WHERE parent_id = ?', [
+        item.id,
+      ])
       await ftsDelete(ctx, 'item', item.key)
       await ctx.db.run('DELETE FROM item WHERE id = ?', [item.id])
 

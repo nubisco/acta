@@ -11,6 +11,11 @@ import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
 import { emitEvent } from '../core/events'
 import { newMentions } from './notifications'
+import {
+  assertCanDeleteComment,
+  assertCanEditComment,
+  commentDeletePolicy,
+} from './comments'
 import { ftsDelete, ftsUpsert } from '../core/fts'
 import { withOp } from '../core/ops'
 import { spaceByKey, docBySlug, type IDocRow } from '../core/store'
@@ -300,13 +305,14 @@ async function applyDocOp(
     case 'comment_update': {
       const doc = await docBySlug(ctx, op.ref)
       const existing = (
-        await ctx.db.query<{ id: string; body: string }>(
-          'SELECT id, body FROM doc_comment WHERE id = ? AND document_id = ?',
+        await ctx.db.query<{ id: string; body: string; actor_id: string }>(
+          'SELECT id, body, actor_id FROM doc_comment WHERE id = ? AND document_id = ?',
           [op.comment_id, doc.id],
         )
       )[0]
       if (!existing)
         throw new ApiError(404, `comment ${op.comment_id} not on ${doc.slug}`)
+      assertCanEditComment(ctx, existing.actor_id)
       const body = op.body ?? existing.body
       await ctx.db.run(
         `UPDATE doc_comment SET body = ?, edited_at = CASE WHEN ? THEN ? ELSE edited_at END,
@@ -332,6 +338,40 @@ async function applyDocOp(
           { body: newMentions(existing.body, body) },
         )
       }
+      return { slug: doc.slug, id: existing.id, rev: doc.rev }
+    }
+    case 'comment_delete': {
+      const doc = await docBySlug(ctx, op.ref)
+      const existing = (
+        await ctx.db.query<{ id: string; actor_id: string }>(
+          'SELECT id, actor_id FROM doc_comment WHERE id = ? AND document_id = ?',
+          [op.comment_id, doc.id],
+        )
+      )[0]
+      if (!existing)
+        throw new ApiError(404, `comment ${op.comment_id} not on ${doc.slug}`)
+      assertCanDeleteComment(
+        ctx,
+        existing.actor_id,
+        await commentDeletePolicy(ctx),
+      )
+
+      // The index and the link rows go with it, and the anchor goes with the
+      // row, so the page's markdown is untouched. Deleting a comment has
+      // never been able to change a document and must not start now.
+      await ftsDelete(ctx, 'comment', existing.id)
+      await ctx.db.run('DELETE FROM link WHERE src_kind = ? AND src_id = ?', [
+        'comment',
+        existing.id,
+      ])
+      await ctx.db.run('DELETE FROM doc_comment WHERE id = ?', [existing.id])
+      await emitEvent(
+        ctx,
+        'comment.deleted',
+        'doc',
+        doc.id,
+        `deleted a comment on ${doc.slug}`,
+      )
       return { slug: doc.slug, id: existing.id, rev: doc.rev }
     }
     case 'set_meta': {

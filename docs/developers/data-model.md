@@ -99,6 +99,17 @@ happens next, not silently re-time a week of notifications you already have.
 `reminded_at` and `reminded_via` are set once, by the sweep, so a reminder
 cannot repeat every five minutes for as long as the row stays unread.
 
+**`item.parent_id`** The card this one is part of. A link, not a ladder:
+there are no epic, story or task types to keep in order, so any card can be
+part of any card, at any depth, on any board. Refused on a cycle, at the
+moment the edge is asserted, the same way `item_dependency` is. Deleting a
+parent detaches its parts rather than cascading, because deleting one card
+must not silently delete the work underneath it.
+
+It is a different relation from `item_dependency`, which says what has to
+happen first. A card can be part of something it does not wait on, and wait
+on something it is not part of.
+
 **`webhook`, `webhook_delivery`, `rule`** Outbound delivery with a failure
 count, and the automation catalogue.
 

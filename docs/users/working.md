@@ -178,6 +178,28 @@ after the page is edited around it. If the block has since been removed, the
 page opens at the top and tells you. Nothing about the link is stored in the
 page itself.
 
+## Parts of a card
+
+A card can be part of another card. Open the parent and it lists its **Parts**,
+open a part and it says what it is **Part of**. On a board a card shows how many
+of its parts are done.
+
+Anything can be part of anything, at any depth, and a part can live on a
+different board from its parent, which is the point: the work to ship something
+is rarely all on one board. The only thing Acta refuses is a loop, because a
+card that contains itself can never be reached from a board again.
+
+There are no card types. Acta has no epics, stories or tasks: a card is a card,
+and how you use the nesting is up to you. What a card **is** stays a matter for
+its labels.
+
+**This is not the same as "waits on".** A dependency says what has to happen
+first. Being part of something says where the work belongs. A card often does
+both, and either without the other is perfectly ordinary.
+
+Detaching a part never deletes it, and deleting a parent never deletes its
+parts: they simply stand on their own again.
+
 ## Search
 
 `Cmd/Ctrl + K` anywhere. It covers card titles and descriptions, comments and
@@ -214,9 +236,24 @@ minutes is the default. The same page is where you allow desktop
 notifications, which arrive the moment something happens while Acta is open in
 a tab. Browsers only accept that request from a real click, so Acta has to ask.
 
+### Changing a comment after you posted it
+
+The ellipsis beside a comment offers **Edit** and **Delete**, the way Jira and
+Trello do.
+
+Only the author can edit, including when the author is not you and you are an
+admin. A comment carries the writer's name and face, so being able to rewrite
+somebody else's would be putting words in their mouth. An edited comment is
+marked `(edited)`, with the time it happened.
+
+Deleting is different, because moderating a thread is a real need. You can
+always delete your own, an admin can always delete any, and a workspace that
+would rather nothing disappeared can reserve deleting to admins entirely under
+**Settings -> Workspace**.
+
 ## Settings
 
-Five sections, grouped by what you are trying to do.
+Six sections, grouped by what you are trying to do.
 
 **People** is who can sign in. Only people can be assigned work or mentioned.
 
@@ -228,6 +265,10 @@ form, **connections** let a provider like GitHub push signed events in,
 **webhooks** post events back out to your systems, **rules** are Acta reacting
 to itself, and **agent tokens** are credentials for a script that acts under
 its own name.
+
+**Workspace** is policy that applies to everybody, and only an admin sees it.
+Today that is whether people may delete their own comments, or whether
+deleting is reserved to admins.
 
 **Notifications** is how much Acta chases you: the window before an unread
 notification turns into an email, or never, and whether this browser may show

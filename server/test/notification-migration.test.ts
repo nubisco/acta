@@ -135,6 +135,36 @@ describe('a database older than document inboxes', () => {
     expect(rows[0].notify_after_seconds).toBe(600)
   })
 
+  it('gives the workspace the default comment policy', async () => {
+    const db = await openDb(await legacyDb())
+    const rows = await db.query<{ comment_delete: string }>(
+      'SELECT comment_delete FROM workspace',
+    )
+    // People can delete their own comments unless an admin says otherwise.
+    // Defaulting an existing workspace to 'admin' would take something away
+    // from everybody the moment they upgraded.
+    expect(rows[0].comment_delete).toBe('author')
+  })
+
+  it('adds the parent link without disturbing the cards already there', async () => {
+    const path = await legacyDb()
+    const db = await openDb(path)
+    // The legacy fixture has no item table at all, so this is really
+    // asserting the column exists and defaults to null on a database the
+    // migration built the table into. A card that predates the feature is
+    // part of nothing, which is what null means.
+    await db.run(
+      `INSERT INTO item (id, workspace_id, space_id, list_id, key, title, pos, created_by, created_at, updated_at)
+       SELECT 'itm_x', 'w1', s.id, l.id, 'ST-1', 'Old card', 1, 'a1', 1, 1
+         FROM space s JOIN list l ON l.space_id = s.id LIMIT 1`,
+    )
+    const rows = await db.query<{ parent_id: string | null }>(
+      'SELECT parent_id FROM item WHERE key = ?',
+      ['ST-1'],
+    )
+    expect(rows[0]?.parent_id ?? null).toBeNull()
+  })
+
   it('stamps a reminder deadline on a notification written after the migration', async () => {
     const path = await legacyDb()
     const db = await openDb(path)

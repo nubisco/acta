@@ -80,6 +80,7 @@ export type {
   ISearchResult,
   ILiveEvent,
   IMyWorkItem,
+  TCommentDeletePolicy,
 } from '@/types/api'
 import type {
   IOverview,
@@ -91,6 +92,7 @@ import type {
   ISearchResult,
   ILiveEvent,
   IMyWorkItem,
+  TCommentDeletePolicy,
 } from '@/types/api'
 
 // -- Auth -------------------------------------------------------------------
@@ -313,6 +315,18 @@ export const api = {
     req<{ notify_after_seconds: number }>('/notifications/prefs', {
       method: 'PUT',
       body: JSON.stringify({ notify_after_seconds: seconds }),
+    }),
+
+  /**
+   * Workspace-wide policy. Admin only, and the server says so rather than
+   * trusting the caller to have hidden the control: `overview().policy`
+   * reports the current value to everyone, because every comment row's
+   * `can_delete` is decided by it.
+   */
+  setWorkspacePolicy: (policy: { comment_delete: TCommentDeletePolicy }) =>
+    req<{ comment_delete: string }>('/workspace/policy', {
+      method: 'PUT',
+      body: JSON.stringify(policy),
     }),
 
   docTree: () => req<{ docs: IDocNode[] }>('/docs'),
