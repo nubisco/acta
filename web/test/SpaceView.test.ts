@@ -7,6 +7,7 @@
  * Only clicking a real entry and asserting the write catches that.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest'
+import type { VueWrapper } from '@vue/test-utils'
 import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent, ref } from 'vue'
 
@@ -431,5 +432,65 @@ describe('SpaceView card hierarchy', () => {
         .findAll('.space__card-chip')
         .some((c) => c.attributes('aria-label')?.startsWith('Part of')),
     ).toBe(false)
+  })
+})
+
+/**
+ * Dropping a card onto another on the board.
+ *
+ * NbBoard could not express this until 5.9.0, so the board is driven through
+ * the component's own `nest` event here rather than through a synthetic drag:
+ * the zone arithmetic that decides when to emit it is the library's, and it
+ * is tested there.
+ */
+describe('SpaceView nesting', () => {
+  beforeEach(() => {
+    itemWrite.mockClear()
+  })
+
+  // By its own class, not by name: the component is registered from its file
+  // as `Board`, and `.space__board` is the handle this view already owns.
+  // The cast is because a selector-based findComponent cannot know what it
+  // found, and what it found is NbBoard.
+  const board = (view: Awaited<ReturnType<typeof render>>) =>
+    view.findComponent('.space__board') as unknown as VueWrapper
+
+  it('asks the board to allow it', async () => {
+    const view = await render()
+    expect((board(view).props() as Record<string, unknown>).nestable).toBe(true)
+  })
+
+  it('makes the dropped card part of the one it landed on', async () => {
+    const view = await render()
+    board(view).vm.$emit('nest', {
+      itemId: 'SU-3',
+      ontoItemId: 'SU-1',
+      fromColumnId: 'To Do',
+    })
+    await flushPromises()
+
+    const [ops] = itemWrite.mock.calls[0] as unknown as [
+      { op: string; key: string; parent: string }[],
+    ]
+    expect(ops[0].op).toBe('set_parent')
+    expect(ops[0].key).toBe('SU-3')
+    expect(ops[0].parent).toBe('SU-1')
+  })
+
+  it('does not also move it', async () => {
+    const view = await render()
+    board(view).vm.$emit('nest', {
+      itemId: 'SU-3',
+      ontoItemId: 'SU-1',
+      fromColumnId: 'To Do',
+    })
+    await flushPromises()
+
+    // A card dropped onto another has not been given a position. Writing a
+    // move as well would reorder it on top of reparenting it.
+    const ops = itemWrite.mock.calls.flatMap(
+      (call) => (call as unknown as [{ op: string }[]])[0],
+    )
+    expect(ops.map((o) => o.op)).not.toContain('move')
   })
 })

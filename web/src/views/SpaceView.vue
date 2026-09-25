@@ -149,7 +149,9 @@
       :columns="columns"
       :lanes="lanes"
       :items="spaceItems"
+      nestable
       @move="onMove"
+      @nest="onNest"
     >
       <!-- A lane keyed by a person wears their face. The library's own
            label class is kept so the header's type does not change with
@@ -348,6 +350,7 @@ import {
   useToast,
   type IBoardItem,
   type IBoardMoveEvent,
+  type IBoardNestEvent,
 } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
 import type { ISpaceItemRow } from '@/types/api'
@@ -813,6 +816,33 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
     row.list = previousList
     row.pos = previousPos
     toast.error(humanise(err), { title: 'Move failed' })
+  }
+  await loadItems()
+}
+
+/**
+ * A card dropped onto another becomes part of it.
+ *
+ * Not optimistic, unlike a move. A move has an obvious provisional answer to
+ * draw (the card, in the new place), and this does not: the server refuses a
+ * cycle, and drawing the nesting first would mean drawing a relationship that
+ * is about to be taken back. The reload is one request and the refusal is the
+ * interesting case.
+ */
+async function onNest(event: IBoardNestEvent): Promise<void> {
+  try {
+    const { results } = await api.itemWrite([
+      {
+        op: 'set_parent',
+        op_id: newOpId(),
+        key: event.itemId,
+        parent: event.ontoItemId,
+      },
+    ])
+    if (!results[0].ok) throw new Error((results[0] as { error: string }).error)
+    toast.success(`${event.itemId} is now part of ${event.ontoItemId}`)
+  } catch (err) {
+    toast.error(humanise(err), { title: 'Could not nest that card' })
   }
   await loadItems()
 }

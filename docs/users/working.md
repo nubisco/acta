@@ -200,6 +200,17 @@ both, and either without the other is perfectly ordinary.
 Detaching a part never deletes it, and deleting a parent never deletes its
 parts: they simply stand on their own again.
 
+**On a board you can drag a card onto another** to make it part of it. The
+middle of a card nests, its top and bottom edges still move the card to that
+position, and the two look different on purpose: an insertion point is a line
+in the gap the card would land in, and a nest target is the whole card, filled
+and ringed. By keyboard, pick the card up with Space, arrow to the card you
+mean, and hold Shift while you drop.
+
+Dragging only works inside one board, which is why the Parts panel is the main
+route: it searches every board, and a part on another board can only be added
+that way.
+
 ## Search
 
 `Cmd/Ctrl + K` anywhere. It covers card titles and descriptions, comments and
