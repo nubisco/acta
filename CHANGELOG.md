@@ -1,3 +1,10 @@
+# [1.33.0](https://github.com/nubisco/acta/compare/v1.32.1...v1.33.0) (2026-10-01)
+
+
+### Features
+
+* **activity:** make the feed's cards and pages clickable ([ad8f8a6](https://github.com/nubisco/acta/commit/ad8f8a65f03334892062012ddb607142aedbe3ef))
+
 ## [1.32.1](https://github.com/nubisco/acta/compare/v1.32.0...v1.32.1) (2026-09-25)
 
 
