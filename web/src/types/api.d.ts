@@ -217,6 +217,13 @@ export interface IEventRow {
   entity_id: string
   summary: string
   caused_by: string | null
+  /**
+   * What the row opens, resolved by the server from `entity_id`, which is an
+   * internal id and no use to a browser. Absent when the event is about
+   * neither, such as a label or a space change.
+   */
+  item_key?: string
+  doc_slug?: string
 }
 
 export interface ISearchResult {

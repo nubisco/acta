@@ -69,14 +69,57 @@
         :sort-state="sort"
         @sort="onSort"
       >
+        <!-- A person in the feed is a question: what else did they do? The
+             filter this sets is the one already at the top of the page. -->
         <template #cell-who="{ row }">
-          <span class="activity-view__who">
+          <component
+            :is="(row as IRow).handle ? 'button' : 'span'"
+            :type="(row as IRow).handle ? 'button' : undefined"
+            class="activity-view__who"
+            :class="{ 'activity-view__who--live': (row as IRow).handle }"
+            :title="
+              (row as IRow).handle
+                ? `Show only ${(row as IRow).who}`
+                : undefined
+            "
+            @click="
+              (row as IRow).handle && onlyThisPerson((row as IRow).handle)
+            "
+          >
             <ActorAvatar
               v-if="(row as IRow).handle"
               :handle="(row as IRow).handle"
               :size="22"
             />
             {{ (row as IRow).who }}
+          </component>
+        </template>
+        <!-- The feed names cards and pages in the open, so what it names is
+             what you click. A row has no single destination: a dependency
+             summary is about two cards and both ends are worth opening. -->
+        <template #cell-what="{ row }">
+          <span class="activity-view__what">
+            <template
+              v-for="(part, i) in (row as IRow).parts"
+              :key="`${(row as IRow).id}-${i}`"
+            >
+              <button
+                v-if="part.kind === 'item'"
+                type="button"
+                class="activity-view__ref"
+                @click="inspector.open(part.text)"
+              >
+                {{ part.text }}
+              </button>
+              <RouterLink
+                v-else-if="part.kind === 'doc'"
+                class="activity-view__ref"
+                :to="wpath(`/docs/${part.slug}`)"
+              >
+                {{ part.text }}
+              </RouterLink>
+              <template v-else>{{ part.text }}</template>
+            </template>
           </span>
         </template>
         <template #cell-when="{ row }">
@@ -107,10 +150,15 @@ import { api } from '@/api/client'
 import type { IEventRow } from '@/types/api'
 import { absoluteTime, relativeTime, useLoadState } from '@/lib/state'
 import { useWorkspace } from '@/stores/workspace'
+import { RouterLink } from 'vue-router'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import ActorFilter from '@/components/ActorFilter.vue'
+import { activitySegments, type TActivitySegment } from '@/lib/activity'
+import { wpath } from '@/lib/paths'
+import { useInspector } from '@/stores/workspace'
 
 const ws = useWorkspace()
+const inspector = useInspector()
 const load = useLoadState()
 const filterBar = useShellSlot('fixedbar')
 
@@ -134,6 +182,8 @@ interface IRow extends Record<string, unknown> {
   who: string
   handle: string
   what: string
+  /** The summary, split into the things it names. See lib/activity.ts. */
+  parts: TActivitySegment[]
 }
 
 /**
@@ -158,6 +208,17 @@ function onSort(state: unknown): void {
 }
 
 /**
+ * Narrow the feed to one person, from their name in a row.
+ *
+ * Replaces the filter rather than adding to it: clicking a name in a list
+ * means "just them", and the control at the top is still there for picking
+ * several.
+ */
+function onlyThisPerson(handle: string): void {
+  actorFilter.value = [handle]
+}
+
+/**
  * Sorting applies to everything loaded, not to the whole log: the feed is
  * paginated by cursor, so "oldest first" means the oldest of what you have
  * pulled in. Load more, and the sort covers more.
@@ -171,7 +232,10 @@ const rows = computed<IRow[]>(() => {
       when: relativeTime(event.ts),
       who: actor?.name ?? 'Acta',
       handle: actor?.handle ?? '',
+      // Kept as plain text as well: it is what the column sorts on, and what
+      // a screen reader gets if the cell is read as a whole.
       what: event.summary,
+      parts: activitySegments(event.summary, event.doc_slug),
     }
   })
   const active = sort.value
@@ -237,6 +301,62 @@ onScopeDispose(
     display: inline-flex;
     align-items: center;
     gap: var(--nb-spacing-8);
+    text-align: start;
+  }
+
+  /* A button only where there is a person to filter by. The system actor has
+     no handle, so that row stays a plain span rather than a control that
+     would narrow the feed to nobody. */
+  &__who--live {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--nb-c-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--nb-c-focus-ring);
+      outline-offset: 2px;
+      border-radius: var(--nb-radius-sm);
+    }
+  }
+
+  &__what {
+    /* The sentence wraps, and the things in it should not break mid-key. */
+    overflow-wrap: anywhere;
+  }
+
+  /* The card keys and page names inside a summary. Deliberately not a chip:
+     these sit inside a sentence, several to a line, and a row of pills would
+     read as a toolbar rather than as a line of prose that happens to name
+     things you can open. */
+  &__ref {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--nb-c-primary);
+    font-weight: var(--nb-type-label-lg-weight);
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+
+    &:hover,
+    &:focus-visible {
+      text-decoration: underline;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--nb-c-focus-ring);
+      outline-offset: 2px;
+      border-radius: var(--nb-radius-sm);
+    }
   }
 
   &__filters {

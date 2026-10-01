@@ -771,10 +771,12 @@ export async function search(ctx: ICtx, params: TSearch) {
 }
 
 export async function activityQuery(ctx: ICtx, params: TActivityQuery) {
-  const where: string[] = ['workspace_id = ?']
+  // Qualified, because the query joins item and document to resolve what each
+  // row opens, and `id` means two things once it does.
+  const where: string[] = ['e.workspace_id = ?']
   const args: unknown[] = [ctx.workspaceId]
   if (params.entity) {
-    where.push('(entity = ? OR entity_id = ?)')
+    where.push('(e.entity = ? OR e.entity_id = ?)')
     args.push(params.entity, params.entity)
   }
   if (params.actor) {
@@ -789,7 +791,7 @@ export async function activityQuery(ctx: ICtx, params: TActivityQuery) {
       const clause = actors
         .map(
           () =>
-            '(actor_id = ? OR actor_id IN (SELECT id FROM actor WHERE workspace_id = ? AND handle = ?))',
+            '(e.actor_id = ? OR e.actor_id IN (SELECT id FROM actor WHERE workspace_id = ? AND handle = ?))',
         )
         .join(' OR ')
       where.push(`(${clause})`)
@@ -797,19 +799,19 @@ export async function activityQuery(ctx: ICtx, params: TActivityQuery) {
     }
   }
   if (params.actor_kind) {
-    where.push('actor_kind = ?')
+    where.push('e.actor_kind = ?')
     args.push(params.actor_kind)
   }
   if (params.verb) {
-    where.push('verb LIKE ?')
+    where.push('e.verb LIKE ?')
     args.push(params.verb.replace('*', '%'))
   }
   if (params.since) {
-    where.push('id > ?')
+    where.push('e.id > ?')
     args.push(params.since)
   }
   if (params.cursor) {
-    where.push('id < ?')
+    where.push('e.id < ?')
     args.push(params.cursor)
   }
   const rows = await ctx.db.query<{
@@ -823,13 +825,31 @@ export async function activityQuery(ctx: ICtx, params: TActivityQuery) {
     entity_id: string
     summary: string
     caused_by: string | null
+    item_key: string | null
+    doc_slug: string | null
   }>(
-    `SELECT id, ts, actor_id, actor_kind, on_behalf_of, verb, entity, entity_id, summary, caused_by
-       FROM event WHERE ${where.join(' AND ')} ORDER BY id DESC LIMIT ?`,
+    `SELECT e.id, e.ts, e.actor_id, e.actor_kind, e.on_behalf_of, e.verb,
+            e.entity, e.entity_id, e.summary, e.caused_by,
+            -- What the row opens. entity_id is an internal id, which is no
+            -- use to a browser and no use to a person: the feed talks about
+            -- ST-1 and spec, so it has to hand back ST-1 and spec. Resolved
+            -- here for the same reason the notification inbox resolves it,
+            -- rather than asking every client to look up every row.
+            i.key AS item_key,
+            d.slug AS doc_slug
+       FROM event e
+       LEFT JOIN item i ON i.id = e.entity_id AND e.entity = 'item'
+       LEFT JOIN document d ON d.id = e.entity_id AND e.entity = 'doc'
+      WHERE ${where.join(' AND ')}
+      ORDER BY e.id DESC LIMIT ?`,
     [...args, params.limit],
   )
   return {
-    events: rows,
+    events: rows.map((r) => ({
+      ...r,
+      item_key: r.item_key ?? undefined,
+      doc_slug: r.doc_slug ?? undefined,
+    })),
     cursor: rows.length === params.limit ? rows[rows.length - 1].id : undefined,
   }
 }
