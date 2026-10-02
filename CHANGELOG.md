@@ -1,3 +1,10 @@
+# [1.34.0](https://github.com/nubisco/acta/compare/v1.33.0...v1.34.0) (2026-10-02)
+
+
+### Features
+
+* **labels:** a label group can name one answer, and have an order ([8b8bf22](https://github.com/nubisco/acta/commit/8b8bf22847ec5ef28c0cbf8b28724fc40701f4cc))
+
 # [1.33.0](https://github.com/nubisco/acta/compare/v1.32.1...v1.33.0) (2026-10-01)
 
 
