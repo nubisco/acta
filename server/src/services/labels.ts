@@ -29,6 +29,55 @@ export async function labelWrite(
  * So an ambiguous name is refused rather than guessed at, and the refusal
  * says how to disambiguate.
  */
+/**
+ * One label of a given group, by id or by name.
+ *
+ * Scoped to the group rather than to the workspace: a name is only unique
+ * inside its group now, and an op that names the group has already said
+ * which 1.12.0 it means. A ref that is not in this group is an error rather
+ * than a no-op, because silently skipping it leaves the caller believing an
+ * order was applied.
+ */
+async function labelInGroup(
+  ctx: ICtx,
+  groupId: string,
+  ref: string,
+): Promise<{ id: string }> {
+  const find = async (name: string) =>
+    (
+      await ctx.db.query<{ id: string }>(
+        `SELECT id FROM label
+          WHERE workspace_id = ? AND group_id = ?
+            AND (id = ? OR lower(name) = lower(?))`,
+        [ctx.workspaceId, groupId, name, name],
+      )
+    )[0]
+
+  const direct = await find(ref)
+  if (direct) return direct
+
+  // `Group/Name` too, last and only as a fallback, so a label whose own name
+  // contains a slash still resolves as itself. Same order as `labelByRef`.
+  //
+  // The prefix has to be this group. Stripping any prefix would turn
+  // "Affects version/1.9.0" into this group's own 1.9.0 and reorder the
+  // wrong group's values under a ref that plainly says otherwise, which is
+  // the mistake this whole helper exists to stop.
+  const slash = ref.indexOf('/')
+  if (slash > 0) {
+    const named = ref.slice(0, slash)
+    const mine = await ctx.db.query<{ name: string }>(
+      'SELECT name FROM label_group WHERE id = ?',
+      [groupId],
+    )
+    if (mine[0]?.name.toLowerCase() === named.toLowerCase()) {
+      const qualified = await find(ref.slice(slash + 1))
+      if (qualified) return qualified
+    }
+  }
+  throw new ApiError(404, `label ${ref} is not in this group`)
+}
+
 async function groupByRef(ctx: ICtx, ref: string): Promise<{ id: string }> {
   const byId = await ctx.db.query<{ id: string }>(
     'SELECT id FROM label_group WHERE workspace_id = ? AND id = ?',
@@ -153,16 +202,19 @@ async function applyLabelOp(ctx: ICtx, op: TLabelOp): Promise<{ id?: string }> {
     }
     case 'label_reorder': {
       const group = await groupByRef(ctx, op.group)
-      // Positions assigned from the given order, so the caller hands over
-      // what a drag produced and never has to invent numbers. Spaced out so
-      // a later single-label move has room between neighbours.
+      // Resolved inside the group, which is the point of the op naming one.
+      // Resolving across the workspace and then guarding the UPDATE with
+      // `AND group_id = ?` looks safe and is worse than either: ordering
+      // "Fixes version" by the names 1.9.0, 1.11.0, 1.12.0 found the
+      // identically named labels of "Affects version", matched no row, and
+      // reported success on a group it had not touched.
       let pos = 1024
       for (const ref of op.labels) {
-        const label = await labelByRef(ctx, ref)
-        await ctx.db.run(
-          'UPDATE label SET pos = ? WHERE id = ? AND group_id = ?',
-          [pos, label.id, group.id],
-        )
+        const label = await labelInGroup(ctx, group.id, ref)
+        await ctx.db.run('UPDATE label SET pos = ? WHERE id = ?', [
+          pos,
+          label.id,
+        ])
         pos += 1024
       }
       await emitEvent(

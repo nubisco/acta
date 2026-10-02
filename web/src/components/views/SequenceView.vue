@@ -104,9 +104,11 @@
                   :size="18"
                 />
                 <LabelBadge
-                  v-for="label in node.labels"
-                  :key="label"
-                  :name="label"
+                  v-for="label in rowLabels(node)"
+                  :id="label.id"
+                  :key="label.key"
+                  :name="label.name"
+                  qualify
                 />
                 <span v-if="node.size !== null" class="sequence__size">
                   {{ node.size }}
@@ -150,6 +152,7 @@ import { api } from '@/api/client'
 import { useLoadState } from '@/lib/state'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import LabelBadge from '@/components/LabelBadge.vue'
+import { rowLabels } from '@/lib/labels'
 
 const props = defineProps<{ spaceKey: string }>()
 const emit = defineEmits<{ open: [key: string] }>()

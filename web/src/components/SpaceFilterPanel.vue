@@ -5,7 +5,7 @@
          panel got tall; across the toolbar there is room to lay them out. -->
     <div class="filters__row">
       <span class="filters__label">Labels</span>
-      <p v-if="labelNames.length === 0" class="filters__none">
+      <p v-if="labelIds.length === 0" class="filters__none">
         This space has no labels yet.
       </p>
       <!-- Pills, not a dropdown: a label's colour is half of what identifies
@@ -13,15 +13,17 @@
            nor which ones are on. -->
       <div v-else class="filters__pills">
         <button
-          v-for="name in labelNames"
-          :key="name"
+          v-for="id in labelIds"
+          :key="id"
           type="button"
           class="filters__pill"
-          :class="{ 'filters__pill--on': labels.includes(name) }"
-          :aria-pressed="labels.includes(name)"
-          @click="toggleLabel(name)"
+          :class="{ 'filters__pill--on': labels.includes(id) }"
+          :aria-pressed="labels.includes(id)"
+          @click="toggleLabel(id)"
         >
-          <LabelBadge :name="name" />
+          <!-- Qualified: two pills both reading 1.12.0 are two different
+               filters, and the group name is what tells them apart. -->
+          <LabelBadge :id="id" qualify />
         </button>
       </div>
     </div>
@@ -83,7 +85,8 @@ const props = defineProps<{
   labels: string[]
   assignees: string[]
   state: string
-  labelNames: string[]
+  /** Every label this space can be filtered by, as ids. */
+  labelIds: string[]
   /** Whether anything is filtered, which is what makes "Clear all" worth showing. */
   active: boolean
 }>()
@@ -103,12 +106,12 @@ const stateOptions = [
   { label: 'All', value: 'all' },
 ]
 
-function toggleLabel(name: string): void {
+function toggleLabel(id: string): void {
   emit(
     'update:labels',
-    props.labels.includes(name)
-      ? props.labels.filter((l) => l !== name)
-      : [...props.labels, name],
+    props.labels.includes(id)
+      ? props.labels.filter((l) => l !== id)
+      : [...props.labels, id],
   )
 }
 </script>

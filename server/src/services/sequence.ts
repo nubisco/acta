@@ -21,7 +21,12 @@ export interface ISequenceNode {
   list: string
   status: 'open' | 'done' | 'archived'
   assignees: string[]
+  /** Label names, kept as they were: the MCP tools and the importers read
+   *  this shape. `label_ids` is what the browser resolves a label by. */
   labels: string[]
+  /** The same labels as ids, in the same order. A name no longer identifies
+   *  one: two groups may both list 1.12.0 and only the id says which. */
+  label_ids: string[]
   size: number | null
   is_milestone: boolean
   /** Steps from the start. Everything in 0 can begin immediately. */
@@ -183,20 +188,19 @@ export async function sequenceGet(
         [r.id],
       )
     ).map((x) => x.handle)
-    const labels = (
-      await ctx.db.query<{ name: string }>(
-        `SELECT lb.name FROM item_label il JOIN label lb ON lb.id = il.label_id
-          WHERE il.item_id = ?`,
-        [r.id],
-      )
-    ).map((x) => x.name)
+    const labelRows = await ctx.db.query<{ id: string; name: string }>(
+      `SELECT lb.id, lb.name FROM item_label il JOIN label lb ON lb.id = il.label_id
+        WHERE il.item_id = ? ORDER BY lb.id`,
+      [r.id],
+    )
     nodes.push({
       key: r.key,
       title: r.title,
       list: r.list,
       status: r.archived ? 'archived' : r.completed ? 'done' : 'open',
       assignees,
-      labels,
+      labels: labelRows.map((x) => x.name),
+      label_ids: labelRows.map((x) => x.id),
       size: r.size,
       is_milestone: r.is_milestone === 1,
       layer: layerOf.get(r.id)!,

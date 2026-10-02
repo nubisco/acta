@@ -238,6 +238,51 @@ describe('a group with an order', () => {
     ).toEqual(['1.12.0', '1.9.0', '1.11.0'])
   })
 
+  it('orders by bare name inside the group that was named', async () => {
+    // Both groups list 1.9.0, 1.11.0 and 1.12.0. Resolving these names
+    // across the workspace found the other group's labels, matched no row
+    // under the `AND group_id` guard, and returned ok on a group it had not
+    // touched. Found by hand on a seeded instance, not by this suite, which
+    // had only ever passed fully qualified refs.
+    await versionGroups()
+    await labelWrite(jose, [
+      {
+        op: 'label_reorder',
+        op_id: 'r1',
+        group: 'Fixes version',
+        labels: ['1.12.0', '1.9.0', '1.11.0'],
+      },
+    ])
+    const seen = (await workspaceOverview(jose)) as {
+      labels: Array<{ group_name: string; name: string }>
+    }
+    expect(
+      seen.labels
+        .filter((l) => l.group_name === 'Fixes version')
+        .map((l) => l.name),
+    ).toEqual(['1.12.0', '1.9.0', '1.11.0'])
+    // And the other group keeps the order it was given, untouched.
+    expect(
+      seen.labels
+        .filter((l) => l.group_name === 'Affects version')
+        .map((l) => l.name),
+    ).toEqual(['1.9.0', '1.11.0', '1.12.0'])
+  })
+
+  it('refuses to order a group by a label that is not in it', async () => {
+    await versionGroups()
+    const results = await labelWrite(jose, [
+      {
+        op: 'label_reorder',
+        op_id: 'r1',
+        group: 'Fixes version',
+        labels: ['Affects version/1.9.0'],
+      },
+    ])
+    // Rather than reporting success on a group it did not reorder.
+    expect(results[0]?.ok).toBe(false)
+  })
+
   it('keeps an unarranged group by name, and puts a stray label last', async () => {
     await labelWrite(jose, [
       { op: 'group_create', op_id: 'g1', name: 'Phase', space: 'ST' },

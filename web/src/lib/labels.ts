@@ -38,6 +38,8 @@ export interface ILabelEntry {
   id: string
   name: string
   color: string
+  /** The group's id, which is its identity. The name is for reading. */
+  groupId: string
   group: string
   space: string | null
   exclusive: boolean
@@ -66,6 +68,7 @@ function entryOf(label: NonNullable<IOverview['labels']>[number]): ILabelEntry {
     id: label.id,
     name: label.name,
     color: label.color,
+    groupId: label.group_id,
     group: label.group_name,
     space: label.space_key,
     exclusive: label.exclusive === true,
@@ -155,4 +158,28 @@ export function headingOption(group: ILabelGroup): {
 export function headingName(value: string): string | null {
   if (!value.startsWith(HEADING)) return null
   return value.slice(HEADING.length).split('\u0000')[0]
+}
+
+/**
+ * A card's labels, as the thing to render.
+ *
+ * Prefers the ids, because a name no longer identifies a label: a card
+ * carrying 1.12.0 from both the affects group and the fixes group would
+ * otherwise draw the same chip twice and say nothing about which is which.
+ * The names are the fallback for a payload that predates `label_ids`.
+ */
+export function rowLabels(row: {
+  labels?: string[]
+  label_ids?: string[]
+}): { key: string; id?: string; name?: string }[] {
+  if (row.label_ids) return row.label_ids.map((id) => ({ key: id, id }))
+  return (row.labels ?? []).map((name) => ({ key: name, name }))
+}
+
+/**
+ * How a label reads on its own, away from its group's heading. A group that
+ * names a single answer is a field, so its value says which field it answers.
+ */
+export function labelText(entry: ILabelEntry): string {
+  return entry.exclusive ? `${entry.group}: ${entry.name}` : entry.name
 }

@@ -17,14 +17,14 @@
     </template>
     <template #cell-labels="{ row }">
       <span class="tbl__labels">
-        <NbBadge
+        <LabelBadge
           v-for="label in (row as IRow).labelList"
-          :key="label"
+          :id="label.id"
+          :key="label.key"
+          :name="label.name"
           size="sm"
-          :variant="variants.get(label) ?? 'grey'"
-        >
-          {{ label }}
-        </NbBadge>
+          qualify
+        />
       </span>
     </template>
     <template #cell-assignees="{ row }">
@@ -57,12 +57,14 @@ import { computed, ref } from 'vue'
 import type { ISpaceItemRow } from '@/types/api'
 import { relativeTime } from '@/lib/state'
 import ActorAvatar from '@/components/ActorAvatar.vue'
+import LabelBadge from '@/components/LabelBadge.vue'
+import { rowLabels } from '@/lib/labels'
 
 interface IRow extends Record<string, unknown> {
   key: string
   title: string
   list: string
-  labelList: string[]
+  labelList: { key: string; id?: string; name?: string }[]
   assigneeList: string[]
   due: string
   dueAt: number
@@ -71,15 +73,8 @@ interface IRow extends Record<string, unknown> {
   done?: boolean
 }
 
-const props = defineProps<{
-  items: ISpaceItemRow[]
-  variants: Map<string, string>
-}>()
+const props = defineProps<{ items: ISpaceItemRow[] }>()
 const emit = defineEmits<{ open: [key: string] }>()
-
-const variants = computed(
-  () => props.variants as unknown as Map<string, 'grey'>,
-)
 
 const columns = [
   { key: 'key', header: 'Key', sortable: true, width: '7rem' },
@@ -125,7 +120,7 @@ const rows = computed<IRow[]>(() => {
     key: item.key,
     title: item.title,
     list: item.list,
-    labelList: item.labels ?? [],
+    labelList: rowLabels(item),
     assigneeList: item.assignees ?? [],
     labels: (item.labels ?? []).join(', '),
     assignees: (item.assignees ?? []).join(', '),

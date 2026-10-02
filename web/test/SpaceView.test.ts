@@ -52,9 +52,26 @@ const overview = {
       ],
     },
   ],
+  // With ids and groups, because that is what the catalogue carries: a
+  // label is filtered and rendered by id now, since a bare name cannot say
+  // which group a value belongs to.
   labels: [
-    { name: 'Urgent', color: 'red', space_key: null },
-    { name: 'Tech debt', color: 'yellow', space_key: 'SU' },
+    {
+      id: 'lbl_urgent',
+      group_id: 'lgr_tags',
+      group_name: 'Tags',
+      name: 'Urgent',
+      color: 'red',
+      space_key: null,
+    },
+    {
+      id: 'lbl_debt',
+      group_id: 'lgr_tags',
+      group_name: 'Tags',
+      name: 'Tech debt',
+      color: 'yellow',
+      space_key: 'SU',
+    },
   ],
   actors: [
     { handle: 'jose', name: 'Jose', kind: 'human' },
@@ -283,7 +300,9 @@ describe('SpaceView card menu', () => {
       string,
       Record<string, string>,
     ]
-    expect(params.label).toBe('Urgent,Tech debt')
+    // Ids on the wire. The server takes either, and a name would filter on
+    // every group that happens to hold it.
+    expect(params.label).toBe('lbl_urgent,lbl_debt')
   })
 
   it('counts what is filtered on the button', async () => {

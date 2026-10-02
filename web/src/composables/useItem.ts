@@ -9,7 +9,7 @@ import { useInlineLoading, useToast } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
 import type { IItemDetail, TViewState } from '@/types/api'
 import { humanise } from '@/lib/state'
-import { groupKey, headingOption, labelGroups, labelsById } from '@/lib/labels'
+import { headingOption, labelGroups, labelsById } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'
 
 export interface ILifecycleBadge {
@@ -234,15 +234,13 @@ export function useItem(itemKey: Ref<string>) {
     for (const id of ids) {
       const label = catalogue.get(id)
       if (!label?.exclusive) continue
-      keep.set(groupKey({ name: label.group, space: label.space }), id)
+      keep.set(label.groupId, id)
     }
     if (keep.size === 0) return ids
     return ids.filter((id) => {
       const label = catalogue.get(id)
       if (!label?.exclusive) return true
-      return (
-        keep.get(groupKey({ name: label.group, space: label.space })) === id
-      )
+      return keep.get(label.groupId) === id
     })
   }
 

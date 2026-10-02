@@ -11,7 +11,7 @@
 
     <NbPanel
       v-for="group in groups"
-      :key="groupKey(group)"
+      :key="group.id"
       class="labels-settings__group"
     >
       <header class="labels-settings__head">
@@ -149,7 +149,7 @@ import { computed, ref } from 'vue'
 import { useConfirm, useToast } from '@nubisco/ui'
 import { api, newOpId as opId } from '@/api/client'
 import { humanise } from '@/lib/state'
-import { groupKey, labelGroups } from '@/lib/labels'
+import { labelGroups } from '@/lib/labels'
 import type { ILabelEntry, ILabelGroup } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'
 import LabelBadge from '@/components/LabelBadge.vue'

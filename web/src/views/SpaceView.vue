@@ -120,7 +120,6 @@
     <TableView
       v-else-if="view === 'table'"
       :items="items"
-      :variants="variants"
       @open="(key) => inspector.open(key)"
     />
 
@@ -197,14 +196,14 @@
           </span>
           <span class="space__card-meta">
             <span class="space__card-key">{{ item.key }}</span>
-            <NbBadge
-              v-for="label in (item.labels as string[]) ?? []"
-              :key="label"
+            <LabelBadge
+              v-for="label in rowLabels(item as Partial<ISpaceItemRow>)"
+              :id="label.id"
+              :key="label.key"
+              :name="label.name"
               size="sm"
-              :variant="variants.get(label) ?? 'grey'"
-            >
-              {{ label }}
-            </NbBadge>
+              qualify
+            />
             <NbBadge
               v-if="item.due && !item.done && Number(item.due) < Date.now()"
               size="sm"
@@ -274,7 +273,7 @@
         :labels="labelFilter"
         :assignees="assigneeFilter"
         :state="stateFilter"
-        :label-names="labelNames"
+        :label-ids="labelIds"
         :active="filtersActive"
         @update:labels="labelFilter = $event"
         @update:assignees="assigneeFilter = $event"
@@ -356,7 +355,8 @@ import { api, newOpId } from '@/api/client'
 import type { ISpaceItemRow } from '@/types/api'
 import { humanise, useLoadState } from '@/lib/state'
 import { useViewCommands } from '@/lib/commands'
-import { labelVariants } from '@/lib/labels'
+import { labelText, labelsById, rowLabels } from '@/lib/labels'
+import LabelBadge from '@/components/LabelBadge.vue'
 import { roleColor } from '@/lib/colors'
 import { useInspector, useUiState, useWorkspace } from '@/stores/workspace'
 import type { NbMenu } from '@nubisco/ui'
@@ -383,7 +383,7 @@ function openItemModal(key: string): void {
   inspector.close()
   ui.itemModalKey.value = key
 }
-const variants = computed(() => labelVariants(ws.overview.value))
+const labelCatalogue = computed(() => labelsById(ws.overview.value))
 const toast = useToast()
 const confirm = useConfirm()
 const load = useLoadState()
@@ -575,7 +575,7 @@ const filterCount = computed(
     (stateFilter.value !== 'open' ? 1 : 0),
 )
 
-const labelNames = computed(() => labelOptions.value.map((o) => o.value))
+const labelIds = computed(() => labelOptions.value.map((o) => o.value))
 
 // The tour points at a card to explain keys and the details panel, and it
 // needs one specific card rather than every card wearing the same id. Null
@@ -627,7 +627,9 @@ function laneKeysOf(row: ISpaceItemRow): (string | null)[] {
     return who.length > 0 ? who : [null]
   }
   if (swimlane.value === 'label') {
-    const labels = row.labels ?? []
+    // By id. Two groups may both list 1.12.0, and keying the lanes by name
+    // would pour the affected cards and the fixed ones into one band.
+    const labels = rowLabels(row).map((l) => l.id ?? l.name ?? '')
     return labels.length > 0 ? labels : [null]
   }
   return [null]
@@ -650,7 +652,12 @@ const lanes = computed(() => {
         swimlane.value === 'assignee'
           ? (ws.overview.value?.actors.find((a) => a.handle === key)?.name ??
             `@${key}`)
-          : key,
+          : // Qualified, so two lanes that both read 1.12.0 say which is
+            // which. Falls back to the key for a lane keyed by a bare name.
+            (() => {
+              const label = labelCatalogue.value.get(key)
+              return label ? labelText(label) : key
+            })(),
     })),
     // Last, and only when something lands in it: a permanently empty
     // "Unassigned" band is a row of six empty cells on every space.
@@ -689,7 +696,9 @@ const spaceItems = computed<IBoardItem[]>(() =>
 const labelOptions = computed(() => [
   ...(ws.overview.value?.labels ?? [])
     .filter((l) => l.space_key === null || l.space_key === spaceKey.value)
-    .map((l) => ({ label: l.name, value: l.name })),
+    // Valued by id: the server's label filter takes either, and a name
+    // would filter on both groups that happen to hold it.
+    .map((l) => ({ label: l.name, value: l.id })),
 ])
 
 async function loadItems(): Promise<void> {

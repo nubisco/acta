@@ -81,7 +81,15 @@ export interface ISpaceItemRow {
   key: string
   title: string
   list: string
+  /** Label names, position for position with `label_ids`. */
   labels?: string[]
+  /**
+   * The same labels as ids. A name does not identify a label any more:
+   * "Affects version" and "Fixes version" both list 1.12.0, so a card
+   * carrying both would otherwise show one chip twice and a filter on the
+   * name would match either of them.
+   */
+  label_ids?: string[]
   assignees?: string[]
   due?: number
   done?: boolean
