@@ -88,7 +88,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'item_write',
     description:
-      'Batch item mutations, transactional per op, idempotent via op_id (safe to retry). Ops: create (with labels/assignees/checklists inline), update (optional if_rev optimistic lock), move (cross-space moves re-key and alias), comment, comment_update (author only), comment_delete (author, or an admin; the workspace can reserve it to admins), set_parent (makes this card part of another, or null to detach; any card, any depth, any board, refused on a cycle), checklist_set, label, assign, archive, restore, complete, reopen, delete (permanent, refused unless the item is archived first). Up to 100 ops per call; returns {op_id, ok, key, rev} per op.',
+      'Batch item mutations, transactional per op, idempotent via op_id (safe to retry). Ops: create (with labels/assignees/checklists inline), update (optional if_rev optimistic lock), move (cross-space moves re-key and alias), comment, comment_update (author only), comment_delete (author, or an admin; the workspace can reserve it to admins), set_parent (makes this card part of another, or null to detach; any card, any depth, any board, refused on a cycle), checklist_set, label (adding a label from an exclusive group replaces whatever that group held; reference it as "Group/Name" when two groups share value names), assign, archive, restore, complete, reopen, delete (permanent, refused unless the item is archived first). Up to 100 ops per call; returns {op_id, ok, key, rev} per op.',
     schema: zItemWrite,
     write: true,
     handler: async (ctx, args) => {
@@ -159,7 +159,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'label_write',
     description:
-      'Batch label management, idempotent via op_id. Ops: group_create (workspace-wide or space-scoped), label_create, label_update, label_merge (folds one label into another and reassigns all items), label_delete.',
+      'Batch label management, idempotent via op_id. Ops: group_create (workspace-wide or space-scoped; exclusive:true means at most one label from the group per card, which is how a group becomes a field like "Fixes version"), group_update, label_create (pos orders it within its group), label_update, label_reorder (the whole group in the order you want, positions assigned for you), label_merge (folds one label into another and reassigns all items), label_delete. A label is referenced by id, by bare name, or by "Group/Name", which is what to use when two groups hold the same values.',
     schema: zLabelWrite,
     write: true,
     handler: async (ctx, args) => {

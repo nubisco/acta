@@ -447,6 +447,22 @@ export const zLabelOp = z.discriminatedUnion('op', [
     op_id: zOpId,
     name: z.string().min(1).max(100),
     space: zSpaceKey.optional(),
+    /**
+     * At most one label from this group on a card. Omitted means several,
+     * which is what every group did before this existed.
+     *
+     * Optional rather than defaulted, because a zod default lands in the
+     * output type and would make `exclusive` required of every caller that
+     * builds an op by hand.
+     */
+    exclusive: z.boolean().optional(),
+  }),
+  z.object({
+    op: z.literal('group_update'),
+    op_id: zOpId,
+    group: z.string().min(1),
+    name: z.string().min(1).max(100).optional(),
+    exclusive: z.boolean().optional(),
   }),
   z.object({
     op: z.literal('label_create'),
@@ -454,6 +470,8 @@ export const zLabelOp = z.discriminatedUnion('op', [
     group: z.string().min(1),
     name: z.string().min(1).max(100),
     color: z.string().min(1).max(30).default('gray'),
+    /** Where it sits in its group. Omit to leave the group by-name. */
+    pos: z.number().optional(),
   }),
   z.object({
     op: z.literal('label_update'),
@@ -461,6 +479,18 @@ export const zLabelOp = z.discriminatedUnion('op', [
     label: z.string().min(1),
     name: z.string().min(1).max(100).optional(),
     color: z.string().min(1).max(30).optional(),
+    pos: z.number().nullable().optional(),
+  }),
+  z.object({
+    /**
+     * The whole group's order in one op, which is what a drag in the
+     * interface produces. Positions are assigned from the given order, so a
+     * caller never has to invent numbers or know what the neighbours hold.
+     */
+    op: z.literal('label_reorder'),
+    op_id: zOpId,
+    group: z.string().min(1),
+    labels: z.array(z.string().min(1)).min(1).max(200),
   }),
   z.object({
     op: z.literal('label_merge'),

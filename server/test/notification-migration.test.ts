@@ -53,6 +53,15 @@ async function legacyDb(): Promise<string> {
       actor_id TEXT NOT NULL, actor_kind TEXT NOT NULL, on_behalf_of TEXT, verb TEXT NOT NULL,
       entity TEXT NOT NULL, entity_id TEXT NOT NULL, summary TEXT NOT NULL, payload TEXT,
       caused_by TEXT);
+    -- Label tables in the shape they shipped in: no exclusive, no pos. This
+    -- is the case that matters, because every real database already has
+    -- these tables, so the columns only ever arrive by ALTER.
+    CREATE TABLE label_group (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL,
+      space_id TEXT, name TEXT NOT NULL);
+    CREATE TABLE label (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL,
+      group_id TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL DEFAULT 'gray');
+    INSERT INTO label_group VALUES ('lgr_1', 'w1', NULL, 'Type');
+    INSERT INTO label VALUES ('lbl_1', 'w1', 'lgr_1', 'Bug', 'red');
     CREATE TABLE notification (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL REFERENCES workspace(id),
@@ -163,6 +172,22 @@ describe('a database older than document inboxes', () => {
       ['ST-1'],
     )
     expect(rows[0]?.parent_id ?? null).toBeNull()
+  })
+
+  it('leaves every existing label group behaving as it did', async () => {
+    const db = await openDb(await legacyDb())
+    const group = await db.query<{ exclusive: number }>(
+      'SELECT exclusive FROM label_group WHERE name = ?',
+      ['Type'],
+    )
+    const label = await db.query<{ pos: number | null }>(
+      'SELECT pos FROM label WHERE name = ?',
+      ['Bug'],
+    )
+    // Several labels per card, ordered by name. Anything else would change
+    // how a workspace behaves the moment it upgraded.
+    expect(group[0].exclusive).toBe(0)
+    expect(label[0].pos).toBeNull()
   })
 
   it('stamps a reminder deadline on a notification written after the migration', async () => {

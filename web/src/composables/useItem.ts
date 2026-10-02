@@ -9,6 +9,7 @@ import { useInlineLoading, useToast } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
 import type { IItemDetail, TViewState } from '@/types/api'
 import { humanise } from '@/lib/state'
+import { groupKey, headingOption, labelGroups, labelsById } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'
 
 export interface ILifecycleBadge {
@@ -35,6 +36,8 @@ function statusOf(detail: IItemDetail): TItemStatus {
 export interface ISelectOptionView {
   label: string
   value: string
+  /** Group headings are inert rows, not something anybody can pick. */
+  disabled?: boolean
 }
 
 export function useItem(itemKey: Ref<string>) {
@@ -54,6 +57,11 @@ export function useItem(itemKey: Ref<string>) {
     list: '',
     due: null as string | null,
     assignees: [] as string[],
+    /**
+     * Label IDs, not names. Two groups may hold the same value ("Affects
+     * version" and "Fixes version" both list 1.12.0), so a name cannot say
+     * which of them the card carries.
+     */
     labels: [] as string[],
     description: '',
     status: 'open' as TItemStatus,
@@ -87,7 +95,7 @@ export function useItem(itemKey: Ref<string>) {
         ? new Date(detail.due).toISOString().slice(0, 10)
         : null
       draft.assignees = detail.assignees ?? []
-      draft.labels = detail.labels ?? []
+      draft.labels = labelIdsOf(detail)
       draft.description = detail.description
       draft.status = statusOf(detail)
       computeLifecycle(detail)
@@ -111,9 +119,15 @@ export function useItem(itemKey: Ref<string>) {
       assigneeOptions.value = (ws.overview.value?.actors ?? [])
         .filter((a) => a.kind === 'human')
         .map((a) => ({ label: a.name, value: a.handle }))
-      labelOptions.value = (ws.overview.value?.labels ?? [])
-        .filter((l) => l.space_key === null || l.space_key === detail.space)
-        .map((l) => ({ label: l.name, value: l.name }))
+      // Grouped, and in the catalogue's own order: the server already
+      // returns labels by group and then by each group's arrangement, so
+      // sorting anything here would undo ordered labels.
+      labelOptions.value = labelGroups(ws.overview.value, detail.space).flatMap(
+        (group) => [
+          headingOption(group),
+          ...group.labels.map((l) => ({ label: l.name, value: l.id })),
+        ],
+      )
       viewState.value = 'ready'
     } catch (err) {
       loadMessage.value = humanise(err)
@@ -190,11 +204,59 @@ export function useItem(itemKey: Ref<string>) {
     void write({ op: 'update', op_id: newOpId(), key: item.value.key, due })
   }
 
+  /**
+   * A card's labels as ids. `label_ids` is what the server sends; the name
+   * fallback is for a payload that predates it, where a bare name is the
+   * best that can be done.
+   */
+  function labelIdsOf(detail: IItemDetail): string[] {
+    if (detail.label_ids) return [...detail.label_ids]
+    const byName = new Map<string, string>()
+    for (const group of labelGroups(ws.overview.value, detail.space))
+      for (const label of group.labels)
+        if (!byName.has(label.name)) byName.set(label.name, label.id)
+    return (detail.labels ?? []).map((name) => byName.get(name) ?? name)
+  }
+
+  /**
+   * A group that names a single answer lets go of whatever it held when a
+   * second value is picked, which is exactly what the server does on write.
+   * Done here as well so the interface never shows two values from such a
+   * group and then disagrees with itself after a reload.
+   *
+   * The survivor is the last one in the draft, because a multiple select
+   * appends what was just picked: picking a second value means somebody
+   * changed their mind, so the new one wins.
+   */
+  function pruneExclusive(ids: string[]): string[] {
+    const catalogue = labelsById(ws.overview.value)
+    const keep = new Map<string, string>()
+    for (const id of ids) {
+      const label = catalogue.get(id)
+      if (!label?.exclusive) continue
+      keep.set(groupKey({ name: label.group, space: label.space }), id)
+    }
+    if (keep.size === 0) return ids
+    return ids.filter((id) => {
+      const label = catalogue.get(id)
+      if (!label?.exclusive) return true
+      return (
+        keep.get(groupKey({ name: label.group, space: label.space })) === id
+      )
+    })
+  }
+
+  function commitLabels(): void {
+    const pruned = pruneExclusive(draft.labels)
+    if (pruned.length !== draft.labels.length) draft.labels = pruned
+    commitSet('label')
+  }
+
   function commitSet(kind: 'assign' | 'label'): void {
     if (!item.value) return
     const current = kind === 'assign' ? draft.assignees : draft.labels
     const before = new Set(
-      (kind === 'assign' ? item.value.assignees : item.value.labels) ?? [],
+      kind === 'assign' ? (item.value.assignees ?? []) : labelIdsOf(item.value),
     )
     const after = new Set(current)
     const add = [...after].filter((entry) => !before.has(entry))
@@ -409,7 +471,7 @@ export function useItem(itemKey: Ref<string>) {
     commitList,
     commitDue,
     commitAssignees: () => commitSet('assign'),
-    commitLabels: () => commitSet('label'),
+    commitLabels,
     commitStatus,
     toggleCheck,
     addChecklist,

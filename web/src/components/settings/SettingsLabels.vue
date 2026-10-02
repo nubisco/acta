@@ -1,5 +1,14 @@
 <template>
   <div class="labels-settings">
+    <p class="labels-settings__lede">
+      Labels are grouped, and a group is a field: "Fixes version" names one
+      release, "Affects version" names several. Drag a label to set where it
+      sits in its group, which is the order every picker shows: 1.9.0 belongs
+      before 1.11.0 and sorting by name says otherwise. Turning on "One value
+      per card" applies from then on. Cards that already carry several keep
+      them, because a setting should not quietly delete work somebody did.
+    </p>
+
     <NbPanel
       v-for="group in groups"
       :key="groupKey(group)"
@@ -27,66 +36,78 @@
         </NbButton>
       </header>
 
-      <NbDataTable
-        :columns="columns"
-        :rows="rowsFor(group)"
-        row-key="id"
-        size="sm"
-        :aria-label="`Labels in ${group.name}`"
+      <div class="labels-settings__option">
+        <NbSwitch
+          size="sm"
+          label="One value per card"
+          :name="`exclusive-${group.name}`"
+          :model-value="group.exclusive"
+          :disabled="!ws.isAdmin.value"
+          @update:model-value="
+            (on?: boolean) => setExclusive(group, on === true)
+          "
+        />
+        <NbInfoHint
+          title="One value per card"
+          :label="`About one value per card in ${group.name}`"
+          text="A card can carry at most one label from this group, and picking a second replaces the first. Cards that already carry several are left alone: they settle the next time somebody edits them."
+        />
+      </div>
+
+      <NbReorderList
+        :model-value="group.labels"
+        item-key="id"
+        :disabled="!ws.isAdmin.value"
+        :label="`Labels in ${group.name}`"
+        class="labels-settings__list"
+        @update:model-value="(next: ILabelEntry[]) => reorder(group, next)"
       >
-        <template #cell-label="{ row }">
-          <NbBadge
-            size="md"
-            :variant="variants.get(String(row.name)) ?? 'grey'"
-          >
-            {{ row.name }}
-          </NbBadge>
-        </template>
-        <template #cell-color="{ row }">
-          <span class="labels-settings__color">
-            <span
-              class="labels-settings__swatch"
-              :style="{ background: swatch(String(row.color)) }"
-              aria-hidden="true"
-            />
-            {{ row.color }}
-          </span>
-        </template>
-        <template #cell-actions="{ row }">
-          <div class="labels-settings__actions">
-            <NbButton
-              size="sm"
-              variant="ghost"
-              icon="pencil-simple"
-              :aria-label="`Edit label ${row.name}`"
-              @click="openEdit(group, String(row.id))"
-            />
-            <NbButton
-              size="sm"
-              variant="ghost"
-              icon="arrows-merge"
-              :aria-label="`Merge label ${row.name} into another`"
-              :disabled="group.labels.length < 2"
-              @click="openMerge(group, String(row.id))"
-            />
-            <NbButton
-              size="sm"
-              variant="danger"
-              outlined
-              icon="trash-simple"
-              :aria-label="`Delete label ${row.name}`"
-              @click="remove(group, String(row.id))"
-            />
+        <template #default="{ item }">
+          <div class="labels-settings__row">
+            <LabelBadge :id="item.id" size="md" />
+            <span class="labels-settings__color">
+              <span
+                class="labels-settings__swatch"
+                :style="{ background: swatch(item.color) }"
+                aria-hidden="true"
+              />
+              {{ item.color }}
+            </span>
+            <div class="labels-settings__actions">
+              <NbButton
+                size="sm"
+                variant="ghost"
+                icon="pencil-simple"
+                :aria-label="`Edit label ${item.name}`"
+                @click="openEdit(group, item.id)"
+              />
+              <NbButton
+                size="sm"
+                variant="ghost"
+                icon="arrows-merge"
+                :aria-label="`Merge label ${item.name} into another`"
+                :disabled="group.labels.length < 2"
+                @click="openMerge(group, item.id)"
+              />
+              <NbButton
+                size="sm"
+                variant="danger"
+                outlined
+                icon="trash-simple"
+                :aria-label="`Delete label ${item.name}`"
+                @click="remove(item)"
+              />
+            </div>
           </div>
         </template>
-        <template #empty>
-          <NbEmptyState
-            size="sm"
-            title="No labels in this group"
-            description="Add one and it becomes available on every item in scope."
-          />
-        </template>
-      </NbDataTable>
+      </NbReorderList>
+
+      <NbEmptyState
+        v-if="group.labels.length === 0"
+        size="sm"
+        title="No labels in this group"
+        description="Add one and it becomes available on every item in scope."
+      />
     </NbPanel>
 
     <NbEmptyState
@@ -118,58 +139,36 @@
  * different product. Editing now happens in a dialog, which is the pattern
  * the design system documents, and it also fixes a real defect: the create
  * form's name field was a single ref shared by every group on the page.
+ *
+ * The labels themselves are an `NbReorderList` rather than the shared
+ * `NbDataTable`, because their order is now part of the data: a version
+ * group is only useful arranged, and a table cannot be dragged. The rest of
+ * the pane keeps the panel furniture the other panes use.
  */
 import { computed, ref } from 'vue'
 import { useConfirm, useToast } from '@nubisco/ui'
 import { api, newOpId as opId } from '@/api/client'
 import { humanise } from '@/lib/state'
-import { labelVariants } from '@/lib/labels'
+import { groupKey, labelGroups } from '@/lib/labels'
+import type { ILabelEntry, ILabelGroup } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'
+import LabelBadge from '@/components/LabelBadge.vue'
 import LabelEditModal from '@/components/settings/LabelEditModal.vue'
-import type { ILabelGroupView, ILabelView } from '@/components/settings/labels'
+import type { ILabelView } from '@/components/settings/labels'
 
 const ws = useWorkspace()
 const toast = useToast()
 const confirm = useConfirm()
 
-const columns = [
-  { key: 'label', header: 'Label' },
-  { key: 'name', header: 'Name' },
-  { key: 'color', header: 'Colour' },
-  { key: 'actions', header: '' },
-]
-
-const variants = computed(() => labelVariants(ws.overview.value))
-
-const groups = computed<ILabelGroupView[]>(() => {
-  const out = new Map<string, ILabelGroupView>()
-  for (const label of ws.overview.value?.labels ?? []) {
-    const key = `${label.group_name}:${label.space_key ?? ''}`
-    if (!out.has(key))
-      out.set(key, {
-        name: label.group_name,
-        space: label.space_key,
-        labels: [],
-      })
-    out.get(key)!.labels.push({
-      id: label.id,
-      name: label.name,
-      color: label.color,
-    })
-  }
-  return [...out.values()]
-})
-
-function groupKey(group: ILabelGroupView): string {
-  return `${group.name}:${group.space ?? ''}`
-}
+/**
+ * Straight from the catalogue, which the server already returns by group and
+ * then by each group's own arrangement. Sorting it here would undo the
+ * ordering this pane exists to let people set.
+ */
+const groups = computed<ILabelGroup[]>(() => labelGroups(ws.overview.value))
 
 function spaceName(key: string): string {
   return ws.overview.value?.spaces.find((b) => b.key === key)?.name ?? key
-}
-
-function rowsFor(group: ILabelGroupView) {
-  return group.labels.map((l) => ({ id: l.id, name: l.name, color: l.color }))
 }
 
 /** The dot beside the colour name, so the word is not the only cue. */
@@ -179,40 +178,88 @@ function swatch(color: string): string {
 
 const editing = ref<{
   mode: 'create' | 'edit' | 'merge'
-  group: ILabelGroupView
+  group: ILabelGroup
   label: ILabelView | null
   siblings: ILabelView[]
 } | null>(null)
 
-function find(group: ILabelGroupView, id: string): ILabelView | null {
-  return group.labels.find((l) => l.id === id) ?? null
+function view(label: ILabelEntry): ILabelView {
+  return { id: label.id, name: label.name, color: label.color }
 }
 
-function openCreate(group: ILabelGroupView): void {
-  editing.value = { mode: 'create', group, label: null, siblings: group.labels }
+function find(group: ILabelGroup, id: string): ILabelView | null {
+  const label = group.labels.find((l) => l.id === id)
+  return label ? view(label) : null
 }
 
-function openEdit(group: ILabelGroupView, id: string): void {
+function openCreate(group: ILabelGroup): void {
+  editing.value = {
+    mode: 'create',
+    group,
+    label: null,
+    siblings: group.labels.map(view),
+  }
+}
+
+function openEdit(group: ILabelGroup, id: string): void {
   editing.value = {
     mode: 'edit',
     group,
     label: find(group, id),
-    siblings: group.labels.filter((l) => l.id !== id),
+    siblings: group.labels.filter((l) => l.id !== id).map(view),
   }
 }
 
-function openMerge(group: ILabelGroupView, id: string): void {
+function openMerge(group: ILabelGroup, id: string): void {
   editing.value = {
     mode: 'merge',
     group,
     label: find(group, id),
-    siblings: group.labels.filter((l) => l.id !== id),
+    siblings: group.labels.filter((l) => l.id !== id).map(view),
   }
 }
 
-function remove(group: ILabelGroupView, id: string): void {
-  const label = find(group, id)
-  if (!label) return
+/** One op, one refresh, one place to turn a failed op into a toast. */
+async function run(
+  op: Parameters<typeof api.labelWrite>[0][number],
+  failure: string,
+): Promise<void> {
+  try {
+    const { results } = await api.labelWrite([op])
+    const bad = results.find((r) => !r.ok)
+    if (bad) throw new Error((bad as { error: string }).error)
+    await ws.refresh()
+  } catch (err) {
+    toast.error(humanise(err), { title: failure })
+    await ws.refresh()
+  }
+}
+
+function setExclusive(group: ILabelGroup, on: boolean): void {
+  void run(
+    { op: 'group_update', op_id: opId(), group: group.id, exclusive: on },
+    'Could not change the group',
+  )
+}
+
+/**
+ * The whole group in the order the drag produced, in one op. The server
+ * assigns the positions from that order, so nothing here invents numbers or
+ * has to know what the neighbours hold.
+ */
+function reorder(group: ILabelGroup, next: ILabelEntry[]): void {
+  void run(
+    {
+      op: 'label_reorder',
+      op_id: opId(),
+      group: group.id,
+      labels: next.map((l) => l.id),
+    },
+    'Could not reorder',
+  )
+}
+
+function remove(label: ILabelEntry): void {
   void confirm({
     title: 'Delete label',
     message: 'It is removed from every item that carries it.',
@@ -220,16 +267,10 @@ function remove(group: ILabelGroupView, id: string): void {
     confirmLabel: 'Delete label',
     cancelLabel: 'Keep it',
     onConfirm: async () => {
-      try {
-        const { results } = await api.labelWrite([
-          { op: 'label_delete', op_id: opId(), label: label.id },
-        ])
-        const bad = results.find((r) => !r.ok)
-        if (bad) throw new Error((bad as { error: string }).error)
-        await ws.refresh()
-      } catch (err) {
-        toast.error(humanise(err), { title: 'Delete failed' })
-      }
+      await run(
+        { op: 'label_delete', op_id: opId(), label: label.id },
+        'Delete failed',
+      )
     },
   })
 }
@@ -240,6 +281,13 @@ function remove(group: ILabelGroupView, id: string): void {
   display: flex;
   flex-direction: column;
   gap: var(--nb-spacing-24);
+
+  &__lede {
+    max-width: 68ch;
+    margin: 0;
+    color: var(--nb-c-text-subtle);
+    font-size: var(--nb-type-body-sm-size);
+  }
 
   &__group {
     display: flex;
@@ -265,10 +313,27 @@ function remove(group: ILabelGroupView, id: string): void {
     font-size: var(--nb-type-body-sm-size);
   }
 
+  &__option {
+    display: flex;
+    align-items: center;
+    gap: var(--nb-spacing-8);
+  }
+
+  /* A label row: the chip, then the colour, then the controls hard right. */
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: var(--nb-spacing-16);
+    min-inline-size: 0;
+  }
+
   &__color {
     display: flex;
     align-items: center;
     gap: var(--nb-spacing-8);
+    flex: 1;
+    color: var(--nb-c-text-subtle);
+    font-size: var(--nb-type-body-sm-size);
   }
 
   &__swatch {

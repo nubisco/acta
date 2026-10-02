@@ -78,16 +78,25 @@ export async function workspaceOverview(ctx: ICtx) {
     [ctx.workspaceId],
   )
   const labels = await ctx.db.query<{
+    group_id: string
     group_name: string
     space_key: string | null
     id: string
     name: string
     color: string
+    exclusive: number
+    pos: number | null
   }>(
-    `SELECT g.name AS group_name, b.key AS space_key, l.id, l.name, l.color
+    // Ordered by `pos` where a group has been arranged, and by name where it
+    // has not. Versions are why: 1.9.0 comes before 1.11.0, and no amount of
+    // sorting by name will agree. NULLs last so an unplaced label in an
+    // otherwise arranged group lands at the end rather than the front.
+    `SELECT g.id AS group_id, g.name AS group_name, b.key AS space_key, g.exclusive,
+            l.id, l.name, l.color, l.pos
        FROM label l JOIN label_group g ON g.id = l.group_id
        LEFT JOIN space b ON b.id = g.space_id
-      WHERE l.workspace_id = ? ORDER BY g.name, l.name`,
+      WHERE l.workspace_id = ?
+      ORDER BY g.name, l.pos IS NULL, l.pos, l.name`,
     [ctx.workspaceId],
   )
   const actors = await ctx.db.query<{
@@ -133,7 +142,19 @@ export async function workspaceOverview(ctx: ICtx) {
           items: l.items,
         })),
     })),
-    labels,
+    labels: labels.map((l) => ({
+      // The id, so a caller can name a group exactly. Two boards can each
+      // have a "Fixes version", and the name alone is then ambiguous.
+      group_id: l.group_id,
+      group_name: l.group_name,
+      space_key: l.space_key,
+      id: l.id,
+      name: l.name,
+      color: l.color,
+      // Absent rather than false, the way every other flag in this payload
+      // reads, so a group that behaves as it always did says nothing.
+      exclusive: l.exclusive === 1 || undefined,
+    })),
     actors,
     doc_roots: docRoots,
   }
@@ -212,6 +233,7 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
     IItemRow & {
       list_name: string
       labels: string | null
+      label_ids: string | null
       assignees: string | null
       cmts: number
       chk_done: number
@@ -225,7 +247,12 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
             (SELECT p.key FROM item p WHERE p.id = i.parent_id) AS parent_key,
             (SELECT COUNT(*) FROM item c WHERE c.parent_id = i.id AND c.archived = 0) AS parts_total,
             (SELECT COUNT(*) FROM item c WHERE c.parent_id = i.id AND c.archived = 0 AND c.completed = 1) AS parts_done,
-            (SELECT GROUP_CONCAT(lb.name) FROM item_label il JOIN label lb ON lb.id = il.label_id WHERE il.item_id = i.id) AS labels,
+            -- Both ordered by label id through an inner subselect, so the
+            -- two lists correspond position by position. GROUP_CONCAT has no
+            -- guaranteed order of its own, and an ORDER BY inside it needs a
+            -- SQLite newer than we can assume of every deployment.
+            (SELECT GROUP_CONCAT(name) FROM (SELECT lb.name FROM item_label il JOIN label lb ON lb.id = il.label_id WHERE il.item_id = i.id ORDER BY lb.id)) AS labels,
+            (SELECT GROUP_CONCAT(id) FROM (SELECT lb.id FROM item_label il JOIN label lb ON lb.id = il.label_id WHERE il.item_id = i.id ORDER BY lb.id)) AS label_ids,
             (SELECT GROUP_CONCAT(a.handle) FROM item_assignee ia JOIN actor a ON a.id = ia.actor_id WHERE ia.item_id = i.id) AS assignees,
             (SELECT COUNT(*) FROM comment c WHERE c.item_id = i.id) AS cmts,
             (SELECT COUNT(*) FROM checklist_item ci JOIN checklist ch ON ch.id = ci.checklist_id WHERE ch.item_id = i.id AND ci.done = 1) AS chk_done,
@@ -242,6 +269,7 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
     title: r.title,
     list: r.list_name,
     labels: r.labels ? r.labels.split(',') : undefined,
+    label_ids: r.label_ids ? r.label_ids.split(',') : undefined,
     assignees: r.assignees ? r.assignees.split(',') : undefined,
     due: r.due ?? undefined,
     // The timeline needs somewhere for a bar to start. Without it every card
@@ -295,12 +323,17 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
         [item.list_id],
       )
     )[0].name
-    const labels = (
-      await ctx.db.query<{ name: string }>(
-        'SELECT lb.name FROM item_label il JOIN label lb ON lb.id = il.label_id WHERE il.item_id = ?',
-        [item.id],
-      )
-    ).map((r) => r.name)
+    // Ids alongside the names, because a name is no longer enough to say
+    // which group a value belongs to. "Affects version" and "Fixes version"
+    // both list 1.12.0, so a card carrying the bare name cannot be shown as
+    // the field it actually is. `labels` keeps its shape, since the MCP
+    // tools, the importers and the board all read it.
+    const labelRows = await ctx.db.query<{ id: string; name: string }>(
+      'SELECT lb.id, lb.name FROM item_label il JOIN label lb ON lb.id = il.label_id WHERE il.item_id = ?',
+      [item.id],
+    )
+    const labels = labelRows.map((r) => r.name)
+    const labelIds = labelRows.map((r) => r.id)
     const assignees = (
       await ctx.db.query<{ handle: string }>(
         'SELECT a.handle FROM item_assignee ia JOIN actor a ON a.id = ia.actor_id WHERE ia.item_id = ?',
@@ -315,6 +348,7 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
       title: item.title,
       description: item.description,
       labels: labels.length > 0 ? labels : undefined,
+      label_ids: labelIds.length > 0 ? labelIds : undefined,
       assignees: assignees.length > 0 ? assignees : undefined,
       due: item.due ?? undefined,
       done: item.completed === 1 || undefined,

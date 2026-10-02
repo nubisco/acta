@@ -178,6 +178,32 @@ after the page is edited around it. If the block has since been removed, the
 page opens at the top and tells you. Nothing about the link is stored in the
 page itself.
 
+## Label groups that behave like fields
+
+A label group can do two more things, and together they cover most of what
+people reach for custom fields to do.
+
+**One value per card.** A group can be set so a card carries at most one of its
+labels. "Fixes version" is one release. "Affects version" is several, which is
+the default and what every group did before. Picking a second value in a
+one-value group replaces the first rather than being refused, because picking
+again means you changed your mind.
+
+Turning it on does not go back and prune cards that already carry several. The
+next time you edit one, it settles.
+
+**An order of your own.** Labels in a group can be arranged, which matters the
+moment the values are not alphabetical: `1.9.0` comes before `1.11.0`, and
+sorting by name puts it last. A group you have not arranged stays in
+alphabetical order, and a label you have not placed in an arranged group sits
+at the end.
+
+Because a group is scoped to a space, a software board can carry "Affects
+version" and "Fixes version" while a marketing board never sees them. Two
+groups can hold the same values, which versions do constantly, so where you
+need to be precise a label is written as `Group/Name`, as in
+`Fixes version/1.12.0`.
+
 ## Parts of a card
 
 A card can be part of another card. Open the parent and it lists its **Parts**,
@@ -268,7 +294,9 @@ Six sections, grouped by what you are trying to do.
 
 **People** is who can sign in. Only people can be assigned work or mentioned.
 
-**Labels** is the vocabulary your cards are filed under.
+**Labels** is the vocabulary your cards are filed under. A label lives in a
+group, and a group belongs either to one space or to the whole workspace, so a
+board can have its own vocabulary without imposing it on every other board.
 
 **Automation** is everything that happens without a person, arranged by which
 way the work flows: **ingest endpoints** take a URL you paste into a website

@@ -203,7 +203,15 @@ CREATE TABLE IF NOT EXISTS label_group (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
   space_id TEXT REFERENCES space(id),
-  name TEXT NOT NULL
+  name TEXT NOT NULL,
+  -- At most one label from this group on a card. "Fixes version" is one
+  -- release; "Affects version" is several, and stays the default.
+  --
+  -- Enforced on write by removing the others, not by refusing: a person
+  -- picking a second value means they changed their mind, and a refusal
+  -- would make them clear the old one first for no reason.
+  -- See ADDITIVE_COLUMNS for existing databases.
+  exclusive INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS label (
@@ -211,7 +219,12 @@ CREATE TABLE IF NOT EXISTS label (
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
   group_id TEXT NOT NULL REFERENCES label_group(id),
   name TEXT NOT NULL,
-  color TEXT NOT NULL DEFAULT 'gray'
+  color TEXT NOT NULL DEFAULT 'gray',
+  -- Where it sits in its group. Versions are the case that needs it: 1.9.0
+  -- comes before 1.11.0 and no amount of sorting by name will agree. Null
+  -- means unordered, and a group of nulls falls back to by-name, which is
+  -- what every existing group does today.
+  pos REAL
 );
 
 CREATE TABLE IF NOT EXISTS item_label (
@@ -776,4 +789,10 @@ export const ADDITIVE_COLUMNS = [
   // Every read of a card's parts is this lookup, and every board read asks
   // it once per card.
   'CREATE INDEX IF NOT EXISTS idx_item_parent ON item(parent_id)',
+  // At most one label from this group on a card, for groups that name a
+  // single answer rather than a set of tags.
+  'ALTER TABLE label_group ADD COLUMN exclusive INTEGER NOT NULL DEFAULT 0',
+  // Where a label sits in its group, for groups whose order is not
+  // alphabetical. Null everywhere until somebody arranges one.
+  'ALTER TABLE label ADD COLUMN pos REAL',
 ]

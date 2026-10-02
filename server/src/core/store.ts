@@ -163,8 +163,35 @@ export async function labelByRef(
           WHERE l.workspace_id = ? AND lower(l.name) = lower(?)`,
         [ctx.workspaceId, ref],
       ))
-  if (byName.length === 0) throw new ApiError(404, `label ${ref} not found`)
-  return byName[0]
+  if (byName.length > 0) return byName[0]
+
+  // `Group/Name`, last, so a label whose own name contains a slash still
+  // resolves as itself. Needed the moment two groups hold the same values,
+  // which is exactly what versions do: "Affects version" and "Fixes
+  // version" both list 1.12.0, and a bare name picks whichever row the
+  // planner reached first.
+  const slash = ref.indexOf('/')
+  if (slash > 0) {
+    const groupName = ref.slice(0, slash)
+    const labelName = ref.slice(slash + 1)
+    const qualified = await ctx.db.query<{
+      id: string
+      name: string
+      group_id: string
+    }>(
+      `SELECT l.id, l.name, l.group_id FROM label l
+         JOIN label_group g ON g.id = l.group_id
+        WHERE l.workspace_id = ?
+          AND lower(g.name) = lower(?) AND lower(l.name) = lower(?)
+          ${spaceId ? 'AND (g.space_id IS NULL OR g.space_id = ?)' : ''}`,
+      spaceId
+        ? [ctx.workspaceId, groupName, labelName, spaceId]
+        : [ctx.workspaceId, groupName, labelName],
+    )
+    if (qualified.length > 0) return qualified[0]
+  }
+
+  throw new ApiError(404, `label ${ref} not found`)
 }
 
 const POS_STEP = 1024

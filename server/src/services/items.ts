@@ -453,6 +453,26 @@ async function applyItemOp(
       const item = await itemByKey(ctx, op.key)
       for (const ref of op.add ?? []) {
         const label = await labelByRef(ctx, ref, item.space_id)
+        // A group that names a single answer, "Fixes version" rather than a
+        // set of tags, lets go of whatever it held. Done by replacing rather
+        // than by refusing: picking a second value means somebody changed
+        // their mind, and a refusal would make them clear the old one first
+        // for no reason.
+        const exclusive = (
+          await ctx.db.query<{ id: string }>(
+            `SELECT g.id FROM label l JOIN label_group g ON g.id = l.group_id
+              WHERE l.id = ? AND g.exclusive = 1`,
+            [label.id],
+          )
+        )[0]
+        if (exclusive) {
+          await ctx.db.run(
+            `DELETE FROM item_label
+              WHERE item_id = ?
+                AND label_id IN (SELECT id FROM label WHERE group_id = ?)`,
+            [item.id, exclusive.id],
+          )
+        }
         await ctx.db.run(
           'INSERT OR IGNORE INTO item_label (item_id, label_id) VALUES (?, ?)',
           [item.id, label.id],

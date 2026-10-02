@@ -110,6 +110,29 @@ It is a different relation from `item_dependency`, which says what has to
 happen first. A card can be part of something it does not wait on, and wait
 on something it is not part of.
 
+**`label_group`, `label`** The classification vocabulary. A group is scoped to
+a space or is workspace-wide, so a version group on one board never appears on
+another.
+
+Two columns turn a group from a bag of tags into something closer to a field.
+`label_group.exclusive` means at most one label from that group on a card,
+which is what "Fixes version" needs and "Affects version" does not. It is
+enforced on write by **replacing**, not by refusing: picking a second value
+means somebody changed their mind, and a refusal would make them clear the old
+one first for no reason. Turning it on does not retroactively prune cards that
+already carry several, because quietly deleting data to satisfy a setting is
+not a thing a settings screen should do.
+
+`label.pos` orders a group. Versions are why: `1.9.0` comes before `1.11.0`
+and no amount of sorting by name will agree. Null means unordered and the
+group falls back to by-name, which is what every group did before this
+existed. A group that is partly arranged puts its unplaced labels last.
+
+Two groups can hold the same value names, which versions do constantly, so a
+label is referenced by id, by bare name, or by **`Group/Name`**. For the same
+reason a card read returns `label_ids` alongside `labels`: the bare name
+`1.12.0` cannot say which group it came from.
+
 **`webhook`, `webhook_delivery`, `rule`** Outbound delivery with a failure
 count, and the automation catalogue.
 

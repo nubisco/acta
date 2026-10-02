@@ -34,6 +34,39 @@ body {
   min-inline-size: 0;
 }
 
+/* A label group's heading inside the label picker. The dropdown is teleported
+ * to the body, so this cannot live in a component's scoped block, and both the
+ * inspector and the card modal render the same row.
+ *
+ * It rides on a disabled option, which is how a heading stays inert in a
+ * component that has no notion of a group: disabled rows are ignored on click
+ * and carry aria-disabled.
+ *
+ * The two overrides below are narrow and reluctant, and the reason each one is
+ * here was measured in a browser rather than guessed:
+ *
+ *  - The library dims a disabled option to 0.45. On the heading that landed at
+ *    a contrast ratio of 2.65:1 against the dropdown at 11px/600, which is
+ *    below AA and was the difference between a heading you read and one you
+ *    squint at. Full opacity with the subtle text colour measures 4.6:1.
+ *  - `not-allowed` says a control was refused. A heading is not a refused
+ *    control, it is a heading.
+ *
+ * Both go away when @nubisco/ui gives a select real option groups, which is
+ * the actual fix and is filed. */
+.nb-select__option--disabled:has(.label-group-heading) {
+  opacity: 1;
+  cursor: default;
+}
+
+.label-group-heading {
+  font-size: var(--nb-type-label-sm-size);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--nb-c-text-subtle);
+}
+
 /* NbNotificationCenter's panel sits at z-index 15 and NbShell's sidebar at
  * 100, so a notification centre placed in the sidebar (which is where a bell
  * belongs, and where NbShell's own layout puts it) is painted over by the

@@ -216,14 +216,21 @@
             @change="it.commitLabels"
           >
             <template #option="{ option }">
-              <LabelBadge :name="String(option.value)" size="md" />
+              <span
+                v-if="headingName(String(option.value))"
+                class="label-group-heading"
+              >
+                {{ headingName(String(option.value)) }}
+              </span>
+              <LabelBadge v-else :id="String(option.value)" size="md" />
             </template>
             <template #value="{ values }">
               <span class="label-values">
                 <LabelBadge
-                  v-for="name in values"
-                  :key="String(name)"
-                  :name="String(name)"
+                  v-for="labelId in values"
+                  :id="String(labelId)"
+                  :key="String(labelId)"
+                  qualify
                   size="md"
                 />
               </span>
@@ -418,6 +425,7 @@ import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'
 import LabelBadge from '@/components/LabelBadge.vue'
+import { headingName } from '@/lib/labels'
 import DependencyPanel from '@/components/DependencyPanel.vue'
 import PartsPanel from '@/components/PartsPanel.vue'
 import PartOfChip from '@/components/PartOfChip.vue'

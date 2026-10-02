@@ -12,11 +12,17 @@ export interface IOverview {
     lists: { id: string; name: string; role?: string; items: number }[]
   }[]
   labels: {
+    group_id: string
     group_name: string
     space_key: string | null
     id: string
     name: string
     color: string
+    /**
+     * At most one label from this group on a card. Absent means several,
+     * which is how every group behaved before this existed.
+     */
+    exclusive?: true
   }[]
   actors: {
     id: string
@@ -122,6 +128,13 @@ export interface IItemDetail {
   title: string
   description: string
   labels?: string[]
+  /**
+   * The same labels by id, in the same order. A name no longer says which
+   * group a value belongs to: "Affects version" and "Fixes version" both
+   * list 1.12.0, so anything that cares about the group resolves through
+   * these against the overview catalogue.
+   */
+  label_ids?: string[]
   assignees?: string[]
   due?: number
   done?: boolean
