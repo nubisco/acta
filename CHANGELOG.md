@@ -1,3 +1,10 @@
+## [1.34.1](https://github.com/nubisco/acta/compare/v1.34.0...v1.34.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* **labels:** tell two groups apart everywhere a card is shown ([a21b513](https://github.com/nubisco/acta/commit/a21b513aa3efeedabb7538f15d27ae8a19f4688d))
+
 # [1.34.0](https://github.com/nubisco/acta/compare/v1.33.0...v1.34.0) (2026-10-02)
 
 
