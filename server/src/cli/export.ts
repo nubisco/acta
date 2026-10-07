@@ -158,11 +158,13 @@ for (const space of spaces) {
   )
 }
 
-// Labels, actors, attachments ----------------------------------------------
+// Labels, actors, goals, attachments ----------------------------------------
+// Awaited: these two used to stringify the pending promise, so every export
+// wrote `{}` to both files.
 writeFileSync(
   join(outDir, 'labels.json'),
   JSON.stringify(
-    db.query(
+    await db.query(
       `SELECT g.name AS group_name, b.key AS space_key, l.name, l.color
          FROM label l JOIN label_group g ON g.id = l.group_id LEFT JOIN space b ON b.id = g.space_id`,
     ),
@@ -173,11 +175,64 @@ writeFileSync(
 writeFileSync(
   join(outDir, 'actors.json'),
   JSON.stringify(
-    db.query('SELECT handle, name, kind, email, role, disabled FROM actor'),
+    await db.query(
+      'SELECT handle, name, kind, email, role, disabled FROM actor',
+    ),
     null,
     2,
   ),
 )
+// Goals, with what they are made of: the cards linked to each (by key, so
+// the file reads alongside the space exports), the check-ins and followers.
+const goals = await db.query<{
+  id: string
+  number: number
+  title: string
+  description: string
+  owner: string | null
+  parent: number | null
+  status: string
+  start_date: number | null
+  target_date: number | null
+  metric_name: string | null
+  metric_unit: string | null
+  metric_start: number | null
+  metric_target: number | null
+  metric_current: number | null
+  archived: number
+}>(
+  `SELECT g.id, g.number, g.title, g.description, o.handle AS owner, p.number AS parent,
+          g.status, g.start_date, g.target_date, g.metric_name, g.metric_unit,
+          g.metric_start, g.metric_target, g.metric_current, g.archived
+     FROM goal g LEFT JOIN actor o ON o.id = g.owner_id LEFT JOIN goal p ON p.id = g.parent_id
+    ORDER BY g.number`,
+)
+const goalExport = []
+for (const { id, ...goal } of goals) {
+  goalExport.push({
+    ...goal,
+    items: (
+      await db.query<{ key: string }>(
+        'SELECT i.key FROM goal_item gi JOIN item i ON i.id = gi.item_id WHERE gi.goal_id = ? ORDER BY i.key',
+        [id],
+      )
+    ).map((r) => r.key),
+    followers: (
+      await db.query<{ handle: string }>(
+        'SELECT a.handle FROM goal_follower f JOIN actor a ON a.id = f.actor_id WHERE f.goal_id = ?',
+        [id],
+      )
+    ).map((r) => r.handle),
+    check_ins: await db.query(
+      `SELECT a.handle AS by, u.status, u.body, u.metric_value, u.created_at
+         FROM goal_update u JOIN actor a ON a.id = u.actor_id
+        WHERE u.goal_id = ? ORDER BY u.created_at`,
+      [id],
+    ),
+  })
+}
+writeFileSync(join(outDir, 'goals.json'), JSON.stringify(goalExport, null, 2))
+
 if (existsSync(join(dataDir, 'attachments'))) {
   cpSync(join(dataDir, 'attachments'), join(outDir, 'attachments'), {
     recursive: true,
@@ -185,5 +240,5 @@ if (existsSync(join(dataDir, 'attachments'))) {
 }
 
 console.log(
-  `exported ${docs.length} docs, ${spaces.length} spaces, ${itemTotal} items to ${outDir}`,
+  `exported ${docs.length} docs, ${spaces.length} spaces, ${itemTotal} items, ${goals.length} goals to ${outDir}`,
 )

@@ -509,6 +509,171 @@ export type TLabelOp = z.infer<typeof zLabelOp>
 export const zLabelWrite = z.object({ ops: z.array(zLabelOp).min(1).max(50) })
 
 // --------------------------------------------------------------------------
+// goal_write ops
+// --------------------------------------------------------------------------
+
+/**
+ * A goal, by its workspace number: `12` or `G-12`. Goals are workspace-wide
+ * rather than per space, because the work behind one is rarely all on one
+ * board, so they are numbered once per workspace. A bare `G` cannot collide
+ * with a space key, which is always two characters or more.
+ */
+export const zGoalRef = z.union([
+  z.number().int().positive(),
+  z.string().regex(/^(?:G-)?\d{1,9}$/),
+])
+export type TGoalRef = z.infer<typeof zGoalRef>
+
+/**
+ * The owner's judgement of where a goal stands, as opposed to how much of its
+ * work is done. The two are kept apart on purpose: a goal can be nine tenths
+ * built and still off track, and a goal with nothing built can be exactly
+ * where it should be in its first week.
+ *
+ * pending, on_track, at_risk and off_track are a goal in flight. done, paused
+ * and cancelled are a goal somebody has stopped steering.
+ */
+export const GOAL_STATUSES = [
+  'pending',
+  'on_track',
+  'at_risk',
+  'off_track',
+  'done',
+  'paused',
+  'cancelled',
+] as const
+export const zGoalStatus = z.enum(GOAL_STATUSES)
+export type TGoalStatus = z.infer<typeof zGoalStatus>
+
+/**
+ * One measurable target, the "key result" of an OKR: "MRR from 2k to 10k".
+ * `current` moves with check-ins. A target below its start is allowed, since
+ * plenty of goals are about bringing a number down.
+ */
+export const zGoalMetric = z
+  .object({
+    name: z.string().min(1).max(120),
+    unit: z.string().max(20).optional(),
+    start: z.number().finite(),
+    target: z.number().finite(),
+    current: z.number().finite().optional(),
+  })
+  .refine((m) => m.start !== m.target, {
+    message: 'a metric needs a target different from where it starts',
+  })
+export type TGoalMetric = z.infer<typeof zGoalMetric>
+
+const goalFields = {
+  title: z.string().min(1).max(300),
+  description: z.string().max(50_000),
+  /** Epoch milliseconds, like a card's due date. */
+  date: z.number().int().nullable(),
+  /** People, by handle or id. */
+  people: z.array(z.string().min(1)).max(50),
+  items: z.array(zItemKey).max(100),
+}
+
+export const zGoalOp = z.discriminatedUnion('op', [
+  z.object({
+    op: z.literal('create'),
+    op_id: zOpId,
+    title: goalFields.title,
+    description: goalFields.description.optional(),
+    owner: z.string().min(1).nullable().optional(),
+    /** The goal this one is part of. */
+    parent: zGoalRef.optional(),
+    status: zGoalStatus.optional(),
+    start_date: goalFields.date.optional(),
+    target_date: goalFields.date.optional(),
+    metric: zGoalMetric.optional(),
+    /** Cards that serve it. Each card's parts count too. */
+    items: goalFields.items.optional(),
+    followers: goalFields.people.optional(),
+  }),
+  z.object({
+    op: z.literal('update'),
+    op_id: zOpId,
+    goal: zGoalRef,
+    if_rev: z.number().int().optional(),
+    title: goalFields.title.optional(),
+    description: goalFields.description.optional(),
+    /** null leaves it without an owner. */
+    owner: z.string().min(1).nullable().optional(),
+    start_date: goalFields.date.optional(),
+    target_date: goalFields.date.optional(),
+    /** null removes the metric. Its value history stays on the check-ins. */
+    metric: zGoalMetric.nullable().optional(),
+  }),
+  z.object({
+    op: z.literal('set_parent'),
+    op_id: zOpId,
+    goal: zGoalRef,
+    /** The goal this one becomes part of. Null makes it top-level. */
+    parent: zGoalRef.nullable(),
+  }),
+  z.object({
+    /** Which cards serve this goal. */
+    op: z.literal('link'),
+    op_id: zOpId,
+    goal: zGoalRef,
+    add: goalFields.items.optional(),
+    remove: goalFields.items.optional(),
+  }),
+  z
+    .object({
+      /**
+       * A dated update from whoever is steering: where it stands, in a
+       * sentence or two, and the metric's new value if it has one. The goal's
+       * status and current value follow the latest check-in.
+       */
+      op: z.literal('check_in'),
+      op_id: zOpId,
+      goal: zGoalRef,
+      status: zGoalStatus.optional(),
+      body: z.string().max(20_000).optional(),
+      metric_value: z.number().finite().optional(),
+    })
+    .refine(
+      (c) =>
+        c.status !== undefined ||
+        (c.body !== undefined && c.body.trim() !== '') ||
+        c.metric_value !== undefined,
+      { message: 'a check-in needs a status, a note or a metric value' },
+    ),
+  z.object({
+    op: z.literal('check_in_update'),
+    op_id: zOpId,
+    goal: zGoalRef,
+    check_in_id: z.string().min(1),
+    body: z.string().max(20_000),
+  }),
+  z.object({
+    op: z.literal('check_in_delete'),
+    op_id: zOpId,
+    goal: zGoalRef,
+    check_in_id: z.string().min(1),
+  }),
+  z.object({
+    /** Who hears about check-ins and status changes, besides the owner. */
+    op: z.literal('follow'),
+    op_id: zOpId,
+    goal: zGoalRef,
+    add: goalFields.people.optional(),
+    remove: goalFields.people.optional(),
+  }),
+  z.object({ op: z.literal('archive'), op_id: zOpId, goal: zGoalRef }),
+  z.object({ op: z.literal('restore'), op_id: zOpId, goal: zGoalRef }),
+  /**
+   * Permanent, and refused unless the goal is archived first, exactly like a
+   * card. Its sub-goals become top-level and its cards are untouched.
+   */
+  z.object({ op: z.literal('delete'), op_id: zOpId, goal: zGoalRef }),
+])
+export type TGoalOp = z.infer<typeof zGoalOp>
+
+export const zGoalWrite = z.object({ ops: z.array(zGoalOp).min(1).max(100) })
+
+// --------------------------------------------------------------------------
 // Reads
 // --------------------------------------------------------------------------
 
@@ -517,6 +682,11 @@ export const zSpaceGet = z.object({
   list: z.string().optional(),
   label: z.string().optional(),
   assignee: z.string().optional(),
+  /**
+   * Cards serving this goal: linked to it or to one of its sub-goals, and
+   * everything that is part of those, at any depth.
+   */
+  goal: zGoalRef.optional(),
   state: z.enum(['open', 'done', 'archived', 'all']).default('open'),
   text: z.string().optional(),
   updated_since: z.number().int().optional(),
@@ -532,6 +702,19 @@ export const zItemGet = z.object({
       z.enum(['comments', 'checklists', 'links', 'activity', 'attachments']),
     )
     .optional(),
+})
+
+export const zGoalList = z.object({
+  /** open is everything not archived, whatever its status. */
+  state: z.enum(['open', 'archived', 'all']).default('open'),
+  /** Comma separated, "any of these". */
+  status: z.string().optional(),
+  owner: z.string().optional(),
+})
+
+export const zGoalGet = z.object({
+  goals: z.array(zGoalRef).min(1).max(20),
+  include: z.array(z.enum(['items', 'check_ins'])).optional(),
 })
 
 export const zSearch = z.object({

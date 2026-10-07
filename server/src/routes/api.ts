@@ -6,6 +6,9 @@ import {
   zSpaceWrite,
   zDocSlug,
   zDocWrite,
+  zGoalGet,
+  zGoalList,
+  zGoalWrite,
   zItemGet,
   zItemWrite,
   zLabelWrite,
@@ -26,6 +29,7 @@ import {
 import { sequenceGet } from '../services/sequence'
 import { itemWrite } from '../services/items'
 import { labelWrite } from '../services/labels'
+import { goalGet, goalList, goalWrite } from '../services/goals'
 import {
   activityQuery,
   spaceGet,
@@ -148,6 +152,15 @@ export function apiRoutes(
    */
   app.get('/me/work', async (c) => c.json(await myWork(ctxOf(c))))
 
+  /** Every goal with its progress, and the breakdown the dashboard draws. */
+  app.get('/goals', async (c) =>
+    c.json(await goalList(ctxOf(c), zGoalList.parse(c.req.query()))),
+  )
+
+  app.post('/goals/get', async (c) =>
+    c.json(await goalGet(ctxOf(c), zGoalGet.parse(await c.req.json()))),
+  )
+
   app.post('/items/get', async (c) =>
     c.json(await itemGet(ctxOf(c), zItemGet.parse(await c.req.json()))),
   )
@@ -219,6 +232,13 @@ export function apiRoutes(
     requireScope(ctx, 'write')
     const body = zSpaceWrite.parse(await c.req.json())
     return c.json({ results: await spaceWrite(ctx, body.ops) })
+  })
+
+  app.post('/goals/write', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'write')
+    const body = zGoalWrite.parse(await c.req.json())
+    return c.json({ results: await goalWrite(ctx, body.ops) })
   })
 
   app.post('/docs/write', async (c) => {

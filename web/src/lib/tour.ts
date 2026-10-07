@@ -42,6 +42,12 @@ export const introTour: IWalkthrough = {
       placement: 'bottom',
     },
     {
+      target: 'nav-goals',
+      title: 'Goals: what the work is for',
+      body: 'A goal groups cards from any space behind one outcome. It has two separate signals: its status, which the owner sets in regular check-ins, and its progress, measured from the cards. Home shows how every goal stands.',
+      placement: 'right',
+    },
+    {
       target: 'nav-docs',
       title: 'Documents live next to the work',
       body: 'Your knowledge base is here, in the same workspace and the same search as the spaces. Pages are versioned, so you can compare any two versions and see who changed what.',

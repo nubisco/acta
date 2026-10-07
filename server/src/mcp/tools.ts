@@ -11,6 +11,9 @@ import {
   zSpaceWrite,
   zDocSlug,
   zDocWrite,
+  zGoalGet,
+  zGoalList,
+  zGoalWrite,
   zItemGet,
   zItemWrite,
   zLabelWrite,
@@ -29,6 +32,7 @@ import { spaceWrite } from '../services/spaces'
 import { docWrite } from '../services/docs'
 import { itemWrite } from '../services/items'
 import { labelWrite } from '../services/labels'
+import { goalGet, goalList, goalWrite } from '../services/goals'
 import { ruleList, ruleWrite, zRuleWrite } from '../services/rules'
 import { webhookList, webhookWrite, zWebhookWrite } from '../services/webhooks'
 import {
@@ -67,21 +71,21 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'workspace_overview',
     description:
-      'One-call bootstrap: workspace name, all spaces with their lists and item counts, label groups, members (humans and agents), and doc tree roots. Call this first; no other read is needed to orient.',
+      'One-call bootstrap: workspace name, all spaces with their lists and item counts, label groups, members (humans and agents), doc tree roots, and every goal (number, title, status, parent). Call this first; no other read is needed to orient.',
     schema: z.object({}),
     handler: (ctx) => workspaceOverview(ctx),
   },
   {
     name: 'space_get',
     description:
-      'Items of one space, compact rows by default (key, title, list, labels, assignees, comment count, checklist progress, rev, updated). Filter by list, label, assignee, state (open|done|archived|all), free text, or updated_since for delta reads. detail=full adds descriptions. Never read a whole space to change one item; use item_write directly.',
+      'Items of one space, compact rows by default (key, title, list, labels, assignees, comment count, checklist progress, rev, updated). Filter by list, label, assignee, goal (number: the cards serving it, its sub-goals and parts included), state (open|done|archived|all), free text, or updated_since for delta reads. detail=full adds descriptions. Never read a whole space to change one item; use item_write directly.',
     schema: zSpaceGet,
     handler: (ctx, args) => spaceGet(ctx, args as z.infer<typeof zSpaceGet>),
   },
   {
     name: 'item_get',
     description:
-      'Full detail for up to 50 items by key in one call: description, comments, checklists, links (backlinks included), attachments; add "activity" to include the audit tail. Old keys from cross-space moves resolve automatically.',
+      'Full detail for up to 50 items by key in one call: description, comments, checklists, links (backlinks included), attachments, parent and parts, dependencies, and goals (the goals it serves, with via:KEY when the link is on a card it is part of); add "activity" to include the audit tail. Old keys from cross-space moves resolve automatically.',
     schema: zItemGet,
     handler: (ctx, args) => itemGet(ctx, args as z.infer<typeof zItemGet>),
   },
@@ -94,6 +98,31 @@ export const MCP_TOOLS: IMcpTool[] = [
     handler: async (ctx, args) => {
       const body = args as z.infer<typeof zItemWrite>
       return { results: await itemWrite(ctx, body.ops, body.default_space) }
+    },
+  },
+  {
+    name: 'goal_list',
+    description:
+      "Every goal in the workspace with its state, plus a summary (count by status, how many are overdue or have had no check-in for 30 days, and the work across all goals in flight). Goals are workspace-wide and numbered G-1, G-2. Each row carries two separate signals: status (the owner's judgement: pending, on_track, at_risk, off_track, done, paused, cancelled, set by check-ins) and progress (measured from the cards that serve it: total, done, active, waiting, overdue, and percent weighted by card size, unsized counting as 1). Progress counts cards linked to the goal, every card that is part of a linked card at any depth, and the work of its sub-goals (archived and cancelled sub-goals excluded), each card once. Also: owner, parent goal number, start and target dates, elapsed (percent of the date window gone), metric {name, unit, start, target, current, percent} when it has one, last_check_in. Filter by state (open|archived|all), status (comma separated), owner. To list the cards behind a goal, use goal_get or space_get with goal.",
+    schema: zGoalList,
+    handler: (ctx, args) => goalList(ctx, args as z.infer<typeof zGoalList>),
+  },
+  {
+    name: 'goal_get',
+    description:
+      'Full detail for up to 20 goals by number (12 or "G-12"): everything goal_list returns plus description, followers, ancestors, children (its sub-goals, each with its own progress), items (every card counted toward this goal itself: linked:true for a direct link, via:KEY for a part reached through a linked card, with done, active, waiting, overdue and size) and check_ins newest first (status, body, metric_value, can_edit, can_delete). include narrows to ["items"] or ["check_ins"].',
+    schema: zGoalGet,
+    handler: (ctx, args) => goalGet(ctx, args as z.infer<typeof zGoalGet>),
+  },
+  {
+    name: 'goal_write',
+    description:
+      'Batch goal mutations, idempotent via op_id. A goal is referenced by number (12 or "G-12"). Ops: create (title, description, owner handle (defaults to you if you are a person; null for none), parent goal, status, start_date and target_date as epoch ms, metric {name, unit?, start, target, current?}, items: card keys that serve it, followers: handles); update (title, description, owner, dates, metric; null clears; optional if_rev); set_parent (a goal part of another goal, any depth, refused on a cycle; null makes it top-level); link (add/remove card keys; a card can serve several goals and its parts count too); check_in (the regular word on where it stands: status and/or body and/or metric_value; the goal\'s status and metric follow the latest check-in, and its owner and followers are notified); check_in_update (author only); check_in_delete (author, or an admin; the workspace can reserve it to admins; does not rewind the status); follow (add/remove handles; people only); archive; restore; delete (permanent, refused unless archived; sub-goals become top-level, cards are untouched). Returns {op_id, ok, key: "G-12", rev} per op.',
+    schema: zGoalWrite,
+    write: true,
+    handler: async (ctx, args) => {
+      const body = args as z.infer<typeof zGoalWrite>
+      return { results: await goalWrite(ctx, body.ops) }
     },
   },
   {

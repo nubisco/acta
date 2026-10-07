@@ -86,6 +86,7 @@ something built around it, [talk to us](https://nubisco.io).
 
 - [Concepts](/users/concepts): spaces, cards, keys, actors, events.
 - [Working in Acta](/users/working): the day-to-day of the web app.
+- [Goals](/users/goals): what the work is for, and how it stands.
 - [Connect an agent](/users/connect-an-agent): point your own editor or
   assistant at your workspace, acting as you.
 

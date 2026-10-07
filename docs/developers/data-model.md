@@ -43,6 +43,28 @@ workspace-wide or scoped to a space.
 
 **`checklist`, `checklist_item`, `comment`, `attachment`** As expected.
 
+**`goal`** What the work is for. Workspace-wide, numbered from
+`workspace.next_goal_seq` (a counter rather than `MAX()+1`, so a deleted
+goal's number is never handed out again). `parent_id` makes it part of
+another goal: a link, not a ladder, with cycles refused on write and
+deleting a parent detaching its sub-goals. `status` is the owner's
+judgement and moves only through check-ins after creation. An optional
+metric lives in five `metric_*` columns, present together or not at all.
+
+**`goal_item`** Which cards serve which goal, many to many. Only the direct
+link is stored. Everything that is part of a linked card counts too, and is
+resolved on read with a recursive query over `item.parent_id`, so a card
+moved into or out of a tree changes every goal it serves without a write to
+this table. Progress is never stored: it is computed on every read from the
+cards, weighted by `size` (unsized counts as 1), each card once, with
+archived and cancelled sub-goals left out of a parent's rollup.
+
+**`goal_update`** A check-in: status (null when it did not change), note,
+metric value, author. The goal's `status` and `metric_current` follow the
+latest one. Deleting one does not rewind the status.
+
+**`goal_follower`** Who hears about check-ins besides the owner. People only.
+
 ## Documents
 
 **`document`** Slug-addressed, with a `rev`. The tree is `parent_id` plus a
@@ -57,7 +79,11 @@ of itself.
 
 **`link`** Extracted cross-references: `(src_kind, src_id) → (ref_type,
 target)` where `ref_type` is `item`, `space`, `doc`, `actor` or `query`.
-Rebuilt on save, which is what makes backlinks possible.
+Rebuilt on save, which is what makes backlinks possible. A `[[goal:12]]`
+reference renders but is deliberately not stored here: the table's `CHECK`
+constraint predates goals and SQLite cannot alter one in place, so it is
+filtered out on write (`isIndexedRef` in `shared/src/markdown.ts`). Rebuilding
+the table to allow it is worth doing when something needs goal backlinks.
 
 **`fts`** An FTS5 virtual table over item titles and descriptions, comments and
 documents. FTS5 has no `RENAME COLUMN`, so any column change means dropping and

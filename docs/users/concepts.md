@@ -1,6 +1,6 @@
 # Concepts
 
-Six ideas explain most of Acta.
+Seven ideas explain most of Acta.
 
 ## Workspace
 
@@ -52,11 +52,20 @@ Beyond CommonMark and GFM, Acta understands cross-references:
 | `[[ENG-142]]`                              | An item                                        |
 | `[[space:ENG]]`                            | A space                                        |
 | `[[doc:manual/vision]]`                    | A document (add `\|label` to retitle the link) |
+| `[[goal:12]]`                              | A goal, shown by its name                      |
 | `[[@handle]]`                              | A member, which notifies them                  |
 | `![[query: space=ENG list="In Progress"]]` | A live embed of matching items                 |
 
 References are extracted on save and stored, so a document knows what points
 at it, not only what it points to.
+
+## Goals
+
+A **goal** names an outcome and groups the cards that serve it, from any
+space. Goals are numbered per workspace (`G-12`), can be part of other goals,
+and carry two signals that are deliberately kept apart: a **status** the owner
+sets in dated check-ins, and **progress** measured from the cards. See
+[Goals](/users/goals).
 
 ## Actors
 

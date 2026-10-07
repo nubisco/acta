@@ -73,6 +73,26 @@ const NOTIFIABLE = new Set([
   'doc.created',
   'doc.updated',
   'member.updated',
+  // Goals. Being handed one, a check-in on one you own or follow, and it
+  // being put away or brought back. Editing its fields is not here, for the
+  // same reason saving a document is not: a goal's description gets tidied
+  // far more often than anybody needs telling.
+  'goal.created',
+  'goal.owner_changed',
+  'goal.checked_in',
+  'goal.check_in_updated',
+  'goal.archived',
+  'goal.restored',
+])
+
+/**
+ * Goal verbs where owning or following the goal is reason enough to hear.
+ * The rest notify only the people a write names: a new owner, a mention.
+ */
+const GOAL_PARTICIPANT_VERBS = new Set([
+  'goal.checked_in',
+  'goal.archived',
+  'goal.restored',
 ])
 
 /**
@@ -169,6 +189,28 @@ async function itemParticipants(
  * somebody replied to a thread, and having typed in a page once is a much
  * weaker claim on your attention than having said something in it.
  */
+/** A goal's owner and followers, people only, still members. */
+async function goalParticipants(
+  ctx: ICtx,
+  goalId: string,
+): Promise<{ owner: string[]; followers: string[] }> {
+  const owner = (
+    await ctx.db.query<{ owner_id: string }>(
+      `SELECT g.owner_id FROM goal g JOIN actor a ON a.id = g.owner_id
+        WHERE g.id = ? AND a.disabled = 0`,
+      [goalId],
+    )
+  ).map((r) => r.owner_id)
+  const followers = (
+    await ctx.db.query<{ actor_id: string }>(
+      `SELECT f.actor_id FROM goal_follower f JOIN actor a ON a.id = f.actor_id
+        WHERE f.goal_id = ? AND a.kind = 'human' AND a.disabled = 0`,
+      [goalId],
+    )
+  ).map((r) => r.actor_id)
+  return { owner, followers }
+}
+
 async function docParticipants(
   ctx: ICtx,
   documentId: string,
@@ -240,6 +282,7 @@ export async function notifyForEvent(
 
   let itemKey: string | null = null
   let docSlug: string | null = null
+  let goalNumber: number | null = null
   const wantsParticipants = PARTICIPANT_VERBS.has(event.verb)
 
   if (event.entity === 'item') {
@@ -270,6 +313,23 @@ export async function notifyForEvent(
         for (const id of await docParticipants(ctx, row.id)) add(id, 'involved')
       }
     }
+  } else if (event.entity === 'goal') {
+    const row = (
+      await ctx.db.query<{ id: string; number: number }>(
+        'SELECT id, number FROM goal WHERE id = ?',
+        [event.entity_id],
+      )
+    )[0]
+    if (row) {
+      goalNumber = row.number
+      if (GOAL_PARTICIPANT_VERBS.has(event.verb)) {
+        const { owner, followers } = await goalParticipants(ctx, row.id)
+        // The owner is told as the person responsible, which is what
+        // "assigned" means everywhere else; a follower chose to watch.
+        for (const id of owner) add(id, 'assigned')
+        for (const id of followers) add(id, 'involved')
+      }
+    }
   }
 
   if (found.size === 0) return 0
@@ -282,8 +342,8 @@ export async function notifyForEvent(
     // twice for one thing happening once.
     await ctx.db.run(
       `INSERT OR IGNORE INTO notification
-         (id, workspace_id, actor_id, event_id, reason, verb, summary, item_key, doc_slug, created_at, remind_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, workspace_id, actor_id, event_id, reason, verb, summary, item_key, doc_slug, goal_number, created_at, remind_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         newId('ntf'),
         ctx.workspaceId,
@@ -294,6 +354,7 @@ export async function notifyForEvent(
         event.summary,
         itemKey,
         docSlug,
+        goalNumber,
         ts,
         delay === undefined ? null : ts + delay,
       ],
@@ -309,6 +370,7 @@ export interface INotificationRow {
   summary: string
   item_key: string | null
   doc_slug: string | null
+  goal_number: number | null
   created_at: number
   read_at: number | null
   /** Who caused it, so the inbox can put a face on the row. */
@@ -317,7 +379,7 @@ export interface INotificationRow {
   actor_avatar_url: string | null
 }
 
-const INBOX_SELECT = `SELECT n.id, n.reason, n.verb, n.summary, n.item_key, n.doc_slug,
+const INBOX_SELECT = `SELECT n.id, n.reason, n.verb, n.summary, n.item_key, n.doc_slug, n.goal_number,
          n.created_at, n.read_at,
          a.handle AS actor_handle, a.name AS actor_name, a.avatar_url AS actor_avatar_url
     FROM notification n

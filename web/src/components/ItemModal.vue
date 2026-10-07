@@ -199,6 +199,16 @@
           />
         </div>
 
+        <!-- First of the relations: what the card is for. -->
+        <section class="item-modal__section">
+          <h3>Goals</h3>
+          <ItemGoalsPanel
+            :item-key="it.item.value.key"
+            :goals="it.item.value.goals ?? []"
+            @changed="it.load"
+          />
+        </section>
+
         <!-- Its own section, beside Plan. Composition and sequence are
              different relations and stay visibly apart. -->
         <section class="item-modal__section">
@@ -362,6 +372,7 @@ import LabelBadge from '@/components/LabelBadge.vue'
 import { headingName } from '@/lib/labels'
 import DependencyPanel from '@/components/DependencyPanel.vue'
 import PartsPanel from '@/components/PartsPanel.vue'
+import ItemGoalsPanel from '@/components/goals/ItemGoalsPanel.vue'
 import PartOfChip from '@/components/PartOfChip.vue'
 
 const props = defineProps<{ open: boolean; itemKey: string }>()

@@ -249,6 +249,12 @@
     @close="ui.newSpaceOpen.value = false"
     @created="onSpaceCreated"
   />
+  <GoalFormModal
+    :open="ui.newGoal.value !== null"
+    :parent="ui.newGoal.value?.parent ?? null"
+    @close="ui.newGoal.value = null"
+    @saved="onGoalCreated"
+  />
   <ItemModal
     v-if="ui.itemModalKey.value"
     :open="ui.itemModalKey.value !== null"
@@ -301,6 +307,7 @@ import ItemModal from '@/components/ItemModal.vue'
 import DocPreviewModal from '@/components/DocPreviewModal.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
 import NewSpaceModal from '@/components/NewSpaceModal.vue'
+import GoalFormModal from '@/components/goals/GoalFormModal.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 import WelcomeModal from '@/components/WelcomeModal.vue'
 import { wpath } from '@/lib/paths'
@@ -498,18 +505,27 @@ const navEntries = computed(() => {
       active: route.name === 'home',
     },
     {
-      to: wpath('/docs'),
-      label: 'Docs',
-      icon: 'book-open',
-      tour: 'nav-docs',
-      active: route.name === 'docs',
-    },
-    {
       to: wpath('/activity'),
       label: 'Activity',
       icon: 'pulse',
       tour: 'nav-activity',
       active: route.name === 'activity',
+    },
+    // Right under the workspace-wide views and above Docs and the spaces,
+    // because goals are what the rest of the work is for. Jose set the order.
+    {
+      to: wpath('/goals'),
+      label: 'Goals',
+      icon: 'target',
+      tour: 'nav-goals',
+      active: route.name === 'goals' || route.name === 'goal',
+    },
+    {
+      to: wpath('/docs'),
+      label: 'Docs',
+      icon: 'book-open',
+      tour: 'nav-docs',
+      active: route.name === 'docs',
     },
   ]
 })
@@ -550,6 +566,14 @@ const trail = computed<ICrumb[]>(() => {
     const space = spaces.value.find((b) => b.key === key)
     return [{ text: 'Spaces', to: wpath('/') }, { text: space?.name ?? key }]
   }
+  if (route.meta.crumb === 'goal') {
+    const number = Number(String(route.params.goal ?? '').replace(/^G-/i, ''))
+    const goal = ws.overview.value?.goals?.find((g) => g.number === number)
+    return [
+      { text: 'Goals', to: wpath('/goals') },
+      { text: goal ? `${goal.key} ${goal.title}` : `G-${number}` },
+    ]
+  }
   if (route.meta.crumb === 'docs') {
     const slug = String(route.params.slug ?? '')
     const crumbs: ICrumb[] = [{ text: 'Docs', to: wpath('/docs') }]
@@ -570,6 +594,7 @@ const trail = computed<ICrumb[]>(() => {
     home: 'Home',
     settings: 'Settings',
     activity: 'Activity',
+    goals: 'Goals',
     search: 'Search',
   }
   const name = String(route.name ?? '')
@@ -597,6 +622,12 @@ watch(inspectorVisible, (visible) => {
 async function signOut(): Promise<void> {
   await ws.logout()
   void router.push({ name: 'login' })
+}
+
+function onGoalCreated(number: number): void {
+  ui.newGoal.value = null
+  ui.goalsVersion.value += 1
+  void router.push(wpath(`/goals/${number}`))
 }
 
 function onSpaceCreated(key: string): void {
@@ -659,6 +690,24 @@ watch(
             handler: () => void router.push(wpath(`/s/${b.key}`)),
           })),
         {
+          id: 'go:goals',
+          label: 'Goals',
+          icon: 'target',
+          namespace: 'Go',
+          handler: () => void router.push(wpath('/goals')),
+        },
+        // Each goal by name, so "go to the licensing goal" is a few
+        // keystrokes from anywhere, like a space is.
+        ...(overview.goals ?? [])
+          .filter((g) => !g.archived)
+          .map((g) => ({
+            id: `goal:${g.number}`,
+            label: `Goal: ${g.key} ${g.title}`,
+            icon: 'target',
+            namespace: 'Go',
+            handler: () => void router.push(wpath(`/goals/${g.number}`)),
+          })),
+        {
           id: 'go:docs',
           label: 'Docs',
           icon: 'book-open',
@@ -685,6 +734,13 @@ watch(
           icon: 'plus',
           namespace: 'Create',
           handler: () => (ui.newSpaceOpen.value = true),
+        },
+        {
+          id: 'create:goal',
+          label: 'Create goal',
+          icon: 'target',
+          namespace: 'Create',
+          handler: () => (ui.newGoal.value = {}),
         },
         {
           id: 'sidebar:toggle',

@@ -4,6 +4,7 @@
  */
 
 import type {
+  TGoalOp,
   TSpaceOp,
   TDocOp,
   TItemOp,
@@ -81,6 +82,9 @@ export type {
   ILiveEvent,
   IMyWorkItem,
   TCommentDeletePolicy,
+  IGoalRow,
+  IGoalDetail,
+  IGoalSummary,
 } from '@/types/api'
 import type {
   IOverview,
@@ -93,6 +97,9 @@ import type {
   ILiveEvent,
   IMyWorkItem,
   TCommentDeletePolicy,
+  IGoalRow,
+  IGoalDetail,
+  IGoalSummary,
 } from '@/types/api'
 
 // -- Auth -------------------------------------------------------------------
@@ -255,6 +262,28 @@ export const api = {
       body: JSON.stringify({ urls }),
     }),
 
+  /**
+   * Every goal with its measured progress, and the breakdown of the whole
+   * set. The breakdown ignores the filters, so a dashboard's numbers keep
+   * their meaning whatever the table under them is narrowed to.
+   */
+  goals: (params: Record<string, string> = {}) =>
+    req<{ goals: IGoalRow[]; summary: IGoalSummary }>(
+      `/goals?${new URLSearchParams(params)}`,
+    ),
+
+  goalGet: (goals: number[], include?: ('items' | 'check_ins')[]) =>
+    req<{ goals: IGoalDetail[] }>('/goals/get', {
+      method: 'POST',
+      body: JSON.stringify({ goals, include }),
+    }),
+
+  goalWrite: (ops: TGoalOp[]) =>
+    req<{ results: TOpResult[] }>('/goals/write', {
+      method: 'POST',
+      body: JSON.stringify({ ops }),
+    }),
+
   itemGet: (keys: string[], include?: string[]) =>
     req<{ items: IItemDetail[] }>('/items/get', {
       method: 'POST',
@@ -291,6 +320,7 @@ export const api = {
         summary: string
         item_key: string | null
         doc_slug: string | null
+        goal_number: number | null
         created_at: number
         read_at: number | null
         actor_handle: string | null

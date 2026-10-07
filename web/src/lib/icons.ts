@@ -44,6 +44,7 @@ import * as pulse from '@nubisco/ui/icons/pulse'
 import * as quotes from '@nubisco/ui/icons/quotes'
 import * as robot from '@nubisco/ui/icons/robot'
 import * as sidebarSimple from '@nubisco/ui/icons/sidebar-simple'
+import * as target from '@nubisco/ui/icons/target'
 import * as textB from '@nubisco/ui/icons/text-b'
 import * as textHFour from '@nubisco/ui/icons/text-h-four'
 import * as textHOne from '@nubisco/ui/icons/text-h-one'
@@ -69,6 +70,9 @@ export function registerActaIcons(): void {
     plus,
     'sidebar-simple': sidebarSimple,
     moon,
+    // Goals: the nav entry, the palette's goal entries, and the glyph on a
+    // `[[goal:12]]` chip in the editor (RefChip.vue).
+    target,
     // Editor toolbar and the `/` slash menu.
     'text-b': textB,
     'text-italic': textItalic,

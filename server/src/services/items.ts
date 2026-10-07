@@ -1,5 +1,6 @@
 import {
   extractRefs,
+  isIndexedRef,
   itemKey,
   newId,
   type TItemOp,
@@ -121,7 +122,7 @@ async function syncLinks(
     srcKind,
     srcId,
   ])
-  for (const ref of extractRefs(body)) {
+  for (const ref of extractRefs(body).filter(isIndexedRef)) {
     await ctx.db.run(
       `INSERT OR IGNORE INTO link (workspace_id, src_kind, src_id, ref_type, target)
        VALUES (?, ?, ?, ?, ?)`,
@@ -837,6 +838,10 @@ async function applyItemOp(
         item.id,
       ])
       await ctx.db.run('DELETE FROM external_link WHERE item_id = ?', [item.id])
+      // The goals it served lose it, which is all deleting a card should do
+      // to a goal. Its parts were never linked here, so they stay counted
+      // only if something else still links them.
+      await ctx.db.run('DELETE FROM goal_item WHERE item_id = ?', [item.id])
       await ctx.db.run(
         "DELETE FROM link WHERE src_kind = 'item' AND src_id = ?",
         [item.id],

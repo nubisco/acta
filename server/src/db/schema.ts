@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS workspace (
   -- their own words. See ADDITIVE_COLUMNS for existing databases.
   comment_delete TEXT NOT NULL DEFAULT 'author'
     CHECK (comment_delete IN ('author', 'admin')),
+  -- The number the next goal gets. Goals are numbered per workspace, the way
+  -- cards are per space, and a counter rather than MAX()+1 so a deleted
+  -- goal's number is never handed to a different goal. See ADDITIVE_COLUMNS.
+  next_goal_seq INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL
 );
 
@@ -496,6 +500,8 @@ CREATE TABLE IF NOT EXISTS notification (
   -- The card or document to open. Null for workspace-level news.
   item_key TEXT,
   doc_slug TEXT,
+  -- The goal to open, for news about a goal. See ADDITIVE_COLUMNS.
+  goal_number INTEGER,
   created_at INTEGER NOT NULL,
   read_at INTEGER,
   -- When this becomes eligible for a nudge outside the app, stamped from the
@@ -516,6 +522,83 @@ CREATE INDEX IF NOT EXISTS idx_notification_inbox
 -- The sweep's own index is in ADDITIVE_COLUMNS, beside the columns it
 -- names: this block runs before that list, so an index declared here would
 -- name a column an existing database does not have yet.
+
+-- What the work is for.
+--
+-- A goal is workspace-wide rather than per space, because the work behind
+-- one is rarely all on one board. It carries two signals that are kept apart
+-- on purpose: the owner's judgement (status, posted through check-ins) and
+-- the measured progress of the cards that serve it, which is computed on
+-- read and never stored, so it cannot drift from the cards.
+CREATE TABLE IF NOT EXISTS goal (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  -- G-12 is number 12. Stable across renames, unlike a slug.
+  number INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  owner_id TEXT REFERENCES actor(id),
+  -- The goal this one is part of. A link, not a ladder, exactly like a
+  -- card's parent: any goal under any goal, cycles refused on write, and
+  -- deleting a parent detaches rather than cascades.
+  parent_id TEXT REFERENCES goal(id),
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'on_track', 'at_risk', 'off_track', 'done', 'paused', 'cancelled')),
+  start_date INTEGER,
+  target_date INTEGER,
+  -- One measurable target, optional. All five together or none at all;
+  -- metric_name is the one that says which.
+  metric_name TEXT,
+  metric_unit TEXT,
+  metric_start REAL,
+  metric_target REAL,
+  metric_current REAL,
+  archived INTEGER NOT NULL DEFAULT 0,
+  rev INTEGER NOT NULL DEFAULT 1,
+  created_by TEXT NOT NULL REFERENCES actor(id),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  UNIQUE (workspace_id, number)
+);
+CREATE INDEX IF NOT EXISTS idx_goal_parent ON goal(parent_id);
+
+-- Which cards serve a goal. Many to many: a card can serve several goals,
+-- and everything that is part of a linked card counts toward it as well,
+-- which is resolved on read rather than copied here.
+CREATE TABLE IF NOT EXISTS goal_item (
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  goal_id TEXT NOT NULL REFERENCES goal(id),
+  item_id TEXT NOT NULL REFERENCES item(id),
+  created_by TEXT NOT NULL REFERENCES actor(id),
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (goal_id, item_id)
+);
+CREATE INDEX IF NOT EXISTS idx_goal_item_item ON goal_item(item_id);
+
+-- A check-in: the owner's (or anybody's) dated word on where a goal stands.
+-- The goal's own status and metric_current follow the latest one, and the
+-- history stays here, which is what makes a trend readable later.
+CREATE TABLE IF NOT EXISTS goal_update (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  goal_id TEXT NOT NULL REFERENCES goal(id),
+  actor_id TEXT NOT NULL REFERENCES actor(id),
+  -- Null when the check-in did not change it.
+  status TEXT,
+  body TEXT NOT NULL DEFAULT '',
+  metric_value REAL,
+  created_at INTEGER NOT NULL,
+  edited_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_goal_update_goal ON goal_update(goal_id, created_at);
+
+-- Who hears about a goal besides its owner.
+CREATE TABLE IF NOT EXISTS goal_follower (
+  goal_id TEXT NOT NULL REFERENCES goal(id),
+  actor_id TEXT NOT NULL REFERENCES actor(id),
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (goal_id, actor_id)
+);
 
 -- Open Graph metadata behind a link preview card, cached with a TTL.
 --
@@ -795,4 +878,9 @@ export const ADDITIVE_COLUMNS = [
   // Where a label sits in its group, for groups whose order is not
   // alphabetical. Null everywhere until somebody arranges one.
   'ALTER TABLE label ADD COLUMN pos REAL',
+  // The number the next goal gets. Existing workspaces start at 1, which is
+  // right, since nothing has been numbered yet.
+  'ALTER TABLE workspace ADD COLUMN next_goal_seq INTEGER NOT NULL DEFAULT 1',
+  // Which goal a notification opens, beside item_key and doc_slug.
+  'ALTER TABLE notification ADD COLUMN goal_number INTEGER',
 ]

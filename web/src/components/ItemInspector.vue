@@ -328,6 +328,21 @@
           />
         </NbAccordionItem>
 
+        <!-- What the card is for, first among its relations. Its own section
+             rather than a field, because a goal inherited through a parent
+             needs room to say where it comes from. -->
+        <NbAccordionItem
+          id="goals"
+          title="Goals"
+          :meta="countLabel(it.item.value.goals)"
+        >
+          <ItemGoalsPanel
+            :item-key="it.item.value.key"
+            :goals="it.item.value.goals ?? []"
+            @changed="it.load"
+          />
+        </NbAccordionItem>
+
         <NbAccordionItem
           id="plan"
           title="Plan"
@@ -428,6 +443,7 @@ import LabelBadge from '@/components/LabelBadge.vue'
 import { headingName } from '@/lib/labels'
 import DependencyPanel from '@/components/DependencyPanel.vue'
 import PartsPanel from '@/components/PartsPanel.vue'
+import ItemGoalsPanel from '@/components/goals/ItemGoalsPanel.vue'
 import PartOfChip from '@/components/PartOfChip.vue'
 import type { IPartRef } from '@/types/api'
 

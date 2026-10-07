@@ -63,6 +63,7 @@ import {
   itemChip,
   itemChipHtml,
   refIconSvg,
+  goalRefLabel,
 } from '@/components/decorations/refs'
 import {
   bareUrlParagraph,
@@ -186,6 +187,12 @@ function renderRefs(html: string): string {
         return `<a class="md__ref md__ref--link" data-ref-type="space" data-ref="${esc(target.slice(6))}" href="${esc(wpath(`/s/${target.slice(6)}`))}">${refIconSvg('space')}<span>${esc(alias ?? target.slice(6))}</span></a>`
       if (target.startsWith('doc:'))
         return `<a class="md__ref md__ref--link" data-ref-type="doc" data-ref="${esc(target.slice(4))}" href="${esc(wpath(`/docs/${target.slice(4)}`))}">${refIconSvg('doc')}<span>${esc(alias ?? target.slice(4))}</span></a>`
+      if (target.startsWith('goal:')) {
+        const number = target.slice(5).trim().replace(/^G-/i, '')
+        if (!/^\d+$/.test(number)) return esc(raw)
+        const label = goalRefLabel(number, ws.overview.value?.goals, alias)
+        return `<a class="md__ref md__ref--link" data-ref-type="goal" data-ref="${esc(number)}" href="${esc(wpath(`/goals/${number}`))}">${refIconSvg('goal')}<span>${esc(label)}</span></a>`
+      }
       if (/^[A-Z][A-Z0-9]{1,4}-\d+$/.test(target))
         return `<button type="button" class="md__ref md__ref--item" data-ref-type="item" data-ref="${esc(target)}">${esc(alias ?? target)}</button>`
       return esc(raw)
@@ -582,6 +589,7 @@ function onClick(event: MouseEvent): void {
     return
   event.preventDefault()
   if (refType === 'space') void router.push(wpath(`/s/${ref}`))
+  else if (refType === 'goal') void router.push(wpath(`/goals/${ref}`))
   else if (refType === 'doc') {
     if (docNav) docNav(ref)
     else docPreview.open(ref)

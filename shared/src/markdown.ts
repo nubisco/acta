@@ -166,10 +166,29 @@ export function applySectionEdit(
 
 // ---------------------------------------------------------------------------
 // Cross-references: [[SW-142]], [[space:DOOD]], [[doc:manual/vision|label]],
-// [[@handle]], and embeds ![[query: ...]]. Code spans and fences are skipped.
+// [[goal:12]], [[@handle]], and embeds ![[query: ...]]. Code spans and fences
+// are skipped.
 // ---------------------------------------------------------------------------
 
-export type TRefType = 'item' | 'space' | 'doc' | 'actor' | 'query'
+export type TRefType = 'item' | 'space' | 'doc' | 'actor' | 'query' | 'goal'
+
+/**
+ * The reference types the link table stores, which is what backlinks and
+ * "Referenced by" are built from.
+ *
+ * A goal reference renders as a chip and is deliberately not indexed. The
+ * table's CHECK constraint predates goals and SQLite cannot alter one in
+ * place, so writing a goal row would either fail the whole save or, under
+ * INSERT OR IGNORE, vanish silently. Saying so here is the honest version of
+ * the second. Rebuilding the table to allow it is a migration worth doing
+ * only when something needs goal backlinks.
+ */
+export function isIndexedRef(ref: IRef): boolean {
+  return ref.type !== 'goal'
+}
+
+/** A goal's reference target, `12`, from either `12` or `G-12`. */
+export const GOAL_REF_RE = /^(?:G-)?(\d{1,9})$/
 
 export interface IRef {
   type: TRefType
@@ -277,6 +296,9 @@ export function extractRefs(body: string): IRef[] {
         offset,
         raw,
       })
+    } else if (targetPart.startsWith('goal:')) {
+      const m = GOAL_REF_RE.exec(targetPart.slice(5).trim())
+      if (m) refs.push({ type: 'goal', target: m[1], alias, offset, raw })
     } else if (/^[A-Z][A-Z0-9]{1,4}-\d+$/.test(targetPart)) {
       refs.push({ type: 'item', target: targetPart, alias, offset, raw })
     }

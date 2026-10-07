@@ -123,6 +123,22 @@ const router = createRouter({
           meta: { title: 'Activity' },
         },
         {
+          path: 'goals',
+          name: 'goals',
+          component: () => import('./views/GoalsView.vue'),
+          meta: { title: 'Goals' },
+        },
+        {
+          // `12` or `G-12`, so a key pasted from anywhere still lands.
+          path: 'goals/:goal',
+          name: 'goal',
+          component: () => import('./views/GoalView.vue'),
+          props: (to) => ({
+            number: Number(String(to.params.goal).replace(/^G-/i, '')),
+          }),
+          meta: { crumb: 'goal', title: 'Goal' },
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('./views/SettingsView.vue'),

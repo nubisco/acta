@@ -84,6 +84,7 @@ export default defineConfig({
             { text: 'What Acta is', link: '/users/' },
             { text: 'Concepts', link: '/users/concepts' },
             { text: 'Working in Acta', link: '/users/working' },
+            { text: 'Goals', link: '/users/goals' },
             { text: 'Connect an agent', link: '/users/connect-an-agent' },
           ],
         },

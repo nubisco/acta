@@ -273,11 +273,13 @@
         :labels="labelFilter"
         :assignees="assigneeFilter"
         :state="stateFilter"
+        :goal="goalFilter"
         :label-ids="labelIds"
         :active="filtersActive"
         @update:labels="labelFilter = $event"
         @update:assignees="assigneeFilter = $event"
         @update:state="stateFilter = $event"
+        @update:goal="goalFilter = $event"
         @clear="clearFilters"
         @close="filtersOpen = false"
       />
@@ -396,6 +398,24 @@ const labelFilter = ref<string[]>([])
 const assigneeFilter = ref<string[]>([])
 const stateFilter = ref('open')
 const textFilter = ref('')
+
+/**
+ * The goal the space is narrowed to, in the URL rather than component state
+ * so a goal's page can link straight to "its cards on this board", and so
+ * the link can be shared.
+ */
+const goalFilter = computed<number | null>({
+  get: () => {
+    const raw = String(route.query.goal ?? '').replace(/^G-/i, '')
+    return /^\d+$/.test(raw) ? Number(raw) : null
+  },
+  set: (value) => {
+    const query = { ...route.query }
+    if (value === null) delete query.goal
+    else query.goal = String(value)
+    void router.replace({ query })
+  },
+})
 
 /* The new-item modal, and which list it creates into: a column footer names
  * its own column, the topbar button leaves it to the modal's backlog default. */
@@ -571,6 +591,7 @@ const filterCount = computed(
   () =>
     labelFilter.value.length +
     assigneeFilter.value.length +
+    (goalFilter.value !== null ? 1 : 0) +
     (textFilter.value !== '' ? 1 : 0) +
     (stateFilter.value !== 'open' ? 1 : 0),
 )
@@ -711,13 +732,18 @@ async function loadItems(): Promise<void> {
   if (assigneeFilter.value.length > 0)
     params.assignee = assigneeFilter.value.join(',')
   if (textFilter.value) params.text = textFilter.value
+  if (goalFilter.value !== null) params.goal = String(goalFilter.value)
   const result = await load.run(api.spaceGet(spaceKey.value, params))
   if (result) items.value = result.items
 }
 
-watch([spaceKey, labelFilter, assigneeFilter, stateFilter], loadItems, {
-  immediate: true,
-})
+watch(
+  [spaceKey, labelFilter, assigneeFilter, stateFilter, goalFilter],
+  loadItems,
+  {
+    immediate: true,
+  },
+)
 
 let textDebounce: ReturnType<typeof setTimeout> | undefined
 watch(textFilter, () => {
@@ -746,6 +772,11 @@ onScopeDispose(
       'item.assigned',
       'item.created',
       'item.updated',
+      // Whether a card serves the goal the space is filtered to.
+      'item.goal_linked',
+      'item.goal_unlinked',
+      'item.parented',
+      'item.detached',
     ])
     if (event.actor_kind !== 'human' || changesMembership.has(event.verb))
       void loadItems()
@@ -778,6 +809,7 @@ function clearFilters(): void {
   assigneeFilter.value = []
   textFilter.value = ''
   stateFilter.value = 'open'
+  goalFilter.value = null
 }
 
 /**

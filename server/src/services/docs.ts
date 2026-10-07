@@ -2,6 +2,7 @@ import {
   anchorTextFromMarkdown,
   applySectionEdit,
   extractRefs,
+  isIndexedRef,
   newId,
   sectionMap,
   type TDocOp,
@@ -65,7 +66,7 @@ async function syncDocDerived(
   await ctx.db.run("DELETE FROM link WHERE src_kind = 'doc' AND src_id = ?", [
     docId,
   ])
-  for (const ref of extractRefs(body)) {
+  for (const ref of extractRefs(body).filter(isIndexedRef)) {
     await ctx.db.run(
       `INSERT OR IGNORE INTO link (workspace_id, src_kind, src_id, ref_type, target)
        VALUES (?, 'doc', ?, ?, ?)`,
@@ -236,7 +237,7 @@ async function applyDocOp(
         ],
       )
       await ftsUpsert(ctx, 'comment', id, doc.slug, op.body)
-      for (const ref of extractRefs(op.body)) {
+      for (const ref of extractRefs(op.body).filter(isIndexedRef)) {
         await ctx.db.run(
           `INSERT OR IGNORE INTO link (workspace_id, src_kind, src_id, ref_type, target)
            VALUES (?, 'comment', ?, ?, ?)`,

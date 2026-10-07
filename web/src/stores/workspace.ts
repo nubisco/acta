@@ -50,6 +50,8 @@ export interface IAppNotification {
   itemKey: string | null
   /** The page to open, for everything that happened on a document. */
   docSlug: string | null
+  /** The goal to open, for news about a goal. */
+  goalNumber: number | null
   /**
    * Who did it. A person is represented by their avatar wherever they
    * appear, and an inbox is a list of things people did, so a row without a
@@ -98,6 +100,12 @@ let unsubscribe: (() => void) | null = null
 let reloadTimer: ReturnType<typeof setTimeout> | null = null
 
 const NOTIFY_VERBS = new Set([
+  'goal.created',
+  'goal.owner_changed',
+  'goal.checked_in',
+  'goal.check_in_updated',
+  'goal.archived',
+  'goal.restored',
   'comment.created',
   'comment.updated',
   'comment.resolved',
@@ -165,6 +173,7 @@ export function notificationPath(n: IAppNotification): string | null {
   if (n.itemKey)
     return `/${slug}/s/${n.itemKey.split('-')[0]}?item=${n.itemKey}`
   if (n.docSlug) return `/${slug}/docs/${n.docSlug}`
+  if (n.goalNumber !== null) return `/${slug}/goals/${n.goalNumber}`
   return null
 }
 
@@ -231,7 +240,14 @@ export function useWorkspace() {
           downTimer = null
         }
         connectionDown.value = false
-        if (event.entity === 'space' || event.entity === 'list') void refresh()
+        // Goals ride in the overview as the catalogue every chip and picker
+        // reads, so a goal created or renamed elsewhere has to reach it.
+        if (
+          event.entity === 'space' ||
+          event.entity === 'list' ||
+          event.entity === 'goal'
+        )
+          void refresh()
         // Anything might have produced a notification for this person, and
         // the server is the one that knows. Re-reading is cheap and means
         // the bell shows the same thing in every tab.
@@ -288,6 +304,7 @@ export function useWorkspace() {
       verb: n.verb,
       itemKey: n.item_key,
       docSlug: n.doc_slug,
+      goalNumber: n.goal_number ?? null,
       actorHandle: n.actor_handle,
       timestamp: new Date(n.created_at).toISOString(),
       read: n.read_at !== null,
@@ -401,6 +418,16 @@ const newSpaceOpen = ref(false)
 const itemModalKey = ref<string | null>(null)
 
 /**
+ * The new-goal dialog: null when closed, and when open, what it starts with.
+ * Global like the new-space one, because a goal is created from the Goals
+ * page, from a goal ("Add sub-goal"), from Home and from the palette alike.
+ */
+const newGoal = ref<{ parent?: number } | null>(null)
+/** Bumped when a goal is created here, so lists re-read without waiting on
+ *  the live stream, which may be down. */
+const goalsVersion = ref(0)
+
+/**
  * Dual-flavor sidebar: dense routes collapse to the icon rail, navigation-
  * heavy routes expand. The user's toggle overrides the route default until
  * the next navigation.
@@ -462,7 +489,7 @@ export function useDocPreview() {
 const DENSE_ROUTES = new Set(['space', 'docs'])
 
 export function useUiState() {
-  return { newSpaceOpen, itemModalKey, sidebarChoice }
+  return { newSpaceOpen, itemModalKey, sidebarChoice, newGoal, goalsVersion }
 }
 
 export function sidebarDefaultFor(routeName: unknown): TSidebarVariant {

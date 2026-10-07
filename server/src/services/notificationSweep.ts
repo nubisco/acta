@@ -77,6 +77,7 @@ export interface IPendingNote {
   summary: string
   item_key: string | null
   doc_slug: string | null
+  goal_number: number | null
   /**
    * Who did it. The summaries are written as activity lines with the actor
    * left off, because in the feed the face is already beside them. Out of
@@ -226,7 +227,7 @@ export async function reminderSweep(
     IPendingNote & { actor_id: string; workspace_id: string }
   >(
     `SELECT n.id, n.actor_id, n.workspace_id, n.reason, n.verb, n.summary,
-            n.item_key, n.doc_slug, a.name AS actor_name
+            n.item_key, n.doc_slug, n.goal_number, a.name AS actor_name
        FROM notification n
        LEFT JOIN event e ON e.id = n.event_id
        LEFT JOIN actor a ON a.id = e.actor_id
@@ -320,6 +321,22 @@ const REASON_WORDS: Record<string, string> = {
   involved: 'On your card',
 }
 
+/**
+ * A goal's owner is stored as "assigned" and a follower as "involved",
+ * because those are the reasons the table allows, but "Assigned to you" and
+ * "On your card" are the wrong words for a goal.
+ */
+const GOAL_REASON_WORDS: Record<string, string> = {
+  mention: 'Mentioned you',
+  assigned: 'Your goal',
+  involved: 'A goal you follow',
+}
+
+function reasonWords(note: IPendingNote): string {
+  const words = note.verb.startsWith('goal.') ? GOAL_REASON_WORDS : REASON_WORDS
+  return words[note.reason] ?? 'Waiting on you'
+}
+
 /** The email channel. Silent, and honest about it, when there is no address. */
 export function emailChannel(send: TEmailSender): INotificationChannel {
   return {
@@ -337,7 +354,7 @@ export function emailChannel(send: TEmailSender): INotificationChannel {
         collapse(
           notes.map((n) => ({
             summary: n.actor_name ? `${n.actor_name} ${n.summary}` : n.summary,
-            reason: REASON_WORDS[n.reason] ?? 'Waiting on you',
+            reason: reasonWords(n),
             url: linkFor(base, to.workspaceSlug, n),
           })),
         ).slice(0, DIGEST_LINES),
@@ -401,6 +418,8 @@ function linkFor(
     return `${root}/s/${encodeURIComponent(spaceKey)}?item=${encodeURIComponent(note.item_key)}`
   }
   if (note.doc_slug) return `${root}/docs/${note.doc_slug}`
+  if (note.goal_number !== null && note.goal_number !== undefined)
+    return `${root}/goals/${note.goal_number}`
   return null
 }
 

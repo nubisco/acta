@@ -1,15 +1,18 @@
 # Tools
 
-Thirteen tools, plus `attachment_add` when the instance has an attachment
+Sixteen tools, plus `attachment_add` when the instance has an attachment
 store configured (it does in every standard deployment). Those marked
 **write** require a token with the write scope.
 
 | Tool                 |           | Does                                                                                                                                                                                                                                                                    |
 | -------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `workspace_overview` |           | One-call bootstrap: workspace name, every space with its lists and item counts, label groups, members (human and agent), document tree roots. Call this first.                                                                                                          |
+| `workspace_overview` |           | One-call bootstrap: workspace name, every space with its lists and item counts, label groups, members (human and agent), document tree roots, every goal. Call this first.                                                                                              |
 | `space_get`          |           | Items of one space as compact rows. Filter by list, label, assignee, state, free text, or `updated_since` for delta reads. `detail=full` adds descriptions.                                                                                                             |
 | `item_get`           |           | Full detail for up to 50 items by key: description, comments, checklists, links and backlinks, attachments, optionally the activity tail. Old keys from cross-space moves resolve automatically.                                                                        |
 | `item_write`         | **write** | Batch item mutations. See below.                                                                                                                                                                                                                                        |
+| `goal_list`          |           | Every goal with its status and measured progress, plus a summary: counts by status, how many are past their date or quiet for a month, and the work across all goals in flight. See [Goals](#goals).                                                                    |
+| `goal_get`           |           | Up to 20 goals in full: description, followers, ancestors, sub-goals with their own progress, every card counted toward the goal, and the check-ins.                                                                                                                    |
+| `goal_write`         | **write** | Batch goal mutations. See [Goals](#goals).                                                                                                                                                                                                                              |
 | `space_write`        | **write** | Create and change spaces and lists: `create` (with the `kanban6` template), `update`, `archive`, `list_create`, `list_update`, `list_archive`.                                                                                                                          |
 | `doc_tree`           |           | The document hierarchy as a flat, depth-annotated list. Optionally scoped to a subtree.                                                                                                                                                                                 |
 | `doc_get`            |           | One document: frontmatter, body, `rev`. `include: ["sections"]` adds the heading map with per-section hashes; `"versions"` the history; `"backlinks"` the referrers; `"comments"` the comments, with anchor status for inline ones. `at_version` reads an old revision. |
@@ -58,6 +61,62 @@ work once, so a retry after a timeout is safe:
       "op_id": "a2",
       "key": "ENG-142",
       "body": "Blocked until [[ENG-140]] lands. cc [[@dana]]"
+    }
+  ]
+}
+```
+
+## Goals
+
+A goal is referenced by its number, `12` or `"G-12"`. `goal_write` takes up to
+100 ops and returns `{op_id, ok, key: "G-12", rev}` for each.
+
+| Op                                   | Notes                                                                                                                                                                                                                                     |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create`                             | `title`, `description`, `owner` (defaults to you if you are a person, `null` for none), `parent`, `status`, `start_date` and `target_date` (epoch ms), `metric {name, unit?, start, target, current?}`, `items` (card keys), `followers`. |
+| `update`                             | Any of the fields above except status and parent. `null` clears. Optional `if_rev`.                                                                                                                                                       |
+| `set_parent`                         | Makes a goal part of another, at any depth. Cycles are refused. `null` makes it top-level.                                                                                                                                                |
+| `link`                               | `add` and `remove` card keys. A card can serve several goals, and everything that is part of it counts too.                                                                                                                               |
+| `check_in`                           | `status`, `body` and `metric_value`, at least one. Moves the goal's status and metric, and notifies its owner and followers.                                                                                                              |
+| `check_in_update`, `check_in_delete` | Edit is author only. Delete follows the workspace's comment rule and does not rewind the status.                                                                                                                                          |
+| `follow`                             | `add` and `remove` handles. People only.                                                                                                                                                                                                  |
+| `archive`, `restore`                 |                                                                                                                                                                                                                                           |
+| `delete`                             | Permanent, refused unless archived. Sub-goals become top-level; cards are untouched.                                                                                                                                                      |
+
+Every goal row carries two signals that must not be confused. `status` is the
+owner's judgement, set by check-ins. `progress` is measured from the cards on
+every read: `cards_total`, `cards_done`, `cards_active`, `cards_waiting`,
+`cards_overdue`, and `percent`, weighted by card size with unsized cards
+counting as 1. The rows also carry `overdue` (in flight and past its target
+date), `stale` (in flight with no check-in for 30 days), `elapsed` (how much of
+the date window has gone) and `metric` with its own `percent`.
+
+`space_get` takes `goal` to return only the cards serving it, sub-goals and
+parts included, and `item_get` returns the goals each card serves, with `via`
+naming the card the link is on when it is inherited.
+
+A card being linked or unlinked is an event on the card (`item.goal_linked`,
+`item.goal_unlinked`), so automation rules can act on it. Goal events
+(`goal.created`, `goal.updated`, `goal.checked_in`, `goal.status_changed`,
+`goal.parented`, `goal.archived` and the rest) go to webhooks and the activity
+feed.
+
+```json
+{
+  "ops": [
+    {
+      "op": "create",
+      "op_id": "g1",
+      "title": "Ship licensing v2",
+      "target_date": 1798761600000,
+      "items": ["ST-140", "ST-152"]
+    },
+    {
+      "op": "check_in",
+      "op_id": "g2",
+      "goal": "G-1",
+      "status": "at_risk",
+      "body": "Activation is done. Waiting on [[@dana]] for the refund flow."
     }
   ]
 }

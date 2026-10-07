@@ -19,6 +19,10 @@ export type TActivitySegment =
   | { kind: 'text'; text: string }
   | { kind: 'item'; text: string }
   | { kind: 'doc'; text: string; slug: string }
+  | { kind: 'goal'; text: string; number: number }
+
+/** A goal key. Never confused with a card key, which needs two letters. */
+const GOAL_KEY = /\bG-(\d+)\b/g
 
 /**
  * Split a summary into plain text and the things it names.
@@ -31,6 +35,12 @@ export type TActivitySegment =
 export function activitySegments(
   summary: string,
   docSlug?: string,
+  /**
+   * Whether `G-12` in this summary names a goal. Only the server's own goal
+   * sentences are trusted to: a card created as "Fix the G-12 cable" would
+   * otherwise grow a link to a goal it has nothing to do with.
+   */
+  goals = false,
 ): TActivitySegment[] {
   const out: TActivitySegment[] = []
   let rest = summary
@@ -45,7 +55,23 @@ export function activitySegments(
     rest = summary.slice(at + docSlug.length)
   }
   pushKeys(out, rest)
-  return merge(out)
+  return merge(goals ? out.flatMap(splitGoals) : out)
+}
+
+/** Lift goal keys out of the text runs, leaving everything else alone. */
+function splitGoals(segment: TActivitySegment): TActivitySegment[] {
+  if (segment.kind !== 'text') return [segment]
+  const out: TActivitySegment[] = []
+  let last = 0
+  for (const m of segment.text.matchAll(GOAL_KEY)) {
+    if (m.index > last)
+      out.push({ kind: 'text', text: segment.text.slice(last, m.index) })
+    out.push({ kind: 'goal', text: m[0], number: Number(m[1]) })
+    last = m.index + m[0].length
+  }
+  if (last < segment.text.length)
+    out.push({ kind: 'text', text: segment.text.slice(last) })
+  return out
 }
 
 function pushKeys(out: TActivitySegment[], text: string): void {

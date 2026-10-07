@@ -36,8 +36,11 @@ Open a card in the side inspector, or press the expand control for the full
 modal. Both show the same thing.
 
 Status, list, due date, assignees and labels are always visible. Description,
-comments, checklists, attachments, plan and history are in sections you can
-collapse, so a long description cannot bury the comments underneath it.
+comments, checklists, goals, attachments, plan and history are in sections you
+can collapse, so a long description cannot bury the comments underneath it.
+
+The **Goals** section lists the [goals](/users/goals) the card serves,
+including ones it inherits from a card it is part of, and links it to another.
 
 ### Plan
 

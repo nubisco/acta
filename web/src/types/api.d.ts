@@ -33,6 +33,8 @@ export interface IOverview {
     avatar_url?: string | null
   }[]
   doc_roots: { slug: string; title: string; children: number }[]
+  /** Every goal, compact, for chips and pickers. */
+  goals?: IGoalRef[]
   /** Workspace-wide policy, as Settings shows it and the server enforces it. */
   policy?: { comment_delete: TCommentDeletePolicy }
 }
@@ -159,6 +161,9 @@ export interface IItemDetail {
   parent?: IPartRef
   /** The cards that are part of this one. Any depth, across spaces. */
   parts?: IPartRef[]
+  /** The goals this card serves. `via` names the card the link is actually
+   *  on, when that is something this card is part of. */
+  goals?: (IGoalRef & { via?: string })[]
   /** Cards that must finish before this one. */
   blocked_by?: IDependencyRef[]
   /** Cards waiting on this one. */
@@ -245,6 +250,7 @@ export interface IEventRow {
    */
   item_key?: string
   doc_slug?: string
+  goal_number?: number
 }
 
 export interface ISearchResult {
@@ -277,4 +283,120 @@ export interface IMyWorkItem {
   completed?: boolean
   reason?: string
   at?: number
+}
+
+/** The owner's judgement of a goal, as opposed to its measured progress. */
+export type TGoalStatus =
+  | 'pending'
+  | 'on_track'
+  | 'at_risk'
+  | 'off_track'
+  | 'done'
+  | 'paused'
+  | 'cancelled'
+
+/** A goal as the overview lists it. */
+export interface IGoalRef {
+  number: number
+  key: string
+  title: string
+  status: TGoalStatus | string
+  parent?: number
+  archived?: true
+}
+
+/** Measured from the cards that serve a goal, never stored. */
+export interface IGoalProgress {
+  cards_total: number
+  cards_done: number
+  cards_active: number
+  cards_waiting: number
+  cards_overdue: number
+  weight_total: number
+  weight_done: number
+  /** Absent when there is nothing to measure. */
+  percent?: number
+}
+
+export interface IGoalMetric {
+  name: string
+  unit?: string
+  start: number
+  target: number
+  current: number
+  percent: number
+}
+
+/** One goal in a list, everything a row needs to be drawn and judged. */
+export interface IGoalRow {
+  number: number
+  key: string
+  title: string
+  status: TGoalStatus
+  owner?: string
+  parent?: number
+  start_date?: number
+  target_date?: number
+  archived?: true
+  metric?: IGoalMetric
+  progress: IGoalProgress
+  /** Cards linked to this goal itself. */
+  linked: number
+  sub_goals?: number
+  /** How far through its date window, 0 to 100. */
+  elapsed?: number
+  overdue?: true
+  /** In flight with nothing said about it for a month. */
+  stale?: true
+  last_check_in?: { ts: number; by: string; status?: TGoalStatus }
+  following?: true
+  rev: number
+  updated: number
+}
+
+export interface IGoalSummary {
+  total: number
+  in_flight: number
+  by_status: Record<TGoalStatus, number>
+  overdue: number
+  stale: number
+  work: IGoalProgress
+}
+
+export interface IGoalCard {
+  key: string
+  title: string
+  space: string
+  list: string
+  done?: true
+  active?: true
+  waiting?: true
+  overdue?: true
+  size: number
+  linked?: true
+  via?: string
+}
+
+export interface IGoalCheckIn {
+  id: string
+  by: string
+  ts: number
+  edited?: number
+  status?: TGoalStatus
+  body?: string
+  metric_value?: number
+  can_edit?: true
+  can_delete?: true
+}
+
+export interface IGoalDetail extends IGoalRow {
+  description: string
+  created: number
+  created_by?: string
+  followers: string[]
+  /** Its sub-goals, each with its own progress. */
+  children: IGoalRow[]
+  ancestors: { number: number; key: string; title: string }[]
+  items?: IGoalCard[]
+  check_ins?: IGoalCheckIn[]
 }

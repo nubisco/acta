@@ -56,6 +56,17 @@ features:
     link: /users/working
     linkText: The sequence view
   - icon:
+      src: https://api.iconify.design/ph/target-bold.svg?color=%236ee7d8
+      width: 36
+      height: 36
+    title: Goals before cards
+    details: >
+      Name the outcome, link the cards from any space, and see two honest
+      signals side by side: the owner's check-ins, and progress measured from
+      the work.
+    link: /users/goals
+    linkText: Goals
+  - icon:
       src: https://api.iconify.design/ph/shield-check-bold.svg?color=%233a6ede
       width: 36
       height: 36

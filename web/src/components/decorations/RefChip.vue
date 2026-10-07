@@ -47,7 +47,12 @@ import { computed } from 'vue'
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/vue-3'
 import ActorChip from '@/components/ActorChip.vue'
 import { useRefCards } from '@/stores/refs'
-import { classifyRef, itemChip } from '@/components/decorations/refs'
+import {
+  classifyRef,
+  goalRefLabel,
+  itemChip,
+} from '@/components/decorations/refs'
+import { useWorkspace } from '@/stores/workspace'
 
 /* eslint-disable-next-line vue/prop-name-casing --
    NodeViewProps is Tiptap's type and carries `HTMLAttributes`. Renaming it
@@ -74,10 +79,20 @@ const chip = computed(() => {
   )
 })
 
-const label = computed(() => alias.value?.trim() || target.value.value)
+const ws = useWorkspace()
+
+const label = computed(() =>
+  target.value.kind === 'goal'
+    ? goalRefLabel(target.value.value, ws.overview.value?.goals, alias.value)
+    : alias.value?.trim() || target.value.value,
+)
 
 const glyph = computed(() =>
-  target.value.kind === 'doc' ? 'file-text' : 'kanban',
+  target.value.kind === 'doc'
+    ? 'file-text'
+    : target.value.kind === 'goal'
+      ? 'target'
+      : 'kanban',
 )
 
 const chipClasses = computed(() => {

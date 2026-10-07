@@ -20,6 +20,7 @@ import {
   commentDeletePolicy,
 } from './comments'
 import { anchorTextFromMarkdown, sectionMap } from '@nubisco/acta-shared'
+import { GOAL_ITEMS_SQL, goalByRef, goalCatalogue, goalsForItem } from './goals'
 
 type TSpaceGet = z.infer<typeof zSpaceGet>
 type TItemGet = z.infer<typeof zItemGet>
@@ -157,6 +158,10 @@ export async function workspaceOverview(ctx: ICtx) {
     })),
     actors,
     doc_roots: docRoots,
+    // Every goal, compact. Small by nature (a workspace has tens, not
+    // thousands), and every surface that renders a goal chip or offers a
+    // goal picker needs the names without a read of its own.
+    goals: await goalCatalogue(ctx),
   }
 }
 
@@ -223,6 +228,14 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
       )
       for (const handle of handles) args.push(handle, handle)
     }
+  }
+  if (params.goal !== undefined) {
+    // Everything serving the goal, its sub-goals' work and every part of a
+    // linked card included: the same set its progress is measured over, so
+    // filtering a board by a goal shows exactly the cards behind its number.
+    const goal = await goalByRef(ctx, params.goal)
+    where.push(`i.id IN (${GOAL_ITEMS_SQL})`)
+    args.push(goal.id)
   }
   if (params.cursor) {
     where.push('i.key > ?')
@@ -409,6 +422,11 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
       done: r.completed === 1 || undefined,
     }))
     if (parts.length > 0) out.parts = parts
+
+    // The goals this card serves, linked to it or to anything it is part
+    // of. Always, like parts: what a card is for is what the card is.
+    const goals = await goalsForItem(ctx, item.id)
+    if (goals.length > 0) out.goals = goals
 
     // Always, not behind `include`. What a card waits on is part of what the
     // card IS, and the sequence view was showing it while the card itself
@@ -861,6 +879,7 @@ export async function activityQuery(ctx: ICtx, params: TActivityQuery) {
     caused_by: string | null
     item_key: string | null
     doc_slug: string | null
+    goal_number: number | null
   }>(
     `SELECT e.id, e.ts, e.actor_id, e.actor_kind, e.on_behalf_of, e.verb,
             e.entity, e.entity_id, e.summary, e.caused_by,
@@ -870,10 +889,12 @@ export async function activityQuery(ctx: ICtx, params: TActivityQuery) {
             -- here for the same reason the notification inbox resolves it,
             -- rather than asking every client to look up every row.
             i.key AS item_key,
-            d.slug AS doc_slug
+            d.slug AS doc_slug,
+            g.number AS goal_number
        FROM event e
        LEFT JOIN item i ON i.id = e.entity_id AND e.entity = 'item'
        LEFT JOIN document d ON d.id = e.entity_id AND e.entity = 'doc'
+       LEFT JOIN goal g ON g.id = e.entity_id AND e.entity = 'goal'
       WHERE ${where.join(' AND ')}
       ORDER BY e.id DESC LIMIT ?`,
     [...args, params.limit],
@@ -883,6 +904,7 @@ export async function activityQuery(ctx: ICtx, params: TActivityQuery) {
       ...r,
       item_key: r.item_key ?? undefined,
       doc_slug: r.doc_slug ?? undefined,
+      goal_number: r.goal_number ?? undefined,
     })),
     cursor: rows.length === params.limit ? rows[rows.length - 1].id : undefined,
   }

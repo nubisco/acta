@@ -77,7 +77,7 @@
       v-for="entry in entries"
       :key="entry.id"
       :title="entry.title"
-      :body="REASONS[entry.reason]"
+      :body="reasonFor(entry)"
       :time="entry.timestamp"
       :read="entry.read"
       :variant="variantFor(entry.verb)"
@@ -131,6 +131,21 @@ const REASONS: Record<IAppNotification['reason'], string> = {
   mention: 'Mentioned you',
   assigned: 'Assigned to you',
   involved: 'You are on this',
+}
+
+/**
+ * A goal's owner is told as "assigned" and a follower as "involved", which
+ * are the reasons the inbox has, but "Assigned to you" is the wrong sentence
+ * about a goal somebody owns.
+ */
+const GOAL_REASONS: Record<IAppNotification['reason'], string> = {
+  mention: 'Mentioned you',
+  assigned: 'Your goal',
+  involved: 'A goal you follow',
+}
+
+function reasonFor(entry: IAppNotification): string {
+  return (entry.verb.startsWith('goal.') ? GOAL_REASONS : REASONS)[entry.reason]
 }
 
 /**

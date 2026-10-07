@@ -37,6 +37,26 @@
       />
     </div>
 
+    <div v-if="goalOptions.length > 1" class="filters__row">
+      <span class="filters__label">Goal</span>
+      <!-- A select rather than pills: goals are names, not colours, and
+           there can be many. One at a time, since "serves either of two
+           goals" is not a question anybody asks a board. -->
+      <NbSelect
+        id="field-space-filter-goal"
+        size="sm"
+        :model-value="goal === null ? '' : String(goal)"
+        :options="goalOptions"
+        aria-label="Filter by goal"
+        @update:model-value="
+          emit(
+            'update:goal',
+            $event === '' || $event === null ? null : Number($event),
+          )
+        "
+      />
+    </div>
+
     <div class="filters__row">
       <span class="filters__label">Status</span>
       <NbRadio
@@ -78,13 +98,18 @@
  * one owner of what the space is filtered by and the panel can be mounted and
  * unmounted freely without carrying anything.
  */
+import { computed } from 'vue'
 import LabelBadge from '@/components/LabelBadge.vue'
 import ActorFilter from '@/components/ActorFilter.vue'
+import { goalOptionLabel } from '@/lib/goals'
+import { useWorkspace } from '@/stores/workspace'
 
 const props = defineProps<{
   labels: string[]
   assignees: string[]
   state: string
+  /** The goal the cards must serve, by number. Null is any. */
+  goal: number | null
   /** Every label this space can be filtered by, as ids. */
   labelIds: string[]
   /** Whether anything is filtered, which is what makes "Clear all" worth showing. */
@@ -95,9 +120,20 @@ const emit = defineEmits<{
   'update:labels': [value: string[]]
   'update:assignees': [value: string[]]
   'update:state': [value: string]
+  'update:goal': [value: number | null]
   clear: []
   close: []
 }>()
+
+const ws = useWorkspace()
+
+/** Every goal not archived, plus whichever one is selected even if it is. */
+const goalOptions = computed(() => [
+  { label: 'Any goal', value: '' },
+  ...(ws.overview.value?.goals ?? [])
+    .filter((g) => !g.archived || g.number === props.goal)
+    .map((g) => ({ label: goalOptionLabel(g), value: String(g.number) })),
+])
 
 const stateOptions = [
   { label: 'Open', value: 'open' },

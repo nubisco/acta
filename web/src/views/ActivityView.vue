@@ -118,6 +118,13 @@
               >
                 {{ part.text }}
               </RouterLink>
+              <RouterLink
+                v-else-if="part.kind === 'goal'"
+                class="activity-view__ref"
+                :to="wpath(`/goals/${part.number}`)"
+              >
+                {{ part.text }}
+              </RouterLink>
               <template v-else>{{ part.text }}</template>
             </template>
           </span>
@@ -235,7 +242,11 @@ const rows = computed<IRow[]>(() => {
       // Kept as plain text as well: it is what the column sorts on, and what
       // a screen reader gets if the cell is read as a whole.
       what: event.summary,
-      parts: activitySegments(event.summary, event.doc_slug),
+      parts: activitySegments(
+        event.summary,
+        event.doc_slug,
+        event.entity === 'goal' || event.verb.startsWith('item.goal_'),
+      ),
     }
   })
   const active = sort.value
