@@ -1,3 +1,10 @@
+# [1.35.0](https://github.com/nubisco/acta/compare/v1.34.1...v1.35.0) (2026-10-07)
+
+
+### Features
+
+* **goals:** group work behind the outcomes it is for ([a680bbe](https://github.com/nubisco/acta/commit/a680bbe94b13dc2837393448dd06acb5cbab1a58))
+
 ## [1.34.1](https://github.com/nubisco/acta/compare/v1.34.0...v1.34.1) (2026-10-02)
 
 
