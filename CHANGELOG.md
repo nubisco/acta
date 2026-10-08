@@ -1,3 +1,11 @@
+# [1.39.0](https://github.com/nubisco/acta/compare/v1.38.0...v1.39.0) (2026-10-08)
+
+
+### Features
+
+* boards keep their filters, and the pinned card header sits flush ([20ee5d8](https://github.com/nubisco/acta/commit/20ee5d826659faaf2b1d6bf0afdd42e3878a6438))
+* changes reach every open tab at once, and goals open on the icon rail ([d5e9374](https://github.com/nubisco/acta/commit/d5e9374cf61781d1e665882b0b8c82cecdc1e203))
+
 # [1.38.0](https://github.com/nubisco/acta/compare/v1.37.0...v1.38.0) (2026-10-08)
 
 
