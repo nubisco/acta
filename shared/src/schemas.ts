@@ -690,7 +690,12 @@ export const zSpaceGet = z.object({
   state: z.enum(['open', 'done', 'archived', 'all']).default('open'),
   text: z.string().optional(),
   updated_since: z.number().int().optional(),
-  detail: z.enum(['compact', 'full']).default('compact'),
+  /**
+   * compact: the row. board: what a board card shows on top of it (a one
+   * line summary, size, open blockers, attachment count and the goals the
+   * card serves). full: board plus the whole description.
+   */
+  detail: z.enum(['compact', 'board', 'full']).default('compact'),
   cursor: z.string().optional(),
   limit: z.number().int().min(1).max(200).default(100),
 })

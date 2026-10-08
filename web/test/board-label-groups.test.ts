@@ -127,7 +127,7 @@ beforeEach(() => {
 describe('a board where two groups hold the same value', () => {
   it('says which group each chip answers', async () => {
     const view = await render()
-    const chips = view.findAll('.space__card-meta .nb-badge')
+    const chips = view.findAll('.board-card__labels .nb-badge')
     const text = chips.map((c) => c.text())
     // The exclusive group reads as the field it is. The other stays a tag,
     // which keeps the common case quiet.
@@ -139,7 +139,7 @@ describe('a board where two groups hold the same value', () => {
 
   it('colours each chip from its own group', async () => {
     const view = await render()
-    const chips = view.findAll('.space__card-meta .nb-badge')
+    const chips = view.findAll('.board-card__labels .nb-badge')
     const classes = chips.map((c) => c.classes().join(' '))
     expect(classes.some((c) => c.includes('orange'))).toBe(true)
     expect(classes.some((c) => c.includes('blue'))).toBe(true)

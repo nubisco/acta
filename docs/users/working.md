@@ -32,6 +32,34 @@ useful.
 
 ## Cards
 
+### On a board
+
+Every card on a board has the same six rows, in the same order, so the same
+fact is always in the same place:
+
+1. **Header**: the card's key, the card it is part of, and on the right
+   whether it is blocked (and by what), done, and its size.
+2. **Title**, up to three lines.
+3. **Summary**: the first line of the description.
+4. **Goal**: the [goal](/users/goals) it serves, with a dot for how that goal
+   stands. A card serving more than one shows the first and "+1". Click it to
+   open the goal.
+5. **Labels**.
+6. **Footer**: checklist, comments, attachments and parts, always all four and
+   in that order, dimmed at zero and green when complete. On the right, the due
+   date (amber for today and tomorrow, red once late, green once done) and up to
+   three people, then "+N".
+
+A row with nothing in it keeps its place and says so: "No description",
+"No goal", "No labels", an empty calendar, an empty face. So an empty card is
+the same shape as a full one, and only a long title makes a card taller.
+
+Those empty slots are buttons. Click "No goal", "No labels", the empty
+calendar, the empty face or the dashed size to set it right there, without
+opening the card.
+
+### Opening a card
+
 Open a card in the side inspector, or press the expand control for the full
 modal. Both show the same thing.
 
@@ -210,8 +238,8 @@ need to be precise a label is written as `Group/Name`, as in
 ## Parts of a card
 
 A card can be part of another card. Open the parent and it lists its **Parts**,
-open a part and it says what it is **Part of**. On a board a card shows how many
-of its parts are done.
+open a part and it says what it is **Part of**. On a board a card names what it
+is part of in its header, and its footer counts how many of its parts are done.
 
 Anything can be part of anything, at any depth, and a part can live on a
 different board from its parent, which is the point: the work to ship something

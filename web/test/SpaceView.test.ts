@@ -157,10 +157,8 @@ async function openMenu(
   view: Awaited<ReturnType<typeof render>>,
   title: string,
 ) {
-  const card = view
-    .findAll('.space__card')
-    .find((c) => c.text().includes(title))
-  await card!.trigger('contextmenu')
+  const card = view.findAll('.board-card').find((c) => c.text().includes(title))
+  await card!.find('.board-card__open').trigger('contextmenu')
   await view.vm.$nextTick()
   return view.findAll('.nb-menu-item')
 }
@@ -241,16 +239,20 @@ describe('SpaceView card menu', () => {
     inspectorMock.itemKey.value = 'SU-1'
     const view = await render()
 
-    const open = view.findAll('.space__card--open')
+    const open = view.findAll('.board-card--open')
     expect(open).toHaveLength(1)
     expect(open[0].text()).toContain('First')
-    expect(open[0].attributes('aria-current')).toBe('true')
+    expect(open[0].find('.board-card__open').attributes('aria-current')).toBe(
+      'true',
+    )
   })
 
   it('marks nothing when the details panel is closed', async () => {
     const view = await render()
-    expect(view.findAll('.space__card--open')).toHaveLength(0)
-    expect(view.find('.space__card').attributes('aria-current')).toBeUndefined()
+    expect(view.findAll('.board-card--open')).toHaveLength(0)
+    expect(
+      view.find('.board-card__open').attributes('aria-current'),
+    ).toBeUndefined()
   })
 
   // Four dropdowns competing for a toolbar row is what this replaces, so the
@@ -419,11 +421,11 @@ describe('SpaceView card hierarchy', () => {
   it('says how much of a card is done when it has parts', async () => {
     const view = await withHierarchy()
     const card = view
-      .findAll('.space__card')
+      .findAll('.board-card')
       .find((c) => c.text().includes('First'))!
     expect(card.text()).toContain('1/3')
     const chip = card
-      .findAll('.space__card-chip')
+      .findAll('.board-card__count')
       .find((c) => c.attributes('aria-label')?.includes('parts done'))
     expect(chip?.attributes('aria-label')).toBe('1 of 3 parts done')
   })
@@ -431,10 +433,10 @@ describe('SpaceView card hierarchy', () => {
   it('names what a card is part of', async () => {
     const view = await withHierarchy()
     const card = view
-      .findAll('.space__card')
+      .findAll('.board-card')
       .find((c) => c.text().includes('Middle'))!
     const chip = card
-      .findAll('.space__card-chip')
+      .findAll('.board-card__chip')
       .find((c) => c.attributes('aria-label')?.startsWith('Part of'))
     expect(chip?.attributes('aria-label')).toBe('Part of SU-1')
     expect(chip?.text()).toContain('SU-1')
@@ -444,11 +446,11 @@ describe('SpaceView card hierarchy', () => {
   it('says nothing on a card that is neither a part nor made of parts', async () => {
     const view = await withHierarchy()
     const card = view
-      .findAll('.space__card')
+      .findAll('.board-card')
       .find((c) => c.text().includes('First'))!
     expect(
       card
-        .findAll('.space__card-chip')
+        .findAll('.board-card__chip')
         .some((c) => c.attributes('aria-label')?.startsWith('Part of')),
     ).toBe(false)
   })

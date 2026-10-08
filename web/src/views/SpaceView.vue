@@ -176,82 +176,15 @@
         </NbButton>
       </template>
       <template #card="{ item }">
-        <button
-          class="space__card"
-          :class="{
-            'space__card--open': inspector.itemKey.value === item.key,
-          }"
-          :data-nb-tour-step="item.id === firstCardId ? 'space-card' : null"
-          type="button"
-          :aria-current="
-            inspector.itemKey.value === item.key ? 'true' : undefined
-          "
-          @click="inspector.open(String(item.key))"
-          @dblclick="openItemModal(String(item.key))"
-          @contextmenu.prevent="openCardMenu($event, String(item.key))"
-        >
-          <span class="space__card-title">
-            <s v-if="item.done">{{ item.title }}</s>
-            <template v-else>{{ item.title }}</template>
-          </span>
-          <span class="space__card-meta">
-            <span class="space__card-key">{{ item.key }}</span>
-            <LabelBadge
-              v-for="label in rowLabels(item as Partial<ISpaceItemRow>)"
-              :id="label.id"
-              :key="label.key"
-              :name="label.name"
-              size="sm"
-              qualify
-            />
-            <NbBadge
-              v-if="item.due && !item.done && Number(item.due) < Date.now()"
-              size="sm"
-              variant="orange"
-              dot
-            >
-              Overdue
-            </NbBadge>
-            <!-- Hierarchy at a glance, and no more than that. A card that is
-                 part of something names what: the key is the only half of the
-                 sentence that is not already on screen. -->
-            <span
-              v-if="item.parent_key"
-              class="space__card-chip"
-              :aria-label="`Part of ${item.parent_key}`"
-            >
-              <NbIcon name="arrow-bend-left-up" /> {{ item.parent_key }}
-            </span>
-            <span
-              v-if="item.parts_total"
-              class="space__card-chip"
-              :aria-label="`${item.parts_done ?? 0} of ${item.parts_total} parts done`"
-            >
-              <NbIcon name="tree-structure" /> {{ item.parts_done ?? 0 }}/{{
-                item.parts_total
-              }}
-            </span>
-            <span
-              v-if="item.chk"
-              class="space__card-chip"
-              :aria-label="`Checklist ${item.chk}`"
-            >
-              <NbIcon name="check-square" /> {{ item.chk }}
-            </span>
-            <span
-              v-if="item.cmts"
-              class="space__card-chip"
-              :aria-label="`${item.cmts} comments`"
-            >
-              <NbIcon name="chat-circle" /> {{ item.cmts }}
-            </span>
-            <ActorAvatar
-              v-for="assignee in (item.assignees as string[]) ?? []"
-              :key="assignee"
-              :handle="assignee"
-            />
-          </span>
-        </button>
+        <BoardCard
+          :row="item as unknown as ISpaceItemRow"
+          :open="inspector.itemKey.value === item.key"
+          :tour-step="item.id === firstCardId ? 'space-card' : null"
+          @open="inspector.open"
+          @expand="openItemModal"
+          @menu="openCardMenu"
+          @edit="openQuickEdit"
+        />
       </template>
     </NbBoard>
 
@@ -284,6 +217,16 @@
         @close="filtersOpen = false"
       />
     </NbMenu>
+
+    <CardQuickEdit
+      :open="quickEdit.open"
+      :field="quickEdit.field"
+      :row="quickEditRow"
+      :space-key="spaceKey ?? ''"
+      :anchor="quickEdit.anchor"
+      @close="quickEdit.open = false"
+      @saved="loadItems"
+    />
 
     <NbMenu
       ref="cardMenu"
@@ -343,7 +286,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onScopeDispose, ref, watch } from 'vue'
+import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   useConfirm,
@@ -358,11 +301,11 @@ import type { ISpaceItemRow } from '@/types/api'
 import { humanise, useLoadState } from '@/lib/state'
 import { useViewCommands } from '@/lib/commands'
 import { labelText, labelsById, rowLabels } from '@/lib/labels'
-import LabelBadge from '@/components/LabelBadge.vue'
+import BoardCard, { type TCardField } from '@/components/BoardCard.vue'
+import CardQuickEdit from '@/components/CardQuickEdit.vue'
 import { roleColor } from '@/lib/colors'
 import { useInspector, useUiState, useWorkspace } from '@/stores/workspace'
 import type { NbMenu } from '@nubisco/ui'
-import ActorAvatar from '@/components/ActorAvatar.vue'
 import ActorChip from '@/components/ActorChip.vue'
 import NewItemModal from '@/components/NewItemModal.vue'
 import CalendarView from '@/components/views/CalendarView.vue'
@@ -439,6 +382,26 @@ const menuItem = computed(() => {
     atBottom: column[column.length - 1]?.key === row.key,
   }
 })
+
+/* An empty slot on a card, opened in place. One menu for the board,
+ * pointed at whichever slot was clicked. */
+const quickEdit = reactive<{
+  open: boolean
+  field: TCardField | null
+  key: string
+  anchor: HTMLElement | null
+}>({ open: false, field: null, key: '', anchor: null })
+const quickEditRow = computed(
+  () => items.value.find((i) => i.key === quickEdit.key) ?? null,
+)
+
+function openQuickEdit(
+  field: TCardField,
+  key: string,
+  anchor: HTMLElement,
+): void {
+  Object.assign(quickEdit, { open: true, field, key, anchor })
+}
 
 function openCardMenu(event: MouseEvent, key: string): void {
   menuKey.value = key
@@ -727,6 +690,9 @@ async function loadItems(): Promise<void> {
   const params: Record<string, string> = {
     state: stateFilter.value,
     limit: '200',
+    // What a card shows beyond the row: summary, size, blockers,
+    // attachments and goals. The other views ignore what they do not draw.
+    detail: 'board',
   }
   if (labelFilter.value.length > 0) params.label = labelFilter.value.join(',')
   if (assigneeFilter.value.length > 0)
@@ -753,6 +719,12 @@ watch(textFilter, () => {
 
 onScopeDispose(
   ws.onLive((event) => {
+    // A goal renamed, checked in on or archived changes the goal pill on
+    // every card that serves it.
+    if (event.entity === 'goal') {
+      void loadItems()
+      return
+    }
     if (event.entity !== 'item') return
     // Someone else's change always needs a reload. Our own usually does not,
     // because the space already shows it: a drag applies the move locally,
@@ -777,6 +749,13 @@ onScopeDispose(
       'item.goal_unlinked',
       'item.parented',
       'item.detached',
+      // Not membership, but what a card face shows and a reload is the only
+      // way the board learns it.
+      'item.sized',
+      'item.blocked',
+      'item.unblocked',
+      'attachment.added',
+      'attachment.removed',
     ])
     if (event.actor_kind !== 'human' || changesMembership.has(event.verb))
       void loadItems()
@@ -970,80 +949,6 @@ async function onNest(event: IBoardNestEvent): Promise<void> {
     max-block-size: calc(100dvh - var(--space-chrome, 13rem));
     overflow: auto;
     overscroll-behavior: contain;
-  }
-
-  &__card {
-    background: none;
-    border: 0;
-    padding: 0;
-    text-align: start;
-    display: grid;
-    gap: var(--nb-spacing-4);
-    cursor: pointer;
-    width: 100%;
-    color: inherit;
-    font: inherit;
-    /* A grid item's default min-width is auto, so it refuses to shrink below
-       its content and a long title pushes the card wider than its column
-       instead of wrapping inside it. */
-    min-inline-size: 0;
-
-    &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring);
-      outline-offset: 2px;
-    }
-  }
-
-  /* Which card the details panel is showing. Without it the panel could be
-     describing any of them, and "close" had nothing visible to undo. An
-     inline-start bar rather than a background tint: cards already carry
-     label colour, and a second tint underneath muddied it. */
-  &__card--open {
-    position: relative;
-
-    &::before {
-      content: '';
-      position: absolute;
-      inset-block: 0;
-      inset-inline-start: calc(var(--nb-spacing-8) * -1);
-      inline-size: 2px;
-      border-radius: 1px;
-      background: var(--nb-c-primary);
-    }
-  }
-
-  /* Cards are a dense list. At 16px they matched the inspector's title, which
-   * flattened the hierarchy between "the space" and "the card you opened". */
-  &__card-title {
-    font-size: var(--nb-type-body-md-size);
-
-    font-weight: var(--nb-type-label-lg-weight);
-    /* Wraps to as many lines as it needs. A card is as wide as its column,
-       never wider, so the column is what decides the width and the title
-       follows it. `anywhere` because an unbroken token (a URL, a long key)
-       has no space to break at and would otherwise still push the card out. */
-    min-inline-size: 0;
-    overflow-wrap: anywhere;
-  }
-
-  &__card-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--nb-spacing-4);
-    font-size: var(--nb-type-label-sm-size);
-    color: var(--nb-c-text-muted);
-  }
-
-  &__card-key {
-    font-family: var(--nb-font-family-mono);
-    color: var(--nb-c-text-subtle);
-  }
-
-  &__card-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--nb-spacing-2);
   }
 }
 </style>

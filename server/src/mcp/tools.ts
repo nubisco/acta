@@ -78,7 +78,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'space_get',
     description:
-      'Items of one space, compact rows by default (key, title, list, labels, assignees, comment count, checklist progress, rev, updated). Filter by list, label, assignee, goal (number: the cards serving it, its sub-goals and parts included), state (open|done|archived|all), free text, or updated_since for delta reads. detail=full adds descriptions. Never read a whole space to change one item; use item_write directly.',
+      'Items of one space, compact rows by default (key, title, list, labels, assignees, comment count, checklist progress, rev, updated). Filter by list, label, assignee, goal (number: the cards serving it, its sub-goals and parts included), state (open|done|archived|all), free text, or updated_since for delta reads. detail=board adds what a board card shows (summary: the first line of the description, size, blocked_by: open blockers, atts, goals: the goals each card serves, inherited through parents); detail=full adds that and whole descriptions. Never read a whole space to change one item; use item_write directly.',
     schema: zSpaceGet,
     handler: (ctx, args) => spaceGet(ctx, args as z.infer<typeof zSpaceGet>),
   },

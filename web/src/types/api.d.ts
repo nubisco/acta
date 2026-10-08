@@ -109,6 +109,18 @@ export interface ISpaceItemRow {
    *  Absent rather than zero, so a card with no parts carries nothing. */
   parts_total?: number
   parts_done?: number
+  /*
+   * The rest come only with detail=board (or full): what a board card shows
+   * beyond the row itself.
+   */
+  /** The first line of the description, as plain text. */
+  summary?: string
+  size?: number
+  /** Blockers still open. A finished blocker no longer counts. */
+  blocked_by?: string[]
+  atts?: number
+  /** The goals it serves, its own first, then any inherited from a parent. */
+  goals?: { number: number; key: string; title: string; status: string }[]
 }
 
 export interface IDependencyRef {

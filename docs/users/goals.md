@@ -40,7 +40,9 @@ view.
 ## Which cards count
 
 A card can serve several goals. Link it from the goal's page (search any
-space) or from the card's own **Goals** section.
+space), from the card's own **Goals** section, or from "No goal" on the card
+on its board. On a board every card shows the goal it serves, inherited ones
+included, with a dot for how that goal stands.
 
 - **Linking a card counts its parts.** Everything that is
   [part of](/users/working#parts-of-a-card) a linked card counts too, at any

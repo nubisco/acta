@@ -20,7 +20,13 @@ import {
   commentDeletePolicy,
 } from './comments'
 import { anchorTextFromMarkdown, sectionMap } from '@nubisco/acta-shared'
-import { GOAL_ITEMS_SQL, goalByRef, goalCatalogue, goalsForItem } from './goals'
+import {
+  GOAL_ITEMS_SQL,
+  goalByRef,
+  goalCatalogue,
+  goalKey,
+  goalsForItem,
+} from './goals'
 
 type TSpaceGet = z.infer<typeof zSpaceGet>
 type TItemGet = z.infer<typeof zItemGet>
@@ -254,6 +260,8 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
       parent_key: string | null
       parts_total: number
       parts_done: number
+      atts: number
+      blocked_by: string | null
     }
   >(
     `SELECT i.*, l.name AS list_name,
@@ -269,7 +277,12 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
             (SELECT GROUP_CONCAT(a.handle) FROM item_assignee ia JOIN actor a ON a.id = ia.actor_id WHERE ia.item_id = i.id) AS assignees,
             (SELECT COUNT(*) FROM comment c WHERE c.item_id = i.id) AS cmts,
             (SELECT COUNT(*) FROM checklist_item ci JOIN checklist ch ON ch.id = ci.checklist_id WHERE ch.item_id = i.id AND ci.done = 1) AS chk_done,
-            (SELECT COUNT(*) FROM checklist_item ci JOIN checklist ch ON ch.id = ci.checklist_id WHERE ch.item_id = i.id) AS chk_total
+            (SELECT COUNT(*) FROM checklist_item ci JOIN checklist ch ON ch.id = ci.checklist_id WHERE ch.item_id = i.id) AS chk_total,
+            (SELECT COUNT(*) FROM attachment at WHERE at.owner_kind = 'item' AND at.owner_id = i.id) AS atts,
+            -- Only blockers still in the way: a finished or archived blocker
+            -- no longer holds anything up.
+            (SELECT GROUP_CONCAT(b.key) FROM item_dependency d JOIN item b ON b.id = d.blocker_id
+              WHERE d.blocked_id = i.id AND b.completed = 0 AND b.archived = 0) AS blocked_by
        FROM item i JOIN list l ON l.id = i.list_id
       WHERE ${where.join(' AND ')}
       ORDER BY i.key LIMIT ?`,
@@ -277,6 +290,10 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
   )
 
   const page = rows.slice(0, params.limit)
+  // A board card shows more than a row does. Compact stays compact, because
+  // agents read spaces through it and pay for every field.
+  const card = params.detail !== 'compact'
+  const goals = card ? await goalsBySpaceItem(ctx, space.id) : new Map()
   const items = page.map((r) => ({
     key: r.key,
     title: r.title,
@@ -304,6 +321,15 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
     updated: r.updated_at,
     pos: r.pos,
     description: params.detail === 'full' ? r.description : undefined,
+    ...(card
+      ? {
+          summary: descriptionSummary(r.description) || undefined,
+          size: r.size ?? undefined,
+          blocked_by: r.blocked_by ? r.blocked_by.split(',') : undefined,
+          atts: r.atts || undefined,
+          goals: goals.get(r.id),
+        }
+      : {}),
   }))
 
   return {
@@ -311,6 +337,88 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
     items,
     cursor: rows.length > params.limit ? page[page.length - 1].key : undefined,
   }
+}
+
+/**
+ * The first line of a description that says something, as plain text, for
+ * the one line a board card has room for. Headings, list bullets, quotes,
+ * emphasis and link targets are markup, not words, so they go.
+ */
+export function descriptionSummary(
+  markdown: string | null | undefined,
+): string {
+  let fenced = false
+  for (const raw of (markdown ?? '').split('\n')) {
+    const trimmed = raw.trim()
+    // Code says nothing a person can read at a glance, so a fence and all
+    // it holds are skipped, as are horizontal rules and table rows.
+    if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
+      fenced = !fenced
+      continue
+    }
+    if (fenced || /^(?:[-*_]\s*){3,}$/.test(trimmed) || trimmed.startsWith('|'))
+      continue
+    const line = trimmed
+      .replace(/^(?:#{1,6}\s+|>\s*|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)/, '')
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(
+        /\[\[(?:[a-z]+:)?([^\]|]+)(?:\|([^\]]+))?\]\]/g,
+        (_m, ref, alias) => alias ?? ref,
+      )
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/(\*\*|__|~~)(.+?)\1/g, '$2')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/(^|[\s(])[*_](\S(?:.*?\S)?)[*_](?=[\s).,;:!?]|$)/g, '$1$2')
+      .trim()
+    if (!line) continue
+    return line.length > 160 ? `${line.slice(0, 159)}…` : line
+  }
+  return ''
+}
+
+/**
+ * The goals every card of a space serves, linked to it or to anything it is
+ * part of, nearest first. One query for the whole space: asking per card
+ * would be a query per card, and a list of ids would run into D1's limit on
+ * bound parameters.
+ */
+async function goalsBySpaceItem(ctx: ICtx, spaceId: string) {
+  const rows = await ctx.db.query<{
+    item_id: string
+    number: number
+    title: string
+    status: string
+  }>(
+    `WITH RECURSIVE up(start, id, depth) AS (
+       SELECT i.id, i.id, 0 FROM item i WHERE i.space_id = ?
+       UNION
+       SELECT up.start, i.parent_id, up.depth + 1 FROM item i JOIN up ON i.id = up.id
+        WHERE i.parent_id IS NOT NULL AND up.depth < 64
+     )
+     SELECT up.start AS item_id, g.number, g.title, g.status
+       FROM up
+       JOIN goal_item gi ON gi.item_id = up.id
+       JOIN goal g ON g.id = gi.goal_id
+      WHERE g.archived = 0
+      ORDER BY up.start, up.depth, g.number`,
+    [spaceId],
+  )
+  const out = new Map<
+    string,
+    { number: number; key: string; title: string; status: string }[]
+  >()
+  for (const r of rows) {
+    const list = out.get(r.item_id) ?? []
+    if (list.some((g) => g.number === r.number)) continue
+    list.push({
+      number: r.number,
+      key: goalKey(r.number),
+      title: r.title,
+      status: r.status,
+    })
+    out.set(r.item_id, list)
+  }
+  return out
 }
 
 // --------------------------------------------------------------------------
