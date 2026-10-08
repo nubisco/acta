@@ -434,3 +434,55 @@ describe('what an instance is configured to send as', () => {
     expect(channels.map((c) => c.id)).toEqual(['email'])
   })
 })
+
+/**
+ * Reported by Ivan as NU-134 (now LA-361): the reminder's button read "Open
+ * Nubisco" and opened the wrong page, and the card keys in it were not links.
+ * Production ran with no ACTA_BASE_URL, and the cron sweep has no request to
+ * take an address from, so the button became the relative link "/nubisco",
+ * which a mail client resolves against its own domain.
+ */
+describe('the reminder email itself', () => {
+  it('names the product on its button and links the workspace absolutely', async () => {
+    await noise(1)
+    const { sent, channel } = captureEmail()
+    await reminderSweep(db, {
+      channels: [channel],
+      baseUrl: 'https://acta.nubisco.io/',
+      nowMs: Date.now() + HOUR,
+    })
+    const { html, text } = sent[0]
+    expect(html).toContain('Open Acta')
+    expect(html).not.toContain('Open Nubisco')
+    expect(html).toContain('href="https://acta.nubisco.io/nubisco"')
+    expect(text).toContain('Open Acta: https://acta.nubisco.io/nubisco')
+  })
+
+  it('makes every card key in a line a link to that card', async () => {
+    await noise(1)
+    const { sent, channel } = captureEmail()
+    await reminderSweep(db, {
+      channels: [channel],
+      baseUrl: 'https://acta.nubisco.io',
+      nowMs: Date.now() + HOUR,
+    })
+    expect(sent[0].html).toContain(
+      '<a href="https://acta.nubisco.io/nubisco/s/ST?item=ST-1"',
+    )
+    expect(sent[0].html).toMatch(/>ST-1<\/a>/)
+  })
+
+  it('never sends a relative link when the instance has no address', async () => {
+    await noise(1)
+    const { sent, channel } = captureEmail()
+    await reminderSweep(db, {
+      channels: [channel],
+      nowMs: Date.now() + HOUR,
+    })
+    // No button and no links rather than links into the reader's mail
+    // client. The words are all still there.
+    expect(sent[0].html).not.toMatch(/href="\//)
+    expect(sent[0].html).not.toContain('Open Acta')
+    expect(sent[0].text).toContain('ST-1')
+  })
+})

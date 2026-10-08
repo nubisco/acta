@@ -38,6 +38,12 @@ ACTA_SSO_LABEL = "Nubisco Platform"
 # corporate contact form sends as it. The product name in front of it is what
 # tells a recipient which app is writing, so each product sets its own.
 ACTA_EMAIL_FROM = "Acta <notifications@nubisco.io>"
+# Where this instance lives, for every link that leaves it: the reminder
+# emails' button and card links, and anything else built without a request
+# to take an origin from. The cron sweep has no request at all, so without
+# this the reminders went out with the button pointing at the relative path
+# "/nubisco" and no card links (LA-361, reported by Ivan).
+ACTA_BASE_URL = "https://acta.nubisco.io"
 # No ACTA_ADMIN_* here: identity comes from platform.nubisco.io via SSO, and
 # the first person to sign in to a fresh workspace is made its admin. These
 # remain supported, and are still required, for an instance running on email

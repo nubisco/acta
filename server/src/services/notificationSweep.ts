@@ -343,19 +343,28 @@ export function emailChannel(send: TEmailSender): INotificationChannel {
     id: 'email',
     async reach(to, notes) {
       if (!to.email) return false
-      const base = to.baseUrl.replace(/\/$/, '')
+      const root = workspaceRoot(to.baseUrl, to.workspaceSlug)
       const message = digestEmail(
         {
           name: to.name,
           workspace: to.workspace,
-          baseUrl: to.workspaceSlug ? `${base}/${to.workspaceSlug}` : base,
+          appUrl: root,
           total: notes.length,
+          refs: {
+            item: (key) =>
+              root
+                ? `${root}/s/${encodeURIComponent(key.split('-')[0])}?item=${encodeURIComponent(key)}`
+                : null,
+            goal: (number) => (root ? `${root}/goals/${number}` : null),
+          },
         },
         collapse(
           notes.map((n) => ({
             summary: n.actor_name ? `${n.actor_name} ${n.summary}` : n.summary,
             reason: reasonWords(n),
-            url: linkFor(base, to.workspaceSlug, n),
+            url: linkFor(to.baseUrl, to.workspaceSlug, n),
+            goals:
+              n.verb.startsWith('goal.') || n.verb.startsWith('item.goal_'),
           })),
         ).slice(0, DIGEST_LINES),
       )
@@ -383,15 +392,10 @@ export function emailChannel(send: TEmailSender): INotificationChannel {
  * all six says nothing the first one did not, and it buries the other card
  * underneath them.
  */
-function collapse(
-  lines: Array<{ summary: string; reason: string; url: string | null }>,
-): Array<{ summary: string; reason: string; url: string | null }> {
-  const out: Array<{
-    summary: string
-    reason: string
-    url: string | null
-    count: number
-  }> = []
+function collapse<T extends { summary: string; reason: string }>(
+  lines: T[],
+): T[] {
+  const out: Array<T & { count: number }> = []
   for (const line of lines) {
     const seen = out.find(
       (o) => o.summary === line.summary && o.reason === line.reason,
@@ -399,11 +403,29 @@ function collapse(
     if (seen) seen.count += 1
     else out.push({ ...line, count: 1 })
   }
-  return out.map((o) => ({
-    summary: o.count > 1 ? `${o.summary} (${o.count} times)` : o.summary,
-    reason: o.reason,
-    url: o.url,
+  // Every other field rides through untouched, so what a line links to
+  // survives being folded.
+  return out.map(({ count, ...line }) => ({
+    ...(line as unknown as T),
+    summary: count > 1 ? `${line.summary} (${count} times)` : line.summary,
   }))
+}
+
+/**
+ * The workspace's absolute address, or null.
+ *
+ * Absolute or nothing. Production ran for weeks with no base address, and
+ * the button went out as the relative link "/nubisco", which every mail
+ * client resolved against its own domain. A link that lands on the reader's
+ * webmail is worse than no link.
+ */
+function workspaceRoot(
+  base: string,
+  workspaceSlug: string | null,
+): string | null {
+  const trimmed = base.trim().replace(/\/+$/, '')
+  if (!/^https?:\/\/[^/]/i.test(trimmed) || !workspaceSlug) return null
+  return `${trimmed}/${encodeURIComponent(workspaceSlug)}`
 }
 
 function linkFor(
@@ -411,8 +433,8 @@ function linkFor(
   workspaceSlug: string | null,
   note: IPendingNote,
 ): string | null {
-  if (!base || !workspaceSlug) return null
-  const root = `${base}/${encodeURIComponent(workspaceSlug)}`
+  const root = workspaceRoot(base, workspaceSlug)
+  if (!root) return null
   if (note.item_key) {
     const spaceKey = note.item_key.split('-')[0]
     return `${root}/s/${encodeURIComponent(spaceKey)}?item=${encodeURIComponent(note.item_key)}`

@@ -119,9 +119,14 @@ state.
 | `ACTA_RESEND_API_KEY` | _unset_ | [Resend](https://resend.com) API key. Unset means no email is ever sent.                                                                                                                                                                                              |
 | `ACTA_EMAIL_FROM`     | _unset_ | The From address, for example `Acta <notifications@example.com>`. Required alongside the key, and there is no default: a sender baked into an open-source product is the wrong one on every instance of it that is not ours. Must be verified in your Resend account. |
 
-`ACTA_BASE_URL` matters here too: without it the digest has no links in it,
-because a link that lands somewhere other than the thing being described is
-worse than no link.
+`ACTA_BASE_URL` matters here too, and on Cloudflare it is effectively
+required: the reminders are sent by a cron trigger, which has no request to
+learn the instance's address from. With it, the digest's **Open Acta** button
+opens the workspace and every card key in it links to that card. Without it
+the digest has no button and no links, because a relative link resolves
+against the reader's mail client, and a link that lands somewhere other than
+the thing being described is worse than no link. It must be absolute
+(`https://acta.example.com`); anything else is treated as unset.
 
 On Cloudflare Workers the key is a secret, not a var:
 
