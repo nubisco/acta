@@ -314,6 +314,7 @@ import TableView from '@/components/views/TableView.vue'
 import TimelineView from '@/components/views/TimelineView.vue'
 import SequenceView from '@/components/views/SequenceView.vue'
 import SpaceFilterPanel from '@/components/SpaceFilterPanel.vue'
+import { recallBoardFilters, rememberBoardFilters } from '@/lib/boardFilters'
 
 const props = defineProps<{ spaceKey?: string }>()
 
@@ -360,6 +361,42 @@ const goalFilter = computed<number | null>({
     void router.replace({ query })
   },
 })
+
+/**
+ * Each board comes back with the filters it was left with (see
+ * lib/boardFilters.ts). Synchronous, so the restored filters are in place
+ * before the first load for the board rather than after it.
+ */
+let filtersFor: string | null = null
+watch(
+  () => props.spaceKey,
+  (space) => {
+    if (!space) return
+    const recalled = recallBoardFilters(space)
+    filtersFor = space
+    labelFilter.value = recalled.labels
+    assigneeFilter.value = recalled.assignees
+    stateFilter.value = recalled.state
+    textFilter.value = recalled.text
+    // The URL wins: a link to a goal's cards on this board means that goal.
+    if (route.query.goal === undefined && recalled.goal !== null)
+      goalFilter.value = recalled.goal
+  },
+  { immediate: true, flush: 'sync' },
+)
+watch(
+  [labelFilter, assigneeFilter, stateFilter, textFilter, goalFilter],
+  () => {
+    if (!filtersFor || filtersFor !== props.spaceKey) return
+    rememberBoardFilters(filtersFor, {
+      labels: labelFilter.value,
+      assignees: assigneeFilter.value,
+      state: stateFilter.value,
+      text: textFilter.value,
+      goal: goalFilter.value,
+    })
+  },
+)
 
 /* The new-item modal, and which list it creates into: a column footer names
  * its own column, the topbar button leaves it to the modal's backlog default. */
@@ -722,9 +759,18 @@ async function revealPending(): Promise<void> {
   const key = ui.revealCard.value?.key ?? revealOnLoad
   if (!key) return
   if (!items.value.some((row) => row.key === key)) {
-    // Its own space, and still not here: filtered out or archived. Dropped,
-    // or it would fire on some later load the reader did not ask about.
+    // Its own space, and still not here: filtered out or archived.
     if (key.split('-')[0] === spaceKey.value) {
+      // Asked for from a card's "Show on board", and hidden by this board's
+      // filters: the person asked to see this card, so the filters give way
+      // and the reload that follows points at it (Jose, 2026-10-08).
+      if (ui.revealCard.value?.key === key && filtersActive.value) {
+        clearFilters()
+        toast.info(`Filters cleared to show ${key}.`)
+        return
+      }
+      // Otherwise dropped, or it would fire on some later load the reader
+      // did not ask about.
       ui.revealCard.value = null
       revealOnLoad = null
     }

@@ -11,7 +11,11 @@ import { afterEach, describe, expect, it } from 'bun:test'
 import type { Hono } from 'hono'
 import { createApp } from '../src/app'
 import { createToken } from '../src/core/auth'
-import type { ILiveTransport } from '../src/core/live'
+import {
+  LIVE_MAX_AGE_MS,
+  LIVE_REAUTH_CODE,
+  type ILiveTransport,
+} from '../src/core/live'
 import { openDb, type BunSqliteDriver } from '../src/db'
 import { bunLive, bunWebsocket } from '../src/live-bun'
 import { LiveHub } from '../src/live-hub'
@@ -87,6 +91,26 @@ describe('the socket on Bun', () => {
     ws.close()
   })
 
+  it('refuses a socket opened from another site', async () => {
+    const app = await boot(bunLive)
+    server = Bun.serve({ port: 0, fetch: app.fetch, websocket: bunWebsocket })
+    // Another nubisco.io app would carry the Lax session cookie here.
+    const res = await fetch(
+      `http://localhost:${server.port}/api/v1/events/socket`,
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
+          origin: 'https://evil.nubisco.io',
+          upgrade: 'websocket',
+          connection: 'Upgrade',
+          'sec-websocket-version': '13',
+          'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==',
+        },
+      },
+    )
+    expect(res.status).toBe(403)
+  })
+
   it('refuses somebody who is not signed in', async () => {
     const app = await boot(bunLive)
     const res = await app.request('/api/v1/events/socket', {
@@ -134,16 +158,20 @@ describe('the hub', () => {
     ) {}
   }
 
-  function hub() {
-    const sockets = [{ got: [] as string[] }, { got: [] as string[] }].map(
-      (s) => ({
-        ...s,
+  function hub(openedAt: number[] = [Date.now(), Date.now()]) {
+    const sockets = openedAt.map((at) => {
+      const s = { got: [] as string[], closed: null as number | null }
+      return Object.assign(s, {
         send(m: string) {
           s.got.push(m)
         },
-        close() {},
-      }),
-    )
+        close(code?: number) {
+          s.closed = code ?? 1000
+        },
+        serializeAttachment() {},
+        deserializeAttachment: () => ({ openedAt: at }),
+      })
+    })
     let auto: unknown = null
     const state = {
       acceptWebSocket() {},
@@ -160,6 +188,19 @@ describe('the hub', () => {
     )
     expect(res.status).toBe(204)
     expect(sockets.map((s) => s.got)).toEqual([['{}'], ['{}']])
+  })
+
+  it('makes a socket sign in again once it is half an hour old', async () => {
+    const { hub: h, sockets } = hub([
+      Date.now() - LIVE_MAX_AGE_MS - 1,
+      Date.now(),
+    ])
+    await h.fetch(
+      new Request('https://live.hub/publish', { method: 'POST', body: '{}' }),
+    )
+    expect(sockets[0].got).toEqual([])
+    expect(sockets[0].closed).toBe(LIVE_REAUTH_CODE)
+    expect(sockets[1].got).toEqual(['{}'])
   })
 
   it('answers pings without waking, and wants an upgrade to connect', async () => {

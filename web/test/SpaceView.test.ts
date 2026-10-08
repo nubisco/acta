@@ -10,7 +10,16 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import type { VueWrapper } from '@vue/test-utils'
 import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent, ref } from 'vue'
+import {
+  NO_FILTERS,
+  forgetBoardFilters,
+  recallBoardFilters,
+  rememberBoardFilters,
+} from '@/lib/boardFilters'
 
+const reveal = vi.hoisted(() => ({
+  value: null as { key: string; at: number } | null,
+}))
 const itemWrite = vi.fn(async () => ({ results: [{ op_id: 'x', ok: true }] }))
 const spaceGet = vi.fn()
 
@@ -98,7 +107,7 @@ vi.mock('@/stores/workspace', () => ({
   }),
   useUiState: () => ({
     newSpaceOpen: { value: false },
-    revealCard: { value: null },
+    revealCard: reveal,
   }),
   useInspector: () => inspectorMock,
 }))
@@ -168,6 +177,8 @@ async function openMenu(
 
 describe('SpaceView card menu', () => {
   beforeEach(() => {
+    forgetBoardFilters()
+    reveal.value = null
     itemWrite.mockClear()
     spaceGet.mockClear()
     inspectorMock.itemKey.value = null
@@ -516,5 +527,103 @@ describe('SpaceView nesting', () => {
       (call) => (call as unknown as [{ op: string }[]])[0],
     )
     expect(ops.map((o) => o.op)).not.toContain('move')
+  })
+})
+
+describe('a board keeps its filters', () => {
+  beforeEach(() => {
+    forgetBoardFilters()
+    reveal.value = null
+    spaceGet.mockReset()
+  })
+
+  /** What the server sends for a request: SU-2 only passes with no label. */
+  function serve() {
+    spaceGet.mockImplementation(
+      async (_space: string, params: Record<string, string>) => ({
+        items: params.label ? items.slice(0, 1) : items.slice(0, 2),
+      }),
+    )
+  }
+
+  const lastParams = () =>
+    (
+      spaceGet.mock.calls.at(-1) as unknown as [string, Record<string, string>]
+    )[1]
+
+  it('comes back with the filters it was left with', async () => {
+    serve()
+    rememberBoardFilters('SU', {
+      ...NO_FILTERS,
+      labels: ['lbl_urgent'],
+      assignees: ['jose'],
+    })
+    const view = mount(SpaceView, {
+      props: { spaceKey: 'SU' },
+      global: { stubs: { teleport: true } },
+    })
+    await flushPromises()
+    // The very first load already asks for them: no unfiltered flash.
+    expect(spaceGet).toHaveBeenCalledTimes(1)
+    expect(lastParams().label).toBe('lbl_urgent')
+    expect(lastParams().assignee).toBe('jose')
+    expect(filtersButton(view).text()).toContain('2')
+    view.unmount()
+  })
+
+  it('remembers a filter as it is set, and never lends it to another board', async () => {
+    serve()
+    const view = mount(SpaceView, {
+      props: { spaceKey: 'SU' },
+      global: { stubs: { teleport: true } },
+    })
+    await flushPromises()
+    await filtersButton(view).trigger('click')
+    await flushPromises()
+    await view.findAll('.filters__pill')[0].trigger('click')
+    await flushPromises()
+    expect(recallBoardFilters('SU').labels).toEqual(['lbl_urgent'])
+
+    await view.setProps({ spaceKey: 'OPS' })
+    await flushPromises()
+    expect(lastParams().label).toBeUndefined()
+
+    await view.setProps({ spaceKey: 'SU' })
+    await flushPromises()
+    expect(lastParams().label).toBe('lbl_urgent')
+    view.unmount()
+  })
+
+  it('drops them when "Show on board" asks for a card they hide', async () => {
+    serve()
+    rememberBoardFilters('SU', { ...NO_FILTERS, labels: ['lbl_urgent'] })
+    reveal.value = { key: 'SU-2', at: 1 }
+    const view = mount(SpaceView, {
+      props: { spaceKey: 'SU' },
+      global: { stubs: { teleport: true } },
+    })
+    await flushPromises()
+
+    expect(lastParams().label).toBeUndefined()
+    expect(recallBoardFilters('SU').labels).toEqual([])
+    expect(
+      view.findAll('.board-card').some((c) => c.text().includes('Middle')),
+    ).toBe(true)
+    expect(reveal.value).toBeNull()
+    view.unmount()
+  })
+
+  it('keeps them when the card asked for is already showing', async () => {
+    serve()
+    rememberBoardFilters('SU', { ...NO_FILTERS, labels: ['lbl_urgent'] })
+    reveal.value = { key: 'SU-1', at: 1 }
+    const view = mount(SpaceView, {
+      props: { spaceKey: 'SU' },
+      global: { stubs: { teleport: true } },
+    })
+    await flushPromises()
+    expect(lastParams().label).toBe('lbl_urgent')
+    expect(recallBoardFilters('SU').labels).toEqual(['lbl_urgent'])
+    view.unmount()
   })
 })

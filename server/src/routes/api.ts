@@ -17,7 +17,7 @@ import {
 import { ApiError, type ICtx } from '../core/ctx'
 import { createToken } from '../core/auth'
 import { emitEvent, flushPendingEvents, onEvent } from '../core/events'
-import { liveFrame, type ILiveTransport } from '../core/live'
+import { liveFrame, sameOriginSocket, type ILiveTransport } from '../core/live'
 import { spaceWrite } from '../services/spaces'
 import { docWrite } from '../services/docs'
 import {
@@ -796,6 +796,8 @@ export function apiRoutes(
   // a tab still running an older bundle, and for the tests.
   app.get('/events/socket', async (c, next) => {
     if (!options.liveSocket) return c.notFound()
+    if (!sameOriginSocket(c.req.raw))
+      return c.json({ error: 'Cross-origin socket refused' }, 403)
     const res = await options.liveSocket(c, next)
     return res ?? c.notFound()
   })

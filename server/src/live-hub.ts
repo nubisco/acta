@@ -12,12 +12,25 @@
  * forwards /events/socket after the workspace middleware has signed the
  * person in and resolved the workspace they belong to.
  */
-import { LIVE_PING, LIVE_PONG, type ILiveTransport } from './core/live'
+import {
+  LIVE_MAX_AGE_MS,
+  LIVE_PING,
+  LIVE_PONG,
+  LIVE_REAUTH_CODE,
+  type ILiveTransport,
+} from './core/live'
 
 /** The few runtime types used here, so the server needs no Workers typings. */
 interface IHubSocket {
   send(message: string): void
   close(code?: number, reason?: string): void
+  serializeAttachment(value: unknown): void
+  deserializeAttachment(): unknown
+}
+
+/** What a socket carries through hibernation. */
+interface IHubAttachment {
+  openedAt: number
 }
 
 interface IHubState {
@@ -53,9 +66,16 @@ export class LiveHub {
   async fetch(request: Request): Promise<Response> {
     if (request.method === 'POST' && request.url === PUBLISH) {
       const frame = await request.text()
+      const now = Date.now()
       for (const ws of this.state.getWebSockets()) {
         try {
-          ws.send(frame)
+          // Checked here rather than on a timer: an old socket that is sent
+          // nothing has nothing to leak, and this is when the hub is awake.
+          const at = (ws.deserializeAttachment() as IHubAttachment | null)
+            ?.openedAt
+          if (!at || now - at > LIVE_MAX_AGE_MS)
+            ws.close(LIVE_REAUTH_CODE, 'Sign in again')
+          else ws.send(frame)
         } catch {
           // A socket closing as the frame goes out. It is gone either way.
         }
@@ -66,6 +86,9 @@ export class LiveHub {
       return new Response('Expected a WebSocket upgrade', { status: 426 })
     const [client, server] = new WebSocketPair()
     this.state.acceptWebSocket(server)
+    server.serializeAttachment({
+      openedAt: Date.now(),
+    } satisfies IHubAttachment)
     return new Response(null, {
       status: 101,
       webSocket: client,

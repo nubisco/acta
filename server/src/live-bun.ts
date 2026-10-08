@@ -5,7 +5,9 @@
 import { upgradeWebSocket, websocket } from 'hono/bun'
 import { onEvent } from './core/events'
 import {
+  LIVE_MAX_AGE_MS,
   LIVE_PING,
+  LIVE_REAUTH_CODE,
   LIVE_PONG,
   liveFrame,
   type ILiveTransport,
@@ -17,8 +19,15 @@ export const bunLive: ILiveTransport = {
     let off: (() => void) | null = null
     return {
       onOpen(_event, ws) {
+        const openedAt = Date.now()
         off = onEvent((event) => {
-          if (event.workspace_id === workspaceId) ws.send(liveFrame(event))
+          if (event.workspace_id !== workspaceId) return
+          if (Date.now() - openedAt > LIVE_MAX_AGE_MS) {
+            off?.()
+            ws.close(LIVE_REAUTH_CODE, 'Sign in again')
+            return
+          }
+          ws.send(liveFrame(event))
         })
       },
       onMessage(event, ws) {

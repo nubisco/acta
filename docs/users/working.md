@@ -88,7 +88,12 @@ you back to the card you came from.
 
 **Show on its space** (the board icon at the top) takes you to the card's
 space with the card still open, scrolls the board to it and rings it for a
-moment so you can find it.
+moment so you can find it. If that board's filters would hide the card, they
+are cleared first, and a message says so.
+
+Each board remembers its own filters (labels, people, status, goal and the
+search box) while the tab is open. Leave for Home or a goal and come back, and
+the board is filtered the way you left it. Another board never inherits them.
 
 ### Plan
 

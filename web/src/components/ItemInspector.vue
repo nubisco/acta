@@ -20,7 +20,7 @@
     </template>
   </NbEmptyState>
 
-  <div v-else-if="it.item.value" class="nb-inspector">
+  <div v-else-if="it.item.value" class="nb-inspector item-inspector">
     <!-- No panel wrapper. A panel titled "Details" around content that is
          already a titled stack of sections put a frame and a heading around
          the whole card, which is not a section of anything, and the save
@@ -814,6 +814,14 @@ function commitDescription(): void {
    column's edges, so content scrolling under it does not show in a gap at
    either side, and the bottom border only appears once something has
    scrolled beneath it. */
+/* A sticky element pins inside its scroller's padding, so the pattern's
+   padding above it left a strip the content showed through as it scrolled
+   under the header (Jose, 2026-10-08). The scroller loses that padding and
+   the header takes the space back inside its own background. */
+.item-inspector {
+  padding-block-start: 0;
+}
+
 .inspector-top {
   position: sticky;
   inset-block-start: 0;
@@ -822,7 +830,7 @@ function commitDescription(): void {
   gap: var(--nb-spacing-8);
   margin-inline: calc(var(--nb-spacing-12) * -1);
   margin-block-start: calc(var(--nb-spacing-8) * -1);
-  padding: var(--nb-spacing-8) var(--nb-spacing-12) var(--nb-spacing-12);
+  padding: var(--nb-spacing-12) var(--nb-spacing-12) var(--nb-spacing-12);
   background: var(--nb-shell-inspector-bg, var(--nb-c-surface));
   border-block-end: 1px solid var(--nb-c-border);
 }
