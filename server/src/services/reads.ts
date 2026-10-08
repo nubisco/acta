@@ -354,9 +354,18 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
       )
     ).map((r) => r.handle)
 
+    const creator = (
+      await ctx.db.query<{ handle: string }>(
+        'SELECT handle FROM actor WHERE id = ?',
+        [item.created_by],
+      )
+    )[0]
     const out: Record<string, unknown> = {
       key: item.key,
       space: spaceKey,
+      // Who made it, always: "who created this" is the first question a
+      // card's history is asked, and it should not need the whole history.
+      created_by: creator?.handle,
       list: listName,
       title: item.title,
       description: item.description,
@@ -516,19 +525,113 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
       out.attachments = await attachmentsFor(ctx, 'item', item.id)
     }
     if (include.has('activity')) {
-      out.activity = await ctx.db.query<{
-        ts: number
-        verb: string
-        summary: string
-        actor_kind: string
-      }>(
-        "SELECT ts, verb, summary, actor_kind FROM event WHERE entity = 'item' AND entity_id = ? ORDER BY id DESC LIMIT 20",
-        [item.id],
-      )
+      out.activity = await itemHistory(ctx, item.id)
     }
     items.push(out)
   }
   return { items }
+}
+
+/**
+ * Everything that happened to one card, newest first, with who did it.
+ *
+ * The raw event rows name people and labels by internal id, which is no use
+ * to a reader, so they are resolved here: assignee changes to handles, label
+ * changes to names with their group. Every row keeps the server's own
+ * summary, so a verb this function does not know about still reads as a
+ * sentence rather than disappearing.
+ *
+ * Older events recorded less than new ones ("labels changed" with no list of
+ * which), and nothing can recover what they did not write down. Those rows
+ * come back with the summary alone.
+ */
+const HISTORY_LIMIT = 200
+
+async function itemHistory(ctx: ICtx, itemId: string) {
+  const rows = await ctx.db.query<{
+    id: string
+    ts: number
+    verb: string
+    summary: string
+    actor_kind: string
+    payload: string | null
+    handle: string | null
+    caused_by: string | null
+  }>(
+    `SELECT e.id, e.ts, e.verb, e.summary, e.actor_kind, e.payload, e.caused_by,
+            a.handle
+       FROM event e LEFT JOIN actor a ON a.id = e.actor_id
+      WHERE e.entity = 'item' AND e.entity_id = ?
+      ORDER BY e.id DESC LIMIT ?`,
+    [itemId, HISTORY_LIMIT],
+  )
+
+  // One lookup each for every person and label any row mentions, rather
+  // than a query per row.
+  const parsed = rows.map((r) => {
+    try {
+      return r.payload ? (JSON.parse(r.payload) as Record<string, unknown>) : {}
+    } catch {
+      return {}
+    }
+  })
+  const ids = (key: string) =>
+    parsed.flatMap((p) => (Array.isArray(p[key]) ? (p[key] as string[]) : []))
+  // Actor ids on assignee events and label ids on label events, pooled:
+  // the prefixes keep them apart, and each lookup only finds its own kind.
+  const refIds = [...new Set([...ids('added'), ...ids('removed')])]
+  const handles = new Map<string, string>()
+  if (refIds.length > 0) {
+    for (const r of await ctx.db.query<{ id: string; handle: string }>(
+      `SELECT id, handle FROM actor WHERE workspace_id = ? AND id IN (${refIds.map(() => '?').join(',')})`,
+      [ctx.workspaceId, ...refIds],
+    ))
+      handles.set(r.id, r.handle)
+  }
+  const labelNames = new Map<string, string>()
+  if (refIds.length > 0) {
+    for (const r of await ctx.db.query<{
+      id: string
+      name: string
+      group_name: string
+    }>(
+      `SELECT l.id, l.name, g.name AS group_name FROM label l JOIN label_group g ON g.id = l.group_id
+        WHERE l.workspace_id = ? AND l.id IN (${refIds.map(() => '?').join(',')})`,
+      [ctx.workspaceId, ...refIds],
+    ))
+      labelNames.set(r.id, `${r.group_name}/${r.name}`)
+  }
+
+  return rows.map((r, i) => {
+    const p = parsed[i]
+    const people = (key: string) =>
+      Array.isArray(p[key])
+        ? (p[key] as string[]).map((id) => handles.get(id)).filter(Boolean)
+        : undefined
+    const labels = (key: string) =>
+      Array.isArray(p[key])
+        ? (p[key] as string[]).map(
+            (id) => labelNames.get(id) ?? '(deleted label)',
+          )
+        : undefined
+    let changes: Record<string, unknown> | undefined
+    if (r.verb === 'item.assigned' || r.verb === 'item.unassigned')
+      changes = { added: people('added'), removed: people('removed') }
+    else if (r.verb === 'item.labeled')
+      changes = { added: labels('added'), removed: labels('removed') }
+    else if (Object.keys(p).length > 0) changes = p
+    return {
+      id: r.id,
+      ts: r.ts,
+      verb: r.verb,
+      summary: r.summary,
+      by: r.handle ?? undefined,
+      actor_kind: r.actor_kind,
+      // A rule did it, on behalf of whatever event triggered the rule.
+      automated: r.caused_by ? true : undefined,
+      changes,
+    }
+  })
 }
 
 // --------------------------------------------------------------------------

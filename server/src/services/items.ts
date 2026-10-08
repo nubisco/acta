@@ -254,7 +254,7 @@ async function applyItemOp(
         'item',
         id,
         `created ${key}: ${op.title}`,
-        undefined,
+        { list: list.name },
         // Naming somebody in a card's description is a mention, exactly as it
         // is in a comment. This was not passed, so it silently told nobody:
         // the mention rendered as a chip and never reached an inbox.
@@ -277,13 +277,22 @@ async function applyItemOp(
       if (op.description !== undefined)
         await syncLinks(ctx, 'item', item.id, op.description)
       await syncItemFts(ctx, item.id)
+      // What changed, so a card's history can say "renamed it" or "moved the
+      // due date" rather than "updated" four times in a row.
+      const changed: Record<string, unknown> = {}
+      if (op.title !== undefined && op.title !== item.title)
+        changed.title = { from: item.title, to: op.title }
+      if (op.description !== undefined && op.description !== item.description)
+        changed.description = true
+      if (op.due !== undefined && op.due !== item.due)
+        changed.due = { from: item.due, to: op.due }
       await emitEvent(
         ctx,
         'item.updated',
         'item',
         item.id,
         `updated ${item.key}`,
-        undefined,
+        Object.keys(changed).length > 0 ? changed : undefined,
         op.description === undefined
           ? undefined
           : newMentions(item.description, op.description),
@@ -332,6 +341,7 @@ async function applyItemOp(
         {
           list: list.name,
           from_key: item.key !== key ? item.key : undefined,
+          space: spaceId !== item.space_id ? key.split('-')[0] : undefined,
         },
       )
       return { key, rev }
@@ -452,6 +462,14 @@ async function applyItemOp(
     }
     case 'label': {
       const item = await itemByKey(ctx, op.key)
+      const before = new Set(
+        (
+          await ctx.db.query<{ label_id: string }>(
+            'SELECT label_id FROM item_label WHERE item_id = ?',
+            [item.id],
+          )
+        ).map((r) => r.label_id),
+      )
       for (const ref of op.add ?? []) {
         const label = await labelByRef(ctx, ref, item.space_id)
         // A group that names a single answer, "Fixes version" rather than a
@@ -487,12 +505,27 @@ async function applyItemOp(
         )
       }
       const rev = await bumpRev(ctx, item)
+      // The difference, by id, which the history resolves to names with
+      // their groups. Worked out from the rows rather than the request,
+      // because an exclusive group can take a label off that nobody named.
+      const after = new Set(
+        (
+          await ctx.db.query<{ label_id: string }>(
+            'SELECT label_id FROM item_label WHERE item_id = ?',
+            [item.id],
+          )
+        ).map((r) => r.label_id),
+      )
       await emitEvent(
         ctx,
         'item.labeled',
         'item',
         item.id,
         `labels changed on ${item.key}`,
+        {
+          added: [...after].filter((id) => !before.has(id)),
+          removed: [...before].filter((id) => !after.has(id)),
+        },
       )
       return { key: item.key, rev }
     }
@@ -654,7 +687,7 @@ async function applyItemOp(
         'item',
         blocked.id,
         `${blocked.key} now waits on ${blocker.key}`,
-        undefined,
+        { blocker: blocker.key },
         // Whoever is holding the blocker now has work queued behind them,
         // which is not visible from their own card at all. The blocked
         // card's own people are reached by involvement, the way every other
@@ -676,13 +709,17 @@ async function applyItemOp(
         'item',
         blocked.id,
         `${blocked.key} no longer waits on ${blocker.key}`,
-        undefined,
+        { blocker: blocker.key },
         { to: await assigneeHints(ctx, blocker.id) },
       )
       return { key: blocked.key, rev: blocked.rev }
     }
     case 'size': {
       const item = await itemByKey(ctx, op.key)
+      const changedSize = op.size !== item.size
+      const changedMilestone =
+        op.is_milestone !== undefined &&
+        (op.is_milestone ? 1 : 0) !== item.is_milestone
       await ctx.db.run(
         `UPDATE item SET size = ?,
            is_milestone = CASE WHEN ? THEN ? ELSE is_milestone END
@@ -694,6 +731,23 @@ async function applyItemOp(
           item.id,
         ],
       )
+      // It used to leave no trace at all, so a card's estimate changed with
+      // nothing in its history to say who changed it or when. Not a
+      // notification: nobody needs a bell for a re-estimate.
+      if (changedSize || changedMilestone) {
+        await emitEvent(
+          ctx,
+          'item.sized',
+          'item',
+          item.id,
+          `sized ${item.key}`,
+          {
+            size: op.size,
+            from: item.size,
+            is_milestone: changedMilestone ? op.is_milestone : undefined,
+          },
+        )
+      }
       return { key: item.key, rev: item.rev }
     }
     case 'assign': {

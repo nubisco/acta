@@ -175,7 +175,10 @@ export interface IItemDetail {
     in: { src_kind: string; src_id: string }[]
   }
   attachments?: IAttachment[]
-  activity?: { ts: number; verb: string; summary: string; actor_kind: string }[]
+  /** Who made the card. */
+  created_by?: string
+  /** The card's history, newest first, when asked for with `activity`. */
+  activity?: IItemEvent[]
 }
 
 /**
@@ -399,4 +402,20 @@ export interface IGoalDetail extends IGoalRow {
   ancestors: { number: number; key: string; title: string }[]
   items?: IGoalCard[]
   check_ins?: IGoalCheckIn[]
+}
+
+/**
+ * One thing that happened to a card. `changes` is what the event recorded,
+ * with people as handles and labels as `Group/Name`; events written before
+ * the history existed may carry nothing beyond `summary`.
+ */
+export interface IItemEvent {
+  id: string
+  ts: number
+  verb: string
+  summary: string
+  by?: string
+  actor_kind: string
+  automated?: true
+  changes?: Record<string, unknown>
 }

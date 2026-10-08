@@ -86,7 +86,11 @@ export function useItem(itemKey: Ref<string>) {
   async function load(): Promise<void> {
     viewState.value = 'loading'
     try {
-      const { items } = await api.itemGet([itemKey.value])
+      const { items } = await api.itemGet(
+        [itemKey.value],
+        // The defaults plus the history, which the card now shows.
+        ['comments', 'checklists', 'links', 'attachments', 'activity'],
+      )
       const detail = items[0]
       item.value = detail
       draft.title = detail.title

@@ -334,6 +334,18 @@
             @changed="it.load"
           />
         </section>
+
+        <section class="item-modal__section">
+          <h3>History</h3>
+          <ItemHistory
+            :item-key="it.item.value.key"
+            :events="it.item.value.activity ?? []"
+            :created="it.item.value.created"
+            :updated="it.item.value.updated"
+            :created-by="it.item.value.created_by"
+            @open="onOpenRelated"
+          />
+        </section>
       </div>
 
       <!-- The conversation gets the column. It is the part of a card that
@@ -365,6 +377,7 @@ import ActorChip from '@/components/ActorChip.vue'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'
 import ChecklistBody from '@/components/ChecklistBody.vue'
 import CommentThread from '@/components/CommentThread.vue'
+import ItemHistory from '@/components/ItemHistory.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
 import ProvenanceNote from '@/components/ProvenanceNote.vue'

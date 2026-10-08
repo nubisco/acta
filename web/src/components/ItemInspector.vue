@@ -69,6 +69,16 @@
             :aria-label="`Show ${it.item.value.key} on its space`"
             @click="viewOnBoard"
           />
+          <!-- To another space or list. The server always could; nothing
+               here offered it until LA-361 needed an agent to do it. -->
+          <NbButton
+            v-nb-tooltip="{ body: 'Move to another space' }"
+            size="sm"
+            variant="ghost"
+            icon="arrow-square-right"
+            :aria-label="`Move ${it.item.value.key} to another space`"
+            @click="moveOpen = true"
+          />
           <!-- Archive was only ever reachable through the Status select,
                which is why it read as missing. Same set as the space's
                right-click menu, so both surfaces agree. -->
@@ -390,6 +400,22 @@
           />
         </NbAccordionItem>
 
+        <!-- Who made it, and everything since, people drawn as people. -->
+        <NbAccordionItem
+          id="history"
+          title="History"
+          :meta="countLabel(it.item.value.activity)"
+        >
+          <ItemHistory
+            :item-key="it.item.value.key"
+            :events="it.item.value.activity ?? []"
+            :created="it.item.value.created"
+            :updated="it.item.value.updated"
+            :created-by="it.item.value.created_by"
+            @open="(key: string) => inspector.open(key)"
+          />
+        </NbAccordionItem>
+
         <NbAccordionItem
           v-if="it.linkFacts.value.length > 0"
           id="links"
@@ -399,6 +425,14 @@
           <NbDefinitionList :items="it.linkFacts.value" layout="stacked" />
         </NbAccordionItem>
       </NbAccordion>
+      <MoveCardModal
+        :open="moveOpen"
+        :item-key="it.item.value.key"
+        :current-space="it.item.value.space"
+        :current-list="it.item.value.list"
+        @close="moveOpen = false"
+        @moved="onMoved"
+      />
       <!-- Always visible, and last. Burying the conversation behind a
            disclosure is the fault this whole change exists to fix. -->
       <div class="inspector-section">
@@ -427,7 +461,7 @@
 
 <script setup lang="ts">
 import { ref, toRef, watch } from 'vue'
-import { useConfirm } from '@nubisco/ui'
+import { useConfirm, useToast } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
 import { useRouter } from 'vue-router'
 import { useInspector, useUiState } from '@/stores/workspace'
@@ -444,6 +478,8 @@ import { headingName } from '@/lib/labels'
 import DependencyPanel from '@/components/DependencyPanel.vue'
 import PartsPanel from '@/components/PartsPanel.vue'
 import ItemGoalsPanel from '@/components/goals/ItemGoalsPanel.vue'
+import ItemHistory from '@/components/ItemHistory.vue'
+import MoveCardModal from '@/components/MoveCardModal.vue'
 import PartOfChip from '@/components/PartOfChip.vue'
 import type { IPartRef } from '@/types/api'
 
@@ -513,6 +549,26 @@ function viewOnBoard(): void {
   if (space) void router.push(wpath(`/s/${space}`))
 }
 const confirm = useConfirm()
+const toast = useToast()
+
+const moveOpen = ref(false)
+
+/**
+ * A move to another space gives the card a new key. The panel follows it
+ * to the new key, so what is open is the card under its current name, and
+ * the toast says what it is called now.
+ */
+function onMoved(key: string): void {
+  moveOpen.value = false
+  const previous = it.item.value?.key
+  if (key !== previous) {
+    inspector.close()
+    inspector.open(key)
+    toast.success(`${previous} is ${key} now. The old key still works.`)
+  } else {
+    void it.load()
+  }
+}
 
 const newChecklist = ref('')
 
