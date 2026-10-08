@@ -1,3 +1,16 @@
+# [1.36.0](https://github.com/nubisco/acta/compare/v1.35.0...v1.36.0) (2026-10-08)
+
+
+### Bug Fixes
+
+* **notifications:** reminder emails link to Acta and to each card ([8e5ea93](https://github.com/nubisco/acta/commit/8e5ea93c15635638bb922de3ea757489252b3ee0))
+* **shell:** show who is signed in when the sidebar is expanded ([a8a5e1f](https://github.com/nubisco/acta/commit/a8a5e1f8cb0936398cb653aadc79947b3cb3d5f3))
+
+
+### Features
+
+* **items:** a card's own history, and moving it to another space ([8b05099](https://github.com/nubisco/acta/commit/8b050990c202b27965fb6d89e7cc588925ea0b14))
+
 # [1.35.0](https://github.com/nubisco/acta/compare/v1.34.1...v1.35.0) (2026-10-07)
 
 
