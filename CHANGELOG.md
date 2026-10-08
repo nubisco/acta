@@ -1,3 +1,10 @@
+# [1.37.0](https://github.com/nubisco/acta/compare/v1.36.1...v1.37.0) (2026-10-08)
+
+
+### Features
+
+* **board:** every card keeps one shape, shows its goal, and fills its gaps in place ([fdf7e37](https://github.com/nubisco/acta/commit/fdf7e370a2e32e95f25683c4413d69fe4d412fee))
+
 ## [1.36.1](https://github.com/nubisco/acta/compare/v1.36.0...v1.36.1) (2026-10-08)
 
 
