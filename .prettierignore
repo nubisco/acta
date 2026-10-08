@@ -16,3 +16,4 @@ web/test/fixtures/
 # Agent worktrees are full copies of this repository living inside it.
 # Formatting them walks the whole codebase once per worktree.
 .claude/
+.wrangler/

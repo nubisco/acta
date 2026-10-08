@@ -82,6 +82,11 @@ acta.example.com {
 }
 ```
 
+Caddy passes WebSocket upgrades through as it is. Other proxies may need to
+be told to (nginx: `proxy_set_header Upgrade $http_upgrade` and
+`Connection "upgrade"`). Without that Acta still works, falling back to a
+server-sent event stream for live updates.
+
 Set `ACTA_BASE_URL=https://acta.example.com` so links in outbound
 notifications point somewhere that works.
 
@@ -114,6 +119,15 @@ database_id = "..."
 [[r2_buckets]]
 binding = "ATTACHMENTS"
 bucket_name = "acta-attachments"
+
+# Live updates: the Durable Object that holds every tab's socket.
+[[durable_objects.bindings]]
+name = "LIVE"
+class_name = "LiveHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LiveHub"]
 ```
 
 `run_worker_first` and `html_handling = "none"` are both load-bearing: the

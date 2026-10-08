@@ -66,3 +66,14 @@ enabled = true
 # resolve the specifier at all and the deploy fails to build. The stub throws,
 # which is what makes safeFetch fall through to DNS-over-HTTPS there.
 "node:dns/promises" = "./src/core/node-dns-stub.ts"
+
+# Live updates: one Durable Object per workspace holds every open tab's
+# socket, so a write handled by any instance (or the cron) reaches all of
+# them at once. See src/live-hub.ts.
+[[durable_objects.bindings]]
+name = "LIVE"
+class_name = "LiveHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LiveHub"]

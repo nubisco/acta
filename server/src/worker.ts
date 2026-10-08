@@ -10,6 +10,7 @@ import { setDeferrer } from './core/defer'
 import { ssoConfigFromEnv } from './core/sso'
 import { oidcConfigFromEnv } from './core/oidc'
 import { D1Driver, type ID1Database } from './db'
+import { hubLive, type IHubNamespace } from './live-hub'
 import type { IBlobStore } from './services/attachments'
 import {
   channelsFromEnv,
@@ -34,6 +35,8 @@ interface IWorkerEnv {
   DB: ID1Database
   ATTACHMENTS: IR2Bucket
   ASSETS: IAssetsBinding
+  /** The live-updates hub, one per workspace (see live-hub.ts). */
+  LIVE: IHubNamespace
   /** Set by the deploy workflow (--var), reported by /healthz. */
   ACTA_BUILD_SHA?: string
   ACTA_WORKSPACE?: string
@@ -99,6 +102,9 @@ function r2BlobStore(bucket: IR2Bucket): IBlobStore {
   }
 }
 
+/** Durable Object classes have to be exported by the worker's main module. */
+export { LiveHub } from './live-hub'
+
 let appPromise: Promise<Hono<IAppEnv>> | null = null
 /**
  * The migrated driver the app is built on. Held separately so the cron
@@ -142,6 +148,7 @@ function getApp(env: IWorkerEnv, origin: string): Promise<Hono<IAppEnv>> {
         ) ?? undefined,
       otpFallback: env.ACTA_OTP_FALLBACK === 'true',
       platformWebhookSecret: env.PLATFORM_WEBHOOK_SECRET,
+      live: hubLive(env.LIVE),
       bootstrap: {
         workspaceName: env.ACTA_WORKSPACE ?? 'Workspace',
         adminEmail: env.ACTA_ADMIN_EMAIL,

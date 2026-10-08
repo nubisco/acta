@@ -91,17 +91,6 @@ let unsubscribe: (() => void) | null = null
 let connectedSlug: string | null = null
 
 /**
- * How often the inbox is re-read regardless of the stream.
- *
- * The stream is fed in-process, by the same server instance that handled the
- * write. On Workers that is often not the instance holding this tab's
- * stream, and the cron that raises due-date reminders never is, so without
- * this the bell and the desktop notification only caught up on a reload.
- */
-const POLL_MS = 60_000
-let pollTimer: ReturnType<typeof setInterval> | null = null
-
-/**
  * Verbs that might have produced a notification for somebody. A superset of
  * the server's list on purpose: this only decides whether to re-read, and
  * the server decides who is actually told.
@@ -289,8 +278,6 @@ export function useWorkspace() {
     if (unsubscribe && connectedSlug === slug) return
     unsubscribe?.()
     connectedSlug = slug
-    if (!pollTimer)
-      pollTimer = setInterval(() => void loadNotifications(), POLL_MS)
     unsubscribe = subscribeEvents(
       (event) => {
         if (downTimer) {
@@ -319,6 +306,10 @@ export function useWorkspace() {
         }
         if (!down) {
           connectionDown.value = false
+          // Connected, or back after a drop: whatever arrived in between was
+          // never sent to this tab, so read the inbox once rather than wait
+          // for the next event.
+          reloadNotificationsSoon()
           return
         }
         downTimer = setTimeout(() => {
@@ -439,8 +430,6 @@ export function useWorkspace() {
     unsubscribe?.()
     unsubscribe = null
     connectedSlug = null
-    if (pollTimer) clearInterval(pollTimer)
-    pollTimer = null
   }
 
   return {
@@ -549,7 +538,11 @@ export function useDocPreview() {
   }
 }
 
-const DENSE_ROUTES = new Set(['space', 'docs'])
+/**
+ * Routes that open on the icon rail. Goals joined boards and docs (Jose,
+ * 2026-10-08): the goal list and a goal's card table want the width.
+ */
+const DENSE_ROUTES = new Set(['space', 'docs', 'goals', 'goal'])
 
 /**
  * A card to point at once its space is on screen: scrolled to and briefly

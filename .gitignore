@@ -23,3 +23,6 @@ import-report.json
 
 # Agent worktrees: complete copies of this repository, created inside it.
 .claude/worktrees/
+
+# wrangler dev state
+.wrangler/

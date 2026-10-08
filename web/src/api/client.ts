@@ -625,27 +625,103 @@ export function attachmentHref(id: string): string {
   return `${BASE}/attachments/${id}`
 }
 
-// -- SSE --------------------------------------------------------------------
+// -- Live updates -----------------------------------------------------------
 
+/** Keeps the socket open through proxies that cut idle connections. */
+const LIVE_PING_MS = 25_000
+/** The longest wait between reconnect attempts. */
+const LIVE_RETRY_MAX_MS = 10_000
+
+/**
+ * Hear about every change in the workspace as it happens.
+ *
+ * A socket, because on Workers it is the only connection that every server
+ * instance can reach (see server/src/core/live.ts). A server that has no
+ * socket answers the plain request to it with 404, and then the tab uses the
+ * older event stream instead, which is right for a single process: a
+ * self-hosted instance from before the socket, or one behind a proxy that
+ * refuses upgrades. Anything else is an outage, and the socket is retried.
+ */
 export function subscribeEvents(
   handler: (event: ILiveEvent) => void,
   onHealth?: (down: boolean) => void,
 ): () => void {
-  // The live stream is workspace-scoped like every other read; without the
-  // segment a second tab would receive the first workspace's events.
-  const source = new EventSource(
-    workspaceSlug
-      ? `${BASE}/w/${encodeURIComponent(workspaceSlug)}/events/stream`
-      : `${BASE}/events/stream`,
-  )
-  source.onopen = () => onHealth?.(false)
-  source.onerror = () => onHealth?.(true)
-  source.onmessage = (msg) => {
+  // The live connection is workspace-scoped like every other read; without
+  // the segment a second tab would receive the first workspace's events.
+  const path = workspaceSlug
+    ? `${BASE}/w/${encodeURIComponent(workspaceSlug)}/events`
+    : `${BASE}/events`
+  let stopped = false
+  let socket: WebSocket | null = null
+  let stream: EventSource | null = null
+  let ping: ReturnType<typeof setInterval> | null = null
+  let retry: ReturnType<typeof setTimeout> | null = null
+  let failures = 0
+
+  const deliver = (data: string) => {
     try {
-      handler(JSON.parse(msg.data) as ILiveEvent)
+      handler(JSON.parse(data) as ILiveEvent)
     } catch {
       // ignore malformed frames
     }
   }
-  return () => source.close()
+
+  function useStream(): void {
+    stream = new EventSource(`${path}/stream`)
+    stream.onopen = () => onHealth?.(false)
+    stream.onerror = () => onHealth?.(true)
+    stream.onmessage = (msg) => deliver(String(msg.data))
+  }
+
+  /** Whether this server has a socket at all, asked without upgrading. */
+  async function hasSocket(): Promise<boolean> {
+    const res = await fetch(`${path}/socket`, {
+      credentials: 'same-origin',
+    }).catch(() => null)
+    return res?.status !== 404
+  }
+
+  function open(): void {
+    if (stopped) return
+    if (typeof WebSocket === 'undefined') return useStream()
+    const url = new URL(`${path}/socket`, window.location.href)
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    const ws = new WebSocket(url.toString())
+    socket = ws
+    let opened = false
+    ws.onopen = () => {
+      opened = true
+      failures = 0
+      onHealth?.(false)
+      ping = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) ws.send('ping')
+      }, LIVE_PING_MS)
+    }
+    ws.onmessage = (msg) => {
+      if (msg.data !== 'pong') deliver(String(msg.data))
+    }
+    ws.onclose = async () => {
+      if (ping) clearInterval(ping)
+      ping = null
+      if (stopped) return
+      onHealth?.(true)
+      failures += 1
+      if (!opened && failures === 1 && !(await hasSocket())) {
+        if (!stopped) useStream()
+        return
+      }
+      if (stopped) return
+      const wait = Math.min(LIVE_RETRY_MAX_MS, 500 * 2 ** failures)
+      retry = setTimeout(open, wait)
+    }
+  }
+
+  open()
+  return () => {
+    stopped = true
+    if (retry) clearTimeout(retry)
+    if (ping) clearInterval(ping)
+    socket?.close()
+    stream?.close()
+  }
 }

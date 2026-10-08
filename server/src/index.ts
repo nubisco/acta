@@ -3,6 +3,7 @@ import { bunAssetReader, createApp } from './app'
 import { ssoConfigFromEnv } from './core/sso'
 import { oidcConfigFromEnv } from './core/oidc'
 import { openDb } from './db'
+import { bunLive, bunWebsocket } from './live-bun'
 import {
   channelsFromEnv,
   notificationSweep,
@@ -23,6 +24,7 @@ const app = await createApp(db, {
   oidc: oidcConfigFromEnv(process.env) ?? undefined,
   otpFallback: process.env.ACTA_OTP_FALLBACK === 'true',
   platformWebhookSecret: process.env.PLATFORM_WEBHOOK_SECRET,
+  live: bunLive,
   bootstrap: {
     workspaceName: process.env.ACTA_WORKSPACE ?? 'Nubisco',
     adminEmail: process.env.ACTA_ADMIN_EMAIL,
@@ -56,6 +58,7 @@ setInterval(() => {
 export default {
   port: PORT,
   fetch: app.fetch,
+  websocket: bunWebsocket,
 }
 
 console.log(`acta server listening on :${PORT} (data: ${DATA_DIR})`)

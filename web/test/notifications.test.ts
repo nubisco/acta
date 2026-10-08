@@ -11,7 +11,11 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 const listed = vi.fn()
 const markRead = vi.fn(async (_id?: string) => ({ ok: true }))
 /** Streams opened, by the workspace each was opened for. */
-const streams: { slug: string; closed: boolean }[] = []
+const streams: {
+  slug: string
+  closed: boolean
+  health?: (down: boolean) => void
+}[] = []
 let slug = 'nubisco'
 vi.mock('@/api/client', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
@@ -27,8 +31,8 @@ vi.mock('@/api/client', async (importOriginal) => {
     setWorkspaceSlug: (next: string) => {
       slug = next
     },
-    subscribeEvents: () => {
-      const stream = { slug, closed: false }
+    subscribeEvents: (_handler: unknown, health?: (down: boolean) => void) => {
+      const stream = { slug, closed: false, health }
       streams.push(stream)
       return () => {
         stream.closed = true
@@ -210,14 +214,20 @@ describe('what the bell and the desktop say', () => {
 })
 
 describe('keeping the bell current', () => {
-  it('re-reads the inbox on a timer, for writes the stream never carries', async () => {
+  it('catches up on the inbox each time the live connection comes back', async () => {
     vi.useFakeTimers()
     try {
       listed.mockResolvedValue({ notifications: [], unread: 0 })
       const ws = await freshStore()
       ws.connect()
+      // No timer any more: delivery is live, so nothing is read on a clock.
+      await vi.advanceTimersByTimeAsync(120_000)
       expect(listed).not.toHaveBeenCalled()
-      await vi.advanceTimersByTimeAsync(60_000)
+
+      // What arrived while the tab was cut off was never sent to it.
+      streams[0].health!(true)
+      streams[0].health!(false)
+      await vi.advanceTimersByTimeAsync(400)
       expect(listed).toHaveBeenCalledTimes(1)
     } finally {
       vi.useRealTimers()

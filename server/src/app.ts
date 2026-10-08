@@ -27,6 +27,8 @@ import { AttachmentStore, type IBlobStore } from './services/attachments'
 import type { IFetchDeps } from './core/safeFetch'
 import { startRulesEngine } from './services/rules'
 import { startWebhookDispatcher } from './services/webhooks'
+import { onEvent } from './core/events'
+import { liveFrame, type ILiveTransport } from './core/live'
 
 export interface IAppEnv {
   Variables: {
@@ -91,6 +93,12 @@ export interface IAppOptions {
    * outbound messages; everything works without it, just without the link.
    */
   baseUrl?: string
+  /**
+   * Who holds the tabs' live sockets (see core/live.ts). Unset, the socket
+   * endpoint answers 404 and the app falls back to the in-process stream,
+   * which is right for tests and for anything running as one process.
+   */
+  live?: ILiveTransport
 }
 
 export async function createApp(
@@ -108,6 +116,14 @@ export async function createApp(
     baseUrl: opts.baseUrl,
   })
   startRulesEngine(db, { fetchImpl: opts.fetchImpl })
+  const publish = opts.live?.publish
+  if (publish)
+    onEvent((event) =>
+      publish(event.workspace_id, liveFrame(event)).catch(() => {
+        // A tab that misses a frame catches up when it reconnects, so a
+        // failed publish is never worth failing anything else over.
+      }),
+    )
 
   const app = new Hono<IAppEnv>()
 
@@ -224,7 +240,10 @@ export async function createApp(
   app.use('/api/v1/w/:workspace/*', requireWorkspace())
   app.route(
     '/api/v1/w/:workspace',
-    apiRoutes(store, { remoteFetchDeps: opts.remoteFetchDeps }),
+    apiRoutes(store, {
+      remoteFetchDeps: opts.remoteFetchDeps,
+      liveSocket: opts.live?.socket,
+    }),
   )
 
   // The same API without a workspace segment, meaning "the workspace this
@@ -234,7 +253,10 @@ export async function createApp(
   app.use('/api/v1/*', requireAuth())
   app.route(
     '/api/v1',
-    apiRoutes(store, { remoteFetchDeps: opts.remoteFetchDeps }),
+    apiRoutes(store, {
+      remoteFetchDeps: opts.remoteFetchDeps,
+      liveSocket: opts.live?.socket,
+    }),
   )
 
   /**

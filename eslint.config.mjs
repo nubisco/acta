@@ -76,6 +76,8 @@ export default defineConfig(
   {
     ignores: [
       '**/dist/',
+      // wrangler dev's local build and state.
+      '**/.wrangler/',
       '**/node_modules/',
       'docs/.vitepress/**',
       'data/',

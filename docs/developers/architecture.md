@@ -44,6 +44,18 @@ and flushed after it commits, so a rolled-back write emits nothing.
 flushed events. A listener can never break the write path: it has already
 committed by the time they run.
 
+**Live updates.** Every open tab holds a WebSocket to
+`/api/v1/w/<workspace>/events/socket` and receives a small frame per event
+(verb, entity, id), which tells it what to re-read. On Bun the process holds
+the sockets and feeds them from the listeners. On Workers a write is handled
+by whichever instance Cloudflare picks, so the sockets are held by a Durable
+Object per workspace (`LiveHub` in `src/live-hub.ts`) and every event is
+published to it. It uses the hibernation API, so between events it costs
+nothing, and the tabs' keepalive pings are answered without waking it. A tab
+that reconnects reads its inbox once, since nothing was sent to it while it
+was away. A server without the socket answers 404, and the tab falls back to
+the older `/events/stream` (server-sent events).
+
 Rule-triggered changes are attributed to the system actor and never re-trigger
 rules, which is what stops two rules from looping.
 

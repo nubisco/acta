@@ -17,6 +17,7 @@ import {
 import { ApiError, type ICtx } from '../core/ctx'
 import { createToken } from '../core/auth'
 import { emitEvent, flushPendingEvents, onEvent } from '../core/events'
+import { liveFrame, type ILiveTransport } from '../core/live'
 import { spaceWrite } from '../services/spaces'
 import { docWrite } from '../services/docs'
 import {
@@ -109,6 +110,8 @@ export interface IApiRouteOptions {
    * their own, so no test touches the network.
    */
   remoteFetchDeps?: IFetchDeps
+  /** Answers /events/socket. Unset means 404, and tabs use the stream. */
+  liveSocket?: ILiveTransport['socket']
 }
 
 export function apiRoutes(
@@ -788,7 +791,15 @@ export function apiRoutes(
     return c.json({ ok: true })
   })
 
-  // SSE ---------------------------------------------------------------------
+  // Live updates ------------------------------------------------------------
+  // The socket is what the app uses (see core/live.ts). The stream stays for
+  // a tab still running an older bundle, and for the tests.
+  app.get('/events/socket', async (c, next) => {
+    if (!options.liveSocket) return c.notFound()
+    const res = await options.liveSocket(c, next)
+    return res ?? c.notFound()
+  })
+
   app.get('/events/stream', (c) => {
     const workspaceId = c.get('workspaceId')
     const stream = new ReadableStream({
@@ -805,14 +816,7 @@ export function apiRoutes(
         }, 20_000)
         const off = onEvent((event) => {
           if (event.workspace_id !== workspaceId) return
-          const data = JSON.stringify({
-            id: event.id,
-            verb: event.verb,
-            entity: event.entity,
-            entity_id: event.entity_id,
-            actor_kind: event.actor_kind,
-          })
-          controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+          controller.enqueue(encoder.encode(`data: ${liveFrame(event)}\n\n`))
         })
         c.req.raw.signal.addEventListener('abort', () => {
           clearInterval(keepalive)
