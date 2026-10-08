@@ -12,6 +12,8 @@
     empty-title="Nothing waiting on you"
     empty-description="You hear about work you are mentioned in, assigned to, or already part of."
     :width="360"
+    side="right"
+    align="end"
     close-on-select
     close-on-navigate
     @mark-all-read="markAllRead"
