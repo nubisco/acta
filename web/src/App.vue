@@ -179,6 +179,7 @@
         :show-account-actions="ws.signsInThroughNubisco.value"
         :show-profile="ws.platformUrl.value !== null"
         placement="right-end"
+        trigger="identity"
         @open="loadAccounts"
         @switch="accounts.switchTo"
         @switch-account="accounts.chooseAccount"
