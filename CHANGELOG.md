@@ -1,3 +1,10 @@
+# [1.38.0](https://github.com/nubisco/acta/compare/v1.37.0...v1.38.0) (2026-10-08)
+
+
+### Features
+
+* a card you can find your way around, goals you can read, notifications that arrive ([fa50dba](https://github.com/nubisco/acta/commit/fa50dba529a624f9d4b8e8da31758edc360bd046))
+
 # [1.37.0](https://github.com/nubisco/acta/compare/v1.36.1...v1.37.0) (2026-10-08)
 
 
