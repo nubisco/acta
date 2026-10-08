@@ -26,6 +26,7 @@
       <li v-for="seg in segments" :key="seg.status">
         <component
           :is="selectable ? 'button' : 'span'"
+          v-nb-tooltip="{ header: seg.label, body: seg.hint }"
           :type="selectable ? 'button' : undefined"
           class="breakdown__status"
           :class="{
@@ -41,7 +42,24 @@
       </li>
     </ul>
 
-    <NbDefinitionList :items="facts" class="breakdown__facts" />
+    <!-- Each term explains itself on hover. "In flight" and "past their
+         date" are this app's words, and nobody should have to guess them
+         (Jose, 2026-10-08). -->
+    <NbDefinitionList class="breakdown__facts">
+      <NbDefinitionListItem v-for="fact in facts" :key="fact.term">
+        <template #term>
+          <span class="breakdown__term">
+            {{ fact.term }}
+            <NbInfoHint
+              :text="fact.hint"
+              :size="13"
+              :label="`About ${fact.term}`"
+            />
+          </span>
+        </template>
+        {{ fact.value }}
+      </NbDefinitionListItem>
+    </NbDefinitionList>
   </div>
 </template>
 
@@ -77,6 +95,7 @@ const segments = computed(() =>
     (status) => ({
       status,
       label: GOAL_STATUS[status].label,
+      hint: GOAL_STATUS[status].hint,
       color: GOAL_STATUS[status].color,
       count: props.summary.by_status[status],
     }),
@@ -90,17 +109,24 @@ const barLabel = computed(() =>
 const facts = computed(() => {
   const work = props.summary.work
   return [
-    { term: 'In flight', value: String(props.summary.in_flight) },
+    {
+      term: 'In flight',
+      hint: 'Goals still being worked towards: pending, on track, at risk or off track. Done, paused and cancelled goals are not in flight.',
+      value: String(props.summary.in_flight),
+    },
     {
       term: 'Past their date',
+      hint: 'Goals in flight whose target date has gone by without them being marked done.',
       value: String(props.summary.overdue),
     },
     {
       term: 'No check-in for a month',
+      hint: 'Goals in flight whose owner has not posted a check-in for over a month, so their status may no longer be true.',
       value: String(props.summary.stale),
     },
     {
       term: 'Work behind them',
+      hint: 'The cards linked to goals in flight, and their parts, each counted once even when it serves several goals.',
       value:
         work.cards_total === 0
           ? 'No cards linked yet'
@@ -112,6 +138,12 @@ const facts = computed(() => {
 </script>
 
 <style scoped lang="scss">
+.breakdown__term {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nb-spacing-4);
+}
+
 .breakdown {
   display: grid;
   gap: var(--nb-spacing-12);

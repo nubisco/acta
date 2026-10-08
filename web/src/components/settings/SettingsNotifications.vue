@@ -16,6 +16,7 @@
 
       <NbRadio
         v-model="delay"
+        v-nb-tour-step="'notify-email'"
         name="notify-after"
         label="Email me about anything I have not seen after"
         :options="DELAY_OPTIONS"
@@ -48,7 +49,7 @@
         </div>
       </header>
 
-      <div class="notify__device">
+      <div v-nb-tour-step="'notify-device'" class="notify__device">
         <NbButton
           v-if="permission === 'default'"
           size="sm"

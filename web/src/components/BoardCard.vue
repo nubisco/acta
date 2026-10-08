@@ -1,7 +1,12 @@
 <template>
   <article
     class="board-card"
-    :class="{ 'board-card--open': open, 'board-card--done': row.done }"
+    :class="{
+      'board-card--open': open,
+      'board-card--done': row.done,
+      'board-card--arrived': arrived,
+    }"
+    :data-card-key="row.key"
     :data-nb-tour-step="tourStep"
   >
     <!-- The whole card opens it. One button stretched under the content
@@ -258,6 +263,8 @@ const props = defineProps<{
   row: ISpaceItemRow
   /** The card the details panel is showing. */
   open?: boolean
+  /** Just arrived at from elsewhere: ringed for a moment so it is found. */
+  arrived?: boolean
   tourStep?: string | null
 }>()
 
@@ -309,6 +316,17 @@ function edit(field: TCardField, event: MouseEvent): void {
 </script>
 
 <style scoped lang="scss">
+@keyframes board-card-arrived {
+  0%,
+  60% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
 .board-card {
   position: relative;
   display: grid;
@@ -320,6 +338,25 @@ function edit(field: TCardField, event: MouseEvent): void {
 
   /* Which card the details panel is showing. A bar at the inline start
      rather than a tint, because cards already carry label colour. */
+  /* Just arrived at from elsewhere: a ring that fades, so the eye finds the
+     card on a full board, and then gets out of the way. */
+  &--arrived::after {
+    content: '';
+    position: absolute;
+    inset: calc(var(--nb-spacing-8) * -1);
+    border-radius: var(--nb-radius-md);
+    box-shadow: 0 0 0 2px var(--nb-c-primary);
+    pointer-events: none;
+    animation: board-card-arrived 2.4s ease-out forwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &--arrived::after {
+      animation-duration: 0.01s;
+      animation-delay: 2.4s;
+    }
+  }
+
   &--open::before {
     content: '';
     position: absolute;

@@ -49,7 +49,7 @@
             >
               G-{{ part.number }}
             </RouterLink>
-            <template v-else>{{ part.text }}</template>
+            <RefText v-else :text="part.text" />
           </template>
           <span v-if="event.automated" class="history__muted">
             (automation)
@@ -88,6 +88,7 @@
  * what they did not write down.
  */
 import { computed, ref, watch } from 'vue'
+import RefText from '@/components/RefText.vue'
 import { RouterLink } from 'vue-router'
 import type { IItemEvent } from '@/types/api'
 import { describe, shownInHistory } from '@/lib/history'

@@ -110,7 +110,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'goal_get',
     description:
-      'Full detail for up to 20 goals by number (12 or "G-12"): everything goal_list returns plus description, followers, ancestors, children (its sub-goals, each with its own progress), items (every card counted toward this goal itself: linked:true for a direct link, via:KEY for a part reached through a linked card, with done, active, waiting, overdue and size) and check_ins newest first (status, body, metric_value, can_edit, can_delete). include narrows to ["items"] or ["check_ins"].',
+      'Full detail for up to 20 goals by number (12 or "G-12"): everything goal_list returns plus description, followers, ancestors, children (its sub-goals, each with its own progress), items (every card counted toward this goal itself: linked:true for a direct link, via:KEY for a part reached through a linked card, with done, active, waiting, overdue, size and assignees as handles) and check_ins newest first (status, body, metric_value, can_edit, can_delete). include narrows to ["items"] or ["check_ins"]. Add "tree" to give each item parent (the card it is directly a part of) and blocked_by (its open blockers, [{key, title, space}], on any space).',
     schema: zGoalGet,
     handler: (ctx, args) => goalGet(ctx, args as z.infer<typeof zGoalGet>),
   },

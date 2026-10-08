@@ -96,7 +96,10 @@ vi.mock('@/stores/workspace', () => ({
     overview: { value: overview },
     onLive: () => () => undefined,
   }),
-  useUiState: () => ({ newSpaceOpen: { value: false } }),
+  useUiState: () => ({
+    newSpaceOpen: { value: false },
+    revealCard: { value: null },
+  }),
   useInspector: () => inspectorMock,
 }))
 

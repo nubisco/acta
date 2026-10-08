@@ -13,6 +13,7 @@ import type {
 } from '@nubisco/acta-shared'
 
 import type { ILinkPreview } from '@/components/decorations/linkCards'
+import type { IWalkthroughRecord } from '@nubisco/ui'
 
 const BASE = '/api/v1'
 
@@ -165,6 +166,21 @@ export const auth = {
   markOnboarded: () =>
     req<{ ok: boolean }>('/auth/me/onboarded', { method: 'POST' }),
 
+  /** Which walkthroughs this person has finished or skipped, by id. */
+  walkthroughs: () =>
+    req<{ walkthroughs: Record<string, IWalkthroughRecord> }>(
+      '/auth/me/walkthroughs',
+    ),
+  walkthroughSet: (id: string, record: IWalkthroughRecord) =>
+    req<{ ok: boolean }>(`/auth/me/walkthroughs/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(record),
+    }),
+  walkthroughReset: (id: string) =>
+    req<{ ok: boolean }>(`/auth/me/walkthroughs/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
   /** Personal access tokens: MCP and the API acting as you, with your role. */
   tokens: () =>
     req<{
@@ -272,7 +288,7 @@ export const api = {
       `/goals?${new URLSearchParams(params)}`,
     ),
 
-  goalGet: (goals: number[], include?: ('items' | 'check_ins')[]) =>
+  goalGet: (goals: number[], include?: ('items' | 'check_ins' | 'tree')[]) =>
     req<{ goals: IGoalDetail[] }>('/goals/get', {
       method: 'POST',
       body: JSON.stringify({ goals, include }),

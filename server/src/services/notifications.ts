@@ -74,10 +74,12 @@ const NOTIFIABLE = new Set([
   'doc.updated',
   'member.updated',
   // Goals. Being handed one, a check-in on one you own or follow, and it
-  // being put away or brought back. Editing its fields is not here, for the
-  // same reason saving a document is not: a goal's description gets tidied
-  // far more often than anybody needs telling.
+  // being put away or brought back. An edit is here for the names it adds
+  // and nothing else, the same way a document save is: it is in neither
+  // participant list, so a goal's description can be tidied all day without
+  // ringing, and somebody newly named in it still hears.
   'goal.created',
+  'goal.updated',
   'goal.owner_changed',
   'goal.checked_in',
   'goal.check_in_updated',
@@ -224,30 +226,38 @@ async function docParticipants(
   return rows.map((r) => r.actor_id)
 }
 
-/** How long each of these people lets an unread notification sit. */
-async function reminderDelays(
+/**
+ * Which of these can be told anything, and how long each lets an unread
+ * notification sit before it is chased (null for never).
+ *
+ * People only, and only members still switched on. An agent has no inbox:
+ * nothing reads its notifications, so naming one in a comment or handing it
+ * a card wrote rows nobody would ever open. A disabled member cannot sign in
+ * to see the bell either. Both used to slip through whenever a write named
+ * them directly, because only involvement filtered them out.
+ */
+async function reachable(
   ctx: ICtx,
   actorIds: string[],
-): Promise<Map<string, number>> {
+): Promise<Map<string, number | null>> {
   if (actorIds.length === 0) return new Map()
   const rows = await ctx.db.query<{
     id: string
-    kind: string
     email: string | null
     notify_after_seconds: number | null
   }>(
-    `SELECT id, kind, email, notify_after_seconds FROM actor
-      WHERE id IN (${actorIds.map(() => '?').join(',')})`,
+    `SELECT id, email, notify_after_seconds FROM actor
+      WHERE id IN (${actorIds.map(() => '?').join(',')})
+        AND kind = 'human' AND disabled = 0`,
     actorIds,
   )
-  const out = new Map<string, number>()
+  const out = new Map<string, number | null>()
   for (const row of rows) {
-    // Nobody to reach. An agent has no inbox and a person with no address on
-    // file cannot be emailed, so the bell is the whole story for them and
-    // stamping a deadline would only give the sweep rows it can never clear.
-    if (row.kind !== 'human' || !row.email) continue
-    const seconds = row.notify_after_seconds ?? 0
-    if (seconds > 0) out.set(row.id, seconds * 1000)
+    // A person with no address on file cannot be emailed, so the bell is the
+    // whole story for them and stamping a deadline would only give the sweep
+    // rows it can never clear.
+    const seconds = row.email ? (row.notify_after_seconds ?? 0) : 0
+    out.set(row.id, seconds > 0 ? seconds * 1000 : null)
   }
   return out
 }
@@ -335,9 +345,12 @@ export async function notifyForEvent(
   if (found.size === 0) return 0
 
   const ts = now()
-  const delays = await reminderDelays(ctx, [...found.keys()])
+  const delays = await reachable(ctx, [...found.keys()])
+  let told = 0
   for (const [actorId, reason] of found) {
-    const delay = delays.get(actorId)
+    if (!delays.has(actorId)) continue
+    const delay = delays.get(actorId) ?? null
+    told += 1
     // OR IGNORE for the unique (actor, event): a retried op must not ring
     // twice for one thing happening once.
     await ctx.db.run(
@@ -356,11 +369,11 @@ export async function notifyForEvent(
         docSlug,
         goalNumber,
         ts,
-        delay === undefined ? null : ts + delay,
+        delay === null ? null : ts + delay,
       ],
     )
   }
-  return found.size
+  return told
 }
 
 export interface INotificationRow {

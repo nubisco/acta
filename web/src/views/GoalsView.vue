@@ -2,6 +2,7 @@
   <div class="goals-view">
     <component :is="actions.Outlet">
       <NbButton
+        v-nb-tour-step="'goals-create'"
         size="sm"
         variant="primary"
         icon="plus"
@@ -53,7 +54,11 @@
     </NbEmptyState>
 
     <template v-else-if="summary">
-      <NbPanel v-if="scope !== 'archived'" class="goals-view__summary">
+      <NbPanel
+        v-if="scope !== 'archived'"
+        v-nb-tour-step="'goals-breakdown'"
+        class="goals-view__summary"
+      >
         <GoalsBreakdown
           :summary="summary"
           selectable
@@ -63,6 +68,7 @@
       </NbPanel>
 
       <NbDataTable
+        v-nb-tour-step="'goals-table'"
         :columns="columns"
         :rows="rows"
         row-key="number"
@@ -150,7 +156,7 @@
  * we doing", and the table after it in tree order, so a sub-goal sits under
  * the goal it serves. A status in the breakdown filters the table.
  */
-import { computed, onScopeDispose, ref, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useShellSlot } from '@nubisco/ui'
 import { api } from '@/api/client'
@@ -159,6 +165,7 @@ import { relativeTime, useLoadState } from '@/lib/state'
 import { goalDate, goalTree, targetLabel } from '@/lib/goals'
 import { wpath } from '@/lib/paths'
 import { useUiState, useWorkspace } from '@/stores/workspace'
+import { useTours } from '@/lib/tours'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import GoalProgress from '@/components/goals/GoalProgress.vue'
 import GoalStatusBadge from '@/components/goals/GoalStatusBadge.vue'
@@ -169,6 +176,7 @@ type TRow = IGoalRow & { depth: number } & Record<string, unknown>
 
 const ws = useWorkspace()
 const ui = useUiState()
+const tours = useTours()
 const router = useRouter()
 const load = useLoadState()
 const actions = useShellSlot('topbar-right')
@@ -228,6 +236,10 @@ async function reload(): Promise<void> {
   if (result) {
     goals.value = result.goals
     summary.value = result.summary
+    // The first visit to goals plays their walkthrough, once the page it
+    // points at is drawn.
+    await nextTick()
+    void tours.maybeStart('goals')
   }
 }
 

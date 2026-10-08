@@ -29,132 +29,154 @@
          .nb-inspector pattern's own padding is a gutter meant to sit BETWEEN
          stacked panels, so without one the content ran to both edges. -->
     <div class="inspector">
-      <div class="inspector-head">
-        <NbButton
-          v-if="inspector.trail.value.length > 0"
-          v-nb-tooltip="{ body: `Back to ${inspector.trail.value.at(-1)}` }"
-          size="sm"
-          variant="ghost"
-          icon="arrow-left"
-          :aria-label="`Back to ${inspector.trail.value.at(-1)}`"
-          @click="inspector.back()"
-        />
-        <span class="inspector-key">{{ it.item.value.key }}</span>
-        <NbBadge
-          v-if="it.lifecycle.value"
-          :variant="it.lifecycle.value.variant"
-          :dot="it.lifecycle.value.dot"
-          size="md"
-        >
-          {{ it.lifecycle.value.text }}
-        </NbBadge>
-        <span class="inspector-actions">
-          <NbInlineLoading
-            :status="it.save.status.value"
-            label="Saving"
-            finished-label="Saved"
-            error-label="Not saved"
-            :dwell="1200"
-            reserve-space
-          />
-          <!-- Finding a card through search or a link drops you into this
+      <!-- Pinned while the rest scrolls, so a reader deep in the comments of
+           a long card still sees which card they are in (Jose, 2026-10-08). -->
+      <div class="inspector-top">
+        <div class="inspector-head">
+          <!-- Where "back" goes, said in words. An arrow alone gave no hint of
+             which card it returns to, so after following two parts nobody
+             knew where they would land. -->
+          <template v-if="previousKey">
+            <NbButton
+              v-nb-tooltip="{ body: `Back to ${previousLabel}` }"
+              size="sm"
+              variant="ghost"
+              icon="arrow-left"
+              :aria-label="`Back to ${previousKey}`"
+              @click="inspector.back()"
+            />
+            <NbBreadcrumbs class="inspector-crumbs">
+              <NbButton
+                v-nb-tooltip="{ body: `Back to ${previousLabel}` }"
+                size="xs"
+                variant="ghost"
+                class="inspector-crumb"
+                @click="inspector.back()"
+              >
+                {{ previousKey }}
+              </NbButton>
+              <span class="inspector-key" aria-current="page">{{
+                it.item.value.key
+              }}</span>
+            </NbBreadcrumbs>
+          </template>
+          <span v-else class="inspector-key">{{ it.item.value.key }}</span>
+          <NbBadge
+            v-if="it.lifecycle.value"
+            :variant="it.lifecycle.value.variant"
+            :dot="it.lifecycle.value.dot"
+            size="md"
+          >
+            {{ it.lifecycle.value.text }}
+          </NbBadge>
+          <span class="inspector-actions">
+            <NbInlineLoading
+              :status="it.save.status.value"
+              label="Saving"
+              finished-label="Saved"
+              error-label="Not saved"
+              :dwell="1200"
+              reserve-space
+            />
+            <!-- Finding a card through search or a link drops you into this
                panel with no sense of where the card actually lives. The space
                marks the open card, so arriving there puts it under the
                reader's eye rather than making them hunt the column. -->
-          <NbButton
-            v-nb-tooltip="{ body: `Show on ${it.item.value.space}` }"
-            size="sm"
-            variant="ghost"
-            icon="kanban"
-            :aria-label="`Show ${it.item.value.key} on its space`"
-            @click="viewOnBoard"
-          />
-          <!-- To another space or list. The server always could; nothing
+            <NbButton
+              v-nb-tooltip="{ body: `Show on ${it.item.value.space}` }"
+              size="sm"
+              variant="ghost"
+              icon="kanban"
+              :aria-label="`Show ${it.item.value.key} on its space`"
+              @click="viewOnBoard"
+            />
+            <!-- To another space or list. The server always could; nothing
                here offered it until LA-361 needed an agent to do it. -->
-          <NbButton
-            v-nb-tooltip="{ body: 'Move to another space' }"
-            size="sm"
-            variant="ghost"
-            icon="arrow-square-right"
-            :aria-label="`Move ${it.item.value.key} to another space`"
-            @click="moveOpen = true"
-          />
-          <!-- Archive was only ever reachable through the Status select,
+            <NbButton
+              v-nb-tooltip="{ body: 'Move to another space' }"
+              size="sm"
+              variant="ghost"
+              icon="arrow-square-right"
+              :aria-label="`Move ${it.item.value.key} to another space`"
+              @click="moveOpen = true"
+            />
+            <!-- Archive was only ever reachable through the Status select,
                which is why it read as missing. Same set as the space's
                right-click menu, so both surfaces agree. -->
-          <NbButton
-            v-if="it.item.value.archived"
-            v-nb-tooltip="{ body: 'Restore to its list' }"
-            size="sm"
-            variant="secondary"
-            icon="arrow-counter-clockwise"
-            :aria-label="`Restore ${it.item.value.key}`"
-            @click="it.toggle('restore')"
-          />
-          <NbButton
-            v-else
-            v-nb-tooltip="{ body: 'Archive this card' }"
-            size="sm"
-            variant="ghost"
-            icon="archive"
-            :aria-label="`Archive ${it.item.value.key}`"
-            @click="it.toggle('archive')"
-          />
-          <!-- Delete only on an archived card: archive is the reversible
+            <NbButton
+              v-if="it.item.value.archived"
+              v-nb-tooltip="{ body: 'Restore to its list' }"
+              size="sm"
+              variant="secondary"
+              icon="arrow-counter-clockwise"
+              :aria-label="`Restore ${it.item.value.key}`"
+              @click="it.toggle('restore')"
+            />
+            <NbButton
+              v-else
+              v-nb-tooltip="{ body: 'Archive this card' }"
+              size="sm"
+              variant="ghost"
+              icon="archive"
+              :aria-label="`Archive ${it.item.value.key}`"
+              @click="it.toggle('archive')"
+            />
+            <!-- Delete only on an archived card: archive is the reversible
                action, and the server refuses a delete before it. -->
-          <NbButton
-            v-if="it.item.value.archived"
-            v-nb-tooltip="{ body: 'Delete permanently' }"
-            size="sm"
-            variant="danger"
-            outlined
-            icon="trash"
-            :aria-label="`Delete ${it.item.value.key} permanently`"
-            @click="confirmDelete"
-          />
-          <!-- Opening a card was a one-way door: the panel had a way back to
+            <NbButton
+              v-if="it.item.value.archived"
+              v-nb-tooltip="{ body: 'Delete permanently' }"
+              size="sm"
+              variant="danger"
+              outlined
+              icon="trash"
+              :aria-label="`Delete ${it.item.value.key} permanently`"
+              @click="confirmDelete"
+            />
+            <!-- Opening a card was a one-way door: the panel had a way back to
                the previous card but no way out, so the only exit was opening
                something else. Closing clears the trail too, otherwise the
                next card you open inherits a way "back" to one you already
                dismissed. -->
-          <!-- Same card, more room. The panel is a column beside the space;
+            <!-- Same card, more room. The panel is a column beside the space;
                some cards want the width, and switching should not mean losing
                your place and opening it again. -->
-          <NbButton
-            v-nb-tooltip="{ body: 'Open full size' }"
-            size="sm"
-            variant="ghost"
-            icon="arrows-out-simple"
-            :aria-label="`Open ${it.item.value.key} full size`"
-            @click="expand"
-          />
-          <NbButton
-            v-nb-tooltip="{ body: 'Close' }"
-            size="sm"
-            variant="ghost"
-            icon="x"
-            class="inspector-close"
-            aria-label="Close the details panel"
-            @click="inspector.close()"
-          />
-        </span>
+            <NbButton
+              v-nb-tooltip="{ body: 'Open full size' }"
+              size="sm"
+              variant="ghost"
+              icon="arrows-out-simple"
+              :aria-label="`Open ${it.item.value.key} full size`"
+              @click="expand"
+            />
+            <NbButton
+              v-nb-tooltip="{ body: 'Close' }"
+              size="sm"
+              variant="ghost"
+              icon="x"
+              class="inspector-close"
+              aria-label="Close the details panel"
+              @click="inspector.close()"
+            />
+          </span>
+        </div>
+        <!-- Above the title, because it is what the title is a part of. -->
+        <PartOfChip
+          v-if="it.item.value.parent"
+          :item-key="it.item.value.key"
+          :space="it.item.value.space"
+          :parent="it.item.value.parent"
+          @changed="it.load"
+          @open="(key: string) => inspector.open(key)"
+        />
+        <NbInlineEdit
+          v-model="it.draft.title"
+          label="Item title"
+          size="lg"
+          class="inspector-title"
+          @commit="it.commitTitle"
+        />
       </div>
-      <!-- Above the title, because it is what the title is a part of. -->
-      <PartOfChip
-        v-if="it.item.value.parent"
-        :item-key="it.item.value.key"
-        :space="it.item.value.space"
-        :parent="it.item.value.parent"
-        @changed="it.load"
-        @open="(key: string) => inspector.open(key)"
-      />
-      <NbInlineEdit
-        v-model="it.draft.title"
-        label="Item title"
-        size="lg"
-        class="inspector-title"
-        @commit="it.commitTitle"
-      />
       <ProvenanceNote
         v-if="it.item.value.imported"
         :imported="it.item.value.imported"
@@ -276,6 +298,11 @@
         <h3 class="inspector-section__title">
           <NbIcon name="text-align-left" :size="15" />
           Description
+          <NbInfoHint
+            :text="SECTION_INFO.description"
+            :size="14"
+            label="About the description"
+          />
         </h3>
         <MarkdownEditor
           v-if="editingDescription"
@@ -312,22 +339,26 @@
           :id="`checklist:${checklist.name}`"
           :key="checklist.name"
           :title="checklist.name"
+          icon="list-checks"
+          :info="SECTION_INFO.checklist"
         >
-          <!-- In the meta slot because the header has no actions slot, and
-               .stop so removing a checklist does not also toggle the section
-               it lives in. -->
           <template #meta>
-            <span class="inspector-progress">
-              {{ checklist.items.filter((entry) => entry.done).length }}/{{
-                checklist.items.length
-              }}
-            </span>
+            <SectionCount
+              :text="`${ticked(checklist)}/${checklist.items.length}`"
+              :tip="`${ticked(checklist)} of ${checklist.items.length} ticked`"
+              :empty="checklist.items.length === 0"
+            />
+          </template>
+          <!-- Beside the header rather than in it, and named, because a bare
+               bin next to a count read as deleting the count. -->
+          <template #actions>
             <NbButton
+              v-nb-tooltip="{ body: `Delete the ${checklist.name} checklist` }"
               size="xxs"
               variant="ghost"
               icon="trash-simple"
               :aria-label="`Delete checklist ${checklist.name}`"
-              @click.stop="confirmDeleteChecklist(checklist.name)"
+              @click="confirmDeleteChecklist(checklist.name)"
             />
           </template>
           <ChecklistBody
@@ -341,11 +372,10 @@
         <!-- What the card is for, first among its relations. Its own section
              rather than a field, because a goal inherited through a parent
              needs room to say where it comes from. -->
-        <NbAccordionItem
-          id="goals"
-          title="Goals"
-          :meta="countLabel(it.item.value.goals)"
-        >
+        <NbAccordionItem id="goals" title="Goals" :info="SECTION_INFO.goals">
+          <template #meta>
+            <SectionCount v-bind="goalsCount(it.item.value)" />
+          </template>
           <ItemGoalsPanel
             :item-key="it.item.value.key"
             :goals="it.item.value.goals ?? []"
@@ -353,11 +383,10 @@
           />
         </NbAccordionItem>
 
-        <NbAccordionItem
-          id="plan"
-          title="Plan"
-          :meta="planCount(it.item.value)"
-        >
+        <NbAccordionItem id="plan" title="Plan" :info="SECTION_INFO.plan">
+          <template #meta>
+            <SectionCount v-bind="planCount(it.item.value)" />
+          </template>
           <DependencyPanel
             :item-key="it.item.value.key"
             :space="it.item.value.space"
@@ -374,11 +403,10 @@
              and sequence are different relations, and the model deliberately
              keeps them apart: folding them together on the card is exactly
              the confusion the parent link was chosen to avoid. -->
-        <NbAccordionItem
-          id="parts"
-          title="Parts"
-          :meta="partsCount(it.item.value)"
-        >
+        <NbAccordionItem id="parts" title="Parts" :info="SECTION_INFO.parts">
+          <template #meta>
+            <SectionCount v-bind="partsCount(it.item.value)" />
+          </template>
           <PartsPanel
             :item-key="it.item.value.key"
             :space="it.item.value.space"
@@ -391,8 +419,19 @@
         <NbAccordionItem
           id="attachments"
           title="Attachments"
-          :meta="countLabel(it.item.value.attachments)"
+          :info="SECTION_INFO.attachments"
         >
+          <template #meta>
+            <SectionCount
+              v-bind="
+                plainCount(
+                  it.item.value.attachments,
+                  'attachment',
+                  'Nothing attached',
+                )
+              "
+            />
+          </template>
           <AttachmentsPanel
             :owner="{ item: it.item.value.key }"
             :attachments="it.item.value.attachments ?? []"
@@ -404,8 +443,19 @@
         <NbAccordionItem
           id="history"
           title="History"
-          :meta="countLabel(it.item.value.activity)"
+          :info="SECTION_INFO.history"
         >
+          <template #meta>
+            <SectionCount
+              v-bind="
+                plainCount(
+                  it.item.value.activity,
+                  'recorded change',
+                  'No changes yet',
+                )
+              "
+            />
+          </template>
           <ItemHistory
             :item-key="it.item.value.key"
             :events="it.item.value.activity ?? []"
@@ -420,9 +470,27 @@
           v-if="it.linkFacts.value.length > 0"
           id="links"
           title="Links"
-          :meta="countLabel(it.linkFacts.value)"
+          :info="SECTION_INFO.links"
         >
-          <NbDefinitionList :items="it.linkFacts.value" layout="stacked" />
+          <template #meta>
+            <SectionCount v-bind="plainCount(it.linkFacts.value, 'link', '')" />
+          </template>
+          <NbDefinitionList layout="stacked">
+            <NbDefinitionListItem
+              v-for="(fact, i) in it.linkFacts.value"
+              :key="i"
+              :term="fact.term"
+            >
+              <RefText v-if="fact.opens === 'item'" :text="fact.value" />
+              <RouterLink
+                v-else-if="fact.opens === 'doc'"
+                :to="wpath(`/docs/${fact.value}`)"
+              >
+                {{ fact.value }}
+              </RouterLink>
+              <template v-else>{{ fact.value }}</template>
+            </NbDefinitionListItem>
+          </NbDefinitionList>
         </NbAccordionItem>
       </NbAccordion>
       <MoveCardModal
@@ -439,12 +507,16 @@
         <h3 class="inspector-section__title">
           <NbIcon name="chat-circle" :size="15" />
           Comments
-          <span
-            v-if="countLabel(it.item.value.comments)"
-            class="inspector-section__count nb-layer-3"
-          >
-            {{ countLabel(it.item.value.comments) }}
-          </span>
+          <NbInfoHint
+            :text="SECTION_INFO.comments"
+            :size="14"
+            label="About comments"
+          />
+          <SectionCount
+            v-bind="
+              plainCount(it.item.value.comments, 'comment', 'No comments yet')
+            "
+          />
         </h3>
         <CommentThread
           v-model="it.commentDraft.value"
@@ -460,7 +532,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, watch } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import { useConfirm, useToast } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
 import { useRouter } from 'vue-router'
@@ -482,6 +554,10 @@ import ItemHistory from '@/components/ItemHistory.vue'
 import MoveCardModal from '@/components/MoveCardModal.vue'
 import PartOfChip from '@/components/PartOfChip.vue'
 import type { IPartRef } from '@/types/api'
+import SectionCount from '@/components/SectionCount.vue'
+import RefText from '@/components/RefText.vue'
+import { SECTION_INFO } from '@/lib/sections'
+import { useRefCards } from '@/stores/refs'
 
 // Outside setup, so it survives the panel unmounting between cards.
 const moduleOpenSections = ref<string[]>([
@@ -496,6 +572,7 @@ const it = useItem(toRef(props, 'itemKey'))
 const inspector = useInspector()
 const router = useRouter()
 const ui = useUiState()
+const refCards = useRefCards()
 
 /**
  * Which sections are open, shared by every card opened this session.
@@ -506,32 +583,80 @@ const ui = useUiState()
  */
 const openSections = moduleOpenSections
 
-/** "2 waiting, 1 blocked" is more than a header can hold; the count of edges
- *  is enough to say whether opening it is worth it. */
+/**
+ * Every section header carries a count in a pill that says on hover what it
+ * counts (Jose, 2026-10-08: a bare "1" beside "Plan" read as nothing). Zero
+ * is drawn too, dimmed, so the pill is always where the reader looks.
+ */
+interface ICount {
+  text: string
+  tip: string
+  empty?: boolean
+}
+
+function plural(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? '' : 's'}`
+}
+
+function plainCount(
+  list: unknown[] | undefined,
+  noun: string,
+  none: string,
+): ICount {
+  const n = list?.length ?? 0
+  return { text: String(n), tip: n ? plural(n, noun) : none, empty: n === 0 }
+}
+
+function ticked(checklist: { items: { done: boolean }[] }): number {
+  return checklist.items.filter((entry) => entry.done).length
+}
+
+function goalsCount(item: { goals?: unknown[] }): ICount {
+  const n = item.goals?.length ?? 0
+  return {
+    text: String(n),
+    tip: n ? `Serves ${plural(n, 'goal')}` : 'Serves no goal yet',
+    empty: n === 0,
+  }
+}
+
+/** Both directions in one number, and the split in the tooltip. */
 function planCount(item: {
   blocked_by?: unknown[]
   blocks?: unknown[]
-}): string | undefined {
-  const n = (item.blocked_by?.length ?? 0) + (item.blocks?.length ?? 0)
-  return n > 0 ? String(n) : undefined
+}): ICount {
+  const waits = item.blocked_by?.length ?? 0
+  const holds = item.blocks?.length ?? 0
+  const n = waits + holds
+  if (n === 0)
+    return { text: '0', tip: 'Waits on nothing, holds nothing up', empty: true }
+  return {
+    text: String(n),
+    tip: `Waits on ${plural(waits, 'card')}, holds up ${plural(holds, 'card')}`,
+  }
 }
 
 /** Done over total, because a bare count cannot say whether the work under a
- *  collapsed header is finished, which is the only reason to open it. The
- *  same shape as a checklist's meta in this accordion, and deliberately not
- *  the panel's own "1 of 3 done" sentence, which would then be on screen
- *  twice the moment the section opened. */
-function partsCount(item: { parts?: IPartRef[] }): string | undefined {
+ *  collapsed header is finished, which is the only reason to open it. */
+function partsCount(item: { parts?: IPartRef[] }): ICount {
   const parts = item.parts ?? []
-  if (parts.length === 0) return undefined
-  return `${parts.filter((p) => p.done).length}/${parts.length}`
+  if (parts.length === 0) return { text: '0', tip: 'No parts', empty: true }
+  const done = parts.filter((p) => p.done).length
+  return {
+    text: `${done}/${parts.length}`,
+    tip: `${done} of ${plural(parts.length, 'part')} done`,
+  }
 }
 
-/** A count for an accordion header, or nothing when there is none to give.
- *  Showing "0" would be noise on the many cards that have no attachments. */
-function countLabel(list: unknown[] | undefined): string | undefined {
-  return list && list.length > 0 ? String(list.length) : undefined
-}
+/** The card "back" returns to, by key and, once known, by title. */
+const previousKey = computed(() => inspector.trail.value.at(-1) ?? null)
+const previousLabel = computed(() => {
+  const key = previousKey.value
+  if (!key) return ''
+  const card = refCards.cards.get(key)
+  return card ? `${key} ${card.title}` : key
+})
+watch(previousKey, (key) => key && refCards.request(key), { immediate: true })
 
 /** Hand this card to the full-size view. The panel closes, because the two
  *  showing the same card at once is a choice nobody asked to make. */
@@ -545,8 +670,16 @@ function expand(): void {
 /** Go to the space this card lives on, leaving the panel open so the space's
  *  marker lands on the card the reader was already looking at. */
 function viewOnBoard(): void {
-  const space = it.item.value?.space
-  if (space) void router.push(wpath(`/s/${space}`))
+  const item = it.item.value
+  if (!item) return
+  // The card rides along in the query. Without it the move to the space read
+  // as "no card open" and closed the panel, so the reader arrived at the
+  // board having lost the very card they went there to find.
+  ui.revealCard.value = { key: item.key, at: Date.now() }
+  void router.push({
+    path: wpath(`/s/${item.space}`),
+    query: { item: item.key },
+  })
 }
 const confirm = useConfirm()
 const toast = useToast()
@@ -671,21 +804,41 @@ function commitDescription(): void {
     color: var(--nb-c-text-subtle);
   }
 
-  &__count {
-    padding-inline: var(--nb-spacing-4);
-    border-radius: var(--nb-radius-pill);
-    background: var(--nb-c-surface);
-    color: var(--nb-c-text-subtle);
-    font-size: var(--nb-type-label-sm-size);
+  :deep(.nb-badge) {
+    text-transform: none;
     letter-spacing: 0;
   }
+}
+
+/* The card's name stays in view. The negative inline margin reaches the
+   column's edges, so content scrolling under it does not show in a gap at
+   either side, and the bottom border only appears once something has
+   scrolled beneath it. */
+.inspector-top {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  display: grid;
+  gap: var(--nb-spacing-8);
+  margin-inline: calc(var(--nb-spacing-12) * -1);
+  margin-block-start: calc(var(--nb-spacing-8) * -1);
+  padding: var(--nb-spacing-8) var(--nb-spacing-12) var(--nb-spacing-12);
+  background: var(--nb-shell-inspector-bg, var(--nb-c-surface));
+  border-block-end: 1px solid var(--nb-c-border);
+}
+
+.inspector-crumbs {
+  min-inline-size: 0;
+}
+
+.inspector-crumb {
+  font-family: var(--nb-font-family-mono);
 }
 
 .inspector-head {
   display: flex;
   align-items: center;
   gap: var(--nb-spacing-8);
-  margin-block-end: var(--nb-spacing-12);
 }
 
 .inspector-actions {
@@ -714,8 +867,6 @@ function commitDescription(): void {
 }
 
 .inspector-title {
-  margin-block-end: var(--nb-spacing-12);
-
   /* The title was rendering at the same 16px as the body prose and as a card
    * on the space, so nothing on the panel read as its heading. The class
    * lands on the inline-edit's own element, so the size belongs here rather
@@ -788,11 +939,6 @@ function commitDescription(): void {
     border-color: var(--nb-c-primary);
     color: var(--nb-c-text-muted);
   }
-}
-
-.inspector-progress {
-  font-size: var(--nb-type-label-sm-size);
-  color: var(--nb-c-text-muted);
 }
 
 .inspector-provenance {

@@ -98,7 +98,7 @@ vi.mock('@/stores/workspace', () => ({
     overview: ref(overview),
     onLive: () => () => undefined,
   }),
-  useUiState: () => ({ newSpaceOpen: ref(false) }),
+  useUiState: () => ({ newSpaceOpen: ref(false), revealCard: ref(null) }),
   useInspector: () => ({ open: vi.fn(), itemKey: ref(null) }),
 }))
 

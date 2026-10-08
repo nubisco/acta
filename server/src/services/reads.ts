@@ -623,8 +623,21 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
           "SELECT ref_type, target FROM link WHERE src_kind = 'item' AND src_id = ?",
           [item.id],
         ),
-        in: await ctx.db.query<{ src_kind: string; src_id: string }>(
-          "SELECT src_kind, src_id FROM link WHERE workspace_id = ? AND ref_type = 'item' AND target = ?",
+        // `src` names the referrer the way a reader would: a card's key (a
+        // comment counts as its card) or a document's slug. The bare id was
+        // all the inspector had to show, and nobody can open an id.
+        in: await ctx.db.query<{
+          src_kind: string
+          src_id: string
+          src: string | null
+        }>(
+          `SELECT l.src_kind, l.src_id,
+                  CASE l.src_kind
+                    WHEN 'item' THEN (SELECT r.key FROM item r WHERE r.id = l.src_id)
+                    WHEN 'comment' THEN (SELECT r.key FROM comment c JOIN item r ON r.id = c.item_id WHERE c.id = l.src_id)
+                    WHEN 'doc' THEN (SELECT d.slug FROM document d WHERE d.id = l.src_id)
+                  END AS src
+             FROM link l WHERE l.workspace_id = ? AND l.ref_type = 'item' AND l.target = ?`,
           [ctx.workspaceId, item.key],
         ),
       }

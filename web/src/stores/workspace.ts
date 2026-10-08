@@ -80,8 +80,26 @@ let downTimer: ReturnType<typeof setTimeout> | null = null
 const workspaceSlug = ref('')
 const workspaces = ref<IWorkspaceSummary[]>([])
 const notifications = ref<IAppNotification[]>([])
+/**
+ * The server's unread count. The list is the newest fifty, so counting the
+ * unread rows in it understated the badge for anybody with more waiting.
+ */
+const unreadTotal = ref(0)
 const listeners = new Set<(event: ILiveEvent) => void>()
 let unsubscribe: (() => void) | null = null
+/** The workspace the live stream was opened for. */
+let connectedSlug: string | null = null
+
+/**
+ * How often the inbox is re-read regardless of the stream.
+ *
+ * The stream is fed in-process, by the same server instance that handled the
+ * write. On Workers that is often not the instance holding this tab's
+ * stream, and the cron that raises due-date reminders never is, so without
+ * this the bell and the desktop notification only caught up on a reload.
+ */
+const POLL_MS = 60_000
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
 /**
  * Verbs that might have produced a notification for somebody. A superset of
@@ -101,6 +119,7 @@ let reloadTimer: ReturnType<typeof setTimeout> | null = null
 
 const NOTIFY_VERBS = new Set([
   'goal.created',
+  'goal.updated',
   'goal.owner_changed',
   'goal.checked_in',
   'goal.check_in_updated',
@@ -177,6 +196,26 @@ export function notificationPath(n: IAppNotification): string | null {
   return null
 }
 
+/**
+ * The line under a desktop notification, which says why it reached you.
+ *
+ * It said "card" whatever the notification was about, so a comment on a page
+ * or a check-in on a goal you own arrived described as a card.
+ */
+export function announceReason(n: IAppNotification): string {
+  if (n.reason === 'mention') return 'You were mentioned'
+  if (n.goalNumber !== null)
+    return n.reason === 'assigned'
+      ? 'On a goal you own'
+      : 'On a goal you follow'
+  if (n.itemKey)
+    return n.reason === 'assigned'
+      ? 'On a card assigned to you'
+      : 'On a card you are part of'
+  if (n.docSlug) return 'On a page you are part of'
+  return 'About your account'
+}
+
 export function useWorkspace() {
   async function loadMe(): Promise<boolean> {
     try {
@@ -204,7 +243,18 @@ export function useWorkspace() {
     setWorkspaceSlug(slug)
     try {
       overview.value = await api.overview()
+      const switched =
+        workspaceSlug.value !== '' && workspaceSlug.value !== slug
       workspaceSlug.value = slug
+      // The bell stays mounted across a switch, so it would go on showing
+      // the last workspace's inbox. Read this one afresh, and treat what is
+      // already waiting here as history rather than a burst of popups.
+      if (switched) {
+        notifications.value = []
+        unreadTotal.value = 0
+        inboxLoaded = false
+        void loadNotifications()
+      }
       return true
     } catch {
       workspaceSlug.value = ''
@@ -232,7 +282,15 @@ export function useWorkspace() {
   }
 
   function connect(): void {
-    if (unsubscribe) return
+    // The stream is opened for one workspace. Moving to another used to
+    // keep the first one's stream, so this workspace's bell only woke up
+    // when something happened in the other.
+    const slug = getWorkspaceSlug()
+    if (unsubscribe && connectedSlug === slug) return
+    unsubscribe?.()
+    connectedSlug = slug
+    if (!pollTimer)
+      pollTimer = setInterval(() => void loadNotifications(), POLL_MS)
     unsubscribe = subscribeEvents(
       (event) => {
         if (downTimer) {
@@ -314,6 +372,9 @@ export function useWorkspace() {
     const first = !inboxLoaded
     inboxLoaded = true
     notifications.value = fresh
+    const listed = fresh.filter((n) => !n.read).length
+    unreadTotal.value =
+      typeof res.unread === 'number' ? Math.max(res.unread, listed) : listed
     for (const n of fresh) {
       if (n.read || announced.has(n.id)) continue
       announced.add(n.id)
@@ -326,24 +387,22 @@ export function useWorkspace() {
   function announce(n: IAppNotification): void {
     if (typeof Notification === 'undefined') return
     if (Notification.permission !== 'granted') return
-    const body =
-      n.reason === 'mention'
-        ? 'You were mentioned'
-        : n.reason === 'assigned'
-          ? 'On a card assigned to you'
-          : 'On a card you are part of'
     const notice = new Notification(n.title, {
-      body,
+      body: announceReason(n),
       // One notification per item replaces the last rather than stacking
       // five of them for one busy card.
       tag: n.itemKey ?? n.id,
       icon: '/icons/acta-192.png',
     })
-    notice.onclick = () => {
+    notice.onclick = async () => {
       window.focus()
+      notice.close()
+      // Opening it from the desktop is reading it, exactly as opening it
+      // from the bell is. Left unread, it stayed in the badge and the
+      // reminder email still went out for something already seen.
+      await markRead(n.id)
       const target = notificationPath(n)
       if (target) window.location.href = target
-      notice.close()
     }
   }
 
@@ -360,10 +419,13 @@ export function useWorkspace() {
       ...n,
       read: true,
     }))
+    unreadTotal.value = 0
     await api.notificationRead().catch(() => undefined)
   }
 
   async function markRead(id: string): Promise<void> {
+    if (notifications.value.some((n) => n.id === id && !n.read))
+      unreadTotal.value = Math.max(0, unreadTotal.value - 1)
     notifications.value = notifications.value.map((n) =>
       n.id === id ? { ...n, read: true } : n,
     )
@@ -376,6 +438,9 @@ export function useWorkspace() {
     overview.value = null
     unsubscribe?.()
     unsubscribe = null
+    connectedSlug = null
+    if (pollTimer) clearInterval(pollTimer)
+    pollTimer = null
   }
 
   return {
@@ -396,9 +461,7 @@ export function useWorkspace() {
     listWorkspaces,
     defaultWorkspaceSlug,
     notifications: computed(() => notifications.value),
-    unreadCount: computed(
-      () => notifications.value.filter((n) => !n.read).length,
-    ),
+    unreadCount: computed(() => unreadTotal.value),
     markAllRead,
     markRead,
     loadNotifications,
@@ -488,8 +551,23 @@ export function useDocPreview() {
 
 const DENSE_ROUTES = new Set(['space', 'docs'])
 
+/**
+ * A card to point at once its space is on screen: scrolled to and briefly
+ * ringed. Set by "Show on its space" in the inspector, which also keeps the
+ * card open, so arriving at the board never means losing the card. `at`
+ * makes asking twice for the same card a change the space can see.
+ */
+const revealCard = ref<{ key: string; at: number } | null>(null)
+
 export function useUiState() {
-  return { newSpaceOpen, itemModalKey, sidebarChoice, newGoal, goalsVersion }
+  return {
+    newSpaceOpen,
+    itemModalKey,
+    sidebarChoice,
+    newGoal,
+    goalsVersion,
+    revealCard,
+  }
 }
 
 export function sidebarDefaultFor(routeName: unknown): TSidebarVariant {

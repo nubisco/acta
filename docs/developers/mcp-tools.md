@@ -11,7 +11,7 @@ store configured (it does in every standard deployment). Those marked
 | `item_get`           |           | Full detail for up to 50 items by key: description, comments, checklists, links and backlinks, attachments, optionally the activity tail. Old keys from cross-space moves resolve automatically.                                                                                                                   |
 | `item_write`         | **write** | Batch item mutations. See below.                                                                                                                                                                                                                                                                                   |
 | `goal_list`          |           | Every goal with its status and measured progress, plus a summary: counts by status, how many are past their date or quiet for a month, and the work across all goals in flight. See [Goals](#goals).                                                                                                               |
-| `goal_get`           |           | Up to 20 goals in full: description, followers, ancestors, sub-goals with their own progress, every card counted toward the goal, and the check-ins.                                                                                                                                                               |
+| `goal_get`           |           | Up to 20 goals in full: description, followers, ancestors, sub-goals with their own progress, every card counted toward the goal with its assignees, and the check-ins. `include: ["tree"]` adds each card's parent and open blockers.                                                                             |
 | `goal_write`         | **write** | Batch goal mutations. See [Goals](#goals).                                                                                                                                                                                                                                                                         |
 | `space_write`        | **write** | Create and change spaces and lists: `create` (with the `kanban6` template), `update`, `archive`, `list_create`, `list_update`, `list_archive`.                                                                                                                                                                     |
 | `doc_tree`           |           | The document hierarchy as a flat, depth-annotated list. Optionally scoped to a subtree.                                                                                                                                                                                                                            |
@@ -90,6 +90,13 @@ every read: `cards_total`, `cards_done`, `cards_active`, `cards_waiting`,
 counting as 1. The rows also carry `overdue` (in flight and past its target
 date), `stale` (in flight with no check-in for 30 days), `elapsed` (how much of
 the date window has gone) and `metric` with its own `percent`.
+
+`goal_get` lists the cards a goal counts itself in `items`, each with
+`assignees` (handles) so it is clear who is on what. `include: ["tree"]` adds
+two fields per card for drawing the work as a tree: `parent`, the card it is
+directly a part of, and `blocked_by`, its open blockers as `{key, title,
+space}`. A blocker that is completed or archived drops out, and one may live on
+any space without serving the goal.
 
 `space_get` takes `goal` to return only the cards serving it, sub-goals and
 parts included, and `item_get` returns the goals each card serves, with `via`

@@ -694,6 +694,8 @@ interface IGoalCard {
   weight: number
   /** The linked card this one is reached through, when it is a part. */
   via_id: string | null
+  /** The card it is directly a part of, whether or not that serves the goal. */
+  parent_id: string | null
 }
 
 export interface IGoalProgress {
@@ -782,6 +784,7 @@ async function cardsByGoal(
     size: number | null
     due: number | null
     waiting: number
+    parent_id: string | null
   }>(
     `WITH RECURSIVE gi(goal_id, root_id, item_id) AS (
        SELECT goal_id, item_id, item_id FROM goal_item
@@ -790,7 +793,7 @@ async function cardsByGoal(
        SELECT gi.goal_id, gi.root_id, c.id FROM gi JOIN item c ON c.parent_id = gi.item_id
      )
      SELECT gi.goal_id, gi.root_id, i.id, i.key, i.title, s.key AS space_key,
-            l.name AS list, l.role, i.completed, i.size, i.due,
+            l.name AS list, l.role, i.completed, i.size, i.due, i.parent_id,
             EXISTS (SELECT 1 FROM item_dependency d JOIN item b ON b.id = d.blocker_id
                      WHERE d.blocked_id = i.id AND b.completed = 0 AND b.archived = 0) AS waiting
        FROM gi
@@ -823,6 +826,7 @@ async function cardsByGoal(
       overdue: !done && r.due !== null && r.due < today,
       weight: r.size ?? 1,
       via_id: linked ? null : r.root_id,
+      parent_id: r.parent_id,
     })
   }
   return out
@@ -1123,9 +1127,13 @@ export async function goalGet(ctx: ICtx, params: z.infer<typeof zGoalGet>) {
         title: a.title,
       })),
     }
-    if (include.has('items')) {
+    if (include.has('items') || include.has('tree')) {
       const own = set.own.get(g.id) ?? new Map<string, IGoalCard>()
       const keyOf = (id: string | null) => (id ? own.get(id)?.key : undefined)
+      const people = await assigneesOf(ctx, g.id)
+      const blockers = include.has('tree')
+        ? await blockersOf(ctx, g.id)
+        : undefined
       row.items = [...own.values()].map((c) => ({
         key: c.key,
         title: c.title,
@@ -1140,6 +1148,20 @@ export async function goalGet(ctx: ICtx, params: z.infer<typeof zGoalGet>) {
         linked: c.via_id === null || undefined,
         /** The linked card it is a part of. */
         via: keyOf(c.via_id),
+        /** Handles, so a reader can tell who is on it and what is free. */
+        assignees: people.get(c.id),
+        ...(blockers && {
+          /**
+           * The card it is directly a part of, for nesting. A parent that no
+           * longer serves the goal (archived, say) falls back to the linked
+           * card, so the part still has somewhere to hang.
+           */
+          parent:
+            c.via_id === null
+              ? undefined
+              : (keyOf(c.parent_id) ?? keyOf(c.via_id)),
+          blocked_by: blockers.get(c.id),
+        }),
       }))
     }
     if (include.has('check_ins')) {
@@ -1185,6 +1207,80 @@ function ancestorsOf(set: IGoalSet, g: IGoalRow): IGoalRow[] {
     out.push(cursor)
     seen.add(cursor.id)
     cursor = cursor.parent_id ? set.byId.get(cursor.parent_id) : undefined
+  }
+  return out
+}
+
+/**
+ * The cards a goal counts itself, linked and every part below them, as a
+ * subquery taking the goal's id. The same walk `cardsByGoal` makes, without
+ * sub-goals, so the extras below line up with `items` card for card.
+ */
+const OWN_ITEMS_SQL = `
+  WITH RECURSIVE gi(item_id) AS (
+    SELECT item_id FROM goal_item WHERE goal_id = ?
+    UNION
+    SELECT c.id FROM item c JOIN gi ON c.parent_id = gi.item_id
+  )`
+
+/** Who is on each of a goal's cards, by card id, handles in order. */
+async function assigneesOf(
+  ctx: ICtx,
+  goalId: string,
+): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>()
+  for (const r of await ctx.db.query<{ item_id: string; handle: string }>(
+    `${OWN_ITEMS_SQL}
+     SELECT ia.item_id, a.handle
+       FROM gi
+       JOIN item_assignee ia ON ia.item_id = gi.item_id
+       JOIN actor a ON a.id = ia.actor_id
+      ORDER BY a.handle`,
+    [goalId],
+  )) {
+    const list = out.get(r.item_id) ?? []
+    list.push(r.handle)
+    out.set(r.item_id, list)
+  }
+  return out
+}
+
+interface IGoalBlocker {
+  key: string
+  title: string
+  space: string
+}
+
+/**
+ * What each of a goal's cards is still waiting on, by card id. Open blockers
+ * only, the same test `waiting` makes, so a card with blockers listed is a
+ * card counted as waiting. A blocker can live on any space and need not serve
+ * the goal at all, so it carries its own title rather than a key to look up.
+ */
+async function blockersOf(
+  ctx: ICtx,
+  goalId: string,
+): Promise<Map<string, IGoalBlocker[]>> {
+  const out = new Map<string, IGoalBlocker[]>()
+  for (const r of await ctx.db.query<{
+    blocked_id: string
+    key: string
+    title: string
+    space: string
+  }>(
+    `${OWN_ITEMS_SQL}
+     SELECT d.blocked_id, b.key, b.title, s.key AS space
+       FROM gi
+       JOIN item_dependency d ON d.blocked_id = gi.item_id
+       JOIN item b ON b.id = d.blocker_id
+       JOIN space s ON s.id = b.space_id
+      WHERE b.completed = 0 AND b.archived = 0
+      ORDER BY b.key`,
+    [goalId],
+  )) {
+    const list = out.get(r.blocked_id) ?? []
+    list.push({ key: r.key, title: r.title, space: r.space })
+    out.set(r.blocked_id, list)
   }
   return out
 }

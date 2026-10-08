@@ -10,6 +10,9 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 const listed = vi.fn()
 const markRead = vi.fn(async (_id?: string) => ({ ok: true }))
+/** Streams opened, by the workspace each was opened for. */
+const streams: { slug: string; closed: boolean }[] = []
+let slug = 'nubisco'
 vi.mock('@/api/client', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
   return {
@@ -18,8 +21,19 @@ vi.mock('@/api/client', async (importOriginal) => {
       ...(actual.api as object),
       notifications: () => listed(),
       notificationRead: (id?: string) => markRead(id),
+      overview: async () => ({ spaces: [] }),
     },
-    getWorkspaceSlug: () => 'nubisco',
+    getWorkspaceSlug: () => slug,
+    setWorkspaceSlug: (next: string) => {
+      slug = next
+    },
+    subscribeEvents: () => {
+      const stream = { slug, closed: false }
+      streams.push(stream)
+      return () => {
+        stream.closed = true
+      }
+    },
   }
 })
 
@@ -45,18 +59,24 @@ const row = (id: string, read = false) => ({
   read_at: read ? 1756000000001 : null,
 })
 
-let shown: { title: string; opts: NotificationOptions }[] = []
+let shown: {
+  title: string
+  opts: NotificationOptions
+  notice: { onclick: (() => unknown) | null }
+}[] = []
 
 beforeEach(() => {
   shown = []
+  streams.length = 0
+  slug = 'nubisco'
   listed.mockReset()
   markRead.mockClear()
   class FakeNotification {
     static permission: NotificationPermission = 'granted'
     static requestPermission = vi.fn(async () => 'granted' as const)
-    onclick: (() => void) | null = null
+    onclick: (() => unknown) | null = null
     constructor(title: string, opts: NotificationOptions) {
-      shown.push({ title, opts })
+      shown.push({ title, opts, notice: this })
     }
     close() {}
   }
@@ -120,6 +140,114 @@ describe('desktop notifications', () => {
     await ws.loadNotifications()
     listed.mockResolvedValue({ notifications: [row('b')], unread: 1 })
     await ws.loadNotifications()
+    expect(shown).toHaveLength(0)
+  })
+})
+
+describe('what the bell and the desktop say', () => {
+  it('counts every unread notification, not only the ones in the list', async () => {
+    // The list is the newest fifty. Somebody with eighty waiting has eighty.
+    listed.mockResolvedValue({ notifications: [row('a')], unread: 80 })
+    const ws = await freshStore()
+    await ws.loadNotifications()
+    expect(ws.unreadCount.value).toBe(80)
+    await ws.markRead('a')
+    expect(ws.unreadCount.value).toBe(79)
+    await ws.markAllRead()
+    expect(ws.unreadCount.value).toBe(0)
+  })
+
+  it('describes a goal as a goal and a page as a page', async () => {
+    const { announceReason } = await import('@/stores/workspace')
+    const base = {
+      id: 'x',
+      title: 't',
+      verb: 'goal.checked_in',
+      itemKey: null,
+      docSlug: null,
+      goalNumber: null,
+      actorHandle: null,
+      timestamp: '',
+      read: false,
+    }
+    expect(announceReason({ ...base, reason: 'assigned', goalNumber: 1 })).toBe(
+      'On a goal you own',
+    )
+    expect(announceReason({ ...base, reason: 'involved', goalNumber: 1 })).toBe(
+      'On a goal you follow',
+    )
+    expect(
+      announceReason({ ...base, reason: 'involved', docSlug: 'spec' }),
+    ).toBe('On a page you are part of')
+    expect(
+      announceReason({ ...base, reason: 'mention', docSlug: 'spec' }),
+    ).toBe('You were mentioned')
+  })
+
+  it('marks a notification read when its desktop popup is clicked', async () => {
+    listed.mockResolvedValue({ notifications: [], unread: 0 })
+    const ws = await freshStore()
+    await ws.loadNotifications()
+    listed.mockResolvedValue({
+      notifications: [
+        {
+          ...row('m'),
+          reason: 'assigned',
+          verb: 'member.updated',
+          summary: 'you are now an admin',
+          item_key: null,
+        },
+      ],
+      unread: 1,
+    })
+    await ws.loadNotifications()
+    expect(shown[0].opts.body).toBe('About your account')
+
+    await shown[0].notice.onclick?.()
+    expect(markRead).toHaveBeenCalledWith('m')
+    expect(ws.unreadCount.value).toBe(0)
+  })
+})
+
+describe('keeping the bell current', () => {
+  it('re-reads the inbox on a timer, for writes the stream never carries', async () => {
+    vi.useFakeTimers()
+    try {
+      listed.mockResolvedValue({ notifications: [], unread: 0 })
+      const ws = await freshStore()
+      ws.connect()
+      expect(listed).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(listed).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('follows a move to another workspace with its stream and its inbox', async () => {
+    listed.mockResolvedValue({ notifications: [row('a')], unread: 1 })
+    const ws = await freshStore()
+    await ws.enterWorkspace('nubisco')
+    ws.connect()
+    await ws.loadNotifications()
+    expect(streams.map((s) => s.slug)).toEqual(['nubisco'])
+
+    listed.mockResolvedValue({
+      notifications: [row('b'), row('c')],
+      unread: 2,
+    })
+    await ws.enterWorkspace('acme')
+    ws.connect()
+    await vi.waitFor(() =>
+      expect(ws.notifications.value.map((n) => n.id)).toEqual(['b', 'c']),
+    )
+
+    // One stream, for the workspace on screen.
+    expect(streams.map((s) => [s.slug, s.closed])).toEqual([
+      ['nubisco', true],
+      ['acme', false],
+    ])
+    // What was already waiting in the other workspace is history there too.
     expect(shown).toHaveLength(0)
   })
 })

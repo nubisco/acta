@@ -719,6 +719,51 @@ export function authRoutes(
   })
 
   /**
+   * Which walkthroughs this person has been through, and how each ended.
+   * The app reads the whole map once, and settings resets one at a time so
+   * it plays again the next time whatever starts it happens.
+   */
+  app.get('/me/walkthroughs', requireAuth(), async (c) => {
+    return c.json({
+      walkthroughs: await walkthroughsOf(c.get('db'), c.get('actor').id),
+    })
+  })
+
+  app.put('/me/walkthroughs/:id', requireAuth(), async (c) => {
+    const id = c.req.param('id')
+    if (!WALKTHROUGH_ID.test(id))
+      return c.json({ error: 'bad walkthrough id' }, 400)
+    const parsed = zWalkthroughRecord.safeParse(
+      await c.req.json().catch(() => null),
+    )
+    if (!parsed.success) return c.json({ error: 'bad walkthrough record' }, 400)
+    const db = c.get('db')
+    const actor = c.get('actor')
+    const all = await walkthroughsOf(db, actor.id)
+    all[id] = parsed.data
+    // A handful exist. The cap only stops a client from growing the row.
+    if (Object.keys(all).length > 64)
+      return c.json({ error: 'too many walkthroughs' }, 400)
+    await db.run('UPDATE actor SET walkthroughs = ? WHERE id = ?', [
+      JSON.stringify(all),
+      actor.id,
+    ])
+    return c.json({ ok: true })
+  })
+
+  app.delete('/me/walkthroughs/:id', requireAuth(), async (c) => {
+    const db = c.get('db')
+    const actor = c.get('actor')
+    const all = await walkthroughsOf(db, actor.id)
+    delete all[c.req.param('id')]
+    await db.run('UPDATE actor SET walkthroughs = ? WHERE id = ?', [
+      JSON.stringify(all),
+      actor.id,
+    ])
+    return c.json({ ok: true })
+  })
+
+  /**
    * The workspaces this person can open. Drives the picker, and lets the app
    * skip it entirely when there is only one, which is the common case.
    */
@@ -780,6 +825,36 @@ export function requireAuth(
 }
 
 /** The token on the request, from either the bearer header or the cookie. */
+const WALKTHROUGH_ID = /^[a-z0-9][a-z0-9-]{0,63}$/
+
+/** One walkthrough's outcome, as @nubisco/ui's walkthrough storage writes it. */
+const zWalkthroughRecord = z.object({
+  version: z.number().int().min(0).max(1_000_000),
+  outcome: z.enum(['finish', 'skip']),
+  completedAt: z.string().max(40),
+})
+
+type TWalkthroughs = Record<string, z.infer<typeof zWalkthroughRecord>>
+
+async function walkthroughsOf(
+  db: ISqlDriver,
+  actorId: string,
+): Promise<TWalkthroughs> {
+  const row = (
+    await db.query<{ walkthroughs: string | null }>(
+      'SELECT walkthroughs FROM actor WHERE id = ?',
+      [actorId],
+    )
+  )[0]
+  if (!row?.walkthroughs) return {}
+  try {
+    const parsed = JSON.parse(row.walkthroughs) as unknown
+    return parsed && typeof parsed === 'object' ? (parsed as TWalkthroughs) : {}
+  } catch {
+    return {}
+  }
+}
+
 async function authedFrom(c: {
   get: (k: 'db') => ISqlDriver
   req: { header: (n: string) => string | undefined }

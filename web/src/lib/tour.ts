@@ -78,6 +78,121 @@ export const introTour: IWalkthrough = {
   ],
 }
 
+/**
+ * Goals, the first time someone opens them (Jose, 2026-10-08: people did not
+ * know what a goal was for or how status and progress differ). Targets are on
+ * the goals page. Opened straight onto one goal instead, the steps that point
+ * at the page are dropped and the ones that only explain still play.
+ */
+export const goalsTour: IWalkthrough = {
+  id: 'acta-goals',
+  version: 1,
+  steps: [
+    {
+      title: 'Goals: what the work is for',
+      body: 'A goal names an outcome, such as "New customers can set up on their own", and gathers the cards that get you there, from any space.',
+    },
+    {
+      target: 'goals-create',
+      title: 'Create a goal',
+      body: 'Give it a title, an owner who steers it, and a target date if it has one. A goal can sit under another goal as a sub-goal.',
+      placement: 'bottom',
+    },
+    {
+      target: 'goals-breakdown',
+      title: 'How they all stand',
+      body: "Status is the owner's judgement, posted in check-ins: on track, at risk or off track. Hover any term for what it means, and click a status to show only those goals.",
+      placement: 'bottom',
+    },
+    {
+      target: 'goals-table',
+      title: 'Progress is measured, not declared',
+      body: 'The bar on each goal comes from its cards and their parts, weighted by size. Status and progress are separate on purpose: a goal can be 80% done and still at risk.',
+      placement: 'top',
+    },
+    {
+      title: 'Linking cards',
+      body: 'Open a goal and link the cards that serve it. Or open any card and pick a goal in its Goals section. The board then shows the goal on each card.',
+    },
+    {
+      title: 'Check in regularly',
+      body: 'The owner posts a check-in with a status and a note. A goal without one for a month is flagged, and Home lists the goals that need a look. You can replay this walkthrough from Settings, under Walkthroughs.',
+    },
+  ],
+}
+
+/**
+ * Notifications, the first time someone closes the bell. Ends in Settings,
+ * on the control that allows desktop notifications on this device, because
+ * that is the part nobody finds on their own.
+ */
+export const notificationsTour: IWalkthrough = {
+  id: 'acta-notifications',
+  version: 1,
+  steps: [
+    {
+      target: 'notifications',
+      title: 'Your notifications',
+      body: 'Anything that needs you lands here: a mention, a card assigned to you, a change to a card you work on. The number counts what you have not opened.',
+      placement: 'right',
+    },
+    {
+      id: 'notify-go-settings',
+      title: 'Nothing slips past',
+      body: 'Leave something unread for a while and Acta emails it to you, gathered into one message. Next, the settings where you decide how this works.',
+    },
+    {
+      target: 'notify-email',
+      title: 'When Acta emails you',
+      body: 'Choose how long an unread notification waits before Acta emails it, or turn the emails off.',
+      placement: 'bottom',
+    },
+    {
+      target: 'notify-device',
+      title: 'Notifications on this device',
+      body: 'Allow them here to get a desktop notification the moment something arrives, while Acta is open in a tab. Each browser asks separately, so do this on every computer you use.',
+      placement: 'bottom',
+    },
+  ],
+}
+
+export type TTourName = 'intro' | 'goals' | 'notifications'
+
+/** Every walkthrough, as Settings lists them, in the order a person meets them. */
+export const WALKTHROUGHS: {
+  name: TTourName
+  walkthrough: IWalkthrough
+  title: string
+  description: string
+  /** What makes it play, finishing the sentence "Plays ..." */
+  plays: string
+}[] = [
+  {
+    name: 'intro',
+    walkthrough: introTour,
+    title: 'Getting around Acta',
+    description:
+      'Where things live: spaces, cards, filters, goals, documents and search.',
+    plays: 'the next time you load Acta',
+  },
+  {
+    name: 'goals',
+    walkthrough: goalsTour,
+    title: 'Goals',
+    description:
+      'What a goal is, how status differs from progress, and how cards count towards one.',
+    plays: 'the next time you open Goals',
+  },
+  {
+    name: 'notifications',
+    walkthrough: notificationsTour,
+    title: 'Notifications',
+    description:
+      'What reaches you, when Acta emails you, and how to allow notifications on this device.',
+    plays: 'the next time you close the notifications panel',
+  },
+]
+
 export const tourLabels: IWalkthroughLabels = {
   back: 'Back',
   next: 'Next',

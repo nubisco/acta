@@ -17,6 +17,7 @@
     <SettingsAutomation v-else-if="tab === 'automation'" />
     <SettingsNotifications v-else-if="tab === 'notifications'" />
     <SettingsAccount v-else-if="tab === 'account'" />
+    <SettingsWalkthroughs v-else-if="tab === 'walkthroughs'" />
   </div>
 </template>
 
@@ -49,7 +50,8 @@
  * which is why it is short: the old one had grown past a thousand lines with
  * every section's state interleaved in a single script block.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useShellSlot } from '@nubisco/ui'
 import { useWorkspace } from '@/stores/workspace'
 import SettingsPeople from '@/components/settings/SettingsPeople.vue'
@@ -58,19 +60,44 @@ import SettingsLabels from '@/components/settings/SettingsLabels.vue'
 import SettingsAutomation from '@/components/settings/SettingsAutomation.vue'
 import SettingsNotifications from '@/components/settings/SettingsNotifications.vue'
 import SettingsAccount from '@/components/settings/SettingsAccount.vue'
+import SettingsWalkthroughs from '@/components/settings/SettingsWalkthroughs.vue'
 
 const filterBar = useShellSlot('fixedbar')
 const ws = useWorkspace()
 
-const tab = ref('people')
+const route = useRoute()
+const router = useRouter()
+
 const tabs = computed(() => [
   { id: 'people', label: 'People' },
   ...(ws.isAdmin.value ? [{ id: 'workspace', label: 'Workspace' }] : []),
   { id: 'labels', label: 'Labels' },
   { id: 'automation', label: 'Automation' },
   { id: 'notifications', label: 'Notifications' },
+  { id: 'walkthroughs', label: 'Walkthroughs' },
   { id: 'account', label: 'Your account' },
 ])
+
+/**
+ * The tab is in the URL, so a link (the bell's settings button, a
+ * walkthrough that ends here) can land on the right one, and a reload stays
+ * where it was.
+ */
+function tabFrom(raw: unknown): string {
+  return typeof raw === 'string' && tabs.value.some((t) => t.id === raw)
+    ? raw
+    : 'people'
+}
+
+const tab = ref(tabFrom(route.query.tab))
+watch(
+  () => route.query.tab,
+  (raw) => (tab.value = tabFrom(raw)),
+)
+watch(tab, (id) => {
+  if (route.query.tab === id) return
+  void router.replace({ query: { ...route.query, tab: id } })
+})
 </script>
 
 <style scoped lang="scss">

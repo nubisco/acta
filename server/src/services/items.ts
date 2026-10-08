@@ -752,6 +752,18 @@ async function applyItemOp(
     }
     case 'assign': {
       const item = await itemByKey(ctx, op.key)
+      // Who held it before, so only a real change counts. An agent or a
+      // second tab sending the whole set again used to tell everyone already
+      // on the card that it was theirs, and tell people who were never on it
+      // that they had been taken off.
+      const holding = new Set(
+        (
+          await ctx.db.query<{ actor_id: string }>(
+            'SELECT actor_id FROM item_assignee WHERE item_id = ?',
+            [item.id],
+          )
+        ).map((r) => r.actor_id),
+      )
       const added: string[] = []
       const removed: string[] = []
       for (const ref of op.add ?? []) {
@@ -760,7 +772,8 @@ async function applyItemOp(
           'INSERT OR IGNORE INTO item_assignee (item_id, actor_id) VALUES (?, ?)',
           [item.id, actor.id],
         )
-        added.push(actor.id)
+        if (!holding.has(actor.id) && !added.includes(actor.id))
+          added.push(actor.id)
       }
       for (const ref of op.remove ?? []) {
         const actor = await actorByRef(ctx, ref)
@@ -768,8 +781,12 @@ async function applyItemOp(
           'DELETE FROM item_assignee WHERE item_id = ? AND actor_id = ?',
           [item.id, actor.id],
         )
-        removed.push(actor.id)
+        if (holding.has(actor.id) && !removed.includes(actor.id))
+          removed.push(actor.id)
       }
+      // Nothing moved: nothing to write into the history and nobody to tell.
+      if (added.length === 0 && removed.length === 0)
+        return { key: item.key, rev: item.rev }
       const rev = await bumpRev(ctx, item)
       await emitEvent(
         ctx,

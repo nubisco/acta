@@ -102,9 +102,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { wpath } from '@/lib/paths'
+import { useTours } from '@/lib/tours'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import {
   notificationPath,
@@ -121,6 +122,16 @@ const inspector = useInspector()
 
 const open = ref(false)
 const loading = ref(false)
+
+// The notifications walkthrough plays once the panel is closed for the
+// first time: the reader has seen what lands here, and the tour then shows
+// where it is set up. Not while it is open, which would cover the list they
+// opened it to read. The pause lets the panel finish closing.
+const tours = useTours()
+watch(open, (now, before) => {
+  if (before && !now)
+    setTimeout(() => void tours.maybeStart('notifications'), 250)
+})
 const failed = ref(false)
 
 const entries = computed(() => ws.notifications.value)
@@ -179,7 +190,7 @@ function openEntry(entry: IAppNotification): void {
 
 function openSettings(): void {
   open.value = false
-  void router.push(wpath('/settings'))
+  void router.push(wpath('/settings?tab=notifications'))
 }
 
 async function markAllRead(): Promise<void> {

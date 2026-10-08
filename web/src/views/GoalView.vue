@@ -183,6 +183,21 @@
               </h2>
               <span class="goal-view__boards">
                 <NbButton
+                  v-if="items.length > 0"
+                  v-nb-tooltip="{
+                    body: asTree
+                      ? 'Show the cards as a flat list'
+                      : 'Show each card with its parts and what blocks it',
+                  }"
+                  size="xs"
+                  :variant="asTree ? 'secondary' : 'ghost'"
+                  icon="tree-structure"
+                  :aria-pressed="asTree"
+                  @click="setAsTree(!asTree)"
+                >
+                  Tree
+                </NbButton>
+                <NbButton
                   v-for="space in spaces"
                   :key="space"
                   size="xs"
@@ -198,6 +213,11 @@
               Link the cards that get this goal done. Everything that is part of
               a linked card counts too, on whatever space it lives.
             </p>
+            <GoalCardTree
+              v-else-if="asTree"
+              :items="items"
+              @open="(key) => inspector.open(key)"
+            />
             <NbDataTable
               v-else
               :columns="cardColumns"
@@ -215,7 +235,9 @@
                   >
                     {{ (row as IGoalCard).key }}
                   </span>
-                  <span class="goal-view__card-title">
+                  <span
+                    class="goal-view__card-title goal-view__card-title--wraps"
+                  >
                     {{ (row as IGoalCard).title }}
                   </span>
                 </span>
@@ -226,39 +248,11 @@
                   {{ (row as IGoalCard).list }}
                 </span>
               </template>
+              <template #cell-people="{ row }">
+                <GoalCardPeople :assignees="(row as IGoalCard).assignees" />
+              </template>
               <template #cell-state="{ row }">
-                <NbBadge
-                  v-if="(row as IGoalCard).done"
-                  size="sm"
-                  variant="green"
-                >
-                  Done
-                </NbBadge>
-                <NbBadge
-                  v-else-if="(row as IGoalCard).overdue"
-                  size="sm"
-                  variant="red"
-                  dot
-                >
-                  Late
-                </NbBadge>
-                <NbBadge
-                  v-else-if="(row as IGoalCard).waiting"
-                  size="sm"
-                  variant="orange"
-                  dot
-                >
-                  Waiting
-                </NbBadge>
-                <NbBadge
-                  v-else-if="(row as IGoalCard).active"
-                  size="sm"
-                  variant="blue"
-                  dot
-                >
-                  Moving
-                </NbBadge>
-                <NbBadge v-else size="sm" variant="grey">To do</NbBadge>
+                <GoalCardState :card="row as IGoalCard" />
               </template>
               <template #cell-how="{ row }">
                 <span v-if="(row as IGoalCard).linked" class="goal-view__muted">
@@ -432,7 +426,7 @@
  * the check-ins are on the other, written by people. Laid side by side they
  * can disagree in plain view, which is the reason to look at a goal at all.
  */
-import { computed, onScopeDispose, ref, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useConfirm, useShellSlot, useToast } from '@nubisco/ui'
 import { api, ApiHttpError, newOpId } from '@/api/client'
@@ -445,7 +439,11 @@ import ActorAvatar from '@/components/ActorAvatar.vue'
 import ActorChip from '@/components/ActorChip.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
+import { useTours } from '@/lib/tours'
+import GoalCardPeople from '@/components/goals/GoalCardPeople.vue'
 import GoalCardPicker from '@/components/goals/GoalCardPicker.vue'
+import GoalCardState from '@/components/goals/GoalCardState.vue'
+import GoalCardTree from '@/components/goals/GoalCardTree.vue'
 import GoalCheckInModal from '@/components/goals/GoalCheckInModal.vue'
 import GoalFormModal from '@/components/goals/GoalFormModal.vue'
 import GoalProgress from '@/components/goals/GoalProgress.vue'
@@ -456,6 +454,7 @@ const props = defineProps<{ number: number }>()
 const ws = useWorkspace()
 const ui = useUiState()
 const inspector = useInspector()
+const tours = useTours()
 const router = useRouter()
 const toast = useToast()
 const confirm = useConfirm()
@@ -479,15 +478,50 @@ const spaces = computed(() => [...new Set(items.value.map((i) => i.space))])
 
 const cardColumns = [
   { key: 'title', header: 'Card' },
-  { key: 'where', header: 'Where', width: 200 },
-  { key: 'state', header: 'State', width: 110 },
-  { key: 'how', header: 'Counted as', width: 130 },
+  { key: 'people', header: 'Assignees', width: 110 },
+  { key: 'where', header: 'Where', width: 110 },
+  { key: 'state', header: 'State', width: 90 },
+  { key: 'how', header: 'Counted as', width: 100 },
 ]
+
+/**
+ * The card list as a flat table or as a tree of parts and blockers. How one
+ * person likes to read it, so it is remembered in this browser only.
+ */
+const TREE_STORAGE_KEY = 'acta:goal-cards-tree'
+
+function loadAsTree(): boolean {
+  try {
+    return window.localStorage.getItem(TREE_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+const asTree = ref(loadAsTree())
+
+function setAsTree(value: boolean): void {
+  asTree.value = value
+  try {
+    window.localStorage.setItem(TREE_STORAGE_KEY, value ? '1' : '0')
+  } catch {
+    // Not remembered, still applied for this visit.
+  }
+}
 
 async function reload(): Promise<void> {
   notFound.value = false
-  const result = await load.run(api.goalGet([props.number]))
-  if (result) goal.value = result.goals[0] ?? null
+  // The tree's fields come with every read, so switching to it is instant
+  // and needs no second request.
+  const result = await load.run(
+    api.goalGet([props.number], ['items', 'check_ins', 'tree']),
+  )
+  if (result) {
+    goal.value = result.goals[0] ?? null
+    // Arriving at a goal straight from a link counts as opening goals.
+    await nextTick()
+    void tours.maybeStart('goals')
+  }
 }
 
 /**
@@ -810,6 +844,17 @@ async function onSaved(): Promise<void> {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+
+    /* In the card table a title on one line held the column at its full
+       length, which pushed the table wider than its panel once the
+       assignees had a column. Two lines, then the ellipsis. */
+    &--wraps {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      white-space: normal;
+    }
   }
 
   &__children {

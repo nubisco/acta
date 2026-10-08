@@ -223,3 +223,139 @@ describe('mcp endpoint', () => {
     expect(read.isError).toBe(false)
   })
 })
+
+/*
+ * An agent is somebody too. Writes over MCP go through the same services as
+ * the UI's, so the people they concern have to hear about them the same way,
+ * through the same endpoints the bell reads.
+ */
+describe('notifications from an agent', () => {
+  let ivanToken: string
+  let joseToken: string
+
+  const asHuman = (path: string, token: string, init: RequestInit = {}) =>
+    app.request(`/api/v1/w/nubisco${path}`, {
+      ...init,
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+    })
+
+  beforeEach(async () => {
+    const ws = (await db.query<{ id: string }>('SELECT id FROM workspace'))[0]
+      .id
+    const jose = (
+      await db.query<{ id: string }>(
+        "SELECT id FROM actor WHERE handle = 'jose'",
+      )
+    )[0].id
+    await db.run(
+      `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
+       VALUES ('act_ivan', ?, 'human', 'ivan', 'Ivan', 'ivan@nubisco.io', 'member', ?)`,
+      [ws, Date.now()],
+    )
+    ivanToken = await createToken(db, ws, 'act_ivan', 'session', [
+      'read',
+      'write',
+    ])
+    joseToken = await createToken(db, ws, jose, 'session', ['read', 'write'])
+    await call('space_write', {
+      ops: [{ op: 'create', op_id: 'b1', key: 'SUP', name: 'Support' }],
+    })
+  })
+
+  it('reaches the person an agent assigns or names, and only them', async () => {
+    await call('item_write', {
+      default_space: 'SUP',
+      ops: [
+        { op: 'create', op_id: 'i1', list: 'Backlog', title: 'Crash' },
+        { op: 'assign', op_id: 'a1', key: 'SUP-1', add: ['ivan'] },
+        {
+          op: 'comment',
+          op_id: 'c1',
+          key: 'SUP-1',
+          body: 'Repro attached, @Ivan',
+        },
+      ],
+    })
+
+    const res = await asHuman('/notifications', ivanToken)
+    expect(res.status).toBe(200)
+    const inbox = (await res.json()) as {
+      notifications: {
+        id: string
+        verb: string
+        reason: string
+        actor_handle: string
+      }[]
+      unread: number
+    }
+    expect(inbox.notifications.map((n) => n.verb).sort()).toEqual([
+      'comment.created',
+      'item.assigned',
+    ])
+    expect(
+      inbox.notifications.find((n) => n.verb === 'comment.created')?.reason,
+    ).toBe('mention')
+    // The face on the row is the agent's, not the person it acts for.
+    expect(inbox.notifications[0].actor_handle).toBe('claude')
+    expect(inbox.unread).toBe(2)
+
+    // Nobody else's inbox fills up with it.
+    const other = (await (
+      await asHuman('/notifications', joseToken)
+    ).json()) as { notifications: unknown[]; unread: number }
+    expect(other.notifications).toHaveLength(0)
+    expect(other.unread).toBe(0)
+
+    // Marking one read is that person's, and the count follows.
+    await asHuman('/notifications/read', ivanToken, {
+      method: 'POST',
+      body: JSON.stringify({ id: inbox.notifications[0].id }),
+    })
+    const after = (await (
+      await asHuman('/notifications', ivanToken)
+    ).json()) as { unread: number }
+    expect(after.unread).toBe(1)
+    await asHuman('/notifications/read', ivanToken, {
+      method: 'POST',
+      body: '{}',
+    })
+    const cleared = (await (
+      await asHuman('/notifications', ivanToken)
+    ).json()) as { unread: number }
+    expect(cleared.unread).toBe(0)
+  })
+
+  it('puts an agent write on the live stream the bell re-reads from', async () => {
+    const abort = new AbortController()
+    const res = await app.request('/api/v1/w/nubisco/events/stream', {
+      headers: { authorization: `Bearer ${ivanToken}` },
+      signal: abort.signal,
+    })
+    expect(res.status).toBe(200)
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+
+    await call('item_write', {
+      default_space: 'SUP',
+      ops: [
+        { op: 'create', op_id: 'i1', list: 'Backlog', title: 'Crash' },
+        { op: 'assign', op_id: 'a1', key: 'SUP-1', add: ['ivan'] },
+      ],
+    })
+
+    let seen = ''
+    while (!seen.includes('item.assigned')) {
+      const { value, done } = await reader.read()
+      if (done) break
+      seen += decoder.decode(value)
+    }
+    abort.abort()
+    expect(seen).toContain('"verb":"item.assigned"')
+    // The frame says that something happened, never what anybody was told:
+    // the inbox itself is only ever read per person, over GET.
+    expect(seen).not.toContain('ivan')
+  })
+})

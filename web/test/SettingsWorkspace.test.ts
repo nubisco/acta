@@ -20,6 +20,12 @@ vi.mock('@/api/client', () => ({
   getWorkspaceSlug: () => 'nubisco',
 }))
 
+// The tab is read from and written to the URL.
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}))
+
 vi.mock('@nubisco/ui', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>
   // The settings view asks the shell for the slot its tab strip goes in, and

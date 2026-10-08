@@ -71,7 +71,10 @@ export function useItem(itemKey: Ref<string>) {
   const assigneeOptions = ref<ISelectOptionView[]>([])
   const labelOptions = ref<ISelectOptionView[]>([])
   const lifecycle = ref<ILifecycleBadge | null>(null)
-  const linkFacts = ref<{ term: string; value: string }[]>([])
+  /** One reference to or from this card, with what the value opens. */
+  const linkFacts = ref<
+    { term: string; value: string; opens?: 'item' | 'doc' }[]
+  >([])
 
   function computeLifecycle(detail: IItemDetail): void {
     if (detail.archived)
@@ -107,10 +110,19 @@ export function useItem(itemKey: Ref<string>) {
         ...(detail.links?.out ?? []).map((link) => ({
           term: `→ ${link.ref_type}`,
           value: link.target,
+          opens:
+            link.ref_type === 'item' || link.ref_type === 'doc'
+              ? (link.ref_type as 'item' | 'doc')
+              : undefined,
         })),
         ...(detail.links?.in ?? []).map((link) => ({
           term: '← referenced by',
-          value: link.src_id,
+          value: link.src ?? link.src_id,
+          opens: !link.src
+            ? undefined
+            : link.src_kind === 'doc'
+              ? ('doc' as const)
+              : ('item' as const),
         })),
       ]
       const space = ws.overview.value?.spaces.find(

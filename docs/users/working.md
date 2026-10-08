@@ -70,6 +70,26 @@ can collapse, so a long description cannot bury the comments underneath it.
 The **Goals** section lists the [goals](/users/goals) the card serves,
 including ones it inherits from a card it is part of, and links it to another.
 
+The card's key, status and title stay pinned at the top of the inspector while
+the rest scrolls, so you always know which card you are reading.
+
+Every section has an info mark beside its name: hover or focus it for what the
+section is for. The count beside a section is a pill, and hovering it says what
+it counts: "1 of 2 ticked" on a checklist, "Waits on 1 card, holds up 0 cards"
+on Plan. A section with nothing in it shows a dimmed 0. The bin beside a
+checklist deletes that checklist, after asking.
+
+Any card key in the inspector opens that card: in the description, a comment,
+a checklist entry, the history, or the Links section. Keys are recognised for
+the spaces in your workspace, so "UTF-8" stays text, and a key inside code is
+left as written. When you open one card from another, the top of the inspector
+reads like a breadcrumb, **← CM-1 / CM-3**: the arrow or the first key takes
+you back to the card you came from.
+
+**Show on its space** (the board icon at the top) takes you to the card's
+space with the card still open, scrolls the board to it and rings it for a
+moment so you can find it.
+
 ### Plan
 
 ![A card open beside the sequence, showing its Plan section](/media/card-plan.jpg)
@@ -84,7 +104,7 @@ The **Plan** section is where a card takes its place in the sequence:
 
 ### Comments
 
-`[[@handle]]` notifies that member. `[[ENG-142]]` links to a card,
+`@handle` or `[[@handle]]` notifies that member. `[[ENG-142]]` links to a card,
 `[[doc:manual/vision]]` to a document. References are extracted on save, so the
 target knows it was mentioned.
 
@@ -276,18 +296,28 @@ documents in one index, and it is also how you jump to a card by key.
 ## Notifications
 
 The bell shows what you were mentioned in, assigned to, or are involved in.
-Involvement means you commented, were assigned, or created the thing.
+Involvement means you commented on the card or the page, or are assigned to
+the card. Creating a card on its own does not make you involved in it.
 
-You hear about it when somebody names you with `@`, in a card, in a comment or
-in the body of a document. You hear about a card being handed to you and about
-one being taken away again. You hear about the conversation on a card or a page
-you have already taken part in, about a card of yours being finished, reopened
-or archived, about a card of yours becoming blocked or stopping being blocked,
-and about a due date a day before it arrives and again once it has passed.
+You hear about it when somebody names you with `@handle` or `[[@handle]]`, in
+a card's description, in a comment, in the body of a document, or in a goal's
+description or check-in. Case does not matter, and an email address or text in
+code is never read as a name. You hear about a card being handed to you and
+about one being taken away again. You hear about the conversation on a card or
+a page you have already taken part in, about a card of yours being edited,
+moved, finished, reopened or archived, about a card of yours becoming blocked
+or stopping being blocked, and about a due date a day before it arrives and
+again once it has passed. A goal tells its owner when it is handed to them,
+and its owner and followers about each check-in.
 
 You never hear about your own actions, and you are not told twice for the same
 thing. Editing a comment that already named three people does not ring for them
-again, only for anybody you have just added.
+again, only for anybody you have just added. Assigning somebody who already
+holds a card tells nobody anything.
+
+An agent's writes reach people exactly as yours do. Only people are told:
+naming an agent or assigning it a card writes nothing to an inbox, because an
+agent does not have one.
 
 ### Being chased
 
@@ -301,8 +331,10 @@ looking.
 
 Choose the window, or turn it off, under **Settings → Notifications**. Ten
 minutes is the default. The same page is where you allow desktop
-notifications, which arrive the moment something happens while Acta is open in
-a tab. Browsers only accept that request from a real click, so Acta has to ask.
+notifications, which arrive while Acta is open in a tab: usually the moment
+something happens, and within a minute at most. Clicking one opens the thing
+and marks it read, as the bell does. Browsers only accept that request from a
+real click, so Acta has to ask.
 
 ### Changing a comment after you posted it
 
@@ -353,3 +385,17 @@ The distinction worth holding on to is whose name ends up in the history. An
 access token is you. An agent token, an ingest endpoint and a connection are
 each their own identity, which is why a card raised by your contact form says
 it came from the contact form rather than from whoever set it up.
+
+## Walkthroughs
+
+Acta has three short walkthroughs, and each plays once, the first time you
+reach what it explains: getting around Acta when you first sign in, goals the
+first time you open them, and notifications the first time you close the
+notifications panel. The notifications one ends in **Settings →
+Notifications**, on the button that allows desktop notifications on this
+device.
+
+**Settings → Walkthroughs** lists them with whether you have seen, skipped or
+not yet met each one. **Reset** makes one play again the next time that moment
+comes round, and **Play now** starts it straight away. What you have seen is
+remembered on your account, so a second browser does not replay it.

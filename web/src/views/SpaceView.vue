@@ -179,6 +179,7 @@
         <BoardCard
           :row="item as unknown as ISpaceItemRow"
           :open="inspector.itemKey.value === item.key"
+          :arrived="arrivedKey === item.key"
           :tour-step="item.id === firstCardId ? 'space-card' : null"
           @open="inspector.open"
           @expand="openItemModal"
@@ -286,7 +287,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   useConfirm,
@@ -700,8 +701,63 @@ async function loadItems(): Promise<void> {
   if (textFilter.value) params.text = textFilter.value
   if (goalFilter.value !== null) params.goal = String(goalFilter.value)
   const result = await load.run(api.spaceGet(spaceKey.value, params))
-  if (result) items.value = result.items
+  if (result) {
+    items.value = result.items
+    void revealPending()
+  }
 }
+
+/**
+ * Point at the card the reader came here for. Asked for through
+ * `revealCard` by the inspector's "Show on its space", and also for a link
+ * that lands on the space with a card open. Scrolled to the middle of the
+ * board both ways, because the columns scroll sideways as well as down.
+ */
+const arrivedKey = ref<string | null>(null)
+let arrivedTimer: ReturnType<typeof setTimeout> | undefined
+let revealOnLoad =
+  typeof route.query.item === 'string' ? route.query.item : null
+
+async function revealPending(): Promise<void> {
+  const key = ui.revealCard.value?.key ?? revealOnLoad
+  if (!key) return
+  if (!items.value.some((row) => row.key === key)) {
+    // Its own space, and still not here: filtered out or archived. Dropped,
+    // or it would fire on some later load the reader did not ask about.
+    if (key.split('-')[0] === spaceKey.value) {
+      ui.revealCard.value = null
+      revealOnLoad = null
+    }
+    return
+  }
+  ui.revealCard.value = null
+  revealOnLoad = null
+  await nextTick()
+  const el = document.querySelector<HTMLElement>(
+    `[data-card-key="${CSS.escape(key)}"]`,
+  )
+  if (!el) return
+  const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  el.scrollIntoView({
+    block: 'center',
+    inline: 'center',
+    behavior: still ? 'auto' : 'smooth',
+  })
+  clearTimeout(arrivedTimer)
+  arrivedKey.value = null
+  await nextTick()
+  arrivedKey.value = key
+  arrivedTimer = setTimeout(() => (arrivedKey.value = null), 2600)
+}
+
+// Already on the card's space: the route does not change, so the request
+// is answered from what is loaded.
+watch(
+  () => ui.revealCard.value,
+  (request) => {
+    if (request) void revealPending()
+  },
+)
 
 watch(
   [spaceKey, labelFilter, assigneeFilter, stateFilter, goalFilter],

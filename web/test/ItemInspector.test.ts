@@ -101,12 +101,22 @@ describe('ItemInspector', () => {
   })
 
   // A count of zero is noise on the many cards that carry no files.
-  it('shows no count for an empty section', async () => {
+  // Every section carries its count in a pill, zero included, so the eye
+  // always finds it in the same place. Zero is dimmed, and the pill says in
+  // words what it counts (Jose, 2026-10-08).
+  it('draws an empty count dimmed, and says what every count means', async () => {
     itemGet.mockResolvedValue({
       items: [{ ...ITEM, comments: [], attachments: [] }],
     })
     const view = await render()
-    expect(view.text()).not.toMatch(/Attachments\s*0/)
+    const pills = view.findAll('.section-count')
+    const attachments = pills.find(
+      (p) => p.attributes('aria-label') === 'Nothing attached',
+    )
+    expect(attachments?.classes()).toContain('section-count--empty')
+    expect(
+      pills.find((p) => p.attributes('aria-label') === 'No comments yet'),
+    ).toBeDefined()
   })
 
   // Parts and dependencies are different relations and the model keeps them
@@ -158,7 +168,13 @@ describe('ItemInspector', () => {
       .find((b) => b.attributes('aria-label')?.includes('on its space'))
     expect(btn).toBeDefined()
     await btn!.trigger('click')
-    expect(push).toHaveBeenCalledWith('/nubisco/s/ST')
+    // The card rides along, so the panel stays open on the board and the
+    // board can point at it.
+    expect(push).toHaveBeenCalledWith({
+      path: '/nubisco/s/ST',
+      query: { item: 'ST-73' },
+    })
+    expect(useUiState().revealCard.value?.key).toBe('ST-73')
   })
 
   // The pair has to behave as one control that changes size, not as two ways
@@ -176,5 +192,67 @@ describe('ItemInspector', () => {
     // mocks were called.
     expect(useUiState().itemModalKey.value).toBe('ST-73')
     expect(useInspector().itemKey.value).toBeNull()
+  })
+
+  // A card opened from another card says which one "back" returns to, in
+  // words, as a breadcrumb (Jose, 2026-10-08).
+  it('names the card it came from beside the one it shows', async () => {
+    useInspector().close()
+    useInspector().open('ST-1')
+    useInspector().open('ST-73')
+    const view = await render()
+    const crumbs = view.find('.inspector-crumbs')
+    expect(crumbs.exists()).toBe(true)
+    expect(crumbs.text()).toContain('ST-1')
+    expect(crumbs.find('[aria-current="page"]').text()).toBe('ST-73')
+    await crumbs.find('.inspector-crumb').trigger('click')
+    expect(useInspector().itemKey.value).toBe('ST-1')
+  })
+
+  it('shows only the key when there is nowhere to go back to', async () => {
+    useInspector().close()
+    useInspector().open('ST-73')
+    const view = await render()
+    expect(view.find('.inspector-crumbs').exists()).toBe(false)
+    expect(view.find('.inspector-key').text()).toBe('ST-73')
+  })
+
+  // People did not know what Plan or Parts meant, or that "Build" was a
+  // checklist with a bin that deletes it.
+  it('explains every section, and names what the bin deletes', async () => {
+    itemGet.mockResolvedValue({
+      items: [
+        {
+          ...ITEM,
+          checklists: [{ name: 'Build', items: [{ text: 'a', done: false }] }],
+        },
+      ],
+    })
+    const view = await render()
+    const hints = view
+      .findAll('.nb-info-hint button')
+      .map((b) => b.attributes('aria-label'))
+    for (const label of [
+      'About the description',
+      'About Build',
+      'About Goals',
+      'About Plan',
+      'About Parts',
+      'About Attachments',
+      'About History',
+      'About comments',
+    ])
+      expect(hints).toContain(label)
+    const bin = view.find('[aria-label="Delete checklist Build"]')
+    // Beside the header's button, never inside it.
+    expect(bin.element.closest('.nb-accordion-item__header')).toBeNull()
+    expect(bin.element.closest('.nb-accordion-item__actions')).not.toBeNull()
+  })
+
+  it('keeps the header in one block that can stay pinned', async () => {
+    const view = await render()
+    const top = view.find('.inspector-top')
+    expect(top.find('.inspector-key').exists()).toBe(true)
+    expect(top.find('.inspector-title').exists()).toBe(true)
   })
 })

@@ -15,6 +15,7 @@ import { bootstrapWorkspace } from '../src/core/bootstrap'
 import { spaceWrite } from '../src/services/spaces'
 import { itemWrite } from '../src/services/items'
 import { docWrite } from '../src/services/docs'
+import { goalWrite } from '../src/services/goals'
 import { notificationList } from '../src/services/notifications'
 import type { ICtx } from '../src/core/ctx'
 
@@ -375,5 +376,232 @@ describe('the face on a row', () => {
     const got = await inbox(ivan)
     expect(got[0].actor_handle).toBe('daniela')
     expect(got[0].actor_name).toBe('daniela')
+  })
+})
+
+/*
+ * The rest of the table: every situation that should reach somebody, and the
+ * ones that deliberately should not, checked one at a time against the
+ * services that the UI and the MCP tools both write through.
+ */
+const newCard = async (who: ICtx, opId: string, extra = {}) =>
+  (
+    (
+      await itemWrite(
+        who,
+        [
+          {
+            op: 'create',
+            op_id: opId,
+            list: 'To Do',
+            title: 'Ship it',
+            ...extra,
+          },
+        ],
+        'ST',
+      )
+    )[0] as { key: string }
+  ).key
+
+describe('a card through its life', () => {
+  it('tells the people put on a card as it is created', async () => {
+    await newCard(jose, 'i1', { assignees: ['ivan', 'jose'] })
+    const got = await inbox(ivan)
+    expect(got.map((n) => n.verb)).toEqual(['item.created'])
+    expect(got[0].reason).toBe('assigned')
+    // The creator assigning themselves is not news to them.
+    expect(await inbox(jose)).toHaveLength(0)
+  })
+
+  it('tells the assignee when the card is moved, completed or reopened', async () => {
+    const key = await newCard(jose, 'i1')
+    await itemWrite(jose, [{ op: 'assign', op_id: 'a1', key, add: ['ivan'] }])
+    await itemWrite(jose, [
+      { op: 'move', op_id: 'm1', key, list: 'In Progress' },
+      { op: 'complete', op_id: 'c1', key },
+      { op: 'reopen', op_id: 'r1', key },
+    ])
+    const got = await verbs(ivan)
+    expect(got).toContain('item.moved')
+    expect(got).toContain('item.completed')
+    expect(got).toContain('item.reopened')
+  })
+
+  it('tells the assignee their card now waits on another', async () => {
+    const blocked = await newCard(jose, 'i1')
+    const blocker = await newCard(jose, 'i2')
+    await itemWrite(jose, [
+      { op: 'assign', op_id: 'a1', key: blocked, add: ['daniela'] },
+    ])
+    await itemWrite(jose, [
+      { op: 'depends_on', op_id: 'd1', key: blocked, blocker },
+    ])
+    expect(await verbs(daniela)).toContain('item.blocked')
+  })
+
+  it('does not tell somebody again that a card they already hold is theirs', async () => {
+    const key = await newCard(jose, 'i1')
+    await itemWrite(jose, [{ op: 'assign', op_id: 'a1', key, add: ['ivan'] }])
+    // An agent, or a second tab, sending the whole set again.
+    await itemWrite(jose, [{ op: 'assign', op_id: 'a2', key, add: ['ivan'] }])
+    expect(await verbs(ivan)).toEqual(['item.assigned'])
+  })
+
+  it('does not tell somebody they were taken off a card they were never on', async () => {
+    const key = await newCard(jose, 'i1')
+    await itemWrite(jose, [
+      { op: 'assign', op_id: 'a1', key, remove: ['daniela'] },
+    ])
+    expect(await inbox(daniela)).toHaveLength(0)
+  })
+
+  it('stays quiet about a re-estimate', async () => {
+    const key = await newCard(jose, 'i1')
+    await itemWrite(jose, [{ op: 'assign', op_id: 'a1', key, add: ['ivan'] }])
+    await itemWrite(jose, [{ op: 'size', op_id: 's1', key, size: 3 }])
+    expect(await verbs(ivan)).toEqual(['item.assigned'])
+  })
+
+  it('tells someone named in a card description once, and not again on the next edit', async () => {
+    const key = await newCard(jose, 'i1', {
+      description: 'for [[@daniela]]',
+    })
+    expect(await verbs(daniela)).toEqual(['item.created'])
+    await itemWrite(jose, [
+      {
+        op: 'update',
+        op_id: 'u1',
+        key,
+        description: 'for [[@daniela]], typo fixed',
+      },
+    ])
+    expect(await verbs(daniela)).toEqual(['item.created'])
+  })
+
+  it('tells the people on a card about a comment, and never the one who wrote it', async () => {
+    const key = await newCard(jose, 'i1')
+    await itemWrite(jose, [{ op: 'assign', op_id: 'a1', key, add: ['ivan'] }])
+    await itemWrite(daniela, [
+      { op: 'comment', op_id: 'c1', key, body: 'one question' },
+    ])
+    await itemWrite(ivan, [
+      { op: 'comment', op_id: 'c2', key, body: 'an answer' },
+    ])
+    // Daniela took part, so the reply reaches her. Ivan wrote it.
+    expect(await verbs(daniela)).toEqual(['comment.created'])
+    expect(await verbs(ivan)).toEqual(['comment.created', 'item.assigned'])
+  })
+})
+
+describe('mentions', () => {
+  it('finds a handle whatever case it was typed in', async () => {
+    const key = await newCard(jose, 'i1')
+    await itemWrite(jose, [
+      {
+        op: 'comment',
+        op_id: 'c1',
+        key,
+        body: 'over to [[@Ivan]] and @DANIELA',
+      },
+    ])
+    expect((await inbox(ivan))[0]?.reason).toBe('mention')
+    expect((await inbox(daniela))[0]?.reason).toBe('mention')
+  })
+
+  it('counts a plain @handle on an edit only when it is new, and never in code', async () => {
+    const key = await newCard(jose, 'i1')
+    const written = await itemWrite(jose, [
+      { op: 'comment', op_id: 'c1', key, body: 'ask @ivan, not `@daniela`' },
+    ])
+    const commentId = (written[0] as { id: string }).id
+    expect((await inbox(ivan))[0]?.reason).toBe('mention')
+    expect(await inbox(daniela)).toHaveLength(0)
+
+    await itemWrite(jose, [
+      {
+        op: 'comment_update',
+        op_id: 'c2',
+        key,
+        comment_id: commentId,
+        body: 'ask @ivan and @daniela',
+      },
+    ])
+    // Ivan was already named, so the edit is news to Daniela alone.
+    expect(await verbs(ivan)).toEqual(['comment.created'])
+    expect(await verbs(daniela)).toEqual(['comment.updated'])
+  })
+
+  it('does not read a handle inside an address or a word', async () => {
+    const key = await newCard(jose, 'i1')
+    await itemWrite(jose, [
+      {
+        op: 'comment',
+        op_id: 'c1',
+        key,
+        body: 'mail ivan@nubisco.io or see foo@daniela',
+      },
+    ])
+    expect(await inbox(ivan)).toHaveLength(0)
+    expect(await inbox(daniela)).toHaveLength(0)
+  })
+
+  it('does not write a notification for an agent, which has no inbox', async () => {
+    await db.run(
+      `INSERT INTO actor (id, workspace_id, kind, handle, name, role, created_at)
+       VALUES ('act_bot', ?, 'agent', 'bot', 'Bot', 'member', ?)`,
+      [workspaceId, Date.now()],
+    )
+    const key = await newCard(jose, 'i1')
+    await itemWrite(jose, [
+      { op: 'comment', op_id: 'c1', key, body: 'ping @bot' },
+      { op: 'assign', op_id: 'a1', key, add: ['bot'] },
+    ])
+    const rows = await db.query(
+      "SELECT id FROM notification WHERE actor_id = 'act_bot'",
+    )
+    expect(rows).toHaveLength(0)
+  })
+
+  it('does not reach somebody who has been switched off', async () => {
+    await db.run('UPDATE actor SET disabled = 1 WHERE id = ?', [
+      daniela.actor.id,
+    ])
+    const key = await newCard(jose, 'i1')
+    await itemWrite(jose, [
+      { op: 'assign', op_id: 'a1', key, add: ['daniela'] },
+    ])
+    expect(await inbox(daniela)).toHaveLength(0)
+  })
+})
+
+describe('goals', () => {
+  it('tells someone added to a goal description by an edit, once', async () => {
+    await goalWrite(jose, [{ op: 'create', op_id: 'g1', title: 'Grow' }])
+    await goalWrite(jose, [
+      { op: 'update', op_id: 'g2', goal: 1, description: 'with [[@ivan]]' },
+    ])
+    const got = await inbox(ivan)
+    expect(got.map((n) => n.verb)).toEqual(['goal.updated'])
+    expect(got[0].reason).toBe('mention')
+    expect(got[0].goal_number).toBe(1)
+
+    await goalWrite(jose, [
+      {
+        op: 'update',
+        op_id: 'g3',
+        goal: 1,
+        description: 'with [[@ivan]], reworded',
+      },
+    ])
+    expect(await inbox(ivan)).toHaveLength(1)
+  })
+
+  it('tells the owner they have been handed a new goal', async () => {
+    await goalWrite(jose, [
+      { op: 'create', op_id: 'g1', title: 'Grow', owner: 'daniela' },
+    ])
+    const got = await inbox(daniela)
+    expect(got.map((n) => n.verb)).toEqual(['goal.created'])
+    expect(got[0].reason).toBe('assigned')
   })
 })

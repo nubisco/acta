@@ -184,7 +184,7 @@ export interface IItemDetail {
   checklists?: { name: string; items: { text: string; done: boolean }[] }[]
   links?: {
     out: { ref_type: string; target: string }[]
-    in: { src_kind: string; src_id: string }[]
+    in: { src_kind: string; src_id: string; src?: string | null }[]
   }
   attachments?: IAttachment[]
   /** Who made the card. */
@@ -390,6 +390,19 @@ export interface IGoalCard {
   size: number
   linked?: true
   via?: string
+  /** Handles of whoever is on it. Absent when nobody is. */
+  assignees?: string[]
+  /** The card it is directly a part of. Only with `include: ['tree']`. */
+  parent?: string
+  /** Its open blockers, on any space. Only with `include: ['tree']`. */
+  blocked_by?: IGoalBlocker[]
+}
+
+/** A card holding up one of a goal's cards. It may not serve the goal. */
+export interface IGoalBlocker {
+  key: string
+  title: string
+  space: string
 }
 
 export interface IGoalCheckIn {

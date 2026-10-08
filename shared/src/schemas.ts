@@ -719,7 +719,12 @@ export const zGoalList = z.object({
 
 export const zGoalGet = z.object({
   goals: z.array(zGoalRef).min(1).max(20),
-  include: z.array(z.enum(['items', 'check_ins'])).optional(),
+  /**
+   * `tree` adds to each item what nesting it needs: `parent`, the card it is
+   * directly a part of, and `blocked_by`, its open blockers with their titles.
+   * Off by default, since an agent reading a goal rarely wants either.
+   */
+  include: z.array(z.enum(['items', 'check_ins', 'tree'])).optional(),
 })
 
 export const zSearch = z.object({

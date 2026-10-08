@@ -6,10 +6,18 @@
  * never colour alone. Progress is a separate thing measured from cards, and
  * is never coloured by status, so the two cannot be mistaken for each other.
  */
-import type { IGoalRef, IGoalRow, TGoalStatus } from '@/types/api'
+import type {
+  IGoalBlocker,
+  IGoalCard,
+  IGoalRef,
+  IGoalRow,
+  TGoalStatus,
+} from '@/types/api'
 
 export interface IGoalStatusMeta {
   label: string
+  /** What the status means, for a tooltip beside it. */
+  hint: string
   /** NbBadge variant. */
   badge: 'grey' | 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'primary'
   /** A colour token for marks that are not a badge, such as a bar segment. */
@@ -21,42 +29,49 @@ export interface IGoalStatusMeta {
 export const GOAL_STATUS: Record<TGoalStatus, IGoalStatusMeta> = {
   pending: {
     label: 'Pending',
+    hint: 'Not judged yet. Nobody has checked in on it with a status.',
     badge: 'grey',
     color: 'var(--nb-c-text-subtle)',
     inFlight: true,
   },
   on_track: {
     label: 'On track',
+    hint: 'The last check-in says it will land as planned.',
     badge: 'green',
     color: 'var(--nb-c-status-valid)',
     inFlight: true,
   },
   at_risk: {
     label: 'At risk',
+    hint: 'The last check-in says it may not land without help.',
     badge: 'orange',
     color: 'var(--nb-c-status-warning)',
     inFlight: true,
   },
   off_track: {
     label: 'Off track',
+    hint: 'The last check-in says it will not land as planned.',
     badge: 'red',
     color: 'var(--nb-c-status-error)',
     inFlight: true,
   },
   done: {
     label: 'Done',
+    hint: 'Achieved. It no longer counts as in flight.',
     badge: 'blue',
     color: 'var(--nb-c-info)',
     inFlight: false,
   },
   paused: {
     label: 'Paused',
+    hint: 'Set aside for now. It does not count as in flight.',
     badge: 'purple',
     color: 'var(--nb-c-text-muted)',
     inFlight: false,
   },
   cancelled: {
     label: 'Cancelled',
+    hint: 'Dropped, and kept for the record.',
     badge: 'grey',
     color: 'var(--nb-c-border)',
     inFlight: false,
@@ -121,6 +136,53 @@ export function goalTree<T extends Pick<IGoalRow, 'number' | 'parent'>>(
   }
   walk(null, 0)
   return out
+}
+
+/** One card in a goal's work drawn as a tree, with what hangs under it. */
+export interface IGoalCardNode {
+  /** Unique in the tree, since a card can be drawn in more than one place. */
+  id: string
+  card: IGoalCard
+  /** The cards it is waiting on, drawn first because they decide what is next. */
+  blockers: IGoalBlocker[]
+  parts: IGoalCardNode[]
+}
+
+/**
+ * A goal's cards as a tree: each linked card at the top, its parts nested
+ * under it at whatever depth they sit, its open blockers beside them. A part
+ * whose parent is not among the cards starts at the top rather than being
+ * lost, and a card is drawn once even on data that loops.
+ */
+export function goalCardTree(items: IGoalCard[]): IGoalCardNode[] {
+  const present = new Set(items.map((i) => i.key))
+  const children = new Map<string | null, IGoalCard[]>()
+  for (const item of items) {
+    const parent =
+      !item.linked && item.parent && present.has(item.parent)
+        ? item.parent
+        : null
+    const list = children.get(parent) ?? []
+    list.push(item)
+    children.set(parent, list)
+  }
+  const seen = new Set<string>()
+  const walk = (parent: string | null, path: string): IGoalCardNode[] => {
+    const out: IGoalCardNode[] = []
+    for (const card of children.get(parent) ?? []) {
+      if (seen.has(card.key)) continue
+      seen.add(card.key)
+      const id = path ? `${path}/${card.key}` : card.key
+      out.push({
+        id,
+        card,
+        blockers: card.blocked_by ?? [],
+        parts: walk(card.key, id),
+      })
+    }
+    return out
+  }
+  return walk(null, '')
 }
 
 /** A goal's number from a route param or a reference: `12` or `G-12`. */

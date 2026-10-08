@@ -194,14 +194,35 @@
           </NbField>
           <NbDefinitionList
             v-if="it.linkFacts.value.length > 0"
-            :items="it.linkFacts.value"
             layout="stacked"
-          />
+          >
+            <NbDefinitionListItem
+              v-for="(fact, i) in it.linkFacts.value"
+              :key="i"
+              :term="fact.term"
+            >
+              <RefText v-if="fact.opens === 'item'" :text="fact.value" />
+              <RouterLink
+                v-else-if="fact.opens === 'doc'"
+                :to="wpath(`/docs/${fact.value}`)"
+              >
+                {{ fact.value }}
+              </RouterLink>
+              <template v-else>{{ fact.value }}</template>
+            </NbDefinitionListItem>
+          </NbDefinitionList>
         </div>
 
         <!-- First of the relations: what the card is for. -->
         <section class="item-modal__section">
-          <h3>Goals</h3>
+          <h3>
+            Goals
+            <NbInfoHint
+              :text="SECTION_INFO.goals"
+              :size="14"
+              label="About goals"
+            />
+          </h3>
           <ItemGoalsPanel
             :item-key="it.item.value.key"
             :goals="it.item.value.goals ?? []"
@@ -212,7 +233,14 @@
         <!-- Its own section, beside Plan. Composition and sequence are
              different relations and stay visibly apart. -->
         <section class="item-modal__section">
-          <h3>Parts</h3>
+          <h3>
+            Parts
+            <NbInfoHint
+              :text="SECTION_INFO.parts"
+              :size="14"
+              label="About parts"
+            />
+          </h3>
           <PartsPanel
             :item-key="it.item.value.key"
             :space="it.item.value.space"
@@ -223,7 +251,14 @@
         </section>
 
         <section class="item-modal__section">
-          <h3>Plan</h3>
+          <h3>
+            Plan
+            <NbInfoHint
+              :text="SECTION_INFO.plan"
+              :size="14"
+              label="About the plan"
+            />
+          </h3>
           <DependencyPanel
             :item-key="it.item.value.key"
             :space="it.item.value.space"
@@ -249,7 +284,14 @@
         />
 
         <section class="item-modal__section">
-          <h3>Description</h3>
+          <h3>
+            Description
+            <NbInfoHint
+              :text="SECTION_INFO.description"
+              :size="14"
+              label="About the description"
+            />
+          </h3>
           <MarkdownEditor
             v-if="editingDescription"
             v-model="it.draft.description"
@@ -285,13 +327,20 @@
           class="item-modal__section"
         >
           <h3>
+            <NbIcon name="list-checks" :size="16" />
             {{ checklist.name }}
-            <span class="item-modal__progress">
-              {{ checklist.items.filter((entry) => entry.done).length }}/{{
-                checklist.items.length
-              }}
-            </span>
+            <NbInfoHint
+              :text="SECTION_INFO.checklist"
+              :size="14"
+              label="About checklists"
+            />
+            <SectionCount
+              :text="`${ticked(checklist)}/${checklist.items.length}`"
+              :tip="`${ticked(checklist)} of ${checklist.items.length} ticked`"
+              :empty="checklist.items.length === 0"
+            />
             <NbButton
+              v-nb-tooltip="{ body: `Delete the ${checklist.name} checklist` }"
               size="xxs"
               variant="ghost"
               icon="trash-simple"
@@ -327,7 +376,14 @@
         </form>
 
         <section class="item-modal__section">
-          <h3>Attachments</h3>
+          <h3>
+            Attachments
+            <NbInfoHint
+              :text="SECTION_INFO.attachments"
+              :size="14"
+              label="About attachments"
+            />
+          </h3>
           <AttachmentsPanel
             :owner="{ item: it.item.value.key }"
             :attachments="it.item.value.attachments ?? []"
@@ -336,7 +392,14 @@
         </section>
 
         <section class="item-modal__section">
-          <h3>History</h3>
+          <h3>
+            History
+            <NbInfoHint
+              :text="SECTION_INFO.history"
+              :size="14"
+              label="About history"
+            />
+          </h3>
           <ItemHistory
             :item-key="it.item.value.key"
             :events="it.item.value.activity ?? []"
@@ -353,7 +416,14 @@
            rather than a strip under everything else. -->
       <aside class="item-modal__conversation" aria-label="Comments">
         <section class="item-modal__section">
-          <h3>Comments</h3>
+          <h3>
+            Comments
+            <NbInfoHint
+              :text="SECTION_INFO.comments"
+              :size="14"
+              label="About comments"
+            />
+          </h3>
           <CommentThread
             v-model="it.commentDraft.value"
             :comments="it.item.value.comments ?? []"
@@ -370,6 +440,10 @@
 
 <script setup lang="ts">
 import { ref, toRef, watch } from 'vue'
+import RefText from '@/components/RefText.vue'
+import SectionCount from '@/components/SectionCount.vue'
+import { SECTION_INFO } from '@/lib/sections'
+import { wpath } from '@/lib/paths'
 import { useConfirm } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
 import { useInspector, useUiState } from '@/stores/workspace'
@@ -443,6 +517,10 @@ function confirmDelete(): void {
       if (await it.remove()) emit('close')
     },
   })
+}
+
+function ticked(checklist: { items: { done: boolean }[] }): number {
+  return checklist.items.filter((entry) => entry.done).length
 }
 
 function confirmDeleteChecklist(name: string): void {
@@ -552,18 +630,19 @@ function commitDescription(): void {
   }
 
   &__section h3 {
+    display: flex;
+    align-items: center;
+    gap: var(--nb-spacing-8);
     margin: 0 0 var(--nb-spacing-8);
     font-size: var(--nb-type-label-md-size);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--nb-c-text-muted);
-  }
 
-  &__progress {
-    margin-inline-start: var(--nb-spacing-4);
-    color: var(--nb-c-text-subtle);
-    text-transform: none;
-    letter-spacing: normal;
+    :deep(.nb-badge) {
+      text-transform: none;
+      letter-spacing: 0;
+    }
   }
 
   &__editor {

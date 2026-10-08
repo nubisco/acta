@@ -55,6 +55,15 @@
       <div class="home-goals__list">
         <h3 class="home-goals__subhead">
           {{ attention.length > 0 ? 'Needs a look' : 'In flight' }}
+          <NbInfoHint
+            :text="
+              attention.length > 0
+                ? 'Goals in flight that are off track, at risk, past their target date, or without a check-in for over a month, worst first.'
+                : 'Nothing needs a look, so these are the top-level goals still being worked towards.'
+            "
+            :size="13"
+            label="About this list"
+          />
         </h3>
         <p v-if="shown.length === 0" class="home-goals__none">
           Nothing in flight right now.
@@ -224,6 +233,9 @@ void reload()
   }
 
   &__subhead {
+    display: flex;
+    align-items: center;
+    gap: var(--nb-spacing-4);
     margin: 0;
     font-size: var(--nb-type-label-sm-size);
     font-weight: var(--nb-type-label-sm-weight);

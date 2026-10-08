@@ -14,7 +14,7 @@
              toward a goal nobody linked it to is otherwise a mystery. It can
              only be undone on the card the link is on. -->
         <span v-if="goal.via" class="item-goals__via">
-          through {{ goal.via }}
+          <RefText :text="`through ${goal.via}`" />
         </span>
         <NbButton
           v-else
@@ -57,6 +57,7 @@
  * not this card's link to remove.
  */
 import { computed, ref } from 'vue'
+import RefText from '@/components/RefText.vue'
 import { RouterLink } from 'vue-router'
 import { api, newOpId } from '@/api/client'
 import { humanise } from '@/lib/state'

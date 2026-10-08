@@ -883,4 +883,8 @@ export const ADDITIVE_COLUMNS = [
   'ALTER TABLE workspace ADD COLUMN next_goal_seq INTEGER NOT NULL DEFAULT 1',
   // Which goal a notification opens, beside item_key and doc_slug.
   'ALTER TABLE notification ADD COLUMN goal_number INTEGER',
+  // The walkthroughs this person has seen or skipped, as JSON keyed by the
+  // walkthrough's id. On the actor for the same reason as onboarded_at: a
+  // tour replaying because someone opened a second browser is a nuisance.
+  'ALTER TABLE actor ADD COLUMN walkthroughs TEXT',
 ]

@@ -4,11 +4,12 @@
       <li v-for="entry in items" :key="entry.text">
         <NbCheckbox
           :model-value="entry.done"
-          :label="entry.text"
           @update:model-value="
             (done: boolean) => emit('toggle', entry.text, done)
           "
-        />
+        >
+          <span class="clist__text"><RefText :text="entry.text" /></span>
+        </NbCheckbox>
         <NbButton
           size="xxs"
           variant="ghost"
@@ -33,6 +34,7 @@
 
 <script setup lang="ts">
 import { ref, useId } from 'vue'
+import RefText from '@/components/RefText.vue'
 
 defineProps<{ items: { text: string; done: boolean }[] }>()
 

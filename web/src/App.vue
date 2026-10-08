@@ -281,22 +281,34 @@
   <!-- Controlled rather than auto-start: the welcome has to have been
        answered first, or the tour spotlights the shell through a modal
        covering it. -->
-  <NbWalkthrough
-    v-if="!route.meta.frameless"
-    :walkthrough="introTour"
-    :controller="tour"
-    :labels="tourLabels"
-  />
+  <template v-if="!route.meta.frameless">
+    <NbWalkthrough
+      :walkthrough="introTour"
+      :controller="tour"
+      :labels="tourLabels"
+    />
+    <NbWalkthrough
+      :walkthrough="goalsTour"
+      :controller="tours.controllers.goals"
+      :labels="tourLabels"
+    />
+    <NbWalkthrough
+      :walkthrough="notificationsTour"
+      :controller="tours.controllers.notifications"
+      :labels="tourLabels"
+    />
+  </template>
   <NbToaster />
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useCommandPalette, useTheme, useWalkthrough } from '@nubisco/ui'
+import { useCommandPalette, useTheme } from '@nubisco/ui'
 import type { IUserMenuAccount, NbMenu, NbShell, TTheme } from '@nubisco/ui'
 import { useAccounts } from '@/stores/accounts'
-import { introTour, tourLabels } from '@/lib/tour'
+import { goalsTour, introTour, notificationsTour, tourLabels } from '@/lib/tour'
+import { setTourNavigator, useTours } from '@/lib/tours'
 import {
   sidebarDefaultFor,
   useInspector,
@@ -357,9 +369,14 @@ const themeOptions = [
   { label: 'Match my system', value: 'system' },
 ]
 const shell = ref<InstanceType<typeof NbShell> | null>(null)
-const tour = useWalkthrough(introTour)
+const tours = useTours()
+const tour = tours.controllers.intro
+setTourNavigator((to) => router.push(wpath(to)))
 
 const welcomeOpen = ref(false)
+// The welcome has the screen while it is open, so no walkthrough starts
+// under it.
+watch(welcomeOpen, (open) => (tours.held.value = open), { immediate: true })
 
 /**
  * The welcome comes first and the tour second, never both at once: a tour

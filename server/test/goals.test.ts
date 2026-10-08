@@ -633,3 +633,97 @@ describe('the breakdown', () => {
     expect(archived.goals.map((g) => g.number)).toEqual([2])
   })
 })
+
+describe('who is on each card, and what it waits on', () => {
+  interface ITreeItem {
+    key: string
+    assignees?: string[]
+    parent?: string
+    blocked_by?: Array<{ key: string; title: string; space: string }>
+  }
+
+  async function treeItems(include?: Array<'items' | 'check_ins' | 'tree'>) {
+    const detail = (await goalGet(jose, { goals: [1], include })).goals[0]
+    return detail.items as ITreeItem[]
+  }
+
+  it('names the assignees of every card, parts included', async () => {
+    const release = await card('ST', 'Release', { assignees: ['ivan', 'jose'] })
+    const part = await card('ST', 'Part', { assignees: ['daniela'] })
+    const free = await card('ST', 'Nobody yet')
+    await partOf(part, release)
+    await goal(jose, {
+      op: 'create',
+      op_id: 'g',
+      title: 'x',
+      items: [release, free],
+    })
+    const items = await treeItems()
+    expect(items.find((i) => i.key === release)?.assignees).toEqual([
+      'ivan',
+      'jose',
+    ])
+    expect(items.find((i) => i.key === part)?.assignees).toEqual(['daniela'])
+    expect(items.find((i) => i.key === free)?.assignees).toBeUndefined()
+  })
+
+  it('keeps nesting and blockers out of the default read', async () => {
+    const release = await card('ST', 'Release')
+    const part = await card('ST', 'Part')
+    const other = await card('CMS', 'Elsewhere')
+    await partOf(part, release)
+    await itemWrite(jose, [
+      { op: 'depends_on', op_id: op(), key: release, blocker: other },
+    ])
+    await goal(jose, { op: 'create', op_id: 'g', title: 'x', items: [release] })
+    for (const item of await treeItems()) {
+      expect(item.parent).toBeUndefined()
+      expect(item.blocked_by).toBeUndefined()
+    }
+  })
+
+  it('nests parts under the card they are directly part of, at any depth', async () => {
+    const release = await card('ST', 'Release')
+    const part = await card('ST', 'Part')
+    const deep = await card('CMS', 'Part of the part')
+    await partOf(part, release)
+    await partOf(deep, part)
+    await goal(jose, { op: 'create', op_id: 'g', title: 'x', items: [release] })
+    const items = await treeItems(['items', 'tree'])
+    expect(items.find((i) => i.key === release)?.parent).toBeUndefined()
+    expect(items.find((i) => i.key === part)?.parent).toBe(release)
+    // Its parent, not the linked card it is counted through.
+    expect(items.find((i) => i.key === deep)?.parent).toBe(part)
+  })
+
+  it('lists open blockers with their titles, from any space', async () => {
+    const release = await card('ST', 'Release')
+    const outside = await card('CMS', 'Translations land')
+    const finished = await card('ST', 'Already done')
+    await itemWrite(jose, [
+      { op: 'depends_on', op_id: op(), key: release, blocker: outside },
+      { op: 'depends_on', op_id: op(), key: release, blocker: finished },
+    ])
+    await goal(jose, { op: 'create', op_id: 'g', title: 'x', items: [release] })
+
+    let blocked = (await treeItems(['tree'])).find((i) => i.key === release)
+    expect(blocked?.blocked_by?.map((b) => b.key).sort()).toEqual(
+      [outside, finished].sort(),
+    )
+    expect(blocked?.blocked_by?.find((b) => b.key === outside)).toEqual({
+      key: outside,
+      title: 'Translations land',
+      space: 'CMS',
+    })
+
+    // A blocker that is finished, or archived, no longer holds anything up.
+    await complete(finished)
+    blocked = (await treeItems(['tree'])).find((i) => i.key === release)
+    expect(blocked?.blocked_by).toEqual([
+      { key: outside, title: 'Translations land', space: 'CMS' },
+    ])
+    await itemWrite(jose, [{ op: 'archive', op_id: op(), key: outside }])
+    blocked = (await treeItems(['tree'])).find((i) => i.key === release)
+    expect(blocked?.blocked_by).toBeUndefined()
+  })
+})

@@ -47,6 +47,7 @@ import { useDocPreview, useInspector, useWorkspace } from '@/stores/workspace'
 import { useRefCards } from '@/stores/refs'
 import { useLinkPreviews } from '@/stores/linkPreviews'
 import { DOC_NAV_KEY } from '@/lib/keys'
+import { cardKeysPlugin } from '@/lib/cardKeys'
 import { wpath } from '@/lib/paths'
 import ActorChip from '@/components/ActorChip.vue'
 import { safeUrl } from '@/lib/safeUrl'
@@ -156,6 +157,12 @@ const md = new MarkdownIt({ html: false, linkify: true, breaks: true }).use(
 // tiptap-markdown, so the two surfaces cannot disagree about what is a
 // formula: see lib/math.ts for the detection rule and why it is that strict.
 md.use(mathPlugin)
+// A key written as plain text ("moved here from CM-23") opens the card too,
+// for the spaces this workspace has. See lib/cardKeys.ts.
+const spaceKeys = computed(
+  () => new Set((ws.overview.value?.spaces ?? []).map((s) => s.key)),
+)
+md.use(cardKeysPlugin, () => spaceKeys.value)
 
 /**
  * Enhanced-Markdown extensions (design-spec §2), applied as source and output
@@ -619,6 +626,13 @@ function hydrateItemRefs(): void {
     el.classList.add(...view.classes)
     el.title = view.title
     el.innerHTML = itemChipHtml(view)
+  }
+  // A key in running text stays text, so it only gains a title to hover.
+  for (const el of root.querySelectorAll<HTMLElement>('.md__ref--bare')) {
+    const key = el.getAttribute('data-ref') ?? ''
+    refCards.request(key)
+    const card = refCards.cards.get(key)
+    if (card) el.title = `${key} ${card.title}`
   }
 }
 

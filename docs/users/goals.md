@@ -66,6 +66,24 @@ Alongside done, a goal says how many of its cards are **moving** (in an
 active or review list), **waiting** (in a blocked list, or waiting on a card
 that is not done) and **late** (past their due date).
 
+## The goal's cards
+
+The **Cards** panel on a goal's page lists every card the goal counts itself.
+Each row says where the card lives, how it stands and whether it is linked or
+counted as a part, and the **Assignees** column shows who is on it: up to three
+faces, then "+N" for the rest. Hover or focus a face for the person's name. A
+card nobody is on reads _Unassigned_, so the free work is easy to spot when you
+are looking for what to pick up next. Click any row to open the card.
+
+**Tree** in the panel's header shows the same cards as a tree instead. Each
+linked card sits at the top with its parts nested under it, at every depth, and
+under each card the cards still **blocking** it, marked in red. A blocker can
+live on any space and need not serve the goal at all. It drops out of the tree
+as soon as it is completed or archived. The tree opens fully expanded, and the
+caret on a row folds or unfolds what is under it (or use the arrow keys).
+Clicking a card, or a blocker, opens it. Your browser remembers whether you
+last looked at the list or the tree.
+
 To see a goal's cards on a board, use the space buttons on the goal's page,
 or pick the goal in a space's filters. The filter shows exactly the cards
 the goal's progress is counted over, sub-goals and parts included.
@@ -129,10 +147,20 @@ Home opens with how every goal stands:
   quiet, worst first. When nothing needs a look, the top-level goals in
   flight instead.
 
+Every term there has an info mark: hover it for what "in flight", "past their
+date" and the rest mean, and hover a status for what it says about a goal.
+
 The Goals page has the same breakdown above the full list, where clicking a
 status filters the list to it. The list is in tree order, so a sub-goal sits
 under the goal it serves. Tabs narrow it to goals you own, goals you follow,
 or the archive.
+
+## The goals walkthrough
+
+The first time you open Goals, a short walkthrough explains what a goal is,
+how status differs from progress, and how cards count towards one. To see it
+again, go to **Settings → Walkthroughs** and press **Play now**, or **Reset**
+it so it plays the next time you open Goals.
 
 ## Archiving and deleting
 
