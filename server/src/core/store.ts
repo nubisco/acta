@@ -14,6 +14,10 @@ export interface ISpaceRow {
   description: string
   next_seq: number
   archived: number
+  /** Days the board shows a done card for. Null: always. */
+  done_window_days: number | null
+  /** When "Clear done now" was last pressed. */
+  done_cleared_at: number | null
 }
 
 export interface IListRow {

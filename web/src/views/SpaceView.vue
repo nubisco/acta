@@ -198,6 +198,15 @@
         </span>
       </template>
       <template #column-footer="{ column }">
+        <DoneColumnFoot
+          v-if="doneLists.has(String(column.id)) && view === 'board'"
+          :hidden="doneHidden"
+          :window-days="doneWindow"
+          :showing-all="showAllDone"
+          @set-window="setDoneWindow"
+          @toggle-all="showAllDone = !showAllDone"
+          @clear="clearDone"
+        />
         <NbButton
           size="sm"
           variant="ghost"
@@ -339,6 +348,7 @@ import TableView from '@/components/views/TableView.vue'
 import TimelineView from '@/components/views/TimelineView.vue'
 import SequenceView from '@/components/views/SequenceView.vue'
 import SpaceFilterPanel from '@/components/SpaceFilterPanel.vue'
+import DoneColumnFoot from '@/components/DoneColumnFoot.vue'
 import ActorFilter from '@/components/ActorFilter.vue'
 import { goalOptionLabel } from '@/lib/goals'
 import { recallBoardFilters, rememberBoardFilters } from '@/lib/boardFilters'
@@ -366,6 +376,11 @@ const filterBar = useShellSlot('fixedbar')
 const topbarActions = useShellSlot('topbar-right')
 
 const items = ref<ISpaceItemRow[]>([])
+/** Done cards the space's window left off the board, and the window. */
+const doneHidden = ref(0)
+const doneWindow = ref<number | null>(14)
+/** The reader asked to see the older done cards, until they leave. */
+const showAllDone = ref(false)
 const filtersOpen = ref(false)
 const labelFilter = ref<string[]>([])
 const assigneeFilter = ref<string[]>([])
@@ -663,6 +678,16 @@ function toggleFilters(): void {
   filtersOpen.value = true
 }
 
+/** Lists whose role is done: where the Done window applies. */
+const doneLists = computed(
+  () =>
+    new Set(
+      (spaceMeta.value?.lists ?? [])
+        .filter((list) => list.role === 'done')
+        .map((list) => list.name),
+    ),
+)
+
 const columns = computed(() =>
   (spaceMeta.value?.lists ?? []).map((list) => ({
     id: list.name,
@@ -781,9 +806,20 @@ async function loadItems(): Promise<void> {
     params.assignee = assigneeFilter.value.join(',')
   if (textFilter.value) params.text = textFilter.value
   if (goalFilter.value !== null) params.goal = String(goalFilter.value)
+  // The board keeps done cards only for the space's window. The other views
+  // are lists of what matches, so they get everything.
+  if (
+    view.value === 'board' &&
+    stateFilter.value === 'open' &&
+    !showAllDone.value
+  )
+    params.done = 'space'
   const result = await load.run(api.spaceGet(spaceKey.value, params))
   if (result) {
     items.value = result.items
+    doneHidden.value = result.done_hidden ?? 0
+    if (result.space?.done_window_days !== undefined)
+      doneWindow.value = result.space.done_window_days
     void revealPending()
   }
 }
@@ -850,7 +886,15 @@ watch(
 )
 
 watch(
-  [spaceKey, labelFilter, assigneeFilter, stateFilter, goalFilter],
+  [
+    spaceKey,
+    labelFilter,
+    assigneeFilter,
+    stateFilter,
+    goalFilter,
+    view,
+    showAllDone,
+  ],
   loadItems,
   {
     immediate: true,
@@ -928,6 +972,54 @@ useViewCommands('space', [
     handler: toggleArchived,
   },
 ])
+
+async function setDoneWindow(days: number | null): Promise<void> {
+  if (!spaceKey.value) return
+  const previous = doneWindow.value
+  doneWindow.value = days
+  try {
+    const { results } = await api.spaceWrite([
+      {
+        op: 'update',
+        op_id: newOpId(),
+        key: spaceKey.value,
+        done_window_days: days,
+      },
+    ])
+    if (!results[0]?.ok) throw new Error(String(results[0]?.error ?? 'failed'))
+    toast.success(
+      days
+        ? `Done cards now leave the board after ${days} day${days === 1 ? '' : 's'}.`
+        : 'Every done card stays on the board.',
+    )
+  } catch (err) {
+    doneWindow.value = previous
+    toast.error(humanise(err), { title: 'Could not change the window' })
+  }
+  await loadItems()
+}
+
+async function clearDone(): Promise<void> {
+  const key = spaceKey.value
+  if (!key) return
+  await confirm({
+    title: 'Clear the done cards?',
+    message:
+      'Every card that is done now leaves this board. Nothing is archived: they stay in search, in the Table view under "Done cards" and in their goals.',
+    confirmLabel: 'Clear done cards',
+    cancelLabel: 'Keep them',
+    tone: 'neutral',
+    onConfirm: async () => {
+      const { results } = await api.spaceWrite([
+        { op: 'clear_done', op_id: newOpId(), key },
+      ])
+      if (!results[0]?.ok)
+        throw new Error(String(results[0]?.error ?? 'failed'))
+      showAllDone.value = false
+      await loadItems()
+    },
+  })
+}
 
 function clearFilters(): void {
   labelFilter.value = []

@@ -247,8 +247,10 @@ export const api = {
 
   spaceGet: (space: string, params: Record<string, string> = {}) =>
     req<{
-      space: { key: string; name: string }
+      space: { key: string; name: string; done_window_days?: number | null }
       items: ISpaceItemRow[]
+      /** With done=space: done cards the board's window left out. */
+      done_hidden?: number
       cursor?: string
     }>(`/spaces/${space}?${new URLSearchParams(params)}`),
 

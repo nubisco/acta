@@ -75,6 +75,13 @@ export async function bootstrapWorkspace(
           WHERE v.document_id = document.id ORDER BY v.rev LIMIT 1
        ) WHERE owner_id IS NULL`,
     )
+    // Done cards that predate done_at count as done since their last update,
+    // the closest the data can say. A no-op once they all have one.
+    await db.run(
+      `UPDATE item SET done_at = updated_at
+        WHERE done_at IS NULL AND (completed = 1
+          OR list_id IN (SELECT id FROM list WHERE role = 'done'))`,
+    )
     return existing[0].id
   }
 

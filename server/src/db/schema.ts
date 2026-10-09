@@ -899,4 +899,37 @@ export const ADDITIVE_COLUMNS = [
   // a deleted page can no longer say it was private, and its history must not
   // become public the moment it goes.
   'ALTER TABLE event ADD COLUMN private_to TEXT',
+  // When a card became done: reached a done list or was completed. The board
+  // hides done cards older than its space's window, measured from this and
+  // never from the last edit, so a comment on an old card does not bring it
+  // back (Jira's well-known trap). Kept by the triggers below, so every write
+  // path, present and future, keeps it right. Bootstrap backfills existing
+  // done cards from their last update.
+  'ALTER TABLE item ADD COLUMN done_at INTEGER',
+  // How many days a space's board shows done cards for (null: always), and
+  // when somebody last pressed "Clear done now". Jose, 2026-10-09.
+  'ALTER TABLE space ADD COLUMN done_window_days INTEGER DEFAULT 14',
+  'ALTER TABLE space ADD COLUMN done_cleared_at INTEGER',
+  `CREATE TRIGGER IF NOT EXISTS item_done_at_insert AFTER INSERT ON item
+   BEGIN
+     UPDATE item SET done_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+      WHERE id = NEW.id AND (NEW.completed = 1
+        OR (SELECT role FROM list WHERE id = NEW.list_id) = 'done');
+   END`,
+  `CREATE TRIGGER IF NOT EXISTS item_done_at_update AFTER UPDATE OF list_id, completed ON item
+   BEGIN
+     UPDATE item SET done_at = CASE
+         WHEN NEW.completed = 1 OR (SELECT role FROM list WHERE id = NEW.list_id) = 'done'
+         THEN COALESCE(OLD.done_at, CAST(strftime('%s', 'now') AS INTEGER) * 1000)
+         ELSE NULL END
+      WHERE id = NEW.id;
+   END`,
+  `CREATE TRIGGER IF NOT EXISTS list_done_at_role AFTER UPDATE OF role ON list
+   BEGIN
+     UPDATE item SET done_at = CASE
+         WHEN completed = 1 OR NEW.role = 'done'
+         THEN COALESCE(done_at, CAST(strftime('%s', 'now') AS INTEGER) * 1000)
+         ELSE NULL END
+      WHERE list_id = NEW.id;
+   END`,
 ]

@@ -58,6 +58,24 @@ Those empty slots are buttons. Click "No goal", "No labels", the empty
 calendar, the empty face or the dashed size to set it right there, without
 opening the card.
 
+### Done cards leave the board
+
+A card in a done list stays on the board for **14 days** after it became done,
+then leaves it, so the Done column shows what was finished lately instead of
+everything ever finished. The clock starts when the card became done, not at
+its last change, so commenting on an old card does not bring it back. Nothing
+is archived: the card stays in search, in the Table view under "Done cards",
+in its history and in its goals' progress.
+
+The foot of the Done column says how many older cards it is not showing. Its
+menu (the three dots) can:
+
+- **Show older done cards** for now, until you leave the board.
+- **Clear done now**: every card that is done right now leaves the board at
+  once, for teams that clear the column after a release or a sprint.
+- **Change the window** for the whole space: 1, 7, 14, 30 or 60 days, or keep
+  every done card.
+
 ### Opening a card
 
 Open a card in the side inspector, or press the expand control for the full

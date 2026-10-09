@@ -68,12 +68,32 @@ async function applySpaceOp(
         'UPDATE space SET name = COALESCE(?, name), description = COALESCE(?, description), updated_at = ? WHERE id = ?',
         [op.name ?? null, op.description ?? null, ts, space.id],
       )
+      if (op.done_window_days !== undefined)
+        await ctx.db.run('UPDATE space SET done_window_days = ? WHERE id = ?', [
+          op.done_window_days,
+          space.id,
+        ])
       await emitEvent(
         ctx,
         'space.updated',
         'space',
         space.id,
         `updated space ${op.key}`,
+      )
+      return { key: op.key, id: space.id }
+    }
+    case 'clear_done': {
+      const space = await spaceByKey(ctx, op.key)
+      await ctx.db.run(
+        'UPDATE space SET done_cleared_at = ?, updated_at = ? WHERE id = ?',
+        [ts, ts, space.id],
+      )
+      await emitEvent(
+        ctx,
+        'space.done_cleared',
+        'space',
+        space.id,
+        `cleared the done cards off ${op.key}`,
       )
       return { key: op.key, id: space.id }
     }

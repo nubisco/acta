@@ -253,6 +253,33 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
     where.push(`i.id IN (${GOAL_ITEMS_SQL})`)
     args.push(goal.id)
   }
+  // The board's Done window. A done card leaves the board once it has been
+  // done for longer than the space's window, or was cleared off with "Clear
+  // done now". Measured from when it became done, never from the last edit,
+  // so a comment on an old card does not bring it back. Counted, so the
+  // column can say what it is not showing.
+  const doneSince =
+    params.done === 'space'
+      ? Math.max(
+          space.done_window_days
+            ? Date.now() - space.done_window_days * 86_400_000
+            : 0,
+          space.done_cleared_at ?? 0,
+        )
+      : 0
+  let hiddenDone = 0
+  if (doneSince > 0) {
+    const older = 'i.done_at IS NOT NULL AND i.done_at < ? AND i.archived = 0'
+    const counted = await ctx.db.query<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM item i JOIN list l ON l.id = i.list_id
+        WHERE ${where.join(' AND ')} AND ${older}`,
+      [...args, doneSince],
+    )
+    hiddenDone = counted[0]?.n ?? 0
+    where.push(`NOT (${older})`)
+    args.push(doneSince)
+  }
+
   if (params.cursor) {
     where.push('i.key > ?')
     args.push(params.cursor)
@@ -343,8 +370,17 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
   }))
 
   return {
-    space: { key: space.key, name: space.name },
+    space: {
+      key: space.key,
+      name: space.name,
+      done_window_days: space.done_window_days ?? null,
+    },
     items,
+    // Asked for with done=space: how many done cards the window left out,
+    // so the Done column can say so instead of losing them silently.
+    ...(params.done === 'space'
+      ? { done_hidden: hiddenDone, done_since: doneSince || undefined }
+      : {}),
     cursor: rows.length > params.limit ? page[page.length - 1].key : undefined,
   }
 }

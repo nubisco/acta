@@ -261,6 +261,21 @@ export const zSpaceOp = z.discriminatedUnion('op', [
     key: zSpaceKey,
     name: z.string().min(1).max(200).optional(),
     description: z.string().max(10_000).optional(),
+    /**
+     * How many days the board shows a card for after it is done. Null shows
+     * every done card. Older ones stay searchable, counted toward goals and
+     * listed under the "done" state, just not on the board.
+     */
+    done_window_days: z.number().int().min(1).max(365).nullable().optional(),
+  }),
+  z.object({
+    /**
+     * "Clear done now": every card done so far leaves the board at once,
+     * for teams that clear in batches. Nothing is archived.
+     */
+    op: z.literal('clear_done'),
+    op_id: zOpId,
+    key: zSpaceKey,
   }),
   z.object({ op: z.literal('archive'), op_id: zOpId, key: zSpaceKey }),
   z.object({
@@ -708,6 +723,12 @@ export const zSpaceGet = z.object({
    * card serves). full: board plus the whole description.
    */
   detail: z.enum(['compact', 'board', 'full']).default('compact'),
+  /**
+   * `space`: leave out done cards older than the space's window, or cleared
+   * with "Clear done now", and report how many were left out. What a board
+   * shows. `all` (the default) returns them all.
+   */
+  done: z.enum(['space', 'all']).optional(),
   cursor: z.string().optional(),
   limit: z.number().int().min(1).max(200).default(100),
 })
