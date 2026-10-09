@@ -179,8 +179,9 @@ function variantFor(verb: string): 'neutral' | 'info' | 'success' | 'warning' {
 /** Opens the thing and marks that one read. The rest stay as they were. */
 function openEntry(entry: IAppNotification): void {
   void ws.markRead(entry.id)
+  // In place, the way every other card reference opens: the page you were
+  // on stays under it (UX audit, 2026-10-09).
   if (entry.itemKey) {
-    void router.push(wpath(`/s/${entry.itemKey.split('-')[0]}`))
     inspector.open(entry.itemKey)
     return
   }

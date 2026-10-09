@@ -9,6 +9,12 @@
 
 export type TDueTone = 'none' | 'later' | 'soon' | 'late' | 'met'
 
+/** One colour per lateness, wherever a due date is shown. */
+export const DUE_VARIANT: Record<
+  Exclude<TDueTone, 'none'>,
+  'grey' | 'orange' | 'red' | 'green'
+> = { later: 'grey', soon: 'orange', late: 'red', met: 'green' }
+
 export interface IDueView {
   tone: TDueTone
   /** What the chip reads. Empty when there is no date. */

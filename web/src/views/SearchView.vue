@@ -70,6 +70,10 @@
       <template #cell-type="{ row }">
         <NbBadge size="sm" variant="grey">{{ row.type }}</NbBadge>
       </template>
+      <!-- The key, so five cards with the same title can be told apart. -->
+      <template #cell-key="{ row }">
+        <span class="search__key">{{ row.key }}</span>
+      </template>
     </NbDataTable>
   </div>
 </template>
@@ -81,7 +85,8 @@ import { useShellSlot } from '@nubisco/ui'
 import { api } from '@/api/client'
 import type { ISearchResult } from '@/types/api'
 import { useLoadState } from '@/lib/state'
-import { useInspector } from '@/stores/workspace'
+import { useInspector, useWorkspace } from '@/stores/workspace'
+import { plainExcerpt } from '@/lib/excerpt'
 import { wpath } from '@/lib/paths'
 
 const route = useRoute()
@@ -89,6 +94,9 @@ const router = useRouter()
 const inspector = useInspector()
 const load = useLoadState()
 const filterBar = useShellSlot('fixedbar')
+const ws = useWorkspace()
+const nameOf = (handle: string) =>
+  ws.overview.value?.actors.find((a) => a.handle === handle)?.name
 
 const query = ref(String(route.query.q ?? ''))
 const typeFilter = ref('')
@@ -103,6 +111,7 @@ const typeOptions = [
 
 const columns = [
   { key: 'type', header: 'Type' },
+  { key: 'key', header: 'Key', width: '6rem' },
   { key: 'title', header: 'Title' },
   { key: 'snippet', header: 'Match' },
   { key: 'space', header: 'Space' },
@@ -111,8 +120,15 @@ const columns = [
 const rows = computed(() =>
   results.value.map((r) => ({
     type: r.type,
+    // A card's key, or the card a comment is on. Docs have none.
+    key:
+      r.type === 'item'
+        ? r.ref
+        : r.type === 'comment' && /^[A-Z][A-Z0-9]*-\d+$/.test(r.title)
+          ? r.title
+          : '',
     title: r.title,
-    snippet: r.snippet.replace(/<<|>>/g, ''),
+    snippet: plainExcerpt(r.snippet.replace(/<<|>>/g, ''), nameOf),
     space: r.space ?? '',
     ref: `${r.type}:${r.ref}`,
     rawRef: r.ref,
@@ -159,6 +175,13 @@ function openResult(row: {
 </script>
 
 <style scoped lang="scss">
+.search__key {
+  font-family: var(--nb-font-family-mono);
+  font-size: var(--nb-type-code-sm-size);
+  color: var(--nb-c-text-subtle);
+  white-space: nowrap;
+}
+
 .search {
   display: grid;
   gap: var(--nb-spacing-16);

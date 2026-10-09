@@ -79,28 +79,35 @@
         class="board-card__summary"
         :class="{ 'board-card__summary--empty': !row.summary }"
       >
-        {{ row.summary || 'No description' }}
+        {{ summary || 'No description' }}
       </span>
 
       <div class="board-card__row">
         <template v-if="goals.length > 0">
-          <RouterLink
-            v-nb-tooltip="{
-              header: `${goals[0].key} ${goals[0].title}`,
-              body: goalStatus(goals[0].status).label,
-            }"
-            class="board-card__goal board-card__live"
-            :to="wpath(`/goals/${goals[0].number}`)"
-          >
-            <NbIcon name="target" class="board-card__goal-icon" />
-            <span class="board-card__goal-key">{{ goals[0].key }}</span>
+          <!-- Only the goal's icon and key are a link. The whole pill was, and
+               it sits in the middle of the card, so a click meant to open the
+               card navigated to the goal instead (UX audit, 2026-10-09). The
+               title and dot are under the card's own click. -->
+          <span class="board-card__goal">
+            <RouterLink
+              v-nb-tooltip="{
+                header: `${goals[0].key} ${goals[0].title}`,
+                body: `${goalStatus(goals[0].status).label}. Open the goal.`,
+              }"
+              class="board-card__goal-link board-card__live"
+              :to="wpath(`/goals/${goals[0].number}`)"
+              :aria-label="`Open goal ${goals[0].key} ${goals[0].title}`"
+            >
+              <NbIcon name="target" class="board-card__goal-icon" />
+              <span class="board-card__goal-key">{{ goals[0].key }}</span>
+            </RouterLink>
             <span class="board-card__goal-title">{{ goals[0].title }}</span>
             <span
               class="board-card__goal-dot"
               :style="{ background: goalStatus(goals[0].status).color }"
               :aria-label="goalStatus(goals[0].status).label"
             />
-          </RouterLink>
+          </span>
           <span
             v-if="goals.length > 1"
             v-nb-tooltip="{
@@ -255,16 +262,18 @@ import type { ISpaceItemRow } from '@/types/api'
 import {
   CARD_FACES,
   countView,
+  DUE_VARIANT,
   dueView,
   parseProgress,
   sizeText,
-  type TDueTone,
 } from '@/lib/cards'
 import { goalStatus } from '@/lib/goals'
 import { rowLabels } from '@/lib/labels'
 import { wpath } from '@/lib/paths'
+import { useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import PriorityBadge from '@/components/PriorityBadge.vue'
+import { plainExcerpt } from '@/lib/excerpt'
 import LabelBadge from '@/components/LabelBadge.vue'
 
 export type TCardField = 'size' | 'goal' | 'labels' | 'due' | 'people'
@@ -286,11 +295,16 @@ const emit = defineEmits<{
   edit: [field: TCardField, key: string, anchor: HTMLElement]
 }>()
 
-const DUE_VARIANT: Record<
-  Exclude<TDueTone, 'none'>,
-  'grey' | 'orange' | 'red' | 'green'
-> = { later: 'grey', soon: 'orange', late: 'red', met: 'green' }
-
+const ws = useWorkspace()
+/** The first line, as a reader would say it: names, not @handles. */
+const summary = computed(() =>
+  props.row.summary
+    ? plainExcerpt(
+        props.row.summary,
+        (h) => ws.overview.value?.actors.find((a) => a.handle === h)?.name,
+      )
+    : '',
+)
 const blockers = computed(() => props.row.blocked_by ?? [])
 const size = computed(() => sizeText(props.row.size))
 const goals = computed(() => props.row.goals ?? [])
@@ -482,9 +496,20 @@ function edit(field: TCardField, event: MouseEvent): void {
     font-size: var(--nb-type-label-sm-size);
     font-weight: var(--nb-type-label-md-weight);
     text-decoration: none;
+  }
 
-    &:hover {
-      background: color-mix(in srgb, var(--nb-c-primary) 14%, transparent);
+  /* The link part of the pill: icon and key. Underlined on hover so it reads
+     as the only thing in the pill that goes somewhere. */
+  &__goal-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nb-spacing-4);
+    flex: none;
+    text-decoration: none;
+    border-radius: var(--nb-radius-xs, 2px);
+
+    &:hover .board-card__goal-key {
+      text-decoration: underline;
     }
 
     &:focus-visible {

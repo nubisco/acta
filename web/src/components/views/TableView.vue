@@ -37,6 +37,19 @@
         />
       </span>
     </template>
+    <!-- The board's wording and colour: "5 days late", not "5 days ago". -->
+    <template #cell-due="{ row }">
+      <NbBadge
+        v-if="(row as IRow).dueView && (row as IRow).dueView!.tone !== 'none'"
+        v-nb-tooltip="{ body: (row as IRow).dueView!.full }"
+        size="sm"
+        :variant="
+          DUE_VARIANT[(row as IRow).dueView!.tone as Exclude<TDueTone, 'none'>]
+        "
+      >
+        {{ (row as IRow).dueView!.text }}
+      </NbBadge>
+    </template>
     <template #cell-priority="{ row }">
       <PriorityBadge :priority="(row as IRow).priorityValue" />
     </template>
@@ -59,6 +72,7 @@
 import { computed, ref } from 'vue'
 import type { ISpaceItemRow } from '@/types/api'
 import PriorityBadge from '@/components/PriorityBadge.vue'
+import { DUE_VARIANT, dueView, type IDueView, type TDueTone } from '@/lib/cards'
 import type { TPriority } from '@/lib/priority'
 import { relativeTime } from '@/lib/state'
 import ActorAvatar from '@/components/ActorAvatar.vue'
@@ -77,6 +91,7 @@ interface IRow extends Record<string, unknown> {
   updatedAt: number
   done?: boolean
   priorityValue?: TPriority
+  dueView?: IDueView
   /** Urgent first when sorted: 4 urgent down to 1 low, absent sorts last. */
   priorityRank: number
 }
@@ -139,6 +154,7 @@ const rows = computed<IRow[]>(() => {
     updatedAt: item.updated,
     done: item.done,
     priorityValue: item.priority,
+    dueView: dueView(item.due, item.done),
     priority: item.priority ?? '',
     priorityRank: item.priority
       ? 5 - ['urgent', 'high', 'medium', 'low'].indexOf(item.priority)
