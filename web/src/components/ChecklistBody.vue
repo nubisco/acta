@@ -10,10 +10,12 @@
         >
           <span class="clist__text"><RefText :text="entry.text" /></span>
         </NbCheckbox>
+        <!-- The bin, not an X: an X closes things, this deletes an entry. -->
         <NbButton
-          size="xxs"
+          v-nb-tooltip="{ body: 'Remove this entry' }"
+          size="xs"
           variant="ghost"
-          icon="x"
+          icon="trash-simple"
           class="clist__remove"
           :aria-label="`Remove ${entry.text}`"
           @click="emit('remove', entry.text)"

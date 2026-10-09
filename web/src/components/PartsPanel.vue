@@ -47,7 +47,7 @@
             }"
             size="sm"
             variant="ghost"
-            icon="x"
+            icon="link-break"
             class="parts__detach"
             :aria-label="`Detach ${part.key} from ${itemKey}. The card is not deleted.`"
             @click="detach(part.key)"

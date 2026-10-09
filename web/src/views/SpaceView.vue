@@ -270,11 +270,24 @@
       :min-width="220"
       @close="cardMenuOpen = false"
     >
+      <!-- The same actions and icons as the card's own header, so the two
+           ways to act on a card do not drift (UX audit, 2026-10-09). -->
       <NbMenuItem
-        icon="arrows-out-simple"
+        icon="sidebar-simple"
         label="Open"
         @select="runCardAction('open')"
       />
+      <NbMenuItem
+        icon="arrows-out-simple"
+        label="Open full size"
+        @select="runCardAction('full')"
+      />
+      <NbMenuItem
+        icon="link-simple"
+        label="Copy link"
+        @select="runCardAction('copy')"
+      />
+      <NbMenuDivider />
       <NbMenuItem
         icon="arrow-line-up"
         label="Move to top"
@@ -332,6 +345,7 @@ import {
   type IBoardNestEvent,
 } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
+import { cardPath } from '@/lib/paths'
 import type { ISpaceItemRow } from '@/types/api'
 import { humanise, useLoadState } from '@/lib/state'
 import { useViewCommands } from '@/lib/commands'
@@ -490,7 +504,8 @@ function openCardMenu(event: MouseEvent, key: string): void {
   cardMenuOpen.value = true
 }
 
-type TCardAction = 'open' | 'top' | 'bottom' | 'archive' | 'restore' | 'delete'
+type TCardAction =
+  'open' | 'full' | 'copy' | 'top' | 'bottom' | 'archive' | 'restore' | 'delete'
 
 /**
  * Every menu entry routes through here. A template handler must be a direct
@@ -506,6 +521,20 @@ async function runCardAction(action: TCardAction): Promise<void> {
 
   if (action === 'open') {
     inspector.open(key)
+    return
+  }
+  if (action === 'full') {
+    inspector.open(key, { full: true })
+    return
+  }
+  if (action === 'copy') {
+    const url = new URL(cardPath(key), window.location.origin).toString()
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success(`Link to ${key} copied.`)
+    } catch {
+      toast.error(url, { title: 'Could not copy the link' })
+    }
     return
   }
   if (action === 'delete') {

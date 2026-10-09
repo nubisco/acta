@@ -70,7 +70,7 @@
                  card that happen to look alike. -->
             <NbButton
               v-nb-tooltip="{ body: 'Show in the side panel' }"
-              size="xs"
+              size="sm"
               variant="ghost"
               icon="arrows-in-simple"
               :aria-label="`Show ${it.item.value.key} in the side panel`"
@@ -82,7 +82,7 @@
             <NbButton
               v-if="it.item.value.archived"
               v-nb-tooltip="{ body: 'Restore to its list' }"
-              size="xs"
+              size="sm"
               variant="secondary"
               icon="arrow-counter-clockwise"
               :aria-label="`Restore ${it.item.value.key}`"
@@ -91,7 +91,7 @@
             <NbButton
               v-else
               v-nb-tooltip="{ body: 'Archive this card' }"
-              size="xs"
+              size="sm"
               variant="ghost"
               icon="archive"
               :aria-label="`Archive ${it.item.value.key}`"
@@ -102,7 +102,7 @@
             <NbButton
               v-if="it.item.value.archived"
               v-nb-tooltip="{ body: 'Delete permanently' }"
-              size="xs"
+              size="sm"
               variant="danger"
               outlined
               icon="trash"
@@ -636,15 +636,18 @@ function commitDescription(): void {
     line-height: 1.25;
   }
 
+  /* The side panel's section heading, exactly: one card, one heading style,
+     whichever size it is shown at (UX audit, 2026-10-09). */
   &__section h3 {
     display: flex;
     align-items: center;
     gap: var(--nb-spacing-8);
     margin: 0 0 var(--nb-spacing-8);
-    font-size: var(--nb-type-label-md-size);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--nb-c-text-muted);
+    font-family: var(--nb-type-label-lg-family);
+    font-size: var(--nb-type-label-lg-size);
+    font-weight: var(--nb-type-label-lg-weight);
+    line-height: var(--nb-type-label-lg-line-height);
+    color: var(--nb-c-text);
 
     :deep(.nb-badge) {
       text-transform: none;

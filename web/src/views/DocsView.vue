@@ -177,7 +177,7 @@
           v-if="doc.backlinks && doc.backlinks.length > 0"
           class="docs__backlinks"
         >
-          <h2>Referenced by</h2>
+          <h2 class="type-heading-01">Referenced by</h2>
           <NbDefinitionList :items="backlinkFacts" layout="columns" />
         </footer>
 
@@ -193,7 +193,7 @@
         />
 
         <section v-if="!viewingOld" class="docs__comments">
-          <h2>
+          <h2 class="type-heading-01">
             Comments
             <span v-if="doc.comments && doc.comments.length > 0">
               ({{ doc.comments.length }})
@@ -342,7 +342,7 @@ function removeDoc(): void {
     title: 'Delete page',
     message: `"${current.title}" and its comments, versions and attachments will be permanently deleted. Pages that still have child pages cannot be deleted.`,
     confirmLabel: 'Delete page',
-    cancelLabel: 'Cancel',
+    cancelLabel: 'Keep it',
     onConfirm: async () => {
       try {
         const { results } = await api.docWrite([

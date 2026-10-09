@@ -758,12 +758,13 @@ function commitDescription(): void {
     align-items: center;
     gap: var(--nb-spacing-8);
     margin: 0;
-    font-size: var(--nb-type-label-sm-size);
-    font-weight: var(--nb-type-label-sm-weight);
-    line-height: 1.4;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--nb-c-text-subtle);
+    /* The accordion headers' own style, so Description and Comments read as
+       sections of the same list rather than as small caps labels. */
+    font-family: var(--nb-type-label-lg-family);
+    font-size: var(--nb-type-label-lg-size);
+    font-weight: var(--nb-type-label-lg-weight);
+    line-height: var(--nb-type-label-lg-line-height);
+    color: var(--nb-c-text);
   }
 
   :deep(.nb-badge) {

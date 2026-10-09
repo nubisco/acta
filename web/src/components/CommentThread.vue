@@ -416,7 +416,7 @@ function askDelete(comment: ICommentView | null): void {
     subject: comment.body,
     subjectLabel: `Comment by ${authorLabel(comment)}`,
     confirmLabel: 'Delete comment',
-    cancelLabel: 'Cancel',
+    cancelLabel: 'Keep it',
     onConfirm: () => emit('delete', id),
   })
 }

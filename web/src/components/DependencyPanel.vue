@@ -60,7 +60,7 @@
                 v-nb-tooltip="{ body: `Unlink ${dep.key}` }"
                 size="sm"
                 variant="ghost"
-                icon="x"
+                icon="link-break"
                 class="deps__remove"
                 :aria-label="`Remove the link to ${dep.key}`"
                 @click="remove(group.kind, dep.key)"

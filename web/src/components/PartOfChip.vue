@@ -20,7 +20,7 @@
       v-nb-tooltip="{ body: `Detach from ${parent.key}. Both cards stay.` }"
       size="sm"
       variant="ghost"
-      icon="x"
+      icon="link-break"
       :aria-label="`Detach ${itemKey} from ${parent.key}. Neither card is deleted.`"
       @click="detach"
     />

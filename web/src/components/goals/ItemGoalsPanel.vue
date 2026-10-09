@@ -23,7 +23,7 @@
           }"
           size="sm"
           variant="ghost"
-          icon="x"
+          icon="link-break"
           :aria-label="`Unlink ${itemKey} from ${goal.key}`"
           @click="unlink(goal.number)"
         />
