@@ -1,5 +1,6 @@
 <template>
   <NbModal
+    close-appearance="button"
     :open="open"
     title="New item"
     size="sm"

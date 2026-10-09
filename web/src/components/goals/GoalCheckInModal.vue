@@ -1,5 +1,6 @@
 <template>
   <NbModal
+    close-appearance="button"
     :open="open"
     :title="`Check in on ${goal.key}`"
     size="md"

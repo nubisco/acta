@@ -1,5 +1,6 @@
 <template>
   <NbModal
+    close-appearance="button"
     :open="open"
     size="lg"
     :title="it.item.value?.key ?? 'Item'"

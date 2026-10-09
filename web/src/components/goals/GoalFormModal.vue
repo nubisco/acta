@@ -1,5 +1,6 @@
 <template>
   <NbModal
+    close-appearance="button"
     :open="open"
     :title="editing ? `Edit ${goal?.key}` : 'New goal'"
     size="md"

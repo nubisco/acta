@@ -1,5 +1,6 @@
 <template>
   <NbModal
+    close-appearance="button"
     :open="open"
     :title="rule ? 'Edit rule' : 'New rule'"
     size="md"

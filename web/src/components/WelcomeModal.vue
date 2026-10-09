@@ -1,5 +1,6 @@
 <template>
   <NbModal
+    close-appearance="button"
     :open="open"
     :title="`Welcome to Acta, ${firstName}`"
     size="md"

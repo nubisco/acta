@@ -98,6 +98,7 @@
 
   <NbModal
     v-if="preview"
+    close-appearance="button"
     :open="preview"
     size="immersive"
     :title="alt || 'Image'"

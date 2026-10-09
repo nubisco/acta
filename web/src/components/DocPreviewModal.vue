@@ -1,5 +1,6 @@
 <template>
   <NbModal
+    close-appearance="button"
     :open="slug !== null"
     size="lg"
     :title="doc?.title ?? slug ?? 'Document'"
