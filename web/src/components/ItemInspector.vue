@@ -188,6 +188,15 @@
             @change="it.commitDue"
           />
         </NbField>
+        <NbField v-slot="{ id }" label="Priority">
+          <NbSelect
+            :id="id"
+            v-model="it.draft.priority"
+            size="sm"
+            :options="PRIORITY_OPTIONS"
+            @change="it.commitPriority"
+          />
+        </NbField>
         <NbField v-slot="{ id }" label="Assignees">
           <NbSelect
             :id="id"
@@ -528,6 +537,7 @@ import MoveCardModal from '@/components/MoveCardModal.vue'
 import PartOfChip from '@/components/PartOfChip.vue'
 import type { IPartRef } from '@/types/api'
 import SectionCount from '@/components/SectionCount.vue'
+import { PRIORITY_OPTIONS } from '@/lib/priority'
 import CardTrail from '@/components/CardTrail.vue'
 import RefText from '@/components/RefText.vue'
 import { SECTION_INFO } from '@/lib/sections'

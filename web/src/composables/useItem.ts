@@ -8,6 +8,7 @@ import { computed, onScopeDispose, reactive, ref, watch, type Ref } from 'vue'
 import { useInlineLoading, useToast } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
 import type { IItemDetail, TViewState } from '@/types/api'
+import type { TPriority } from '@/lib/priority'
 import { humanise } from '@/lib/state'
 import { headingOption, labelGroups, labelsById } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'
@@ -65,6 +66,8 @@ export function useItem(itemKey: Ref<string>) {
     labels: [] as string[],
     description: '',
     status: 'open' as TItemStatus,
+    /** '' is no priority, so the select has a value to show for it. */
+    priority: '' as TPriority | '',
   })
 
   const listOptions = ref<ISelectOptionView[]>([])
@@ -105,6 +108,7 @@ export function useItem(itemKey: Ref<string>) {
       draft.labels = labelIdsOf(detail)
       draft.description = detail.description
       draft.status = statusOf(detail)
+      draft.priority = detail.priority ?? ''
       computeLifecycle(detail)
       linkFacts.value = [
         ...(detail.links?.out ?? []).map((link) => ({
@@ -218,6 +222,18 @@ export function useItem(itemKey: Ref<string>) {
     const due = draft.due ? Date.parse(draft.due) : null
     if (due === (item.value.due ?? null)) return
     void write({ op: 'update', op_id: newOpId(), key: item.value.key, due })
+  }
+
+  function commitPriority(): void {
+    if (!item.value) return
+    const priority = draft.priority || null
+    if (priority === (item.value.priority ?? null)) return
+    void write({
+      op: 'prioritize',
+      op_id: newOpId(),
+      key: item.value.key,
+      priority,
+    })
   }
 
   /**
@@ -484,6 +500,7 @@ export function useItem(itemKey: Ref<string>) {
     commitDescription,
     commitList,
     commitDue,
+    commitPriority,
     commitAssignees: () => commitSet('assign'),
     commitLabels,
     commitStatus,

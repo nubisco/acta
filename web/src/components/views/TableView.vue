@@ -37,6 +37,9 @@
         />
       </span>
     </template>
+    <template #cell-priority="{ row }">
+      <PriorityBadge :priority="(row as IRow).priorityValue" />
+    </template>
     <template #empty>
       <NbEmptyState
         size="sm"
@@ -55,6 +58,8 @@
  */
 import { computed, ref } from 'vue'
 import type { ISpaceItemRow } from '@/types/api'
+import PriorityBadge from '@/components/PriorityBadge.vue'
+import type { TPriority } from '@/lib/priority'
 import { relativeTime } from '@/lib/state'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import LabelBadge from '@/components/LabelBadge.vue'
@@ -71,6 +76,9 @@ interface IRow extends Record<string, unknown> {
   updated: string
   updatedAt: number
   done?: boolean
+  priorityValue?: TPriority
+  /** Urgent first when sorted: 4 urgent down to 1 low, absent sorts last. */
+  priorityRank: number
 }
 
 const props = defineProps<{ items: ISpaceItemRow[] }>()
@@ -82,6 +90,7 @@ const columns = [
   { key: 'list', header: 'List', sortable: true, width: '10rem' },
   { key: 'labels', header: 'Labels', width: '12rem' },
   { key: 'assignees', header: 'Assignees', width: '8rem' },
+  { key: 'priority', header: 'Priority', sortable: true, width: '7rem' },
   { key: 'due', header: 'Due', sortable: true, width: '8rem' },
   { key: 'updated', header: 'Updated', sortable: true, width: '9rem' },
 ]
@@ -129,11 +138,17 @@ const rows = computed<IRow[]>(() => {
     updated: relativeTime(item.updated),
     updatedAt: item.updated,
     done: item.done,
+    priorityValue: item.priority,
+    priority: item.priority ?? '',
+    priorityRank: item.priority
+      ? 5 - ['urgent', 'high', 'medium', 'low'].indexOf(item.priority)
+      : Number.POSITIVE_INFINITY,
   }))
   const active = sort.value
   if (!active) return mapped
   const factor = active.direction === 'desc' ? -1 : 1
   const numeric: Record<string, keyof IRow> = {
+    priority: 'priorityRank',
     due: 'dueAt',
     updated: 'updatedAt',
   }

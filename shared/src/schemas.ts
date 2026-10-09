@@ -131,6 +131,18 @@ export const zItemSizeOp = z.object({
   is_milestone: z.boolean().optional(),
 })
 
+/** How urgent a card is. Absent means nobody has said. */
+export const zPriority = z.enum(['low', 'medium', 'high', 'urgent'])
+export type TPriority = z.infer<typeof zPriority>
+
+export const zItemPrioritizeOp = z.object({
+  op: z.literal('prioritize'),
+  op_id: zOpId,
+  key: zItemKey,
+  /** Null clears it. */
+  priority: zPriority.nullable(),
+})
+
 export const zItemSetMetaOp = z.object({
   op: z.literal('set_meta'),
   op_id: zOpId,
@@ -229,6 +241,7 @@ export const zItemOp = z.discriminatedUnion('op', [
   zItemDependsOp,
   zItemUndependOp,
   zItemSizeOp,
+  zItemPrioritizeOp,
   zItemDeleteOp,
   simpleItemOp('archive'),
   simpleItemOp('restore'),

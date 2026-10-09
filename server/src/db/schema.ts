@@ -906,6 +906,10 @@ export const ADDITIVE_COLUMNS = [
   // path, present and future, keeps it right. Bootstrap backfills existing
   // done cards from their last update.
   'ALTER TABLE item ADD COLUMN done_at INTEGER',
+  // How urgent a card is: low, medium, high or urgent. Null: nobody said.
+  // A real field rather than a label group (Jose, 2026-10-09), because Home
+  // ranks by it and a label can mean anything.
+  "ALTER TABLE item ADD COLUMN priority TEXT CHECK (priority IN ('low', 'medium', 'high', 'urgent'))",
   // How many days a space's board shows done cards for (null: always), and
   // when somebody last pressed "Clear done now". Jose, 2026-10-09.
   'ALTER TABLE space ADD COLUMN done_window_days INTEGER DEFAULT 14',

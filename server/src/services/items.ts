@@ -714,6 +714,29 @@ async function applyItemOp(
       )
       return { key: blocked.key, rev: blocked.rev }
     }
+    case 'prioritize': {
+      const item = await itemByKey(ctx, op.key)
+      if ((item.priority ?? null) === op.priority)
+        return { key: item.key, rev: item.rev }
+      await ctx.db.run('UPDATE item SET priority = ? WHERE id = ?', [
+        op.priority,
+        item.id,
+      ])
+      const rev = await bumpRev(ctx, item)
+      // In the card's history, not the bell: a re-prioritised card is news to
+      // nobody in particular.
+      await emitEvent(
+        ctx,
+        'item.prioritized',
+        'item',
+        item.id,
+        op.priority
+          ? `set the priority of ${item.key} to ${op.priority}`
+          : `cleared the priority of ${item.key}`,
+        { priority: op.priority, previous: item.priority ?? null },
+      )
+      return { key: item.key, rev }
+    }
     case 'size': {
       const item = await itemByKey(ctx, op.key)
       const changedSize = op.size !== item.size

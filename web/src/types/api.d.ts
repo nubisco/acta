@@ -80,6 +80,8 @@ export interface ICommentRow {
 }
 
 export interface ISpaceItemRow {
+  /** How urgent: low, medium, high or urgent. Absent: nobody said. */
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
   key: string
   title: string
   list: string
@@ -144,6 +146,8 @@ export interface IPartRef {
 }
 
 export interface IItemDetail {
+  /** How urgent: low, medium, high or urgent. Absent: nobody said. */
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
   key: string
   space: string
   list: string
@@ -455,4 +459,39 @@ export interface IItemEvent {
   actor_kind: string
   automated?: true
   changes?: Record<string, unknown>
+}
+
+/** Why a card is in Next up: one signal, as a chip says it. */
+export interface INextReason {
+  code: string
+  label: string
+  points: number
+  ref?: string
+}
+
+export interface INextItem {
+  key: string
+  title: string
+  space: string
+  space_key: string
+  list: string
+  list_role: string
+  due?: number
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
+  assigned: boolean
+  score: number
+  reasons: INextReason[]
+}
+
+export interface INextUp {
+  counts: {
+    overdue: number
+    due_today: number
+    due_week: number
+    mentions: number
+    blocking: number
+    waiting: number
+  }
+  items: INextItem[]
+  waiting: (INextItem & { waiting_on: string })[]
 }

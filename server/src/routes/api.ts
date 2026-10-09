@@ -17,6 +17,7 @@ import {
 import { ApiError, type ICtx } from '../core/ctx'
 import { createToken } from '../core/auth'
 import { emitEvent, flushPendingEvents, onEvent } from '../core/events'
+import { nextUp } from '../services/nextUp'
 import { liveFrame, sameOriginSocket, type ILiveTransport } from '../core/live'
 import { spaceWrite } from '../services/spaces'
 import { docWrite } from '../services/docs'
@@ -154,6 +155,15 @@ export function apiRoutes(
    * which cannot answer the question Home is for.
    */
   app.get('/me/work', async (c) => c.json(await myWork(ctxOf(c))))
+  app.get('/me/next', async (c) => {
+    const limit = Number(c.req.query('limit') ?? 7)
+    return c.json(
+      await nextUp(
+        ctxOf(c),
+        Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 50) : 7,
+      ),
+    )
+  })
 
   /** Every goal with its progress, and the breakdown the dashboard draws. */
   app.get('/goals', async (c) =>

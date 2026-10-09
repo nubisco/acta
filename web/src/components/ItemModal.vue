@@ -143,6 +143,15 @@
               @change="it.commitDue"
             />
           </NbField>
+          <NbField v-slot="{ id }" label="Priority" orientation="stack">
+            <NbSelect
+              :id="id"
+              v-model="it.draft.priority"
+              size="sm"
+              :options="PRIORITY_OPTIONS"
+              @change="it.commitPriority"
+            />
+          </NbField>
           <NbField v-slot="{ id }" label="Assignees" orientation="stack">
             <NbSelect
               :id="id"
@@ -467,6 +476,7 @@ import PartsPanel from '@/components/PartsPanel.vue'
 import ItemGoalsPanel from '@/components/goals/ItemGoalsPanel.vue'
 import PartOfChip from '@/components/PartOfChip.vue'
 import CardTrail from '@/components/CardTrail.vue'
+import { PRIORITY_OPTIONS } from '@/lib/priority'
 
 const props = defineProps<{ open: boolean; itemKey: string }>()
 const emit = defineEmits<{ close: [] }>()

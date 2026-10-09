@@ -33,6 +33,15 @@
           <NbIcon name="arrow-bend-left-up" /> {{ row.parent_key }}
         </span>
         <span class="board-card__grow" />
+        <!-- Only the priorities that ask for attention: a low or medium badge
+             on every card is noise that hides the urgent one. -->
+        <PriorityBadge
+          :priority="
+            row.priority === 'urgent' || row.priority === 'high'
+              ? row.priority
+              : null
+          "
+        />
         <span
           v-if="blockers.length > 0"
           v-nb-tooltip="{ body: `Waits on ${blockers.join(', ')}` }"
@@ -255,6 +264,7 @@ import { goalStatus } from '@/lib/goals'
 import { rowLabels } from '@/lib/labels'
 import { wpath } from '@/lib/paths'
 import ActorAvatar from '@/components/ActorAvatar.vue'
+import PriorityBadge from '@/components/PriorityBadge.vue'
 import LabelBadge from '@/components/LabelBadge.vue'
 
 export type TCardField = 'size' | 'goal' | 'labels' | 'due' | 'people'

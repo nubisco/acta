@@ -101,6 +101,7 @@ import type {
   IGoalRow,
   IGoalDetail,
   IGoalSummary,
+  INextUp,
 } from '@/types/api'
 
 // -- Auth -------------------------------------------------------------------
@@ -258,6 +259,9 @@ export const api = {
    * What is mine, across every space. Everything else is space-scoped, which
    * cannot answer the question Home opens with.
    */
+  /** One ranked list of what to pick up next, each card with its reasons. */
+  myNext: (limit = 7) => req<INextUp>(`/me/next?limit=${limit}`),
+
   myWork: () =>
     req<{
       assigned: IMyWorkItem[]

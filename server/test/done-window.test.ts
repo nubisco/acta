@@ -135,3 +135,30 @@ describe('the done window', () => {
     expect('done_hidden' in all).toBe(false)
   })
 })
+
+describe('priority', () => {
+  it('is set, read back on the board and the card, recorded, and cleared', async () => {
+    const write = (priority: string | null, id: string) =>
+      itemWrite(ctx, [
+        { op: 'prioritize', op_id: id, key: 'ST-3', priority },
+      ] as never)
+    expect((await write('urgent', 'p1'))[0].ok).toBe(true)
+    const row = (await board()).items.find((i) => i.key === 'ST-3')
+    expect(row?.priority).toBe('urgent')
+    const events = await db.query<{ verb: string; summary: string }>(
+      "SELECT verb, summary FROM event WHERE verb = 'item.prioritized'",
+    )
+    expect(events[0].summary).toContain('urgent')
+    await write(null, 'p2')
+    expect(
+      (await board()).items.find((i) => i.key === 'ST-3')?.priority,
+    ).toBeUndefined()
+  })
+
+  it('refuses anything that is not a priority', async () => {
+    const [r] = await itemWrite(ctx, [
+      { op: 'prioritize', op_id: 'bad', key: 'ST-3', priority: 'whenever' },
+    ] as never)
+    expect(r.ok).toBe(false)
+  })
+})

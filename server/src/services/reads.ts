@@ -339,6 +339,7 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
     label_ids: r.label_ids ? r.label_ids.split(',') : undefined,
     assignees: r.assignees ? r.assignees.split(',') : undefined,
     due: r.due ?? undefined,
+    priority: r.priority ?? undefined,
     // The timeline needs somewhere for a bar to start. Without it every card
     // would be a milestone on its due date, which is a worse chart and a less
     // true one.
@@ -534,6 +535,7 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
       updated: item.updated_at,
       imported: parseImportedMeta(item.imported_meta),
       size: item.size ?? undefined,
+      priority: item.priority ?? undefined,
       is_milestone: item.is_milestone === 1 || undefined,
     }
 

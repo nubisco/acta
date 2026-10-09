@@ -1,16 +1,12 @@
 <template>
   <div class="home">
-    <h1 class="type-heading-03">
-      {{ ws.overview.value?.workspace.name ?? 'Workspace' }}
-    </h1>
+    <!-- The greeting and what to pick up next come first, then how the
+         goals stand, then the spaces. Jose set this order on 2026-10-09,
+         replacing goals-first: the question people open Home with is what
+         they should be doing. -->
+    <NextUpPanel />
 
-    <!-- First. Goals are what the rest of the work is for, so how they stand
-         is the first thing Home says. Jose set this order. -->
     <HomeGoalsPanel />
-
-    <!-- Before the spaces. What is mine is the question people open Home
-         with, and a grid of boards does not answer it. -->
-    <MyWorkPanel />
 
     <component :is="actions.Outlet">
       <NbButton
@@ -161,7 +157,7 @@ import type { TOverviewSpace } from '@/types/api'
 import { chartColorFor, roleColor } from '@/lib/colors'
 import { humanise, useLoadState } from '@/lib/state'
 import { useUiState, useWorkspace } from '@/stores/workspace'
-import MyWorkPanel from '@/components/MyWorkPanel.vue'
+import NextUpPanel from '@/components/NextUpPanel.vue'
 import HomeGoalsPanel from '@/components/goals/HomeGoalsPanel.vue'
 import { wpath } from '@/lib/paths'
 // A filled star is the same glyph at a different weight, not a different

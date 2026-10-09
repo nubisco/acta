@@ -1,5 +1,40 @@
 # Working in Acta
 
+## Home
+
+Home opens with a greeting and one line on what is waiting for you: cards
+overdue, due today, mentions you have not read, and cards of yours that hold
+somebody else up.
+
+**Next up** is the list of what to pick up next, across every space. It holds
+your open cards, plus any card due within a week that nobody is on in a space
+you work in, ranked by what makes each one pressing. Every card says why it is
+there, two reasons at a glance and all of them behind the (i):
+
+| Reason                               | Counts for                                                         |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| Overdue                              | the most, more for every day late                                  |
+| Due today, tomorrow, within the week | less the further away                                              |
+| Urgent, High, Medium priority        | a card's [priority](#priority)                                     |
+| A mention waiting on you             | an unread mention of you on the card                               |
+| Blocks another card                  | other people's open cards it holds up, more if one of them is late |
+| A goal off track or at risk          | the [goal](/users/goals) it serves is in trouble                   |
+| In progress, In review               | work already started finishes first                                |
+| Untouched for a week                 | in progress but nobody has moved it                                |
+| Nobody on it                         | a dated card with no assignee, slightly lower                      |
+
+A card that waits on another card is not ranked: it sits under **Waiting on
+other cards**, saying what it waits on. The list follows changes as they
+happen. Below it, Home shows how your [goals](/users/goals#home) stand, and
+then your spaces.
+
+## Priority
+
+A card can be **Urgent**, **High**, **Medium** or **Low**, or have no priority,
+which is most cards. Set it from the card's Priority field. Urgent and High
+show on the card on a board, the Table view has a sortable Priority column, and
+[Next up](#home) ranks by it.
+
 ## Views
 
 A space can be read five ways. They are the same cards, not five feature sets.

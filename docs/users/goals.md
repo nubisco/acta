@@ -135,9 +135,9 @@ comment and it becomes a link to that goal, showing its name.
 
 ## Home
 
-![Home, opening with how every goal stands](/media/goals-home.jpg)
+![Home, showing how every goal stands](/media/goals-home.jpg)
 
-Home opens with how every goal stands:
+Under [Next up](/users/working#home), Home shows how every goal stands:
 
 - A bar of goals by status, worst first, with the counts beside each status.
 - How many are in flight, how many are past their date, how many have had no

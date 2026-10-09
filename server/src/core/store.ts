@@ -51,6 +51,7 @@ export interface IItemRow {
   is_milestone: number
   /** The card this one is part of. Null means it stands on its own. */
   parent_id: string | null
+  priority: 'low' | 'medium' | 'high' | 'urgent' | null
 }
 
 export interface IDocRow {
