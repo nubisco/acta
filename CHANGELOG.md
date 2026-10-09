@@ -1,3 +1,10 @@
+## [1.45.4](https://github.com/nubisco/acta/compare/v1.45.3...v1.45.4) (2026-10-09)
+
+
+### Performance Improvements
+
+* **cards:** a status change or a drag updates the card in place, nothing reloads ([7ba76a2](https://github.com/nubisco/acta/commit/7ba76a222fda82a5c7cad1fa86b0ae04990b9e22))
+
 ## [1.45.3](https://github.com/nubisco/acta/compare/v1.45.2...v1.45.3) (2026-10-09)
 
 
