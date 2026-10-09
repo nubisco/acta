@@ -1,3 +1,10 @@
+# [1.42.0](https://github.com/nubisco/acta/compare/v1.41.1...v1.42.0) (2026-10-09)
+
+
+### Features
+
+* **board:** done cards leave the board after 14 days, and the column says so ([e865021](https://github.com/nubisco/acta/commit/e86502194eeb160301a071f57383c0b3282223f4))
+
 ## [1.41.1](https://github.com/nubisco/acta/compare/v1.41.0...v1.41.1) (2026-10-09)
 
 
