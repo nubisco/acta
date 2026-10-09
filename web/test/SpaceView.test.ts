@@ -101,6 +101,8 @@ const inspectorMock = {
 }
 
 vi.mock('@/stores/workspace', () => ({
+  onCardPatched: () => () => {},
+  patchCard: () => {},
   useWorkspace: () => ({
     overview: { value: overview },
     onLive: () => () => undefined,
@@ -148,7 +150,12 @@ const items = [
 import SpaceView from '@/views/SpaceView.vue'
 
 async function render() {
-  spaceGet.mockResolvedValue({ items, cursor: undefined })
+  // Copies: the board moves cards in place, and a shared fixture would carry
+  // one test's drag into the next.
+  spaceGet.mockResolvedValue({
+    items: items.map((i) => ({ ...i })),
+    cursor: undefined,
+  })
   const view = mount(SpaceView, {
     props: { spaceKey: 'SU' },
     global: { stubs: { teleport: true } },
@@ -184,6 +191,24 @@ describe('SpaceView card menu', () => {
     inspectorMock.itemKey.value = null
     inspectorMock.open.mockClear()
     inspectorMock.close.mockClear()
+  })
+
+  // Jose, 2026-10-09: the board flashed because every drag reloaded every
+  // card. The card is already where it was dropped; the write is enough.
+  it('moves a dropped card with one write and no reload', async () => {
+    const view = await render()
+    spaceGet.mockClear()
+    view.findComponent({ name: 'Board' }).vm.$emit('move', {
+      itemId: 'SU-1',
+      toColumnId: 'Doing',
+      beforeItemId: null,
+      afterItemId: null,
+    })
+    await flushPromises()
+    expect(itemWrite).toHaveBeenCalledTimes(1)
+    expect(spaceGet).not.toHaveBeenCalled()
+    const card = view.find('[data-card-key="SU-1"]')
+    expect(card.exists()).toBe(true)
   })
 
   it('moving to the top actually writes a move', async () => {

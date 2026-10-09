@@ -11,7 +11,7 @@ import type { IItemDetail, TViewState } from '@/types/api'
 import type { TPriority } from '@/lib/priority'
 import { humanise } from '@/lib/state'
 import { headingOption, labelGroups, labelsById } from '@/lib/labels'
-import { useWorkspace } from '@/stores/workspace'
+import { patchCard, useWorkspace, type ICardPatch } from '@/stores/workspace'
 
 export interface ILifecycleBadge {
   text: string
@@ -73,6 +73,27 @@ export function useItem(itemKey: Ref<string>) {
     { term: string; value: string; opens?: 'item' | 'doc' }[]
   >([])
 
+  function draftOf(detail: IItemDetail) {
+    return {
+      title: detail.title,
+      list: detail.list,
+      due: detail.due ? new Date(detail.due).toISOString().slice(0, 10) : null,
+      assignees: detail.assignees ?? [],
+      labels: labelIdsOf(detail),
+      description: detail.description,
+      status: statusOf(detail),
+      priority: (detail.priority ?? '') as TPriority | '',
+    }
+  }
+
+  /** The drafts as the server last had them. */
+  function snapshot() {
+    return item.value ? draftOf(item.value) : null
+  }
+
+  const same = (a: unknown, b: unknown) =>
+    JSON.stringify(a) === JSON.stringify(b)
+
   function computeLifecycle(detail: IItemDetail): void {
     if (detail.archived)
       lifecycle.value = { text: 'Archived', variant: 'grey', dot: false }
@@ -83,8 +104,19 @@ export function useItem(itemKey: Ref<string>) {
     else lifecycle.value = { text: 'Open', variant: 'green', dot: true }
   }
 
+  /**
+   * Read the card. The skeleton is for a card not on screen yet: the first
+   * load, or a different card. Refreshing the card already shown happens in
+   * place, because blanking it to a skeleton remounted every section, and
+   * each then fetched its own data again (measured: two card reads and a
+   * space read for one status change).
+   */
   async function load(): Promise<void> {
-    viewState.value = 'loading'
+    const showing = item.value?.key === itemKey.value
+    if (!showing) viewState.value = 'loading'
+    // What the server said last, so a refresh only overwrites the fields the
+    // reader has not changed since.
+    const before = showing ? snapshot() : null
     try {
       const { items } = await api.itemGet(
         [itemKey.value],
@@ -93,16 +125,12 @@ export function useItem(itemKey: Ref<string>) {
       )
       const detail = items[0]
       item.value = detail
-      draft.title = detail.title
-      draft.list = detail.list
-      draft.due = detail.due
-        ? new Date(detail.due).toISOString().slice(0, 10)
-        : null
-      draft.assignees = detail.assignees ?? []
-      draft.labels = labelIdsOf(detail)
-      draft.description = detail.description
-      draft.status = statusOf(detail)
-      draft.priority = detail.priority ?? ''
+      const next = draftOf(detail)
+      for (const field of Object.keys(next) as (keyof typeof next)[]) {
+        // Keep anything the reader is in the middle of changing.
+        if (before && !same(draft[field], before[field])) continue
+        ;(draft as Record<string, unknown>)[field] = next[field]
+      }
       computeLifecycle(detail)
       linkFacts.value = [
         ...(detail.links?.out ?? []).map((link) => ({
@@ -158,13 +186,21 @@ export function useItem(itemKey: Ref<string>) {
 
   type TWriteOp = Parameters<typeof api.itemWrite>[0][number]
 
+  /**
+   * Save one change. On the server's confirmation the change is applied to
+   * the card on screen and announced to the board, with no reload; the card
+   * is then re-read quietly so its history picks up the new entry. A failed
+   * save reloads, since then the server's version is the one to show.
+   */
   async function write(op: TWriteOp): Promise<boolean> {
     saveError.value = ''
+    let rev: number | undefined
     await save.run(async () => {
       const { results } = await api.itemWrite([op])
       if (!results[0].ok) {
         throw new Error((results[0] as { error: string }).error)
       }
+      rev = (results[0] as { rev?: number }).rev
     })
     if (save.status.value === 'error') {
       const failure = save.error.value
@@ -175,8 +211,42 @@ export function useItem(itemKey: Ref<string>) {
       await load()
       return false
     }
-    await load()
+    applyConfirmed(op, rev)
+    void load()
     return true
+  }
+
+  /** The confirmed change, on the card on screen and on every board. */
+  function applyConfirmed(op: TWriteOp, rev?: number): void {
+    const current = item.value
+    if (!current) return
+    const next: IItemDetail = { ...current, rev: rev ?? current.rev }
+    const patch: ICardPatch = { key: current.key }
+    if (op.op === 'move') {
+      next.list = op.list
+      const role = ws.overview.value?.spaces
+        .find((s) => s.key === current.space)
+        ?.lists.find((l) => l.name === op.list)?.role
+      if (role) next.done = role === 'done' || undefined
+      patch.list = op.list
+      patch.done = Boolean(next.done)
+    } else if (op.op === 'update') {
+      if (op.title !== undefined) next.title = patch.title = op.title
+      if (op.description !== undefined) next.description = op.description
+      if (op.due !== undefined) {
+        next.due = op.due ?? undefined
+        patch.due = op.due ?? null
+      }
+    } else if (op.op === 'prioritize') {
+      next.priority = op.priority ?? undefined
+      patch.priority = op.priority
+    } else if (op.op === 'archive' || op.op === 'restore') {
+      next.archived = op.op === 'archive' || undefined
+      patch.archived = op.op === 'archive'
+    }
+    item.value = next
+    computeLifecycle(next)
+    patchCard(patch)
   }
 
   function commitTitle(): void {

@@ -105,6 +105,8 @@ vi.mock('@nubisco/ui', async (importOriginal) => {
 })
 
 vi.mock('@/stores/workspace', () => ({
+  onCardPatched: () => () => {},
+  patchCard: () => {},
   useWorkspace: () => ({
     me: computed(() => ({
       id: 'a',

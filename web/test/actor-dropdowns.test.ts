@@ -20,6 +20,8 @@ const overview = {
 }
 
 vi.mock('@/stores/workspace', () => ({
+  onCardPatched: () => () => {},
+  patchCard: () => {},
   useWorkspace: () => ({
     overview: { value: overview },
     onLive: () => () => undefined,

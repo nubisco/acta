@@ -28,6 +28,8 @@ vi.mock('@/api/client', () => ({
 
 const refresh = vi.fn(async () => undefined)
 vi.mock('@/stores/workspace', () => ({
+  onCardPatched: () => () => {},
+  patchCard: () => {},
   useWorkspace: () => ({ refresh, overview: { value: { actors: [] } } }),
 }))
 

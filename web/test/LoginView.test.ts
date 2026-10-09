@@ -22,6 +22,8 @@ vi.mock('vue-router', () => ({
   }),
 }))
 vi.mock('@/stores/workspace', () => ({
+  onCardPatched: () => () => {},
+  patchCard: () => {},
   useWorkspace: () => ({ loadMe: vi.fn(), refresh: vi.fn() }),
 }))
 vi.mock('@/api/client', () => ({

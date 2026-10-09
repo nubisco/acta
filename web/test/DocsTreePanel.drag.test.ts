@@ -66,6 +66,8 @@ vi.mock('@nubisco/ui', async (importOriginal) => {
 const scopes = ref<string[]>(['read', 'write'])
 const liveListeners: ((event: { entity: string; verb: string }) => void)[] = []
 vi.mock('@/stores/workspace', () => ({
+  onCardPatched: () => () => {},
+  patchCard: () => {},
   useWorkspace: () => ({
     me: computed(() => ({ id: 'a', handle: 'jose', scopes: scopes.value })),
     onLive: (listener: (event: { entity: string; verb: string }) => void) => {

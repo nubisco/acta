@@ -346,6 +346,7 @@ import {
 } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
 import { cardPath } from '@/lib/paths'
+import { onCardPatched, patchCard } from '@/stores/workspace'
 import type { ISpaceItemRow } from '@/types/api'
 import { humanise, useLoadState } from '@/lib/state'
 import { useViewCommands } from '@/lib/commands'
@@ -1099,13 +1100,48 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
       },
     ])
     if (!results[0].ok) throw new Error((results[0] as { error: string }).error)
+    // The card is already where it was dropped. The confirmation is all the
+    // board needs: only the done mark can follow from the move, so that is
+    // all that changes. Reloading every card after every drag is what made
+    // the board flash (Jose, 2026-10-09).
+    row.done = doneLists.value.has(event.toColumnId) || undefined
+    patchCard({ key: row.key, list: row.list, done: Boolean(row.done) })
   } catch (err) {
     row.list = previousList
     row.pos = previousPos
     toast.error(humanise(err), { title: 'Move failed' })
   }
-  await loadItems()
 }
+
+/**
+ * A card changed somewhere else in this tab (the side panel, the full-size
+ * view), confirmed by the server: update that one card here. A card moved to
+ * a list this board does not show any more (archived) leaves it.
+ */
+onScopeDispose(
+  onCardPatched((patch) => {
+    const row = items.value.find((r) => r.key === patch.key)
+    if (!row) return
+    if (patch.archived && stateFilter.value !== 'archived') {
+      items.value = items.value.filter((r) => r.key !== patch.key)
+      return
+    }
+    if (patch.list !== undefined && patch.list !== row.list) {
+      row.list = patch.list
+      // Last in its new list, where the server puts a card moved without a
+      // position.
+      const tail = items.value
+        .filter((r) => r.list === patch.list && r.key !== row.key)
+        .reduce((max, r) => Math.max(max, r.pos), 0)
+      row.pos = tail + 1024
+    }
+    if (patch.done !== undefined) row.done = patch.done || undefined
+    if (patch.title !== undefined) row.title = patch.title
+    if (patch.due !== undefined) row.due = patch.due ?? undefined
+    if (patch.priority !== undefined)
+      row.priority = (patch.priority ?? undefined) as typeof row.priority
+  }),
+)
 
 /**
  * A card dropped onto another becomes part of it.

@@ -94,6 +94,8 @@ const ITEM = {
 }
 
 vi.mock('@/stores/workspace', () => ({
+  onCardPatched: () => () => {},
+  patchCard: () => {},
   useWorkspace: () => ({
     overview: ref(overview),
     onLive: () => () => undefined,

@@ -9,6 +9,8 @@ import { mount } from '@vue/test-utils'
 import ActorFilter from '@/components/ActorFilter.vue'
 
 vi.mock('@/stores/workspace', () => ({
+  onCardPatched: () => () => {},
+  patchCard: () => {},
   useWorkspace: () => ({
     overview: {
       value: {

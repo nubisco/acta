@@ -64,6 +64,8 @@ const overview = {
 
 const refresh = vi.fn()
 vi.mock('@/stores/workspace', () => ({
+  onCardPatched: () => () => {},
+  patchCard: () => {},
   useWorkspace: () => ({
     overview: { value: overview },
     isAdmin: { value: true },

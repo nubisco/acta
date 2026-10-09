@@ -96,6 +96,8 @@ vi.mock('@nubisco/ui', async (importOriginal) => {
 
 const scopes = ref<string[]>(['read', 'write'])
 vi.mock('@/stores/workspace', () => ({
+  onCardPatched: () => () => {},
+  patchCard: () => {},
   useWorkspace: () => ({
     me: computed(() => ({ id: 'a', handle: 'jose', scopes: scopes.value })),
     overview: ref(null),

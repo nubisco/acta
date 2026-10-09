@@ -8,6 +8,8 @@ import { mount } from '@vue/test-utils'
 import LabelBadge from '@/components/LabelBadge.vue'
 
 vi.mock('@/stores/workspace', () => ({
+  onCardPatched: () => () => {},
+  patchCard: () => {},
   useWorkspace: () => ({
     overview: {
       value: {

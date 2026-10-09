@@ -599,6 +599,36 @@ export function useInspector() {
 
 export { historyPosition }
 
+/**
+ * A card changed here, confirmed by the server, told to every view that
+ * draws it, so each can update that one card in place rather than reload
+ * everything (Jose, 2026-10-09: "just the confirmation from the API should be
+ * enough"). The live stream deliberately ignores your own moves, so without
+ * this a status changed in the panel left the board showing the old column.
+ */
+export interface ICardPatch {
+  key: string
+  list?: string
+  done?: boolean
+  due?: number | null
+  priority?: string | null
+  title?: string
+  assignees?: string[]
+  archived?: boolean
+}
+const cardPatchListeners = new Set<(patch: ICardPatch) => void>()
+
+export function onCardPatched(
+  listener: (patch: ICardPatch) => void,
+): () => void {
+  cardPatchListeners.add(listener)
+  return () => cardPatchListeners.delete(listener)
+}
+
+export function patchCard(patch: ICardPatch): void {
+  for (const listener of cardPatchListeners) listener(patch)
+}
+
 /** Quick-look modal for docs referenced outside the docs space. */
 const previewDocSlug = ref<string | null>(null)
 
