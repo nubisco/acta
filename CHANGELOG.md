@@ -1,3 +1,10 @@
+# [1.44.0](https://github.com/nubisco/acta/compare/v1.43.0...v1.44.0) (2026-10-09)
+
+
+### Features
+
+* **cards:** the list is the status ([9250076](https://github.com/nubisco/acta/commit/92500763633d43c5c64526a8152db5abd9594d0d))
+
 # [1.43.0](https://github.com/nubisco/acta/compare/v1.42.0...v1.43.0) (2026-10-09)
 
 
