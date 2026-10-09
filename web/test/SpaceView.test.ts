@@ -161,7 +161,7 @@ async function render() {
 function filtersButton(view: ReturnType<typeof mount>) {
   return view
     .findAll('.space__filters button')
-    .find((b) => b.text().includes('Filters'))!
+    .find((b) => b.text().includes('Labels'))!
 }
 
 /** Right-click a card by its title and return the menu entries. */
@@ -269,25 +269,25 @@ describe('SpaceView card menu', () => {
     ).toBeUndefined()
   })
 
-  // Four dropdowns competing for a toolbar row is what this replaces, so the
-  // first thing worth asserting is that they are actually gone.
-  it('collapses the filter dropdowns into one Filters button', async () => {
+  // Opening a dropdown for every change of person or status was the
+  // problem (Jose, 2026-10-09): only labels, too many for a bar, stay behind
+  // a button. Everything else is in the bar, always visible.
+  it('keeps people, status and search in the bar, and labels behind a button', async () => {
     const view = await render()
     const bar = view.find('.space__filters')
 
-    expect(bar.text()).toContain('Filters')
-    expect(bar.find('#field-filter-label').exists()).toBe(false)
-    expect(bar.find('#field-filter-assignee').exists()).toBe(false)
-    expect(bar.find('#field-filter-state').exists()).toBe(false)
-    // Free-text stays on the toolbar: it is the one filter you use by typing
-    // and burying it behind a click would cost more than it saves.
     expect(bar.find('#field-filter-text').exists()).toBe(true)
+    expect(bar.find('#field-space-filter-state').exists()).toBe(true)
+    const people = bar.find('[aria-label="Filter by assignee"]')
+    expect(people.exists()).toBe(true)
+    // The system actor is not a person and must not be offered as one.
+    expect(people.html()).not.toContain('Acta')
+    expect(filtersButton(view).exists()).toBe(true)
+    expect(view.find('#space-filter-panel').exists()).toBe(false)
   })
 
-  it('opens the panel on click, with labels as pills and people as avatars', async () => {
+  it('opens the labels on click, as coloured pills', async () => {
     const view = await render()
-    expect(view.find('#space-filter-panel').exists()).toBe(false)
-
     await filtersButton(view).trigger('click')
     await flushPromises()
 
@@ -295,10 +295,24 @@ describe('SpaceView card menu', () => {
     expect(panel.exists()).toBe(true)
     expect(panel.text()).toContain('Urgent')
     expect(panel.text()).toContain('Tech debt')
-    // The system actor is not a person and must not be offered as one.
-    expect(
-      panel.find('[aria-label="Filter by assignee"]').text(),
-    ).not.toContain('Acta')
+    expect(panel.find('[aria-label="Filter by assignee"]').exists()).toBe(false)
+  })
+
+  it('offers to clear once anything is filtered', async () => {
+    const view = await render()
+    const clear = () =>
+      view
+        .findAll('.space__filters button')
+        .find((b) => b.text() === 'Clear filters')
+    expect(clear()).toBeUndefined()
+    await filtersButton(view).trigger('click')
+    await flushPromises()
+    await view.findAll('.filters__pill')[0].trigger('click')
+    await flushPromises()
+    expect(clear()).toBeDefined()
+    await clear()!.trigger('click')
+    await flushPromises()
+    expect(filtersButton(view).text()).not.toMatch(/\d/)
   })
 
   it('filters by several labels at once and asks the server for any of them', async () => {
@@ -567,7 +581,7 @@ describe('a board keeps its filters', () => {
     expect(spaceGet).toHaveBeenCalledTimes(1)
     expect(lastParams().label).toBe('lbl_urgent')
     expect(lastParams().assignee).toBe('jose')
-    expect(filtersButton(view).text()).toContain('2')
+    expect(filtersButton(view).text()).toContain('1')
     view.unmount()
   })
 

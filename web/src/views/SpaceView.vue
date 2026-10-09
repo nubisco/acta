@@ -33,25 +33,64 @@
           role="search"
           aria-label="Filter items"
         >
-          <!-- One control instead of three. Given a toolbar's width none of
-               them could show what they held, so labels lost their colour and
-               people were limited to one at a time; the panel has room to show
-               both. The count is on the button because a collapsed filter that
-               does not say it is active is how you end up staring at a space
-               that is missing cards. -->
+          <NbTextInput
+            id="field-filter-text"
+            v-model="textFilter"
+            size="sm"
+            placeholder="Filter cards on this space..."
+          />
+          <!-- Labels alone keep a dropdown: there are too many for the bar,
+               and a label's colour is half of what identifies it. The count
+               is on the button, because a collapsed filter that does not say
+               it is active is how you end up staring at a space that is
+               missing cards. -->
           <NbButton
             ref="filtersButton"
             size="sm"
-            :variant="filtersOpen || filterCount > 0 ? 'secondary' : 'ghost'"
-            icon="funnel"
+            :variant="
+              filtersOpen || labelFilter.length > 0 ? 'secondary' : 'ghost'
+            "
+            icon="tag"
             :aria-pressed="filtersOpen"
             aria-controls="space-filter-panel"
             @click="toggleFilters"
           >
-            Filters
-            <NbBadge v-if="filterCount > 0" size="sm" variant="primary">
-              {{ filterCount }}
+            Labels
+            <NbBadge v-if="labelFilter.length > 0" size="sm" variant="primary">
+              {{ labelFilter.length }}
             </NbBadge>
+          </NbButton>
+          <!-- Everything else is in the bar, always visible: opening a
+               dropdown for every change of person, goal or status was the
+               problem (Jose, 2026-10-09). -->
+          <ActorFilter v-model="assigneeFilter" label="Filter by assignee" />
+          <NbSelect
+            v-if="goalOptions.length > 1"
+            id="field-space-filter-goal"
+            size="sm"
+            :model-value="goalFilter === null ? '' : String(goalFilter)"
+            :options="goalOptions"
+            aria-label="Filter by goal"
+            @update:model-value="
+              goalFilter =
+                $event === '' || $event === null ? null : Number($event)
+            "
+          />
+          <NbSelect
+            id="field-space-filter-state"
+            v-model="stateFilter"
+            size="sm"
+            :options="STATE_OPTIONS"
+            aria-label="Filter by status"
+          />
+          <NbButton
+            v-if="filtersActive"
+            size="sm"
+            variant="ghost"
+            icon="x-circle"
+            @click="clearFilters"
+          >
+            Clear filters
           </NbButton>
           <NbSelect
             id="field-swimlane"
@@ -59,12 +98,6 @@
             size="sm"
             :options="swimlaneOptions"
             aria-label="Group cards into swimlanes"
-          />
-          <NbTextInput
-            id="field-filter-text"
-            v-model="textFilter"
-            size="sm"
-            placeholder="Filter cards on this space..."
           />
         </div>
       </div>
@@ -205,16 +238,8 @@
       <SpaceFilterPanel
         id="space-filter-panel"
         :labels="labelFilter"
-        :assignees="assigneeFilter"
-        :state="stateFilter"
-        :goal="goalFilter"
         :label-ids="labelIds"
-        :active="filtersActive"
         @update:labels="labelFilter = $event"
-        @update:assignees="assigneeFilter = $event"
-        @update:state="stateFilter = $event"
-        @update:goal="goalFilter = $event"
-        @clear="clearFilters"
         @close="filtersOpen = false"
       />
     </NbMenu>
@@ -314,6 +339,8 @@ import TableView from '@/components/views/TableView.vue'
 import TimelineView from '@/components/views/TimelineView.vue'
 import SequenceView from '@/components/views/SequenceView.vue'
 import SpaceFilterPanel from '@/components/SpaceFilterPanel.vue'
+import ActorFilter from '@/components/ActorFilter.vue'
+import { goalOptionLabel } from '@/lib/goals'
 import { recallBoardFilters, rememberBoardFilters } from '@/lib/boardFilters'
 
 const props = defineProps<{ spaceKey?: string }>()
@@ -599,6 +626,22 @@ const filterCount = computed(
 )
 
 const labelIds = computed(() => labelOptions.value.map((o) => o.value))
+
+/** Every goal not archived, plus whichever one is selected even if it is. */
+const goalOptions = computed(() => [
+  { label: 'Any goal', value: '' },
+  ...(ws.overview.value?.goals ?? [])
+    .filter((g) => !g.archived || g.number === goalFilter.value)
+    .map((g) => ({ label: goalOptionLabel(g), value: String(g.number) })),
+])
+
+/** Worded as what the board shows, since the select stands alone in the bar. */
+const STATE_OPTIONS = [
+  { label: 'Open cards', value: 'open' },
+  { label: 'Done cards', value: 'done' },
+  { label: 'Archived cards', value: 'archived' },
+  { label: 'All cards', value: 'all' },
+]
 
 // The tour points at a card to explain keys and the details panel, and it
 // needs one specific card rather than every card wearing the same id. Null

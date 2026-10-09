@@ -117,7 +117,7 @@ async function render(): Promise<VueWrapper> {
 function filtersButton(view: VueWrapper) {
   return view
     .findAll('.space__filters button')
-    .find((b) => b.text().includes('Filters'))!
+    .find((b) => b.text().includes('Labels'))!
 }
 
 beforeEach(() => {

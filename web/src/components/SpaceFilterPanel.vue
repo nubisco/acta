@@ -1,5 +1,5 @@
 <template>
-  <div class="filters" role="group" aria-label="Filters">
+  <div class="filters" role="group" aria-label="Filter by label">
     <!-- Rows of label + control, so the three groups read down the left edge
          and their contents run across. In a column each group stacked and the
          panel got tall; across the toolbar there is room to lay them out. -->
@@ -28,49 +28,14 @@
       </div>
     </div>
 
-    <div class="filters__row">
-      <span class="filters__label">People</span>
-      <ActorFilter
-        :model-value="assignees"
-        label="Filter by assignee"
-        @update:model-value="emit('update:assignees', $event)"
-      />
-    </div>
-
-    <div v-if="goalOptions.length > 1" class="filters__row">
-      <span class="filters__label">Goal</span>
-      <!-- A select rather than pills: goals are names, not colours, and
-           there can be many. One at a time, since "serves either of two
-           goals" is not a question anybody asks a board. -->
-      <NbSelect
-        id="field-space-filter-goal"
-        size="sm"
-        :model-value="goal === null ? '' : String(goal)"
-        :options="goalOptions"
-        aria-label="Filter by goal"
-        @update:model-value="
-          emit(
-            'update:goal',
-            $event === '' || $event === null ? null : Number($event),
-          )
-        "
-      />
-    </div>
-
-    <div class="filters__row">
-      <span class="filters__label">Status</span>
-      <NbRadio
-        name="space-filter-state"
-        direction="horizontal"
-        :options="stateOptions"
-        :model-value="state"
-        @update:model-value="emit('update:state', String($event))"
-      />
-    </div>
-
     <div class="filters__foot">
-      <NbButton v-if="active" size="xs" variant="ghost" @click="emit('clear')">
-        Clear all
+      <NbButton
+        v-if="labels.length > 0"
+        size="xs"
+        variant="ghost"
+        @click="emit('update:labels', [])"
+      >
+        Clear labels
       </NbButton>
       <NbButton
         v-nb-tooltip="{ body: 'Hide filters' }"
@@ -86,61 +51,30 @@
 
 <script setup lang="ts">
 /**
- * The space's filters, as a panel rather than a row of dropdowns.
+ * The space's label filter, as coloured pills in a dropdown.
  *
- * Four controls competing for the toolbar meant each was too narrow to show
- * what it held: the label select showed neither colour nor selection, and the
- * people select could only ever hold one person. Given the full width of the
- * side panel they can be what they actually are, coloured pills and avatars,
- * and the toolbar goes back to one icon.
+ * Labels are the one filter with too many values for the toolbar, and a
+ * closed select shows neither their colour nor which ones are on. People,
+ * goal and status used to live here too, which meant opening a dropdown for
+ * every change; they are in the toolbar now, always visible (Jose,
+ * 2026-10-09).
  *
  * State stays in the space. This renders it and reports changes, so there is
  * one owner of what the space is filtered by and the panel can be mounted and
  * unmounted freely without carrying anything.
  */
-import { computed } from 'vue'
 import LabelBadge from '@/components/LabelBadge.vue'
-import ActorFilter from '@/components/ActorFilter.vue'
-import { goalOptionLabel } from '@/lib/goals'
-import { useWorkspace } from '@/stores/workspace'
 
 const props = defineProps<{
   labels: string[]
-  assignees: string[]
-  state: string
-  /** The goal the cards must serve, by number. Null is any. */
-  goal: number | null
   /** Every label this space can be filtered by, as ids. */
   labelIds: string[]
-  /** Whether anything is filtered, which is what makes "Clear all" worth showing. */
-  active: boolean
 }>()
 
 const emit = defineEmits<{
   'update:labels': [value: string[]]
-  'update:assignees': [value: string[]]
-  'update:state': [value: string]
-  'update:goal': [value: number | null]
-  clear: []
   close: []
 }>()
-
-const ws = useWorkspace()
-
-/** Every goal not archived, plus whichever one is selected even if it is. */
-const goalOptions = computed(() => [
-  { label: 'Any goal', value: '' },
-  ...(ws.overview.value?.goals ?? [])
-    .filter((g) => !g.archived || g.number === props.goal)
-    .map((g) => ({ label: goalOptionLabel(g), value: String(g.number) })),
-])
-
-const stateOptions = [
-  { label: 'Open', value: 'open' },
-  { label: 'Done', value: 'done' },
-  { label: 'Archived', value: 'archived' },
-  { label: 'All', value: 'all' },
-]
 
 function toggleLabel(id: string): void {
   emit(
