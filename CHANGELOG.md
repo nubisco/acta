@@ -1,3 +1,10 @@
+## [1.44.2](https://github.com/nubisco/acta/compare/v1.44.1...v1.44.2) (2026-10-09)
+
+
+### Bug Fixes
+
+* **ui:** plain words in excerpts, one due wording, and clicks land where aimed ([aa78a17](https://github.com/nubisco/acta/commit/aa78a17f4f9d242ba0a593adcf2002d65bd31181))
+
 ## [1.44.1](https://github.com/nubisco/acta/compare/v1.44.0...v1.44.1) (2026-10-09)
 
 
