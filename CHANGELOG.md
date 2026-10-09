@@ -1,3 +1,10 @@
+## [1.41.1](https://github.com/nubisco/acta/compare/v1.41.0...v1.41.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **docs:** a private page's files, comment links and names stay private ([06d4774](https://github.com/nubisco/acta/commit/06d47749f837f16104c41882ebaf54ac132f9660))
+
 # [1.41.0](https://github.com/nubisco/acta/compare/v1.40.0...v1.41.0) (2026-10-09)
 
 
