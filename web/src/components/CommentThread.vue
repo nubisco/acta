@@ -35,7 +35,12 @@
                shown is the original one, and the "imported" badge already
                says where it came from. -->
           <NbAiLabel v-if="comment.agent && !comment.imported?.author" />
-          <time :datetime="timestampIso(comment)">
+          <!-- The exact time on hover, as the activity feed gives it. -->
+          <time
+            v-nb-tooltip="{ body: new Date(comment.ts).toLocaleString() }"
+            :datetime="timestampIso(comment)"
+            tabindex="0"
+          >
             {{ timestampLabel(comment) }}
           </time>
           <!-- Next to the timestamp and in the same voice, because it is the

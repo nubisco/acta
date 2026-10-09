@@ -30,14 +30,17 @@
             v-nb-tooltip="{ body: 'Move page' }"
             size="sm"
             variant="secondary"
-            icon="arrow-elbow-down-right"
+            icon="arrow-square-right"
             aria-label="Move page"
             @click="moving = true"
           />
+          <!-- Permanent, so it looks it: the danger outline cards and goals
+               use, not the dark fill of an everyday action. -->
           <NbButton
             v-nb-tooltip="{ body: 'Delete page' }"
             size="sm"
-            variant="secondary"
+            variant="danger"
+            outlined
             icon="trash"
             aria-label="Delete page"
             @click="removeDoc"
