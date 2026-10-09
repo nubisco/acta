@@ -1,3 +1,12 @@
+## [1.45.1](https://github.com/nubisco/acta/compare/v1.45.0...v1.45.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **cards:** the full-size view offers what the side panel does, in its order ([77d74bc](https://github.com/nubisco/acta/commit/77d74bcf66ff9be69cc10b0f41d59c9bc6bee6b3))
+* **deps:** @nubisco/ui 5.16.0, so the Home customizer's switches name themselves quietly ([bf9d3f9](https://github.com/nubisco/acta/commit/bf9d3f9eb95286de9d72b7db161eb720d03fc175))
+* **ui:** a card key in a sentence looks and behaves the same everywhere ([b467b35](https://github.com/nubisco/acta/commit/b467b35fadfb2489546db24094a672ab57bb3ffd))
+
 # [1.45.0](https://github.com/nubisco/acta/compare/v1.44.3...v1.45.0) (2026-10-09)
 
 
