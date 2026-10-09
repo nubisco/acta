@@ -84,7 +84,15 @@ a checklist entry, the history, or the Links section. Keys are recognised for
 the spaces in your workspace, so "UTF-8" stays text, and a key inside code is
 left as written. When you open one card from another, the top of the inspector
 reads like a breadcrumb, **← CM-1 / CM-3**: the arrow or the first key takes
-you back to the card you came from.
+you back to the card you came from, the same step as the browser's Back.
+Cmd-click (Ctrl-click on Windows and Linux) a card key to open it in a new tab.
+
+**Open full size** (the arrows at the top, or double-click a card on a board)
+shows the same card larger, with the same breadcrumb. A key clicked there opens
+in the full-size view too, and the shrink button hands the card back to the
+side panel. The address bar keeps up with all of it (`?item=CM-3&full=1`), so
+a reload, a shared link or the browser's Back brings back exactly what you were
+looking at.
 
 **Show on its space** (the board icon at the top) takes you to the card's
 space with the card still open, scrolls the board to it and rings it for a

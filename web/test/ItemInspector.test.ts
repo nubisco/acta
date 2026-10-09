@@ -63,7 +63,7 @@ async function render() {
 describe('ItemInspector', () => {
   beforeEach(() => {
     push.mockClear()
-    useUiState().itemModalKey.value = null
+    useInspector().close()
     useInspector().open('ST-73')
     itemGet.mockReset()
     itemGet.mockResolvedValue({ items: [{ ...ITEM }] })
@@ -180,7 +180,7 @@ describe('ItemInspector', () => {
   // The pair has to behave as one control that changes size, not as two ways
   // to open a card: leaving both showing the same card is a state nobody
   // asked for.
-  it('hands the card to the full-size view and closes itself', async () => {
+  it('grows the same card to full size, keeping it open', async () => {
     const view = await render()
     const btn = view
       .findAll('button')
@@ -190,8 +190,8 @@ describe('ItemInspector', () => {
 
     // Real stores, so this asserts the actual handover rather than that two
     // mocks were called.
-    expect(useUiState().itemModalKey.value).toBe('ST-73')
-    expect(useInspector().itemKey.value).toBeNull()
+    expect(useInspector().full.value).toBe(true)
+    expect(useInspector().itemKey.value).toBe('ST-73')
   })
 
   // A card opened from another card says which one "back" returns to, in
@@ -201,20 +201,23 @@ describe('ItemInspector', () => {
     useInspector().open('ST-1')
     useInspector().open('ST-73')
     const view = await render()
-    const crumbs = view.find('.inspector-crumbs')
+    const crumbs = view.find('.card-trail__crumbs')
     expect(crumbs.exists()).toBe(true)
     expect(crumbs.text()).toContain('ST-1')
     expect(crumbs.find('[aria-current="page"]').text()).toBe('ST-73')
-    await crumbs.find('.inspector-crumb').trigger('click')
-    expect(useInspector().itemKey.value).toBe('ST-1')
+    // Back asks the router for a step through history (App.vue answers it),
+    // so the next browser Back does not land on a duplicate.
+    const asked = useInspector().backRequest.value
+    await crumbs.find('.card-trail__crumb').trigger('click')
+    expect(useInspector().backRequest.value).toBe(asked + 1)
   })
 
   it('shows only the key when there is nowhere to go back to', async () => {
     useInspector().close()
     useInspector().open('ST-73')
     const view = await render()
-    expect(view.find('.inspector-crumbs').exists()).toBe(false)
-    expect(view.find('.inspector-key').text()).toBe('ST-73')
+    expect(view.find('.card-trail__crumbs').exists()).toBe(false)
+    expect(view.find('.card-trail__key').text()).toBe('ST-73')
   })
 
   // People did not know what Plan or Parts meant, or that "Build" was a
@@ -252,7 +255,7 @@ describe('ItemInspector', () => {
   it('keeps the header in one block that can stay pinned', async () => {
     const view = await render()
     const top = view.find('.inspector-top')
-    expect(top.find('.inspector-key').exists()).toBe(true)
+    expect(top.find('.card-trail__key').exists()).toBe(true)
     expect(top.find('.inspector-title').exists()).toBe(true)
   })
 })

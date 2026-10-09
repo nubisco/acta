@@ -467,7 +467,6 @@ export function useWorkspace() {
 const inspectedItemKey = ref<string | null>(null)
 
 const newSpaceOpen = ref(false)
-const itemModalKey = ref<string | null>(null)
 
 /**
  * The new-goal dialog: null when closed, and when open, what it starts with.
@@ -488,44 +487,116 @@ export type TSidebarVariant = 'compact' | 'verbose'
 const sidebarChoice = ref<TSidebarVariant | null>(null)
 
 /**
- * Cards opened from inside the inspector (a [[ref]] chip in a description)
- * form a trail, so the inspector carries its own way back in addition to
- * browser history. `navMode` tells the URL sync how to record the change:
- * forward hops push history entries, trail-backs replace.
+ * Cards opened from inside a card (a [[ref]] in a description, a part, a
+ * blocker) form a trail, so the card view carries its own way back in
+ * addition to browser history. `navMode` tells the URL sync how to record the
+ * change: forward hops push history entries, everything else replaces.
+ *
+ * The side panel and the full-size view are one card view at two sizes
+ * (`full`), so they share the card, the trail and the URL (?item=KEY&full=1).
+ * The full-size view used to be a separate dialog with no address and no
+ * trail: a reload or Back lost it, and a card mention inside it opened the
+ * side panel behind it (UX audit, 2026-10-09).
  */
 const inspectorTrail = ref<string[]>([])
+/**
+ * The history position (vue-router's `history.state.position`) each trail
+ * entry was shown at. Back walks real history when the entry right behind
+ * this one is the trail's tail, so browser Back afterwards does not land on a
+ * duplicate of the card just returned to.
+ */
+const inspectorTrailAt = ref<number[]>([])
 const inspectorNavMode = ref<'push' | 'replace'>('push')
+const inspectorFull = ref(false)
+/** Bumped to ask the router (App.vue) for one step back through history. */
+const inspectorBackRequest = ref(0)
+/** Bumped when the reader closes the card (App.vue decides how). */
+const inspectorDismissRequest = ref(0)
+/**
+ * The history position the page stood at before a card was opened on it, or
+ * -1 when the card arrived some other way (a deep link, browser Back). Closing
+ * a card opened right here steps back to that entry rather than writing a
+ * second, identical one after it.
+ */
+const inspectorBaseAt = ref(-1)
+
+function historyPosition(): number {
+  try {
+    const position = (window.history.state as { position?: unknown } | null)
+      ?.position
+    return typeof position === 'number' ? position : -1
+  } catch {
+    return -1
+  }
+}
+
+function popTrail(): string | null {
+  const previous = inspectorTrail.value.at(-1) ?? null
+  inspectorTrail.value = inspectorTrail.value.slice(0, -1)
+  inspectorTrailAt.value = inspectorTrailAt.value.slice(0, -1)
+  return previous
+}
 
 export function useInspector() {
   return {
     itemKey: inspectedItemKey,
     trail: inspectorTrail,
+    trailAt: inspectorTrailAt,
     navMode: inspectorNavMode,
-    open: (key: string) => {
-      if (inspectedItemKey.value && inspectedItemKey.value !== key)
+    full: inspectorFull,
+    backRequest: inspectorBackRequest,
+    dismissRequest: inspectorDismissRequest,
+    baseAt: inspectorBaseAt,
+    /** Show a card at the current size, or at the size asked for. */
+    open: (key: string, options: { full?: boolean } = {}) => {
+      if (!inspectedItemKey.value) inspectorBaseAt.value = historyPosition()
+      if (inspectedItemKey.value && inspectedItemKey.value !== key) {
         inspectorTrail.value = [...inspectorTrail.value, inspectedItemKey.value]
+        inspectorTrailAt.value = [...inspectorTrailAt.value, historyPosition()]
+      }
       inspectorNavMode.value = 'push'
+      if (options.full !== undefined) inspectorFull.value = options.full
       inspectedItemKey.value = key
     },
+    /** Change the size of the card on view, in place. */
+    setFull: (full: boolean) => {
+      if (inspectorFull.value === full) return
+      inspectorNavMode.value = 'replace'
+      inspectorFull.value = full
+    },
+    /** Return to the trail's tail, through history when it is right behind. */
     back: () => {
-      const previous = inspectorTrail.value.at(-1) ?? null
-      inspectorTrail.value = inspectorTrail.value.slice(0, -1)
+      if (inspectorTrail.value.length === 0) return
+      inspectorBackRequest.value += 1
+    },
+    /** Back without history, for when the tail is not the previous entry. */
+    backInPlace: () => {
+      const previous = popTrail()
       inspectorNavMode.value = 'replace'
       inspectedItemKey.value = previous
     },
     /** URL-driven change (deep link, browser Back): no trail bookkeeping,
      * except that landing on the trail's tail IS a back step. */
-    restore: (key: string | null) => {
-      if (inspectorTrail.value.at(-1) === key)
-        inspectorTrail.value = inspectorTrail.value.slice(0, -1)
+    restore: (key: string | null, full = inspectorFull.value) => {
+      if (key !== null && inspectorTrail.value.at(-1) === key) popTrail()
+      inspectorFull.value = key !== null && full
       inspectedItemKey.value = key
     },
+    /** The reader closing the card: the X, Escape, the scrim. */
+    dismiss: () => {
+      if (inspectedItemKey.value) inspectorDismissRequest.value += 1
+    },
     close: () => {
+      inspectorBaseAt.value = -1
       inspectorTrail.value = []
+      inspectorTrailAt.value = []
+      inspectorFull.value = false
       inspectedItemKey.value = null
     },
   }
 }
+
+export { historyPosition }
 
 /** Quick-look modal for docs referenced outside the docs space. */
 const previewDocSlug = ref<string | null>(null)
@@ -555,7 +626,6 @@ const revealCard = ref<{ key: string; at: number } | null>(null)
 export function useUiState() {
   return {
     newSpaceOpen,
-    itemModalKey,
     sidebarChoice,
     newGoal,
     goalsVersion,

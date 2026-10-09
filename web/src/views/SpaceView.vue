@@ -324,11 +324,12 @@ const ws = useWorkspace()
 const inspector = useInspector()
 const ui = useUiState()
 
-/* A dblclick always fires the click handler first, which opens the
- * inspector; close it again so the modal stands alone. */
+/* A dblclick always fires the click handler first, which opens the card in
+ * the side panel; this grows that same card to full size in place, so the
+ * double-click is one history entry rather than two. */
 function openItemModal(key: string): void {
-  inspector.close()
-  ui.itemModalKey.value = key
+  if (inspector.itemKey.value === key) inspector.setFull(true)
+  else inspector.open(key, { full: true })
 }
 const labelCatalogue = computed(() => labelsById(ws.overview.value))
 const toast = useToast()

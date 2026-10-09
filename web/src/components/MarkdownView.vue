@@ -48,7 +48,7 @@ import { useRefCards } from '@/stores/refs'
 import { useLinkPreviews } from '@/stores/linkPreviews'
 import { DOC_NAV_KEY } from '@/lib/keys'
 import { cardKeysPlugin } from '@/lib/cardKeys'
-import { wpath } from '@/lib/paths'
+import { cardPath, wantsNewTab, wpath } from '@/lib/paths'
 import ActorChip from '@/components/ActorChip.vue'
 import { safeUrl } from '@/lib/safeUrl'
 import { imageClass, imageStyle, parseImageAttrs } from '@/lib/imageAttrs'
@@ -589,7 +589,8 @@ function onClick(event: MouseEvent): void {
   const refType = el.getAttribute('data-ref-type')
   const ref = el.getAttribute('data-ref') ?? ''
   if (refType === 'item') {
-    inspector.open(ref)
+    if (wantsNewTab(event)) window.open(cardPath(ref), '_blank', 'noopener')
+    else inspector.open(ref)
     return
   }
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0)

@@ -33,34 +33,7 @@
            a long card still sees which card they are in (Jose, 2026-10-08). -->
       <div class="inspector-top">
         <div class="inspector-head">
-          <!-- Where "back" goes, said in words. An arrow alone gave no hint of
-             which card it returns to, so after following two parts nobody
-             knew where they would land. -->
-          <template v-if="previousKey">
-            <NbButton
-              v-nb-tooltip="{ body: `Back to ${previousLabel}` }"
-              size="sm"
-              variant="ghost"
-              icon="arrow-left"
-              :aria-label="`Back to ${previousKey}`"
-              @click="inspector.back()"
-            />
-            <NbBreadcrumbs class="inspector-crumbs">
-              <NbButton
-                v-nb-tooltip="{ body: `Back to ${previousLabel}` }"
-                size="xs"
-                variant="ghost"
-                class="inspector-crumb"
-                @click="inspector.back()"
-              >
-                {{ previousKey }}
-              </NbButton>
-              <span class="inspector-key" aria-current="page">{{
-                it.item.value.key
-              }}</span>
-            </NbBreadcrumbs>
-          </template>
-          <span v-else class="inspector-key">{{ it.item.value.key }}</span>
+          <CardTrail :card-key="it.item.value.key" />
           <NbBadge
             v-if="it.lifecycle.value"
             :variant="it.lifecycle.value.variant"
@@ -156,7 +129,7 @@
               icon="x"
               class="inspector-close"
               aria-label="Close the details panel"
-              @click="inspector.close()"
+              @click="inspector.dismiss()"
             />
           </span>
         </div>
@@ -532,7 +505,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef, watch } from 'vue'
+import { ref, toRef, watch } from 'vue'
 import { useConfirm, useToast } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
 import { useRouter } from 'vue-router'
@@ -555,9 +528,9 @@ import MoveCardModal from '@/components/MoveCardModal.vue'
 import PartOfChip from '@/components/PartOfChip.vue'
 import type { IPartRef } from '@/types/api'
 import SectionCount from '@/components/SectionCount.vue'
+import CardTrail from '@/components/CardTrail.vue'
 import RefText from '@/components/RefText.vue'
 import { SECTION_INFO } from '@/lib/sections'
-import { useRefCards } from '@/stores/refs'
 
 // Outside setup, so it survives the panel unmounting between cards.
 const moduleOpenSections = ref<string[]>([
@@ -572,7 +545,6 @@ const it = useItem(toRef(props, 'itemKey'))
 const inspector = useInspector()
 const router = useRouter()
 const ui = useUiState()
-const refCards = useRefCards()
 
 /**
  * Which sections are open, shared by every card opened this session.
@@ -648,23 +620,10 @@ function partsCount(item: { parts?: IPartRef[] }): ICount {
   }
 }
 
-/** The card "back" returns to, by key and, once known, by title. */
-const previousKey = computed(() => inspector.trail.value.at(-1) ?? null)
-const previousLabel = computed(() => {
-  const key = previousKey.value
-  if (!key) return ''
-  const card = refCards.cards.get(key)
-  return card ? `${key} ${card.title}` : key
-})
-watch(previousKey, (key) => key && refCards.request(key), { immediate: true })
-
 /** Hand this card to the full-size view. The panel closes, because the two
  *  showing the same card at once is a choice nobody asked to make. */
 function expand(): void {
-  const key = it.item.value?.key
-  if (!key) return
-  ui.itemModalKey.value = key
-  inspector.close()
+  inspector.setFull(true)
 }
 
 /** Go to the space this card lives on, leaving the panel open so the space's
@@ -835,14 +794,6 @@ function commitDescription(): void {
   border-block-end: 1px solid var(--nb-c-border);
 }
 
-.inspector-crumbs {
-  min-inline-size: 0;
-}
-
-.inspector-crumb {
-  font-family: var(--nb-font-family-mono);
-}
-
 .inspector-head {
   display: flex;
   align-items: center;
@@ -861,12 +812,6 @@ function commitDescription(): void {
    the wrong click. */
 .inspector-close {
   margin-inline-start: var(--nb-spacing-8);
-}
-
-.inspector-key {
-  font-family: var(--nb-font-family-mono);
-  font-size: var(--nb-type-code-sm-size);
-  color: var(--nb-c-text-subtle);
 }
 
 .inspector-fields {

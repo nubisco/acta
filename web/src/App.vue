@@ -257,10 +257,10 @@
     @saved="onGoalCreated"
   />
   <ItemModal
-    v-if="ui.itemModalKey.value"
-    :open="ui.itemModalKey.value !== null"
-    :item-key="ui.itemModalKey.value"
-    @close="ui.itemModalKey.value = null"
+    v-if="inspector.full.value && inspector.itemKey.value"
+    :open="true"
+    :item-key="inspector.itemKey.value"
+    @close="inspector.dismiss()"
   />
   <DocPreviewModal />
   <!-- One overlay for both questions: what can I do, and where is that
@@ -310,6 +310,7 @@ import { useAccounts } from '@/stores/accounts'
 import { goalsTour, introTour, notificationsTour, tourLabels } from '@/lib/tour'
 import { setTourNavigator, useTours } from '@/lib/tours'
 import {
+  historyPosition,
   sidebarDefaultFor,
   useInspector,
   useUiState,
@@ -623,8 +624,10 @@ const inspectorVisible = ref(false)
 // The side panel shows a card and nothing else. Filters used to share it,
 // which meant the two could never be open together and the shell had to be
 // told which one it was holding; they live in the space's own toolbar now.
-watch(inspector.itemKey, (key) => {
-  inspectorVisible.value = key !== null
+// The panel shows the card at its side size. At full size the same card is
+// on view, in the dialog, so the panel steps aside without closing it.
+watch([inspector.itemKey, inspector.full], ([key, full]) => {
+  inspectorVisible.value = key !== null && !full
 })
 watch(
   () => route.name,
@@ -634,7 +637,7 @@ watch(
   { immediate: true },
 )
 watch(inspectorVisible, (visible) => {
-  if (!visible) inspector.close()
+  if (!visible && !inspector.full.value) inspector.dismiss()
 })
 
 async function signOut(): Promise<void> {
@@ -653,32 +656,63 @@ function onSpaceCreated(key: string): void {
   void router.push(wpath(`/s/${key}`))
 }
 
-// Deep-linkable inspector: the open card lives in the URL as ?item=KEY, so
-// what you are looking at is what you share. Both directions sync with an
-// equality guard so neither watcher re-triggers the other.
+// Deep-linkable card view: the open card lives in the URL as ?item=KEY, and
+// its full size as &full=1, so what you are looking at is what you share and
+// what a reload brings back. Both directions sync with an equality guard so
+// neither watcher re-triggers the other.
 watch(
-  () => route.query.item,
-  (raw) => {
+  () => [route.query.item, route.query.full] as const,
+  ([raw, fullRaw]) => {
     const target = typeof raw === 'string' && raw ? raw : null
-    if (target !== inspector.itemKey.value) {
-      if (target) inspector.restore(target)
+    const full = target !== null && fullRaw === '1'
+    if (target !== inspector.itemKey.value || full !== inspector.full.value) {
+      if (target) inspector.restore(target, full)
       else inspector.close()
     }
   },
   { immediate: true },
 )
-watch(inspector.itemKey, (key) => {
+watch([inspector.itemKey, inspector.full], ([key, full]) => {
   const current = typeof route.query.item === 'string' ? route.query.item : null
-  if ((key ?? null) === current) return
-  // Forward hops PUSH so browser Back walks the chain the reader followed;
-  // trail-backs and closes REPLACE so neither duplicates the history nor
-  // resurrects a closed inspector.
+  const currentFull = route.query.full === '1'
+  if ((key ?? null) === current && (Boolean(key) && full) === currentFull)
+    return
+  // Forward hops PUSH so browser Back walks the chain the reader followed.
+  // Size changes, trail-backs and closes REPLACE so none of them duplicates
+  // the history or resurrects a closed card.
   const navigate =
     key && inspector.navMode.value === 'push' ? router.push : router.replace
   inspector.navMode.value = 'push'
   void navigate({
-    query: { ...route.query, item: key ?? undefined },
+    query: {
+      ...route.query,
+      item: key ?? undefined,
+      full: key && full ? '1' : undefined,
+    },
   })
+})
+// "Back" in the card's trail. When the entry right behind this one is the
+// trail's tail, it IS that step in history, so take it: replacing instead left
+// a duplicate behind, and the next browser Back appeared to do nothing. The
+// route watcher above then pops the trail.
+// Closing a card opened right here (no hops since) steps back to the entry
+// it was opened from, so Back afterwards leaves the page instead of landing
+// on a copy of it. Anything else closes in place.
+watch(inspector.dismissRequest, () => {
+  const base = inspector.baseAt.value
+  if (
+    base >= 0 &&
+    inspector.trail.value.length === 0 &&
+    historyPosition() === base + 1
+  )
+    router.back()
+  else inspector.close()
+})
+watch(inspector.backRequest, () => {
+  const tailAt = inspector.trailAt.value.at(-1)
+  if (tailAt !== undefined && tailAt >= 0 && tailAt === historyPosition() - 1)
+    router.back()
+  else inspector.backInPlace()
 })
 
 // Views register their own actions under a context (lib/commands.ts); the

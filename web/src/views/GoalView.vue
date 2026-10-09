@@ -782,7 +782,7 @@ async function onSaved(): Promise<void> {
     gap: var(--nb-spacing-16);
     align-items: start;
 
-    @media (max-inline-size: 64rem) {
+    @media (max-width: 64rem) {
       grid-template-columns: minmax(0, 1fr);
     }
   }

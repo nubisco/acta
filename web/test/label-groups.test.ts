@@ -33,7 +33,7 @@ vi.mock('@/api/client', () => ({
 }))
 
 import ItemInspector from '@/components/ItemInspector.vue'
-import { useInspector, useUiState, useWorkspace } from '@/stores/workspace'
+import { useInspector, useWorkspace } from '@/stores/workspace'
 
 /**
  * Deliberately not in alphabetical order, in either direction: "Fixes
@@ -185,7 +185,7 @@ async function pick(view: VueWrapper, id: string) {
 
 describe('the label picker', () => {
   beforeEach(() => {
-    useUiState().itemModalKey.value = null
+    useInspector().close()
     useInspector().open('ST-73')
     itemGet.mockReset()
     itemWrite.mockReset()

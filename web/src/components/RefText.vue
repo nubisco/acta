@@ -6,7 +6,8 @@
         type="button"
         class="md__ref md__ref--bare"
         :title="titleOf(part.key)"
-        @click.stop.prevent="inspector.open(part.key)"
+        @click.stop.prevent="open($event, part.key)"
+        @auxclick.stop.prevent="open($event, part.key)"
       >
         {{ part.key }}</button
       ><template v-else>{{ part.text }}</template>
@@ -19,6 +20,7 @@ import { computed, watchEffect } from 'vue'
 import { useInspector, useWorkspace } from '@/stores/workspace'
 import { useRefCards } from '@/stores/refs'
 import { splitCardKeys } from '@/lib/cardKeys'
+import { cardPath, wantsNewTab } from '@/lib/paths'
 
 /**
  * Plain text with every card key in it made openable: a checklist entry, a
@@ -28,6 +30,11 @@ import { splitCardKeys } from '@/lib/cardKeys'
  * a click of its own, and opening a card must not also tick a checkbox.
  */
 const props = defineProps<{ text: string }>()
+
+function open(event: MouseEvent, key: string): void {
+  if (wantsNewTab(event)) window.open(cardPath(key), '_blank', 'noopener')
+  else if (event.button === 0) inspector.open(key)
+}
 
 const ws = useWorkspace()
 const inspector = useInspector()

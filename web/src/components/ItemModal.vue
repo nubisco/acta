@@ -5,6 +5,11 @@
     :title="it.item.value?.key ?? 'Item'"
     @close="emit('close')"
   >
+    <!-- The same trail as the side panel: the card this one was reached
+         from, and the way back to it. -->
+    <template v-if="it.item.value" #header>
+      <CardTrail :card-key="it.item.value.key" />
+    </template>
     <div v-if="it.viewState.value === 'loading'" class="item-modal__loading">
       <NbSkeleton variant="heading" label="Loading item" />
       <NbSkeleton variant="text" :lines="6" />
@@ -446,7 +451,7 @@ import { SECTION_INFO } from '@/lib/sections'
 import { wpath } from '@/lib/paths'
 import { useConfirm } from '@nubisco/ui'
 import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
-import { useInspector, useUiState } from '@/stores/workspace'
+import { useInspector } from '@/stores/workspace'
 import ActorChip from '@/components/ActorChip.vue'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'
 import ChecklistBody from '@/components/ChecklistBody.vue'
@@ -461,6 +466,7 @@ import DependencyPanel from '@/components/DependencyPanel.vue'
 import PartsPanel from '@/components/PartsPanel.vue'
 import ItemGoalsPanel from '@/components/goals/ItemGoalsPanel.vue'
 import PartOfChip from '@/components/PartOfChip.vue'
+import CardTrail from '@/components/CardTrail.vue'
 
 const props = defineProps<{ open: boolean; itemKey: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -468,20 +474,18 @@ const emit = defineEmits<{ close: [] }>()
 const it = useItem(toRef(props, 'itemKey'))
 const confirm = useConfirm()
 const inspector = useInspector()
-const ui = useUiState()
 
-/** Follow a dependency without leaving the full-size view. */
+/** Follow a dependency without leaving the full-size view. It goes on the
+ *  card trail like any other hop, so the way back is in the header. */
 function onOpenRelated(key: string): void {
-  ui.itemModalKey.value = key
+  inspector.open(key)
 }
 
 /** Hand this card back to the side panel. Closing the modal and opening the
  *  panel on the same key, so the pair behaves as one control that changes the
  *  card's size rather than two separate ways to open it. */
 function collapse(): void {
-  const key = it.item.value?.key
-  emit('close')
-  if (key) inspector.open(key)
+  inspector.setFull(false)
 }
 
 const newChecklist = ref('')
@@ -562,7 +566,7 @@ function commitDescription(): void {
   gap: var(--nb-spacing-24);
   align-items: start;
 
-  @media (max-inline-size: 60rem) {
+  @media (max-width: 60rem) {
     grid-template-columns: minmax(0, 1fr);
   }
 

@@ -228,7 +228,7 @@ function toggleLabel(id: string): void {
   }
 
   /* Narrow: the spine costs more than it gives, so labels sit above. */
-  @media (max-inline-size: 40rem) {
+  @media (max-width: 40rem) {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--nb-spacing-4);
   }
