@@ -17,6 +17,7 @@ import {
   hiddenDocIds,
   viewerOf,
   visibleDocSql,
+  visibleLinkSourceSql,
 } from '../core/docAccess'
 import { anchorStatus, parseAnchor } from './anchors'
 import { attachmentUrl } from './attachments'
@@ -627,7 +628,7 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
       out.checklists = withItems
     }
     if (include.has('links')) {
-      const visibleLinkDocs = visibleDocSql('l.src_id', await hiddenDocIds(ctx))
+      const visibleLinkDocs = visibleLinkSourceSql(await hiddenDocIds(ctx))
       out.links = {
         out: await ctx.db.query<{ ref_type: string; target: string }>(
           "SELECT ref_type, target FROM link WHERE src_kind = 'item' AND src_id = ?",
@@ -648,7 +649,7 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
                     WHEN 'doc' THEN (SELECT d.slug FROM document d WHERE d.id = l.src_id)
                   END AS src
              FROM link l WHERE l.workspace_id = ? AND l.ref_type = 'item' AND l.target = ?
-              AND (l.src_kind != 'doc' OR ${visibleLinkDocs.sql})`,
+              AND ${visibleLinkDocs.sql}`,
           [ctx.workspaceId, item.key, ...visibleLinkDocs.params],
         ),
       }
@@ -997,7 +998,7 @@ export async function docGet(
     }))
   }
   if (include.has('backlinks')) {
-    const visibleBacklinks = visibleDocSql('l.src_id', await hiddenDocIds(ctx))
+    const visibleBacklinks = visibleLinkSourceSql(await hiddenDocIds(ctx))
     // Resolved to something a person can read. The link table stores internal
     // ids, and returning those unchanged put rows like
     // "item  itm_01m2gaz92142arwky3srvkw0pd" under "Referenced by", which
@@ -1026,7 +1027,7 @@ export async function docGet(
          LEFT JOIN comment c ON l.src_kind = 'comment' AND c.id = l.src_id
          LEFT JOIN item ci ON ci.id = c.item_id
         WHERE l.workspace_id = ? AND l.ref_type = 'doc' AND l.target = ?
-          AND (l.src_kind != 'doc' OR ${visibleBacklinks.sql})`,
+          AND ${visibleBacklinks.sql}`,
       [ctx.workspaceId, doc.slug, ...visibleBacklinks.params],
     )
   }

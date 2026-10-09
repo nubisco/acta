@@ -175,6 +175,9 @@ async function applyDocOp(
         'SELECT id FROM document WHERE workspace_id = ? AND slug = ?',
         [ctx.workspaceId, op.slug],
       )
+      // Slugs are unique across the workspace, so a clash with somebody's
+      // private page cannot be hidden: it says only that the address is in
+      // use, never what holds it. "already exists" is what importers match.
       if (existing.length > 0)
         throw new ApiError(409, `doc ${op.slug} already exists`)
       const parent = op.parent ? await docBySlug(ctx, op.parent) : null
@@ -425,11 +428,11 @@ async function applyDocOp(
       } else {
         // Making a page private hides everything under it. Pages somebody
         // else owns would vanish for them, so they have to move out first.
-        const others = await foreignDescendants(ctx, doc.id, doc.owner_id)
+        const others = await foreignDescendants(ctx, doc.id, doc.owner_id ?? '')
         if (others.length > 0)
           throw new ApiError(
             409,
-            `${doc.slug} has pages other people own under it (${others.slice(0, 3).join(', ')}${others.length > 3 ? ', ...' : ''}). Move them out before making it private.`,
+            `${doc.slug} has ${others.length === 1 ? 'a page' : `${others.length} pages`} other people own under it. They have to be moved out before it can be made private.`,
           )
       }
       // Children follow their parent: sharing a page shares the pages under
@@ -605,10 +608,14 @@ async function applyDocOp(
             doc.owner_id !== owner
               ? [doc.slug]
               : await foreignDescendants(ctx, doc.id, owner)
+          // Named only when it is the page being moved: the others may be
+          // private to somebody else, and their names are theirs.
           if (others.length > 0)
             throw new ApiError(
               409,
-              `cannot move ${doc.slug} into a private page: ${others.slice(0, 3).join(', ')} belong to someone else, who would lose sight of them`,
+              doc.owner_id !== owner
+                ? `cannot move ${doc.slug} into a private page: it belongs to someone else, who would lose sight of it`
+                : `cannot move ${doc.slug} into a private page: pages under it belong to someone else, who would lose sight of them`,
             )
         }
       }

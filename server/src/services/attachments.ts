@@ -5,6 +5,7 @@ import { ApiError, now } from '../core/ctx'
 import { emitEvent, flushPendingEvents } from '../core/events'
 import { withOp } from '../core/ops'
 import { docBySlug, itemByKey } from '../core/store'
+import { isDocHidden } from '../core/docAccess'
 
 export const zAttachmentAdd = z
   .object({
@@ -302,7 +303,11 @@ export async function attachmentDelete(
     'SELECT id, kind, filename, owner_kind, owner_id FROM attachment WHERE workspace_id = ? AND id = ?',
     [ctx.workspaceId, id],
   )
-  if (rows.length === 0) throw new ApiError(404, `attachment ${id} not found`)
+  if (
+    rows.length === 0 ||
+    (rows[0].owner_kind === 'doc' && (await isDocHidden(ctx, rows[0].owner_id)))
+  )
+    throw new ApiError(404, `attachment ${id} not found`)
   const meta = rows[0]
   await ctx.db.run('DELETE FROM attachment WHERE id = ?', [id])
   if (meta.kind === 'file') await store.remove(id)
@@ -328,11 +333,19 @@ export async function attachmentGet(
     filename: string
     mime: string | null
     url: string | null
+    owner_kind: string
+    owner_id: string
   }>(
-    'SELECT id, kind, filename, mime, url FROM attachment WHERE workspace_id = ? AND id = ?',
+    'SELECT id, kind, filename, mime, url, owner_kind, owner_id FROM attachment WHERE workspace_id = ? AND id = ?',
     [ctx.workspaceId, id],
   )
-  if (rows.length === 0) throw new ApiError(404, `attachment ${id} not found`)
+  // A file in a private page is as private as the page: fetched by id it
+  // answers exactly as a missing one.
+  if (
+    rows.length === 0 ||
+    (rows[0].owner_kind === 'doc' && (await isDocHidden(ctx, rows[0].owner_id)))
+  )
+    throw new ApiError(404, `attachment ${id} not found`)
   const meta = rows[0]
   if (meta.kind === 'url') return { meta, bytes: null }
   const bytes = await store.read(id)

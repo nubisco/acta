@@ -63,6 +63,28 @@ export function visibleDocSql(
   }
 }
 
+/**
+ * A condition on a `link` row (alias `l`) keeping out the ones whose source
+ * is a hidden page or a comment on one. A page's comments link with src_kind
+ * 'comment', the same as a card's, so both kinds need the check.
+ */
+export function visibleLinkSourceSql(hidden: string[]): {
+  sql: string
+  params: unknown[]
+} {
+  if (hidden.length === 0) return { sql: '1 = 1', params: [] }
+  const ids = JSON.stringify(hidden)
+  return {
+    sql: `NOT (
+      (l.src_kind = 'doc' AND l.src_id IN (SELECT value FROM json_each(?)))
+      OR (l.src_kind = 'comment' AND l.src_id IN (
+        SELECT id FROM doc_comment WHERE document_id IN (SELECT value FROM json_each(?))
+      ))
+    )`,
+    params: [ids, ids],
+  }
+}
+
 /** Whether one page is hidden from this request. */
 export async function isDocHidden(ctx: ICtx, docId: string): Promise<boolean> {
   return (await hiddenDocIds(ctx)).includes(docId)

@@ -22,6 +22,11 @@ import {
   workspaceOverview,
 } from '../src/services/reads'
 import type { ICtx } from '../src/core/ctx'
+import {
+  AttachmentStore,
+  attachmentAdd,
+  attachmentGet,
+} from '../src/services/attachments'
 
 let db: BunSqliteDriver
 let workspaceId: string
@@ -220,6 +225,33 @@ describe('a private page is invisible to everyone else', () => {
     expect(own.events.some((e) => e.verb === 'doc.deleted')).toBe(true)
   })
 
+  it('nor a file in it, fetched by its id', async () => {
+    const blobs = new Map<string, Uint8Array>()
+    const store = new AttachmentStore({
+      put: async (id, bytes) => void blobs.set(id, bytes),
+      get: async (id) => blobs.get(id) ?? null,
+      delete: async (id) => void blobs.delete(id),
+    })
+    const added = (await attachmentAdd(jose, store, {
+      doc: 'draft',
+      filename: 'plan.txt',
+      content_base64: btoa('secret'),
+    } as never)) as { id: string }
+    expect((await attachmentGet(jose, store, added.id)).bytes).not.toBeNull()
+    expect(attachmentGet(ivan, store, added.id)).rejects.toThrow('not found')
+  })
+
+  it("nor its comments' links to a card", async () => {
+    await ok(jose, [
+      { op: 'comment', op_id: 'cm', ref: 'draft', body: 'about ST-1' },
+    ])
+    const card = (await itemGet(ivan, {
+      keys: ['ST-1'],
+      include: ['links'],
+    } as never)) as { items: { links?: { in: unknown[] } }[] }
+    expect(card.items[0].links?.in).toEqual([])
+  })
+
   it('and nobody else can write to it', async () => {
     const error = await fails(ivan, [
       { op: 'comment', op_id: 'x', ref: 'draft', body: 'hi' },
@@ -270,6 +302,8 @@ describe('children follow their parent', () => {
     await ok(ivan, [page('theirs', { parent: 'parent' }), share('theirs')])
     const error = await fails(jose, [share('parent', 'private')])
     expect(error).toContain('other people own')
+    // Never by name: it may be private to them.
+    expect(error).not.toContain('theirs')
     expect(await sees(ivan, 'theirs')).toBe(true)
   })
 
@@ -288,6 +322,6 @@ describe('children follow their parent', () => {
       await fails(jose, [
         { op: 'move', op_id: 'm2', ref: 'theirs', parent: 'mine' },
       ]),
-    ).toContain('belong to someone else')
+    ).toContain('belongs to someone else')
   })
 })
