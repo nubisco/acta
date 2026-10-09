@@ -887,4 +887,11 @@ export const ADDITIVE_COLUMNS = [
   // walkthrough's id. On the actor for the same reason as onboarded_at: a
   // tour replaying because someone opened a second browser is a nuisance.
   'ALTER TABLE actor ADD COLUMN walkthroughs TEXT',
+  // Document ownership and visibility (Jose, 2026-10-09). Existing pages stay
+  // shared with the workspace, which is what they have always been, and
+  // bootstrap backfills their owner from who wrote the first version. A new
+  // page starts private and asks its author on the first save (ask_share).
+  'ALTER TABLE document ADD COLUMN owner_id TEXT REFERENCES actor(id)',
+  "ALTER TABLE document ADD COLUMN visibility TEXT NOT NULL DEFAULT 'workspace'",
+  'ALTER TABLE document ADD COLUMN ask_share INTEGER NOT NULL DEFAULT 0',
 ]

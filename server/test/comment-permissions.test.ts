@@ -280,6 +280,13 @@ describe('documents keep the same rules', () => {
         layout: 'default',
         tags: [],
       },
+      // Shared: a new page starts private to its author.
+      {
+        op: 'set_visibility',
+        op_id: 'd1-share',
+        ref: 'spec',
+        visibility: 'workspace',
+      },
     ])
   })
 

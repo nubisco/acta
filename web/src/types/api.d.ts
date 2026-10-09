@@ -216,6 +216,8 @@ export interface IDocNode {
   depth: number
   rev: number
   updated: number
+  /** Listed only to its owner, who sees it marked. */
+  private?: true
 }
 
 export interface IDocDetail {
@@ -245,6 +247,16 @@ export interface IDocDetail {
   }[]
   versions?: { rev: number; created_at: number; handle: string }[]
   comments?: ICommentRow[]
+  /** The owner's handle. */
+  owner?: string | null
+  /** Private to the owner, or shared with the workspace's members. */
+  visibility?: 'private' | 'workspace'
+  /** Private because a page above it is, so it cannot be shared alone. */
+  inside_private?: true
+  /** Only the owner may change who sees the page. */
+  can_change_visibility?: true
+  /** The owner has not yet been asked whether to share it. */
+  ask_share?: true
 }
 
 export interface IEventRow {

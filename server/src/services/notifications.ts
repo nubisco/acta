@@ -72,6 +72,8 @@ const NOTIFIABLE = new Set([
   'item.overdue',
   'doc.created',
   'doc.updated',
+  // A page coming out of private: the people named in it can see it now.
+  'doc.shared',
   'member.updated',
   // Goals. Being handed one, a check-in on one you own or follow, and it
   // being put away or brought back. An edit is here for the names it adds
@@ -213,6 +215,31 @@ async function goalParticipants(
   return { owner, followers }
 }
 
+/**
+ * The owner of a page that is private (itself or through a page above it),
+ * or undefined when the page is shared. Null when it is private and somehow
+ * ownerless, which then tells nobody.
+ */
+async function privatePageOwner(
+  ctx: ICtx,
+  documentId: string,
+): Promise<string | null | undefined> {
+  const rows = await ctx.db.query<{
+    owner_id: string | null
+    visibility: string
+  }>(
+    `WITH RECURSIVE up(id, parent_id, owner_id, visibility) AS (
+       SELECT id, parent_id, owner_id, visibility FROM document WHERE id = ?
+       UNION
+       SELECT d.id, d.parent_id, d.owner_id, d.visibility FROM document d JOIN up ON d.id = up.parent_id
+     )
+     SELECT owner_id, visibility FROM up WHERE visibility = 'private' LIMIT 1`,
+    [documentId],
+  )
+  if (rows.length === 0) return undefined
+  return rows[0].owner_id
+}
+
 async function docParticipants(
   ctx: ICtx,
   documentId: string,
@@ -292,6 +319,8 @@ export async function notifyForEvent(
 
   let itemKey: string | null = null
   let docSlug: string | null = null
+  /** Set when the page is private: the one person who may hear about it. */
+  let privateOwner: string | null | undefined
   let goalNumber: number | null = null
   const wantsParticipants = PARTICIPANT_VERBS.has(event.verb)
 
@@ -322,6 +351,9 @@ export async function notifyForEvent(
       if (wantsParticipants) {
         for (const id of await docParticipants(ctx, row.id)) add(id, 'involved')
       }
+      // A private page tells nobody but its owner, even someone named in it:
+      // they could not open what the notification points at.
+      privateOwner = await privatePageOwner(ctx, row.id)
     }
   } else if (event.entity === 'goal') {
     const row = (
@@ -341,6 +373,10 @@ export async function notifyForEvent(
       }
     }
   }
+
+  if (privateOwner !== undefined)
+    for (const id of [...found.keys()])
+      if (id !== privateOwner) found.delete(id)
 
   if (found.size === 0) return 0
 

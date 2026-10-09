@@ -1,3 +1,4 @@
+import { isDocHidden } from './docAccess'
 /**
  * Row lookups and position helpers shared by the services. All lookups are
  * workspace-scoped and accept human keys (design-spec §1).
@@ -63,6 +64,11 @@ export interface IDocRow {
   created_at: number
   updated_at: number
   imported_meta: string | null
+  /** Who the page belongs to. Null only before the backfill has run. */
+  owner_id: string | null
+  visibility: 'private' | 'workspace'
+  /** 1 until the author has answered "share it?" after the first save. */
+  ask_share: number
 }
 
 export async function spaceByKey(ctx: ICtx, key: string): Promise<ISpaceRow> {
@@ -115,7 +121,10 @@ export async function docBySlug(ctx: ICtx, slug: string): Promise<IDocRow> {
     'SELECT * FROM document WHERE workspace_id = ? AND slug = ?',
     [ctx.workspaceId, slug],
   )
-  if (rows.length === 0) throw new ApiError(404, `doc ${slug} not found`)
+  // A page hidden from this reader answers exactly as a missing one, so its
+  // existence does not leak (see core/docAccess.ts).
+  if (rows.length === 0 || (await isDocHidden(ctx, rows[0].id)))
+    throw new ApiError(404, `doc ${slug} not found`)
   return rows[0]
 }
 

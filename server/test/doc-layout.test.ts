@@ -67,6 +67,13 @@ beforeEach(async () => {
         title: 'Runbook',
         body: BODY,
       },
+      // Shared: a new page starts private to its author.
+      {
+        op: 'set_visibility',
+        op_id: 'c1-share',
+        ref: 'runbook',
+        visibility: 'workspace',
+      },
     ],
     writer,
   )

@@ -98,7 +98,9 @@
           :wide="isWide"
           :editing="editing"
           :can-edit="canEdit"
+          :access="docAccess ?? undefined"
           @update:wide="setWide"
+          @change-visibility="changeVisibility"
         />
 
         <NbBanner
@@ -268,6 +270,7 @@ import CommentThread from '@/components/CommentThread.vue'
 import DocCommentLayer from '@/components/comments/DocCommentLayer.vue'
 import type { IAnchor } from '@/lib/anchors'
 import DocChromeBar from '@/components/DocChromeBar.vue'
+import { useDocSharing } from '@/composables/useDocSharing'
 import DocsTreeSlot from '@/components/DocsTreeSlot.vue'
 import DocTransferMenu from '@/components/DocTransferMenu.vue'
 import DocMoveModal from '@/components/DocMoveModal.vue'
@@ -392,6 +395,35 @@ const viewingOld = computed(
 const ws = useWorkspace()
 const chrome = useDocChrome()
 const canEdit = computed(() => !!ws.me.value?.scopes.includes('write'))
+
+const sharing = useDocSharing()
+/** Owner and visibility for the info row. */
+const docAccess = computed(() => {
+  const d = doc.value
+  if (!d?.visibility) return null
+  return {
+    owner: d.owner ?? null,
+    visibility: d.visibility,
+    canChange: d.can_change_visibility === true,
+    insidePrivate: d.inside_private === true,
+    workspace: sharing.workspaceName(),
+  }
+})
+
+async function changeVisibility(): Promise<void> {
+  if (!doc.value) return
+  if (await sharing.toggle(doc.value)) await refreshAfterSharing()
+}
+
+/** The page's own facts. The tree follows the doc.shared event itself. */
+async function refreshAfterSharing(): Promise<void> {
+  keepEditorOpen = editing.value
+  try {
+    await loadDoc()
+  } finally {
+    keepEditorOpen = false
+  }
+}
 const isWide = computed(() => doc.value?.layout === 'wide')
 const shownSource = computed(() =>
   editing.value ? draft.value : (doc.value?.body ?? ''),
@@ -684,6 +716,11 @@ async function save(options: { keepEditing?: boolean } = {}): Promise<void> {
     } finally {
       keepEditorOpen = false
     }
+    // A new page is private until its author says otherwise, and the first
+    // save is when they are asked (Jose, 2026-10-09).
+    if (doc.value?.ask_share && (await sharing.askToShare(doc.value)))
+      await refreshAfterSharing()
+    else if (doc.value?.ask_share) await loadDoc()
   } catch {
     conflict.value = true
   } finally {

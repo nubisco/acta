@@ -77,6 +77,23 @@ const inbox = async (who: ICtx) => (await notificationList(who)).notifications
 const verbs = async (who: ICtx) => (await inbox(who)).map((n) => n.verb)
 
 describe('documents', () => {
+  it('tells nobody but the owner about a private page', async () => {
+    await docWrite(jose, [
+      {
+        op: 'create',
+        op_id: 'p1',
+        slug: 'draft',
+        title: 'Draft',
+        body: 'for [[@ivan]]',
+        layout: 'default',
+        tags: [],
+      },
+      { op: 'comment', op_id: 'p2', ref: 'draft', body: '[[@daniela]] look' },
+    ])
+    expect(await inbox(ivan)).toHaveLength(0)
+    expect(await inbox(daniela)).toHaveLength(0)
+  })
+
   it('tells someone named in a comment on a page', async () => {
     await docWrite(jose, [
       {
@@ -87,6 +104,13 @@ describe('documents', () => {
         body: '# Spec',
         layout: 'default',
         tags: [],
+      },
+      // Shared, as these pages are: a new page starts private.
+      {
+        op: 'set_visibility',
+        op_id: 'd1-share',
+        ref: 'spec',
+        visibility: 'workspace',
       },
     ])
     await docWrite(jose, [
@@ -119,8 +143,17 @@ describe('documents', () => {
         layout: 'default',
         tags: [],
       },
+      // Shared, as these pages are: a new page starts private.
+      {
+        op: 'set_visibility',
+        op_id: 'd1-share',
+        ref: 'spec',
+        visibility: 'workspace',
+      },
     ])
-    expect(await verbs(daniela)).toEqual(['doc.created'])
+    // Named while the page was private, so told when it is shared, which is
+    // the first moment she can open it.
+    expect(await verbs(daniela)).toEqual(['doc.shared'])
   })
 
   it('tells someone named by an edit, and only them, and only once', async () => {
@@ -133,6 +166,13 @@ describe('documents', () => {
         body: 'owner: [[@daniela]]',
         layout: 'default',
         tags: [],
+      },
+      // Shared, as these pages are: a new page starts private.
+      {
+        op: 'set_visibility',
+        op_id: 'd1-share',
+        ref: 'spec',
+        visibility: 'workspace',
       },
     ])
     const rev = (
@@ -156,7 +196,7 @@ describe('documents', () => {
     expect(await verbs(ivan)).toEqual(['doc.updated'])
     // Daniela was already named and is named again. Saving a page must not
     // ring for everyone in it every time.
-    expect(await verbs(daniela)).toEqual(['doc.created'])
+    expect(await verbs(daniela)).toEqual(['doc.shared'])
   })
 
   it('stays quiet about a page being saved when nobody new is named', async () => {
@@ -169,6 +209,13 @@ describe('documents', () => {
         body: 'hello',
         layout: 'default',
         tags: [],
+      },
+      // Shared, as these pages are: a new page starts private.
+      {
+        op: 'set_visibility',
+        op_id: 'd1-share',
+        ref: 'spec',
+        visibility: 'workspace',
       },
     ])
     await docWrite(ivan, [
@@ -207,6 +254,13 @@ describe('documents', () => {
         layout: 'default',
         tags: [],
       },
+      // Shared, as these pages are: a new page starts private.
+      {
+        op: 'set_visibility',
+        op_id: 'd1-share',
+        ref: 'spec',
+        visibility: 'workspace',
+      },
     ])
     await docWrite(ivan, [
       { op: 'comment', op_id: 'd2', ref: 'spec', body: 'first' },
@@ -232,6 +286,13 @@ describe('documents', () => {
         body: 'hello',
         layout: 'default',
         tags: [],
+      },
+      // Shared, as these pages are: a new page starts private.
+      {
+        op: 'set_visibility',
+        op_id: 'd1-share',
+        ref: 'spec',
+        visibility: 'workspace',
       },
     ])
     const written = await docWrite(ivan, [

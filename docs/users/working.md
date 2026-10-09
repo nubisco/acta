@@ -126,6 +126,31 @@ target knows it was mentioned.
 A tree of Markdown pages in the left rail. Every save makes a version, and you
 can read or restore an old one.
 
+### Who can see a page
+
+Every page has an **owner**, shown under its title next to the word count, and
+is either **Private** (only the owner sees it) or **Shared** (every member of
+the workspace sees it). Nobody outside the workspace can see a page either way.
+
+- **A new page starts private.** The first time you save it, Acta asks whether
+  to share it with the workspace or keep it private. Either answer is final
+  until you change it.
+- **Change it any time** from the Private or Shared button under the title.
+  Only the owner can, and admins cannot see other people's private pages.
+- **Pages follow the page they sit in.** A page inside a private page is
+  private with it and cannot be shared on its own. Sharing a page shares the
+  pages under it. A page cannot be made private while someone else owns a page
+  under it, and nobody can move someone else's page into a private one.
+- **A private page is invisible to everyone else**, not just closed: it is not
+  in their tree, their search, the activity feed or a card's links, and its
+  events never reach a webhook or Slack. Your private pages carry a lock in the
+  tree.
+- **Mentions wait.** Somebody named in a private page is told when it is
+  shared, which is the first moment they can open it.
+- Pages that existed before this belong to whoever wrote their first version,
+  and stay shared. Pages written by an agent, an import or a script with a personal token are
+  shared, and belong to the person they work for.
+
 **Reorganise the tree by dragging.** Drop a page on the middle of another page
 to put it inside, as the last subpage. Drop it on the top or bottom edge of a
 page to put it just before or after that page, at the same level. Dropping

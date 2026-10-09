@@ -20,6 +20,11 @@ import {
 import { ftsDelete, ftsUpsert } from '../core/fts'
 import { withOp } from '../core/ops'
 import { spaceByKey, docBySlug, type IDocRow } from '../core/store'
+import {
+  foreignDescendants,
+  hasPrivateAncestor,
+  viewerOf,
+} from '../core/docAccess'
 import { anchorForComment, anchorStatus } from './anchors'
 import type { AttachmentStore } from './attachments'
 
@@ -179,9 +184,26 @@ async function applyDocOp(
         'SELECT MAX(pos) AS m FROM document WHERE workspace_id = ? AND parent_id IS ?',
         [ctx.workspaceId, parent?.id ?? null],
       )
+      // A person's new page starts private and they are asked on the first
+      // save. An agent's or an import's is shared, since a private page owned
+      // by a bot is visible to nobody. Inside a private page it is private
+      // regardless, and there is nothing to ask: it follows its parent.
+      const insidePrivate =
+        parent !== null &&
+        (parent.visibility === 'private' ||
+          (await hasPrivateAncestor(ctx, parent.id)))
+      // A person at the screen, that is: a browser session. A personal token
+      // acts as its owner but is how a script or an agent writes, and nobody
+      // is there to be asked about sharing.
+      const byPerson =
+        ctx.actor.kind === 'human' &&
+        (ctx.actor.tokenKind ?? 'session') === 'session' &&
+        !op.imported_meta
+      const visibility = insidePrivate || byPerson ? 'private' : 'workspace'
+      const askShare = byPerson && !insidePrivate ? 1 : 0
       await ctx.db.run(
-        `INSERT INTO document (id, workspace_id, slug, title, parent_id, space_id, pos, body, layout, tags, created_at, updated_at, imported_meta)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO document (id, workspace_id, slug, title, parent_id, space_id, pos, body, layout, tags, created_at, updated_at, imported_meta, owner_id, visibility, ask_share)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           ctx.workspaceId,
@@ -196,6 +218,9 @@ async function applyDocOp(
           ts,
           ts,
           op.imported_meta ? JSON.stringify(op.imported_meta) : null,
+          viewerOf(ctx),
+          visibility,
+          askShare,
         ],
       )
       await ctx.db.run(
@@ -384,6 +409,58 @@ async function applyDocOp(
       ])
       return { slug: doc.slug, rev: doc.rev }
     }
+    case 'set_visibility': {
+      const doc = await docBySlug(ctx, op.ref)
+      if (doc.owner_id !== viewerOf(ctx))
+        throw new ApiError(
+          403,
+          `only the owner of ${doc.slug} can change who sees it`,
+        )
+      if (op.visibility === 'workspace') {
+        if (await hasPrivateAncestor(ctx, doc.id))
+          throw new ApiError(
+            409,
+            `${doc.slug} is inside a private page, so it is private with it. Share that page, or move this one out of it.`,
+          )
+      } else {
+        // Making a page private hides everything under it. Pages somebody
+        // else owns would vanish for them, so they have to move out first.
+        const others = await foreignDescendants(ctx, doc.id, doc.owner_id)
+        if (others.length > 0)
+          throw new ApiError(
+            409,
+            `${doc.slug} has pages other people own under it (${others.slice(0, 3).join(', ')}${others.length > 3 ? ', ...' : ''}). Move them out before making it private.`,
+          )
+      }
+      // Children follow their parent: sharing a page shares the pages under
+      // it, which are all this owner's (a private subtree holds no one
+      // else's pages), and so does making it private.
+      await ctx.db.run(
+        `WITH RECURSIVE down(id) AS (
+           SELECT id FROM document WHERE id = ?
+           UNION
+           SELECT d.id FROM document d JOIN down ON d.parent_id = down.id
+         )
+         UPDATE document SET visibility = ?, ask_share = 0
+          WHERE id IN (SELECT id FROM down)`,
+        [doc.id, op.visibility],
+      )
+      if (doc.visibility !== op.visibility)
+        await emitEvent(
+          ctx,
+          op.visibility === 'workspace' ? 'doc.shared' : 'doc.made_private',
+          'doc',
+          doc.id,
+          op.visibility === 'workspace'
+            ? `shared ${doc.slug} with the workspace`
+            : `made ${doc.slug} private`,
+          undefined,
+          // Anyone named in a page while it was private could not be told
+          // then. Sharing it is when they can see it, so it is when they hear.
+          op.visibility === 'workspace' ? { body: doc.body } : undefined,
+        )
+      return { slug: doc.slug, rev: doc.rev }
+    }
     case 'set_layout': {
       // Page width is how the page is shown, not what it says. No rev bump
       // and no version, so an editor holding `if_rev` is not put into a
@@ -512,6 +589,29 @@ async function applyDocOp(
       }
       if (parentId === doc.id)
         throw new ApiError(400, 'doc cannot be its own parent')
+      // Moving into a private page makes this page private with it. Pages
+      // somebody else owns would then vanish for them, so they cannot go.
+      if (parentId !== null && parentId !== doc.parent_id) {
+        const target = await ctx.db.query<{
+          owner_id: string | null
+          visibility: string
+        }>('SELECT owner_id, visibility FROM document WHERE id = ?', [parentId])
+        const intoPrivate =
+          target[0]?.visibility === 'private' ||
+          (await hasPrivateAncestor(ctx, parentId))
+        if (intoPrivate) {
+          const owner = target[0]?.owner_id ?? ''
+          const others =
+            doc.owner_id !== owner
+              ? [doc.slug]
+              : await foreignDescendants(ctx, doc.id, owner)
+          if (others.length > 0)
+            throw new ApiError(
+              409,
+              `cannot move ${doc.slug} into a private page: ${others.slice(0, 3).join(', ')} belong to someone else, who would lose sight of them`,
+            )
+        }
+      }
       if (parentId !== null && (await isAncestorOrSelf(ctx, doc.id, parentId)))
         throw new ApiError(
           400,

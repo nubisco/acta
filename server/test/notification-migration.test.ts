@@ -123,6 +123,13 @@ describe('a database older than document inboxes', () => {
         layout: 'default',
         tags: [],
       },
+      // Shared: a new page starts private to its author.
+      {
+        op: 'set_visibility',
+        op_id: 'd1-share',
+        ref: 'spec',
+        visibility: 'workspace',
+      },
     ])
 
     // The INSERT names doc_slug. On a database without the column it throws,

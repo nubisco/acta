@@ -67,6 +67,14 @@ export async function bootstrapWorkspace(
         existing[0].id,
       ])
     }
+    // Pages that predate ownership belong to whoever wrote their first
+    // version. A no-op once every page has an owner.
+    await db.run(
+      `UPDATE document SET owner_id = (
+         SELECT v.actor_id FROM doc_version v
+          WHERE v.document_id = document.id ORDER BY v.rev LIMIT 1
+       ) WHERE owner_id IS NULL`,
+    )
     return existing[0].id
   }
 

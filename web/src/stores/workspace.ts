@@ -132,6 +132,7 @@ const NOTIFY_VERBS = new Set([
   'item.overdue',
   'doc.created',
   'doc.updated',
+  'doc.shared',
   'member.updated',
 ])
 

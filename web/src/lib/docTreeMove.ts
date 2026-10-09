@@ -178,7 +178,7 @@ export function moveTargets(
 
 /** The API's flat, depth-ordered list rebuilt into nesting. */
 export function nestDocs(
-  rows: { slug: string; title: string; depth: number }[],
+  rows: { slug: string; title: string; depth: number; private?: boolean }[],
 ): IDocTreeNode[] {
   const roots: IDocTreeNode[] = []
   const stack: { node: IDocTreeNode; depth: number }[] = []
@@ -186,6 +186,7 @@ export function nestDocs(
     const node: IDocTreeNode = {
       slug: row.slug,
       title: row.title,
+      ...(row.private ? { private: true } : {}),
       children: [],
     }
     while (stack.length > 0 && stack[stack.length - 1].depth >= row.depth)

@@ -1,6 +1,58 @@
 <template>
   <div class="doc-chrome">
     <p class="doc-chrome__stats">
+      <!-- Whose page it is and who can see it, first: it decides what is
+           safe to write here (Jose, 2026-10-09). -->
+      <template v-if="access?.owner">
+        <span class="doc-chrome__owner">
+          <span class="doc-chrome__muted">Owner</span>
+          <ActorChip :handle="access.owner" />
+        </span>
+        <span aria-hidden="true">·</span>
+      </template>
+      <template v-if="access">
+        <template v-if="access.canChange && !access.insidePrivate">
+          <!-- Two buttons, not one with a computed icon: the library links
+               icon artwork at build time and needs the literal name. -->
+          <NbButton
+            v-if="access.visibility === 'private'"
+            v-nb-tooltip="{ body: visibilityTip }"
+            size="xs"
+            variant="ghost"
+            icon="lock-simple"
+            aria-label="Private. Change who sees this page"
+            @click="emit('change-visibility')"
+          >
+            Private
+          </NbButton>
+          <NbButton
+            v-else
+            v-nb-tooltip="{ body: visibilityTip }"
+            size="xs"
+            variant="ghost"
+            icon="users-three"
+            aria-label="Shared. Change who sees this page"
+            @click="emit('change-visibility')"
+          >
+            Shared
+          </NbButton>
+        </template>
+        <span
+          v-else
+          v-nb-tooltip="{ body: visibilityTip }"
+          class="doc-chrome__visibility"
+          tabindex="0"
+        >
+          <NbIcon
+            v-if="access.visibility === 'private'"
+            name="lock-simple"
+            :size="14"
+          />
+          <NbIcon v-else name="users-three" :size="14" />
+          {{ visibilityLabel }}
+        </span>
+        <span aria-hidden="true">·</span>
+      </template>
       <span>{{ wordsLabel }}</span>
       <span aria-hidden="true">·</span>
       <span>{{ charactersLabel }}</span>
@@ -73,10 +125,19 @@ import {
   useDocChrome,
 } from '@/lib/docChrome'
 import type { IDocStats } from '@/lib/docText'
+import ActorChip from '@/components/ActorChip.vue'
 
 const props = defineProps<{
   slug: string
   stats: IDocStats
+  /** Who owns the page and who sees it. Absent while viewing an old version. */
+  access?: {
+    owner: string | null
+    visibility: 'private' | 'workspace'
+    canChange: boolean
+    insidePrivate: boolean
+    workspace: string
+  }
   /** The document's stored layout. */
   wide: boolean
   editing: boolean
@@ -87,7 +148,26 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** The stored layout changed, or a failed change was rolled back. */
   'update:wide': [wide: boolean]
+  /** The owner asked to share the page or make it private. */
+  'change-visibility': []
 }>()
+
+const visibilityLabel = computed(() =>
+  props.access?.visibility === 'private' ? 'Private' : 'Shared',
+)
+const visibilityTip = computed(() => {
+  const a = props.access
+  if (!a) return ''
+  if (a.insidePrivate)
+    return 'Private, because the page it sits in is private. Share that page to share this one.'
+  if (a.visibility === 'private')
+    return a.canChange
+      ? `Only you can see this page. Click to share it with ${a.workspace}.`
+      : 'Only its owner can see this page.'
+  return a.canChange
+    ? `Every member of ${a.workspace} can see this page. Click to make it private.`
+    : `Every member of ${a.workspace} can see this page.`
+})
 
 const chrome = useDocChrome()
 const toast = useToast()
@@ -215,6 +295,18 @@ useViewCommands('docs', [
     display: flex;
     align-items: center;
     gap: var(--nb-spacing-2);
+  }
+
+  &__owner,
+  &__visibility {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nb-spacing-4);
+  }
+
+  /* The owner's name sits at the stats' size, not ActorChip's own. */
+  &__owner :deep(.actor-chip__name) {
+    font-size: inherit;
   }
 }
 </style>

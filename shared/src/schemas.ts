@@ -379,6 +379,18 @@ export const zDocOp = z.discriminatedUnion('op', [
     imported_meta: zImportedMeta.nullable(),
   }),
   z.object({
+    /**
+     * Who can see the page: its owner alone, or every member of the
+     * workspace. Only the owner may change it. Sharing a page shares the
+     * pages under it, and a page inside a private page cannot be shared on
+     * its own. Answers the "share it?" question asked after the first save.
+     */
+    op: z.literal('set_visibility'),
+    op_id: zOpId,
+    ref: zDocSlug,
+    visibility: z.enum(['private', 'workspace']),
+  }),
+  z.object({
     op: z.literal('set_layout'),
     op_id: zOpId,
     ref: zDocSlug,

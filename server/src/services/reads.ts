@@ -12,6 +12,12 @@ import type {
 } from '@nubisco/acta-shared'
 import { now, type ICtx } from '../core/ctx'
 import { docBySlug, spaceByKey, itemByKey, type IItemRow } from '../core/store'
+import {
+  hasPrivateAncestor,
+  hiddenDocIds,
+  viewerOf,
+  visibleDocSql,
+} from '../core/docAccess'
 import { anchorStatus, parseAnchor } from './anchors'
 import { attachmentUrl } from './attachments'
 import {
@@ -117,16 +123,19 @@ export async function workspaceOverview(ctx: ICtx) {
     'SELECT id, handle, kind, name, role, avatar_url FROM actor WHERE workspace_id = ? AND disabled = 0 ORDER BY handle',
     [ctx.workspaceId],
   )
+  const visibleRoots = visibleDocSql('d.id', await hiddenDocIds(ctx))
   const docRoots = await ctx.db.query<{
     slug: string
     title: string
     children: number
   }>(
     `SELECT d.slug, d.title,
-            (SELECT COUNT(*) FROM document c WHERE c.parent_id = d.id AND c.archived = 0) AS children
+            (SELECT COUNT(*) FROM document c WHERE c.parent_id = d.id AND c.archived = 0
+                AND ${visibleRoots.sql.replaceAll('d.id', 'c.id')}) AS children
        FROM document d WHERE d.workspace_id = ? AND d.parent_id IS NULL AND d.archived = 0
+        AND ${visibleRoots.sql}
       ORDER BY d.pos`,
-    [ctx.workspaceId],
+    [...visibleRoots.params, ctx.workspaceId, ...visibleRoots.params],
   )
   return {
     workspace: { id: ws.id, name: ws.name },
@@ -618,6 +627,7 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
       out.checklists = withItems
     }
     if (include.has('links')) {
+      const visibleLinkDocs = visibleDocSql('l.src_id', await hiddenDocIds(ctx))
       out.links = {
         out: await ctx.db.query<{ ref_type: string; target: string }>(
           "SELECT ref_type, target FROM link WHERE src_kind = 'item' AND src_id = ?",
@@ -637,8 +647,9 @@ export async function itemGet(ctx: ICtx, params: TItemGet) {
                     WHEN 'comment' THEN (SELECT r.key FROM comment c JOIN item r ON r.id = c.item_id WHERE c.id = l.src_id)
                     WHEN 'doc' THEN (SELECT d.slug FROM document d WHERE d.id = l.src_id)
                   END AS src
-             FROM link l WHERE l.workspace_id = ? AND l.ref_type = 'item' AND l.target = ?`,
-          [ctx.workspaceId, item.key],
+             FROM link l WHERE l.workspace_id = ? AND l.ref_type = 'item' AND l.target = ?
+              AND (l.src_kind != 'doc' OR ${visibleLinkDocs.sql})`,
+          [ctx.workspaceId, item.key, ...visibleLinkDocs.params],
         ),
       }
     }
@@ -767,11 +778,16 @@ export async function docTree(ctx: ICtx, root?: string, depth = 10) {
     parent_id: string | null
     rev: number
     updated_at: number
+    owner_id: string | null
+    visibility: 'private' | 'workspace'
   }
-  const all = await ctx.db.query<INode>(
-    'SELECT id, slug, title, parent_id, rev, updated_at FROM document WHERE workspace_id = ? AND archived = 0 ORDER BY pos, id',
-    [ctx.workspaceId],
-  )
+  const hidden = new Set(await hiddenDocIds(ctx))
+  const all = (
+    await ctx.db.query<INode>(
+      'SELECT id, slug, title, parent_id, rev, updated_at, owner_id, visibility FROM document WHERE workspace_id = ? AND archived = 0 ORDER BY pos, id',
+      [ctx.workspaceId],
+    )
+  ).filter((d) => !hidden.has(d.id))
   const rootNode = root ? all.find((d) => d.slug === root) : undefined
   const out: {
     slug: string
@@ -779,6 +795,8 @@ export async function docTree(ctx: ICtx, root?: string, depth = 10) {
     depth: number
     rev: number
     updated: number
+    /** Private pages are listed only to their owner, marked so. */
+    private?: true
   }[] = []
   // Each page is listed at most once. Moves refuse a cycle now, but a parent
   // chain that already loops (left by an older build) would otherwise repeat
@@ -796,12 +814,45 @@ export async function docTree(ctx: ICtx, root?: string, depth = 10) {
         depth: level,
         rev: node.rev,
         updated: node.updated_at,
+        ...(node.visibility === 'private' ? { private: true as const } : {}),
       })
       walk(node.id, level + 1)
     }
   }
   walk(rootNode?.id ?? null, 0)
   return { docs: out }
+}
+
+/**
+ * Who a page belongs to and who can see it, as the page header shows them:
+ * the owner's handle, whether it is private, whether the reader may change
+ * that, and whether the author still has to be asked about sharing it.
+ */
+async function docAccessFacts(
+  ctx: ICtx,
+  doc: {
+    id: string
+    owner_id: string | null
+    visibility: string
+    ask_share: number
+  },
+) {
+  const owner = doc.owner_id
+    ? await ctx.db.query<{ handle: string }>(
+        'SELECT handle FROM actor WHERE id = ?',
+        [doc.owner_id],
+      )
+    : []
+  const mine = doc.owner_id !== null && doc.owner_id === viewerOf(ctx)
+  const insidePrivate = await hasPrivateAncestor(ctx, doc.id)
+  return {
+    owner: owner[0]?.handle ?? null,
+    visibility: doc.visibility === 'private' ? 'private' : 'workspace',
+    /** Private because a page above it is, so it cannot be shared alone. */
+    inside_private: insidePrivate || undefined,
+    can_change_visibility: mine || undefined,
+    ask_share: (mine && doc.ask_share === 1) || undefined,
+  }
 }
 
 /**
@@ -879,6 +930,7 @@ export async function docGet(
     updated: doc.updated_at,
     body,
     imported: parseImportedMeta(doc.imported_meta),
+    ...(await docAccessFacts(ctx, doc)),
   }
   // Always, not behind `include`. A document's body can embed an attachment,
   // so a reader that has the body but not the attachment list cannot render
@@ -945,6 +997,7 @@ export async function docGet(
     }))
   }
   if (include.has('backlinks')) {
+    const visibleBacklinks = visibleDocSql('l.src_id', await hiddenDocIds(ctx))
     // Resolved to something a person can read. The link table stores internal
     // ids, and returning those unchanged put rows like
     // "item  itm_01m2gaz92142arwky3srvkw0pd" under "Referenced by", which
@@ -972,8 +1025,9 @@ export async function docGet(
          LEFT JOIN document d ON l.src_kind = 'doc' AND d.id = l.src_id
          LEFT JOIN comment c ON l.src_kind = 'comment' AND c.id = l.src_id
          LEFT JOIN item ci ON ci.id = c.item_id
-        WHERE l.workspace_id = ? AND l.ref_type = 'doc' AND l.target = ?`,
-      [ctx.workspaceId, doc.slug],
+        WHERE l.workspace_id = ? AND l.ref_type = 'doc' AND l.target = ?
+          AND (l.src_kind != 'doc' OR ${visibleBacklinks.sql})`,
+      [ctx.workspaceId, doc.slug, ...visibleBacklinks.params],
     )
   }
   if (include.has('versions')) {
@@ -1023,6 +1077,13 @@ export async function search(ctx: ICtx, params: TSearch) {
   if (params.space) {
     filter += ' AND space_key = ?'
     args.push(params.space)
+  }
+  // A page hidden from this reader is not a search result, title included.
+  const hidden = await hiddenDocIds(ctx)
+  if (hidden.length > 0) {
+    // Comments on a page are indexed under the page's slug as their title.
+    filter += ` AND NOT (kind IN ('doc', 'comment') AND (CASE kind WHEN 'doc' THEN ref ELSE title END) IN (SELECT slug FROM document WHERE id IN (SELECT value FROM json_each(?))))`
+    args.push(JSON.stringify(hidden))
   }
   const rows = await ctx.db.query<{
     kind: string
@@ -1089,6 +1150,12 @@ export async function activityQuery(ctx: ICtx, params: TActivityQuery) {
   if (params.cursor) {
     where.push('e.id < ?')
     args.push(params.cursor)
+  }
+  // What happens to a page hidden from this reader is not theirs to see.
+  const visibleEvents = visibleDocSql('e.entity_id', await hiddenDocIds(ctx))
+  if (visibleEvents.params.length > 0) {
+    where.push(`(e.entity != 'doc' OR ${visibleEvents.sql})`)
+    args.push(...visibleEvents.params)
   }
   const rows = await ctx.db.query<{
     id: string
