@@ -1,3 +1,10 @@
+# [1.47.0](https://github.com/nubisco/acta/compare/v1.46.0...v1.47.0) (2026-10-09)
+
+
+### Features
+
+* **board:** select several cards and act on them at once, and delete spaces ([c9cf6c1](https://github.com/nubisco/acta/commit/c9cf6c14333ae08d6994ed1d5a2c65e7449fc1c6))
+
 # [1.46.0](https://github.com/nubisco/acta/compare/v1.45.4...v1.46.0) (2026-10-09)
 
 
