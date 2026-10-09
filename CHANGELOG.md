@@ -1,3 +1,10 @@
+## [1.45.2](https://github.com/nubisco/acta/compare/v1.45.1...v1.45.2) (2026-10-09)
+
+
+### Bug Fixes
+
+* **ui:** deleting a page looks permanent, and a comment says exactly when ([2a58680](https://github.com/nubisco/acta/commit/2a58680f93539db08fb04e2e6a64cf739465d6e3))
+
 ## [1.45.1](https://github.com/nubisco/acta/compare/v1.45.0...v1.45.1) (2026-10-09)
 
 
