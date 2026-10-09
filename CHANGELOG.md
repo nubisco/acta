@@ -1,3 +1,10 @@
+## [1.45.3](https://github.com/nubisco/acta/compare/v1.45.2...v1.45.3) (2026-10-09)
+
+
+### Bug Fixes
+
+* **ui:** one close control, in every dialog and the side panel ([add7791](https://github.com/nubisco/acta/commit/add77912b0f2db20ef0a3ebcb208afced7c8b74f))
+
 ## [1.45.2](https://github.com/nubisco/acta/compare/v1.45.1...v1.45.2) (2026-10-09)
 
 
