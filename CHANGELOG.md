@@ -1,3 +1,10 @@
+## [1.44.1](https://github.com/nubisco/acta/compare/v1.44.0...v1.44.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **ui:** one meaning per icon, one heading style per card, one cancel word ([3f2d487](https://github.com/nubisco/acta/commit/3f2d4877048c3d413263d76e4d5f4d86cf81a5fc))
+
 # [1.44.0](https://github.com/nubisco/acta/compare/v1.43.0...v1.44.0) (2026-10-09)
 
 
