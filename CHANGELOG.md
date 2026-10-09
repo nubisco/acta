@@ -1,3 +1,10 @@
+# [1.46.0](https://github.com/nubisco/acta/compare/v1.45.4...v1.46.0) (2026-10-09)
+
+
+### Features
+
+* **board:** sort the cards in each column by priority, due date or recency ([f03f408](https://github.com/nubisco/acta/commit/f03f40866be990c1e012b1d43a3c40f0c7b68bd6))
+
 ## [1.45.4](https://github.com/nubisco/acta/compare/v1.45.3...v1.45.4) (2026-10-09)
 
 
