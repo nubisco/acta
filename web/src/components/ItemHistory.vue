@@ -37,14 +37,14 @@
             <button
               v-else-if="part.kind === 'item'"
               type="button"
-              class="history__ref"
+              class="md__ref md__ref--bare"
               @click="emit('open', part.key)"
             >
               {{ part.key }}
             </button>
             <RouterLink
               v-else-if="part.kind === 'goal'"
-              class="history__ref"
+              class="md__ref"
               :to="wpath(`/goals/${part.number}`)"
             >
               G-{{ part.number }}
@@ -173,22 +173,6 @@ function nameOf(handle: string | undefined): string {
 
   &__inline {
     vertical-align: middle;
-  }
-
-  &__ref {
-    padding: 0;
-    border: 0;
-    background: none;
-    font: inherit;
-    font-family: var(--nb-font-family-mono);
-    font-size: var(--nb-type-code-sm-size);
-    color: var(--nb-c-primary);
-    cursor: pointer;
-    text-decoration: none;
-
-    &:hover {
-      text-decoration: underline;
-    }
   }
 
   &__when {

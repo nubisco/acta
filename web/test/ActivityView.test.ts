@@ -92,7 +92,7 @@ beforeEach(() => {
 describe('the activity feed', () => {
   it('turns a card key into something that opens the card', async () => {
     const view = await render()
-    const refs = view.findAll('.activity-view__ref')
+    const refs = view.findAll('.md__ref')
 
     expect(refs).toHaveLength(1)
     expect(refs[0].text()).toBe('ST-1')
@@ -109,7 +109,7 @@ describe('the activity feed', () => {
     const view = await render([
       { ...EVENT, verb: 'item.blocked', summary: 'ST-4 now waits on ST-9' },
     ])
-    const refs = view.findAll('.activity-view__ref')
+    const refs = view.findAll('.md__ref')
     expect(refs.map((r) => r.text())).toEqual(['ST-4', 'ST-9'])
   })
 
@@ -124,7 +124,7 @@ describe('the activity feed', () => {
         doc_slug: 'spec',
       },
     ])
-    const link = view.find('a.activity-view__ref')
+    const link = view.find('a.md__ref')
     expect(link.exists()).toBe(true)
     expect(link.attributes('href')).toContain('/docs/spec')
   })
@@ -141,7 +141,7 @@ describe('the activity feed', () => {
     ])
     // A control that goes nowhere is worse than plain text, which is what
     // this row correctly stays.
-    expect(view.findAll('.activity-view__ref')).toHaveLength(0)
+    expect(view.findAll('.md__ref')).toHaveLength(0)
     expect(view.text()).toContain('created label Urgent')
   })
 

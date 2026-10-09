@@ -755,6 +755,10 @@ details.md__details {
   flex: none;
 }
 
+/* The one inline card key (UX audit, 2026-10-09): mono, sized to the text
+   around it rather than a fixed 11px that read like a subscript in 14px
+   prose, and it answers the pointer. Used by markdown, RefText, a card's
+   history and the activity feed alike. */
 button.md__ref {
   background: none;
   border: 0;
@@ -762,7 +766,12 @@ button.md__ref {
   padding: 0;
   cursor: pointer;
   font-family: var(--nb-font-family-mono);
-  font-size: var(--nb-type-code-sm-size);
+  font-size: 0.9em;
+  line-height: inherit;
+
+  &:hover {
+    border-block-end-style: solid;
+  }
 
   &:focus-visible {
     outline: 1px solid var(--nb-c-focus-ring);

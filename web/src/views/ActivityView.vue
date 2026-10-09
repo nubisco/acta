@@ -106,21 +106,21 @@
               <button
                 v-if="part.kind === 'item'"
                 type="button"
-                class="activity-view__ref"
+                class="md__ref md__ref--bare"
                 @click="inspector.open(part.text)"
               >
                 {{ part.text }}
               </button>
               <RouterLink
                 v-else-if="part.kind === 'doc'"
-                class="activity-view__ref"
+                class="md__ref"
                 :to="wpath(`/docs/${part.slug}`)"
               >
                 {{ part.text }}
               </RouterLink>
               <RouterLink
                 v-else-if="part.kind === 'goal'"
-                class="activity-view__ref"
+                class="md__ref"
                 :to="wpath(`/goals/${part.number}`)"
               >
                 {{ part.text }}
@@ -341,33 +341,6 @@ onScopeDispose(
   &__what {
     /* The sentence wraps, and the things in it should not break mid-key. */
     overflow-wrap: anywhere;
-  }
-
-  /* The card keys and page names inside a summary. Deliberately not a chip:
-     these sit inside a sentence, several to a line, and a row of pills would
-     read as a toolbar rather than as a line of prose that happens to name
-     things you can open. */
-  &__ref {
-    background: none;
-    border: 0;
-    padding: 0;
-    font: inherit;
-    color: var(--nb-c-primary);
-    font-weight: var(--nb-type-label-lg-weight);
-    cursor: pointer;
-    text-decoration: none;
-    white-space: nowrap;
-
-    &:hover,
-    &:focus-visible {
-      text-decoration: underline;
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--nb-c-focus-ring);
-      outline-offset: 2px;
-      border-radius: var(--nb-radius-sm);
-    }
   }
 
   &__filters {
