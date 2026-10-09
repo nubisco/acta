@@ -143,7 +143,9 @@ describe('items', () => {
 
     const got = await itemGet(ctx, { keys: ['SW-1'] })
     const item = got.items[0] as Record<string, any>
-    expect(item.list).toBe('In Progress')
+    // Completed in the same batch, and the list is the status, so it sits
+    // in Done (Jose, 2026-10-09).
+    expect(item.list).toBe('Done')
     expect(item.labels).toEqual(['Bug'])
     expect(item.done).toBe(true)
     expect(item.comments).toHaveLength(1)

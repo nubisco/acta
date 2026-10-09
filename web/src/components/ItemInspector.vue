@@ -162,16 +162,9 @@
         :title="it.saveError.value"
       />
       <div class="inspector-fields">
+        <!-- The list is the status (Jose, 2026-10-09): one field, not a
+             Status and a List that could disagree. Done means a done list. -->
         <NbField v-slot="{ id }" label="Status">
-          <NbSelect
-            :id="id"
-            v-model="it.draft.status"
-            size="sm"
-            :options="[...ITEM_STATUS_OPTIONS]"
-            @change="it.commitStatus"
-          />
-        </NbField>
-        <NbField v-slot="{ id }" label="List">
           <NbSelect
             :id="id"
             v-model="it.draft.list"
@@ -516,7 +509,7 @@
 <script setup lang="ts">
 import { ref, toRef, watch } from 'vue'
 import { useConfirm, useToast } from '@nubisco/ui'
-import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
+import { useItem } from '@/composables/useItem'
 import { useRouter } from 'vue-router'
 import { useInspector, useUiState } from '@/stores/workspace'
 import { wpath } from '@/lib/paths'

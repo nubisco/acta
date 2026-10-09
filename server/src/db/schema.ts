@@ -914,18 +914,44 @@ export const ADDITIVE_COLUMNS = [
   // when somebody last pressed "Clear done now". Jose, 2026-10-09.
   'ALTER TABLE space ADD COLUMN done_window_days INTEGER DEFAULT 14',
   'ALTER TABLE space ADD COLUMN done_cleared_at INTEGER',
-  `CREATE TRIGGER IF NOT EXISTS item_done_at_insert AFTER INSERT ON item
-   BEGIN
-     UPDATE item SET done_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
-      WHERE id = NEW.id AND (NEW.completed = 1
-        OR (SELECT role FROM list WHERE id = NEW.list_id) = 'done');
-   END`,
-  `CREATE TRIGGER IF NOT EXISTS item_done_at_update AFTER UPDATE OF list_id, completed ON item
+  // v2 reads the row as it is now rather than NEW: the completed flag is set
+  // by a sibling trigger (below), and NEW still holds the value from before
+  // it, which put done_at back on a card just moved out of Done.
+  'DROP TRIGGER IF EXISTS item_done_at_insert',
+  'DROP TRIGGER IF EXISTS item_done_at_update',
+  `CREATE TRIGGER IF NOT EXISTS item_done_at_insert_v2 AFTER INSERT ON item
    BEGIN
      UPDATE item SET done_at = CASE
-         WHEN NEW.completed = 1 OR (SELECT role FROM list WHERE id = NEW.list_id) = 'done'
-         THEN COALESCE(OLD.done_at, CAST(strftime('%s', 'now') AS INTEGER) * 1000)
+         WHEN item.completed = 1 OR (SELECT role FROM list WHERE id = item.list_id) = 'done'
+         THEN COALESCE(item.done_at, CAST(strftime('%s', 'now') AS INTEGER) * 1000)
          ELSE NULL END
+      WHERE id = NEW.id;
+   END`,
+  `CREATE TRIGGER IF NOT EXISTS item_done_at_update_v2 AFTER UPDATE OF list_id, completed ON item
+   BEGIN
+     UPDATE item SET done_at = CASE
+         WHEN item.completed = 1 OR (SELECT role FROM list WHERE id = item.list_id) = 'done'
+         THEN COALESCE(item.done_at, CAST(strftime('%s', 'now') AS INTEGER) * 1000)
+         ELSE NULL END
+      WHERE id = NEW.id;
+   END`,
+  // The list is the status (Jose, 2026-10-09). A card cannot read "Open"
+  // while sitting in Done, or "Done" while sitting in In Progress: in a space
+  // with a done list, being in one is what done means. A space without one
+  // keeps the completed flag as its only way to say so.
+  `CREATE TRIGGER IF NOT EXISTS item_completed_follows_list_insert AFTER INSERT ON item
+   WHEN EXISTS (SELECT 1 FROM list WHERE space_id = NEW.space_id AND role = 'done')
+   BEGIN
+     UPDATE item SET completed = CASE
+         WHEN (SELECT role FROM list WHERE id = NEW.list_id) = 'done' THEN 1 ELSE 0 END
+      WHERE id = NEW.id;
+   END`,
+  `CREATE TRIGGER IF NOT EXISTS item_completed_follows_list AFTER UPDATE OF list_id ON item
+   WHEN NEW.list_id IS NOT OLD.list_id
+     AND EXISTS (SELECT 1 FROM list WHERE space_id = NEW.space_id AND role = 'done')
+   BEGIN
+     UPDATE item SET completed = CASE
+         WHEN (SELECT role FROM list WHERE id = NEW.list_id) = 'done' THEN 1 ELSE 0 END
       WHERE id = NEW.id;
    END`,
   `CREATE TRIGGER IF NOT EXISTS list_done_at_role AFTER UPDATE OF role ON list

@@ -75,6 +75,28 @@ export async function bootstrapWorkspace(
           WHERE v.document_id = document.id ORDER BY v.rev LIMIT 1
        ) WHERE owner_id IS NULL`,
     )
+    // The list is the status. Cards that disagreed with their list before
+    // that rule are reconciled once: a card sitting in a done list is done,
+    // and a card marked done elsewhere moves to its space's first done list.
+    // Spaces without a done list keep the flag. No-ops once consistent.
+    await db.run(
+      `UPDATE item SET completed = 1
+        WHERE completed = 0 AND list_id IN (SELECT id FROM list WHERE role = 'done')`,
+    )
+    await db.run(
+      `UPDATE item SET
+         list_id = (SELECT l.id FROM list l
+                     WHERE l.space_id = item.space_id AND l.role = 'done' AND l.archived = 0
+                     ORDER BY l.pos LIMIT 1),
+         pos = COALESCE((SELECT MAX(o.pos) FROM item o WHERE o.list_id = (
+                 SELECT l.id FROM list l
+                  WHERE l.space_id = item.space_id AND l.role = 'done' AND l.archived = 0
+                  ORDER BY l.pos LIMIT 1)), 0) + 1024
+        WHERE completed = 1
+          AND list_id NOT IN (SELECT id FROM list WHERE role = 'done')
+          AND EXISTS (SELECT 1 FROM list l
+                       WHERE l.space_id = item.space_id AND l.role = 'done' AND l.archived = 0)`,
+    )
     // Done cards that predate done_at count as done since their last update,
     // the closest the data can say. A no-op once they all have one.
     await db.run(

@@ -75,6 +75,50 @@ export async function itemWrite(
   return results
 }
 
+/** The space's first done list, or null when it has none. */
+async function doneListOf(ctx: ICtx, spaceId: string): Promise<string | null> {
+  const rows = await ctx.db.query<{ id: string }>(
+    "SELECT id FROM list WHERE space_id = ? AND role = 'done' AND archived = 0 ORDER BY pos LIMIT 1",
+    [spaceId],
+  )
+  return rows[0]?.id ?? null
+}
+
+/**
+ * Where a reopened card goes: back to the list it was in before it reached
+ * done, when that is known and still open, else the space's first active
+ * list, else its first list that is not done. Null when it is not in a done
+ * list, since then it is already somewhere open.
+ */
+async function reopenListOf(ctx: ICtx, item: IItemRow): Promise<string | null> {
+  const here = await ctx.db.query<{ role: string }>(
+    'SELECT role FROM list WHERE id = ?',
+    [item.list_id],
+  )
+  if (here[0]?.role !== 'done') return null
+  const moves = await ctx.db.query<{ payload: string | null }>(
+    `SELECT payload FROM event WHERE entity = 'item' AND entity_id = ?
+       AND verb IN ('item.moved', 'item.completed') ORDER BY id DESC LIMIT 5`,
+    [item.id],
+  )
+  for (const move of moves) {
+    const from = (JSON.parse(move.payload ?? '{}') as { from_list?: string })
+      .from_list
+    if (!from) continue
+    const open = await ctx.db.query<{ id: string }>(
+      "SELECT id FROM list WHERE id = ? AND space_id = ? AND archived = 0 AND role != 'done'",
+      [from, item.space_id],
+    )
+    if (open[0]) return open[0].id
+  }
+  const fallback = await ctx.db.query<{ id: string }>(
+    `SELECT id FROM list WHERE space_id = ? AND archived = 0 AND role != 'done'
+      ORDER BY CASE role WHEN 'active' THEN 0 ELSE 1 END, pos LIMIT 1`,
+    [item.space_id],
+  )
+  return fallback[0]?.id ?? null
+}
+
 async function bumpRev(
   ctx: ICtx,
   item: IItemRow,
@@ -340,6 +384,8 @@ async function applyItemOp(
         `moved ${key} to ${list.name}`,
         {
           list: list.name,
+          // Where it came from, so reopening a done card can put it back.
+          from_list: item.list_id !== list.id ? item.list_id : undefined,
           from_key: item.key !== key ? item.key : undefined,
           space: spaceId !== item.space_id ? key.split('-')[0] : undefined,
         },
@@ -857,6 +903,21 @@ async function applyItemOp(
       const field =
         op.op === 'archive' || op.op === 'restore' ? 'archived' : 'completed'
       const value = op.op === 'archive' || op.op === 'complete' ? 1 : 0
+      // The list is the status (Jose, 2026-10-09): completing a card puts it
+      // in its space's done list, and reopening one takes it back out to the
+      // list it came from. Triggers keep the flag in step with the list; a
+      // space with no done list keeps the flag alone.
+      if (op.op === 'complete' || op.op === 'reopen') {
+        const target =
+          op.op === 'complete'
+            ? await doneListOf(ctx, item.space_id)
+            : await reopenListOf(ctx, item)
+        if (target && target !== item.list_id)
+          await ctx.db.run(
+            'UPDATE item SET list_id = ?, pos = ? WHERE id = ?',
+            [target, await tailPos(ctx, 'item', 'list_id', target), item.id],
+          )
+      }
       await ctx.db.run(`UPDATE item SET ${field} = ? WHERE id = ?`, [
         value,
         item.id,
@@ -876,7 +937,15 @@ async function applyItemOp(
         complete: 'completed',
         reopen: 'reopened',
       }[op.op]
-      await emitEvent(ctx, verb, 'item', item.id, `${past} ${item.key}`)
+      await emitEvent(
+        ctx,
+        verb,
+        'item',
+        item.id,
+        `${past} ${item.key}`,
+        // Where a completed card was, so reopening it puts it back there.
+        op.op === 'complete' ? { from_list: item.list_id } : undefined,
+      )
       return { key: item.key, rev }
     }
     case 'delete': {

@@ -162,3 +162,45 @@ describe('priority', () => {
     expect(r.ok).toBe(false)
   })
 })
+
+describe('the list is the status', () => {
+  const where = async (key: string) =>
+    (
+      await db.query<{ list: string; completed: number }>(
+        'SELECT l.name AS list, i.completed FROM item i JOIN list l ON l.id = i.list_id WHERE i.key = ?',
+        [key],
+      )
+    )[0]
+
+  it('completing a card puts it in Done, reopening puts it back where it was', async () => {
+    await itemWrite(ctx, [
+      { op: 'move', op_id: 'r1', key: 'ST-3', list: 'In Progress' },
+      { op: 'complete', op_id: 'r2', key: 'ST-3' },
+    ] as never)
+    expect(await where('ST-3')).toEqual({ list: 'Done', completed: 1 })
+    await itemWrite(ctx, [{ op: 'reopen', op_id: 'r3', key: 'ST-3' }] as never)
+    expect(await where('ST-3')).toEqual({ list: 'In Progress', completed: 0 })
+  })
+
+  it('moving a card in or out of Done is what makes it done or not', async () => {
+    await itemWrite(ctx, [
+      { op: 'move', op_id: 'm1', key: 'ST-3', list: 'Done' },
+    ] as never)
+    expect((await where('ST-3')).completed).toBe(1)
+    await itemWrite(ctx, [
+      { op: 'move', op_id: 'm2', key: 'ST-3', list: 'Backlog' },
+    ] as never)
+    expect((await where('ST-3')).completed).toBe(0)
+  })
+
+  it('reconciles cards that disagreed with their list, once', async () => {
+    await db.run("UPDATE item SET completed = 1 WHERE key = 'ST-3'")
+    await db.run("UPDATE item SET completed = 0 WHERE key = 'ST-2'")
+    await bootstrapWorkspace(db, {
+      adminEmail: 'jose@nubisco.io',
+      adminHandle: 'jose',
+    })
+    expect(await where('ST-3')).toEqual({ list: 'Done', completed: 1 })
+    expect((await where('ST-2')).completed).toBe(1)
+  })
+})

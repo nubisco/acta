@@ -64,7 +64,7 @@ describe('ItemModal', () => {
 
     // Every field the card carries, together, above the description.
     const text = props.text()
-    for (const label of ['Status', 'List', 'Due', 'Assignees', 'Labels']) {
+    for (const label of ['Status', 'Due', 'Priority', 'Assignees', 'Labels']) {
       expect(text).toContain(label)
     }
 

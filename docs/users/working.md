@@ -116,9 +116,16 @@ menu (the three dots) can:
 Open a card in the side inspector, or press the expand control for the full
 modal. Both show the same thing.
 
-Status, list, due date, assignees and labels are always visible. Description,
+Status, due date, priority, assignees and labels are always visible. Description,
 comments, checklists, goals, attachments, plan and history are in sections you
 can collapse, so a long description cannot bury the comments underneath it.
+
+**The status is the list the card is in.** There is no separate Open or Done
+switch to disagree with it: a card in a done list (such as Done) is done, and
+moving it out reopens it. Completing a card (from an agent, a rule or an
+integration) moves it into its space's first done list, and reopening it puts
+it back in the list it came from. A space without a done list keeps a simple
+done mark instead. Archiving is separate, from the archive button.
 
 The **Goals** section lists the [goals](/users/goals) the card serves,
 including ones it inherits from a card it is part of, and links it to another.

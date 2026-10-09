@@ -117,16 +117,9 @@
              competed with the conversation for the eye and left the widest
              part of the modal holding a comment box. -->
         <div class="item-modal__props">
+          <!-- The list is the status (Jose, 2026-10-09): one field, not a
+               Status and a List that could disagree. Done means a done list. -->
           <NbField v-slot="{ id }" label="Status" orientation="stack">
-            <NbSelect
-              :id="id"
-              v-model="it.draft.status"
-              size="sm"
-              :options="[...ITEM_STATUS_OPTIONS]"
-              @change="it.commitStatus"
-            />
-          </NbField>
-          <NbField v-slot="{ id }" label="List" orientation="stack">
             <NbSelect
               :id="id"
               v-model="it.draft.list"
@@ -459,7 +452,7 @@ import SectionCount from '@/components/SectionCount.vue'
 import { SECTION_INFO } from '@/lib/sections'
 import { wpath } from '@/lib/paths'
 import { useConfirm } from '@nubisco/ui'
-import { ITEM_STATUS_OPTIONS, useItem } from '@/composables/useItem'
+import { useItem } from '@/composables/useItem'
 import { useInspector } from '@/stores/workspace'
 import ActorChip from '@/components/ActorChip.vue'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'

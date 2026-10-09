@@ -22,12 +22,6 @@ export interface ILifecycleBadge {
 /** The lifecycle a card moves through; `done`/`archived` map to server ops. */
 export type TItemStatus = 'open' | 'done' | 'archived'
 
-export const ITEM_STATUS_OPTIONS = [
-  { label: 'Open', value: 'open' },
-  { label: 'Done', value: 'done' },
-  { label: 'Archived', value: 'archived' },
-] as const
-
 function statusOf(detail: IItemDetail): TItemStatus {
   if (detail.archived) return 'archived'
   if (detail.done) return 'done'
@@ -461,23 +455,6 @@ export function useItem(itemKey: Ref<string>) {
    * Status is the user-facing card state; the server models it as two
    * booleans, so a status change is a short op sequence, not a field write.
    */
-  async function commitStatus(): Promise<void> {
-    if (!item.value) return
-    const current = statusOf(item.value)
-    const target = draft.status
-    if (target === current) return
-    const ops: ('complete' | 'reopen' | 'archive' | 'restore')[] = []
-    if (current === 'archived') ops.push('restore')
-    if (current === 'done' && target !== 'done') ops.push('reopen')
-    if (target === 'done' && !item.value.done) ops.push('complete')
-    if (target === 'archived') ops.push('archive')
-    for (const op of ops) {
-      const ok = await write({ op, op_id: newOpId(), key: item.value.key })
-      if (!ok) return
-    }
-    if (target === 'archived')
-      toast.success('Archived. Find it under the archived filter.')
-  }
 
   return {
     item: computed(() => item.value),
@@ -503,7 +480,6 @@ export function useItem(itemKey: Ref<string>) {
     commitPriority,
     commitAssignees: () => commitSet('assign'),
     commitLabels,
-    commitStatus,
     toggleCheck,
     addChecklist,
     addChecklistEntry,
