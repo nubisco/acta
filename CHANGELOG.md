@@ -1,3 +1,10 @@
+## [1.47.1](https://github.com/nubisco/acta/compare/v1.47.0...v1.47.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **deps:** @nubisco/ui 5.18.1, so Clear selection reads on the batch bar ([630d24a](https://github.com/nubisco/acta/commit/630d24af563fe9e91d28a79f59aeaaea4b2466fc))
+
 # [1.47.0](https://github.com/nubisco/acta/compare/v1.46.0...v1.47.0) (2026-10-09)
 
 
