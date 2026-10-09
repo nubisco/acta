@@ -495,3 +495,58 @@ export interface INextUp {
   items: INextItem[]
   waiting: (INextItem & { waiting_on: string })[]
 }
+
+export interface IHomeBehind {
+  late: {
+    key: string
+    title: string
+    space: string
+    days_late: number
+    holders: string[]
+  }[]
+  stuck: {
+    key: string
+    title: string
+    space: string
+    idle_days: number
+    holders: string[]
+  }[]
+  goals: {
+    key: string
+    number: number
+    title: string
+    status: string
+    days_late: number
+  }[]
+}
+
+export interface IHomeAttention {
+  entries: {
+    key: string
+    title: string
+    verb: string
+    summary: string
+    actor: string
+    actor_name: string
+    at: number
+    /** Further changes to the same card this week. */
+    more: number
+  }[]
+}
+
+export interface IHomeDocs {
+  docs: {
+    slug: string
+    title: string
+    updated: number
+    by?: string
+    why: 'owner' | 'named' | 'commented'
+    open_comments?: number
+  }[]
+}
+
+/** How a person arranged Home: panels in order, each shown or not, wide or not. */
+export interface IHomeLayout {
+  version: 1
+  panels: { id: string; hidden?: boolean; wide?: boolean }[]
+}

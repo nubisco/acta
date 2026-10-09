@@ -1,12 +1,5 @@
 <template>
   <section class="next-up" aria-labelledby="next-up-title">
-    <!-- Good morning first, then the one line that says what is waiting:
-         the question people open Home with (Jose, 2026-10-09). -->
-    <header class="next-up__greeting">
-      <h1 class="type-heading-03">{{ greeting }}</h1>
-      <p class="next-up__summary">{{ summary }}</p>
-    </header>
-
     <NbPanel class="next-up__panel">
       <header class="next-up__head">
         <h2 id="next-up-title" class="type-heading-02">Next up</h2>
@@ -115,58 +108,21 @@
 
 <script setup lang="ts">
 /**
- * Home's opening: a greeting, a line on what is waiting, and the ranked list
- * of what to pick up next, each card with its reasons. Replaces "Your work",
+ * The ranked list of what to pick up next, each card with its reasons. Replaces "Your work",
  * whose four lists (assigned, due, mentions, recent) each had their own order
  * so nothing said which card mattered most. The ranking is the server's
  * (services/nextUp.ts); this only shows it, reasons first.
  */
-import { computed, onMounted, onScopeDispose, ref } from 'vue'
-import { api } from '@/api/client'
-import { humanise } from '@/lib/state'
-import { useInspector, useWorkspace } from '@/stores/workspace'
-import { useToast } from '@nubisco/ui'
+import { computed } from 'vue'
+import { useInspector } from '@/stores/workspace'
+import { useNextUp } from '@/composables/useNextUp'
 import SectionCount from '@/components/SectionCount.vue'
-import type { INextItem, INextUp } from '@/types/api'
+import type { INextItem } from '@/types/api'
 
 const inspector = useInspector()
-const ws = useWorkspace()
-const toast = useToast()
-
-const loading = ref(true)
-const data = ref<INextUp | null>(null)
+const { data, loading } = useNextUp()
 const items = computed(() => data.value?.items ?? [])
 const waiting = computed(() => data.value?.waiting ?? [])
-
-const greeting = computed(() => {
-  const hour = new Date().getHours()
-  const part =
-    hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-  const name = ws.me.value?.name?.split(/\s+/)[0]
-  return name ? `${part}, ${name}` : part
-})
-
-const plural = (n: number, one: string, many: string) =>
-  `${n} ${n === 1 ? one : many}`
-
-/** One line, worst news first, or the good news when there is none. */
-const summary = computed(() => {
-  const c = data.value?.counts
-  if (!c) return ''
-  const parts: string[] = []
-  if (c.overdue) parts.push(plural(c.overdue, 'card overdue', 'cards overdue'))
-  if (c.due_today) parts.push(`${c.due_today} due today`)
-  if (c.mentions)
-    parts.push(plural(c.mentions, 'mention waiting', 'mentions waiting'))
-  if (c.blocking)
-    parts.push(
-      plural(c.blocking, 'card holding others up', 'cards holding others up'),
-    )
-  const later = c.due_week - c.due_today
-  if (later > 0) parts.push(`${later} more due this week`)
-  if (parts.length === 0) return 'Nothing is overdue or waiting on you.'
-  return `${parts.join(', ')}.`.replace(/^./, (ch) => ch.toUpperCase())
-})
 
 /** Colour by consequence: red and orange only for what is late or in trouble. */
 function tone(code: string): 'red' | 'orange' | 'blue' | 'purple' | 'grey' {
@@ -182,50 +138,12 @@ function why(item: INextItem): string {
     .map((r) => `${r.label} (${r.points > 0 ? '+' : ''}${r.points})`)
     .join(', ')
 }
-
-async function load(): Promise<void> {
-  try {
-    data.value = await api.myNext()
-  } catch (err) {
-    toast.error(humanise(err), { title: 'Could not load what is next' })
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(load)
-
-// Anything about a card might move it up or down. Coalesced, so a burst of
-// writes is one re-read.
-let timer: ReturnType<typeof setTimeout> | undefined
-onScopeDispose(
-  ws.onLive((event) => {
-    if (event.entity !== 'item' && event.entity !== 'goal') return
-    clearTimeout(timer)
-    timer = setTimeout(() => void load(), 500)
-  }),
-)
-onScopeDispose(() => clearTimeout(timer))
 </script>
 
 <style scoped lang="scss">
 .next-up {
   display: grid;
   gap: var(--nb-spacing-16);
-
-  &__greeting {
-    display: grid;
-    gap: var(--nb-spacing-4);
-
-    h1 {
-      margin: 0;
-    }
-  }
-
-  &__summary {
-    margin: 0;
-    color: var(--nb-c-text-muted);
-  }
 
   &__panel {
     display: flex;

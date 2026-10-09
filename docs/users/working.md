@@ -25,8 +25,34 @@ there, two reasons at a glance and all of them behind the (i):
 
 A card that waits on another card is not ranked: it sits under **Waiting on
 other cards**, saying what it waits on. The list follows changes as they
-happen. Below it, Home shows how your [goals](/users/goals#home) stand, and
-then your spaces.
+happen.
+
+Below it, Home has more panels, each with an (i) that says what it shows:
+
+- **Goals**: how your [goals](/users/goals#home) stand, and the ones that
+  need a look.
+- **Falling behind**: in the spaces you work in, whoever holds them, cards
+  past their due date, cards in progress that nobody has moved for a week, and
+  goals still in flight past their target date.
+- **Needs your attention**: what colleagues did this week on cards you hold,
+  created or have commented on, one line per card. Your own changes and
+  mentions (which Next up ranks) are left out.
+- **Document updates**: pages somebody else changed in the last two weeks that
+  you own, have commented on or are named in, with the number of open comment
+  threads on pages you own.
+- **Where you left off** (off by default): the cards you changed last.
+- **Spaces**: every space, favourites first.
+
+### Make Home your own
+
+**Customize** at the top of Home opens a list of the panels beside it. Drag
+them into the order you want (or pick one up with Space and move it with the
+arrow keys), switch off the ones you do not need, and make a panel wide to
+give it the whole row. Home changes as you go, and the layout is saved on your
+account, so it is the same in every browser. Next up can move but not be
+switched off. **Reset to the default layout** puts everything back. A panel
+added to Acta later appears in its default place, even on a Home you have
+customised.
 
 ## Priority
 

@@ -102,6 +102,10 @@ import type {
   IGoalDetail,
   IGoalSummary,
   INextUp,
+  IHomeAttention,
+  IHomeBehind,
+  IHomeDocs,
+  IHomeLayout,
 } from '@/types/api'
 
 // -- Auth -------------------------------------------------------------------
@@ -259,6 +263,22 @@ export const api = {
    * What is mine, across every space. Everything else is space-scoped, which
    * cannot answer the question Home opens with.
    */
+  /** Home: what is slipping in the spaces you work in. */
+  myBehind: () => req<IHomeBehind>('/me/behind'),
+  /** Home: what colleagues did on your cards this week. */
+  myAttention: () => req<IHomeAttention>('/me/attention'),
+  /** Home: pages that changed under you. */
+  myDocs: () => req<IHomeDocs>('/me/docs'),
+  /** Home: the panels you arranged it into, or null for the default. */
+  homeLayout: () => req<{ layout: IHomeLayout | null }>('/me/home'),
+  homeLayoutSave: (layout: IHomeLayout) =>
+    req<{ layout: IHomeLayout }>('/me/home', {
+      method: 'PUT',
+      body: JSON.stringify(layout),
+    }),
+  homeLayoutReset: () =>
+    req<{ layout: null }>('/me/home', { method: 'DELETE' }),
+
   /** One ranked list of what to pick up next, each card with its reasons. */
   myNext: (limit = 7) => req<INextUp>(`/me/next?limit=${limit}`),
 

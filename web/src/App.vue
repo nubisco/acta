@@ -242,6 +242,7 @@
         v-if="inspector.itemKey.value"
         :item-key="inspector.itemKey.value"
       />
+      <HomeCustomizer v-else-if="homeLayout.editing.value" />
     </template>
   </NbShell>
 
@@ -317,6 +318,8 @@ import {
   useWorkspace,
 } from '@/stores/workspace'
 import ItemInspector from '@/components/ItemInspector.vue'
+import HomeCustomizer from '@/components/home/HomeCustomizer.vue'
+import { useHomeLayout } from '@/composables/useHomeLayout'
 import ItemModal from '@/components/ItemModal.vue'
 import DocPreviewModal from '@/components/DocPreviewModal.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
@@ -332,6 +335,7 @@ const route = useRoute()
 const router = useRouter()
 const ws = useWorkspace()
 const inspector = useInspector()
+const homeLayout = useHomeLayout()
 const ui = useUiState()
 const palette = useCommandPalette()
 const docChrome = useDocChrome()
@@ -626,9 +630,12 @@ const inspectorVisible = ref(false)
 // told which one it was holding; they live in the space's own toolbar now.
 // The panel shows the card at its side size. At full size the same card is
 // on view, in the dialog, so the panel steps aside without closing it.
-watch([inspector.itemKey, inspector.full], ([key, full]) => {
-  inspectorVisible.value = key !== null && !full
-})
+watch(
+  [inspector.itemKey, inspector.full, homeLayout.editing],
+  ([key, full, editing]) => {
+    inspectorVisible.value = (key !== null && !full) || editing
+  },
+)
 watch(
   () => route.name,
   () => {
@@ -637,7 +644,11 @@ watch(
   { immediate: true },
 )
 watch(inspectorVisible, (visible) => {
-  if (!visible && !inspector.full.value) inspector.dismiss()
+  if (visible) return
+  // Closing the panel closes whatever it held: a card, or the customizer.
+  if (homeLayout.editing.value && !inspector.itemKey.value)
+    homeLayout.editing.value = false
+  if (!inspector.full.value) inspector.dismiss()
 })
 
 async function signOut(): Promise<void> {

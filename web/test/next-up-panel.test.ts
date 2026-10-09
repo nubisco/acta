@@ -19,6 +19,16 @@ vi.mock('@/stores/workspace', async (importOriginal) => {
 })
 
 import NextUpPanel from '@/components/NextUpPanel.vue'
+import { defineComponent, h } from 'vue'
+import { useNextUp } from '@/composables/useNextUp'
+
+/** Home's greeting line, which reads the same data as the panel. */
+const Summary = defineComponent({
+  setup() {
+    const { summary } = useNextUp()
+    return () => h('p', summary.value)
+  },
+})
 
 const DATA: INextUp = {
   counts: {
@@ -68,16 +78,17 @@ beforeEach(() => {
 })
 
 describe('Next up', () => {
-  it('greets by first name and sums up what is waiting', async () => {
+  it('sums up what is waiting, from the same data as the panel', async () => {
     myNext.mockResolvedValue(DATA)
-    const view = mount(NextUpPanel)
+    const panel = mount(NextUpPanel)
+    const line = mount(Summary)
     await flushPromises()
-    expect(view.find('h1').text()).toMatch(
-      /^Good (morning|afternoon|evening), José$/,
-    )
-    expect(view.text()).toContain(
+    expect(myNext).toHaveBeenCalledTimes(1)
+    expect(line.text()).toBe(
       '1 card overdue, 1 mention waiting, 2 more due this week.',
     )
+    line.unmount()
+    panel.unmount()
   })
 
   it('shows two reasons per card, the rest behind a count, and opens it', async () => {
@@ -90,6 +101,7 @@ describe('Next up', () => {
     expect(row.text()).toContain('+1')
     await row.trigger('click')
     expect(open).toHaveBeenCalledWith('ST-2')
+    view.unmount()
   })
 
   it('keeps waiting cards apart, saying what they wait on', async () => {
@@ -97,6 +109,7 @@ describe('Next up', () => {
     const view = mount(NextUpPanel)
     await flushPromises()
     expect(view.find('.next-up__waiting').text()).toContain('Waiting on ST-1')
+    view.unmount()
   })
 
   it('says so when nothing is waiting', async () => {
@@ -107,8 +120,11 @@ describe('Next up', () => {
       counts: { ...DATA.counts, overdue: 0, mentions: 0, due_week: 0 },
     })
     const view = mount(NextUpPanel)
+    const line = mount(Summary)
     await flushPromises()
     expect(view.text()).toContain('Nothing is waiting on you')
-    expect(view.text()).toContain('Nothing is overdue or waiting on you.')
+    expect(line.text()).toBe('Nothing is overdue or waiting on you.')
+    line.unmount()
+    view.unmount()
   })
 })

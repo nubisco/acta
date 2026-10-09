@@ -96,3 +96,29 @@ describe('closing', () => {
     expect(inspector.baseAt.value).toBe(-1)
   })
 })
+
+describe('Escape', () => {
+  it('closes the panel, unless a field or a dialog has it', async () => {
+    const { mount, flushPromises } = await import('@vue/test-utils')
+    const { default: ItemInspector } =
+      await import('@/components/ItemInspector.vue')
+    inspector.open('ST-21')
+    const before = inspector.dismissRequest.value
+    const view = mount(ItemInspector, {
+      props: { itemKey: 'ST-21' },
+      attachTo: document.body,
+      global: { stubs: { teleport: true } },
+    })
+    await flushPromises()
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    )
+    expect(inspector.dismissRequest.value).toBe(before)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(inspector.dismissRequest.value).toBe(before + 1)
+    input.remove()
+    view.unmount()
+  })
+})

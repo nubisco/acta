@@ -507,7 +507,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 import { useConfirm, useToast } from '@nubisco/ui'
 import { useItem } from '@/composables/useItem'
 import { useRouter } from 'vue-router'
@@ -622,6 +622,26 @@ function partsCount(item: { parts?: IPartRef[] }): ICount {
     tip: `${done} of ${plural(parts.length, 'part')} done`,
   }
 }
+
+/**
+ * Escape closes the panel, as it closes every other overlay (UX audit,
+ * 2026-10-09). Not while typing, where Escape belongs to the field, and not
+ * while a dialog or a menu is open, which take it first.
+ */
+function onKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Escape' || event.defaultPrevented) return
+  const target = event.target instanceof Element ? event.target : null
+  if (
+    target?.closest('input, textarea, select, [contenteditable="true"]') ||
+    document.querySelector(
+      '[role="dialog"], [role="alertdialog"], [role="menu"]',
+    )
+  )
+    return
+  inspector.dismiss()
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 /** Hand this card to the full-size view. The panel closes, because the two
  *  showing the same card at once is a choice nobody asked to make. */

@@ -899,6 +899,9 @@ export const ADDITIVE_COLUMNS = [
   // a deleted page can no longer say it was private, and its history must not
   // become public the moment it goes.
   'ALTER TABLE event ADD COLUMN private_to TEXT',
+  // The panels this person arranged Home into, as JSON (services/home.ts).
+  // Null: the default, which follows the defaults as they change.
+  'ALTER TABLE actor ADD COLUMN home_layout TEXT',
   // When a card became done: reached a done list or was completed. The board
   // hides done cards older than its space's window, measured from this and
   // never from the last edit, so a comment on an old card does not bring it

@@ -18,6 +18,14 @@ import { ApiError, type ICtx } from '../core/ctx'
 import { createToken } from '../core/auth'
 import { emitEvent, flushPendingEvents, onEvent } from '../core/events'
 import { nextUp } from '../services/nextUp'
+import {
+  docUpdates,
+  fallingBehind,
+  homeLayoutGet,
+  homeLayoutReset,
+  homeLayoutSet,
+  needsAttention,
+} from '../services/home'
 import { liveFrame, sameOriginSocket, type ILiveTransport } from '../core/live'
 import { spaceWrite } from '../services/spaces'
 import { docWrite } from '../services/docs'
@@ -155,6 +163,24 @@ export function apiRoutes(
    * which cannot answer the question Home is for.
    */
   app.get('/me/work', async (c) => c.json(await myWork(ctxOf(c))))
+  app.get('/me/behind', async (c) => c.json(await fallingBehind(ctxOf(c))))
+  app.get('/me/attention', async (c) => c.json(await needsAttention(ctxOf(c))))
+  app.get('/me/docs', async (c) => c.json(await docUpdates(ctxOf(c))))
+  app.get('/me/home', async (c) =>
+    c.json({ layout: await homeLayoutGet(ctxOf(c)) }),
+  )
+  app.put('/me/home', async (c) =>
+    c.json({
+      layout: await homeLayoutSet(
+        ctxOf(c),
+        await c.req.json().catch(() => null),
+      ),
+    }),
+  )
+  app.delete('/me/home', async (c) => {
+    await homeLayoutReset(ctxOf(c))
+    return c.json({ layout: null })
+  })
   app.get('/me/next', async (c) => {
     const limit = Number(c.req.query('limit') ?? 7)
     return c.json(
