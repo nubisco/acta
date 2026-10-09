@@ -1,3 +1,10 @@
+# [1.45.0](https://github.com/nubisco/acta/compare/v1.44.3...v1.45.0) (2026-10-09)
+
+
+### Features
+
+* **home:** more panels, and a Home each person arranges themselves ([7c5d76b](https://github.com/nubisco/acta/commit/7c5d76bee4f8c6f96b01137252e67e11a695cbff))
+
 ## [1.44.3](https://github.com/nubisco/acta/compare/v1.44.2...v1.44.3) (2026-10-09)
 
 
