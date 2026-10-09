@@ -238,6 +238,59 @@ describe('SpaceView card menu', () => {
     view.unmount()
   })
 
+  // Jose, 2026-10-09: select several cards and act on them at once.
+  it('moves a dragged selection with one batched write, in place', async () => {
+    const view = await render()
+    spaceGet.mockClear()
+    itemWrite.mockResolvedValueOnce({
+      results: [
+        { op_id: 'a', ok: true },
+        { op_id: 'b', ok: true },
+      ],
+    })
+    view.findComponent({ name: 'Board' }).vm.$emit('move-many', {
+      itemIds: ['SU-1', 'SU-2'],
+      toColumnId: 'Doing',
+      beforeItemId: null,
+      afterItemId: null,
+    })
+    await flushPromises()
+    expect(itemWrite).toHaveBeenCalledTimes(1)
+    const [ops] = itemWrite.mock.calls[0] as unknown as [
+      { op: string; key: string; list: string; pos: number }[],
+    ]
+    expect(ops.map((o) => [o.op, o.key, o.list])).toEqual([
+      ['move', 'SU-1', 'Doing'],
+      ['move', 'SU-2', 'Doing'],
+    ])
+    expect(ops[0].pos).toBeLessThan(ops[1].pos)
+    expect(spaceGet).not.toHaveBeenCalled()
+  })
+
+  it('archives the selected cards from the batch bar', async () => {
+    const view = await render()
+    await view
+      .findComponent({ name: 'Board' })
+      .vm.$emit('update:selected', ['SU-1', 'SU-2'])
+    await flushPromises()
+    itemWrite.mockResolvedValueOnce({
+      results: [
+        { op_id: 'a', ok: true },
+        { op_id: 'b', ok: true },
+      ],
+    })
+    view.findComponent({ name: 'BoardBatchActions' }).vm.$emit('archive')
+    await flushPromises()
+    const [ops] = itemWrite.mock.calls.at(-1) as unknown as [
+      { op: string; key: string }[],
+    ]
+    expect(ops.map((o) => [o.op, o.key])).toEqual([
+      ['archive', 'SU-1'],
+      ['archive', 'SU-2'],
+    ])
+    expect(view.find('[data-card-key="SU-1"]').exists()).toBe(false)
+  })
+
   it('moving to the top actually writes a move', async () => {
     const view = await render()
     const entries = await openMenu(view, 'Last')

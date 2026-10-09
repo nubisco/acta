@@ -3,7 +3,9 @@ import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
 import { emitEvent } from '../core/events'
 import { withOp } from '../core/ops'
-import { spaceByKey, listByRef, tailPos } from '../core/store'
+import { spaceByKey, listByRef, tailPos, type IItemRow } from '../core/store'
+import { purgeItem } from './items'
+import type { AttachmentStore } from './attachments'
 
 const KANBAN6: { name: string; role: string }[] = [
   { name: 'Backlog', role: 'backlog' },
@@ -17,10 +19,13 @@ const KANBAN6: { name: string; role: string }[] = [
 export async function spaceWrite(
   ctx: ICtx,
   ops: TSpaceOp[],
+  store?: AttachmentStore,
 ): Promise<TOpResult[]> {
   const results: TOpResult[] = []
   for (const op of ops) {
-    results.push(await withOp(ctx, op.op_id, () => applySpaceOp(ctx, op)))
+    results.push(
+      await withOp(ctx, op.op_id, () => applySpaceOp(ctx, op, store)),
+    )
   }
   return results
 }
@@ -28,6 +33,7 @@ export async function spaceWrite(
 async function applySpaceOp(
   ctx: ICtx,
   op: TSpaceOp,
+  store?: AttachmentStore,
 ): Promise<{ key?: string; id?: string }> {
   const ts = now()
   switch (op.op) {
@@ -94,6 +100,73 @@ async function applySpaceOp(
         'space',
         space.id,
         `cleared the done cards off ${op.key}`,
+      )
+      return { key: op.key, id: space.id }
+    }
+    case 'restore': {
+      const space = await spaceByKey(ctx, op.key)
+      await ctx.db.run(
+        'UPDATE space SET archived = 0, updated_at = ? WHERE id = ?',
+        [ts, space.id],
+      )
+      await emitEvent(
+        ctx,
+        'space.restored',
+        'space',
+        space.id,
+        `restored space ${op.key}`,
+      )
+      return { key: op.key, id: space.id }
+    }
+    case 'delete': {
+      // Like a card: archive is the reversible step, delete is for good, so
+      // a space holding work has to be archived first. An empty space has
+      // nothing to lose and goes directly (Jose, 2026-10-09: an empty board
+      // had no way of being removed at all). Admins only, as in Trello,
+      // Jira, Linear and Asana.
+      if (ctx.actor.role !== 'admin')
+        throw new ApiError(403, 'only a workspace admin can delete a space')
+      const space = await spaceByKey(ctx, op.key)
+      const cards = await ctx.db.query<IItemRow>(
+        'SELECT * FROM item WHERE space_id = ?',
+        [space.id],
+      )
+      if (cards.length > 0 && space.archived !== 1)
+        throw new ApiError(
+          409,
+          `${op.key} holds ${cards.length} ${cards.length === 1 ? 'card' : 'cards'}; archive the space before deleting it`,
+        )
+      for (const card of cards) await purgeItem(ctx, card, store)
+      // Labels that belong to this space alone go with it.
+      await ctx.db.run(
+        'DELETE FROM item_label WHERE label_id IN (SELECT l.id FROM label l JOIN label_group g ON g.id = l.group_id WHERE g.space_id = ?)',
+        [space.id],
+      )
+      await ctx.db.run(
+        'DELETE FROM label WHERE group_id IN (SELECT id FROM label_group WHERE space_id = ?)',
+        [space.id],
+      )
+      await ctx.db.run('DELETE FROM label_group WHERE space_id = ?', [space.id])
+      // Pages filed under the space are somebody's writing: kept, unfiled.
+      await ctx.db.run(
+        'UPDATE document SET space_id = NULL WHERE space_id = ?',
+        [space.id],
+      )
+      await ctx.db.run('DELETE FROM ingest_token WHERE space_id = ?', [
+        space.id,
+      ])
+      await ctx.db.run('DELETE FROM connection WHERE space_id = ?', [space.id])
+      await ctx.db.run('DELETE FROM space_star WHERE space_id = ?', [space.id])
+      await ctx.db.run('DELETE FROM list WHERE space_id = ?', [space.id])
+      await ctx.db.run('DELETE FROM space WHERE id = ?', [space.id])
+      await emitEvent(
+        ctx,
+        'space.deleted',
+        'space',
+        space.id,
+        cards.length > 0
+          ? `deleted space ${op.key} and its ${cards.length} ${cards.length === 1 ? 'card' : 'cards'}`
+          : `deleted space ${op.key}`,
       )
       return { key: op.key, id: space.id }
     }

@@ -291,6 +291,14 @@ export const zSpaceOp = z.discriminatedUnion('op', [
     key: zSpaceKey,
   }),
   z.object({ op: z.literal('archive'), op_id: zOpId, key: zSpaceKey }),
+  /** Bring an archived space back. */
+  z.object({ op: z.literal('restore'), op_id: zOpId, key: zSpaceKey }),
+  /**
+   * Delete a space for good, with its lists, cards and space labels. Admins
+   * only. A space with cards must be archived first; an empty one can go
+   * directly. Documents filed under it are kept, at the top of the tree.
+   */
+  z.object({ op: z.literal('delete'), op_id: zOpId, key: zSpaceKey }),
   z.object({
     op: z.literal('list_create'),
     op_id: zOpId,

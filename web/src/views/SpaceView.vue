@@ -16,6 +16,12 @@
       <NbButton size="sm" variant="primary" icon="plus" @click="openNewItem()">
         Add item
       </NbButton>
+      <SpaceActionsMenu
+        v-if="spaceMeta"
+        :space-key="spaceMeta.key"
+        :space-name="spaceMeta.name"
+        :cards="spaceMeta.lists.reduce((sum, l) => sum + l.items, 0)"
+      />
     </component>
 
     <component :is="filterBar.Outlet">
@@ -185,14 +191,31 @@
          MORE of the board rather than to inflating what is already there. -->
     <NbBoard
       v-else
+      v-model:selected="selected"
       class="space__board"
       :columns="columns"
       :lanes="lanes"
       :items="spaceItems"
       nestable
+      selectable
       @move="onMove"
+      @move-many="onMoveMany"
       @nest="onNest"
     >
+      <!-- Several cards at once: Cmd or Ctrl-click, Shift-click, or X on a
+           focused card selects them; drag any of them to move them all. -->
+      <template #batch-actions>
+        <BoardBatchActions
+          :lists="(spaceMeta?.lists ?? []).map((l) => l.name)"
+          :people="batchPeople"
+          :labels="batchLabels"
+          @move="(list: string) => batchMove(list)"
+          @assign="batchAssign"
+          @label="batchLabel"
+          @priority="batchPriority"
+          @archive="batchArchive"
+        />
+      </template>
       <!-- A lane keyed by a person wears their face. The library's own
            label class is kept so the header's type does not change with
            what the lane happens to be grouped by. -->
@@ -350,6 +373,7 @@ import {
   useToast,
   type IBoardItem,
   type IBoardMoveEvent,
+  type IBoardMoveManyEvent,
   type IBoardNestEvent,
 } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
@@ -379,6 +403,9 @@ import TimelineView from '@/components/views/TimelineView.vue'
 import SequenceView from '@/components/views/SequenceView.vue'
 import SpaceFilterPanel from '@/components/SpaceFilterPanel.vue'
 import DoneColumnFoot from '@/components/DoneColumnFoot.vue'
+import BoardBatchActions from '@/components/BoardBatchActions.vue'
+import SpaceActionsMenu from '@/components/SpaceActionsMenu.vue'
+import type { TPriority } from '@/lib/priority'
 import ActorFilter from '@/components/ActorFilter.vue'
 import { goalOptionLabel } from '@/lib/goals'
 import { recallBoardFilters, rememberBoardFilters } from '@/lib/boardFilters'
@@ -1182,6 +1209,183 @@ onScopeDispose(
       row.priority = (patch.priority ?? undefined) as typeof row.priority
   }),
 )
+
+// --- several cards at once --------------------------------------------------
+
+/** Board item ids (a card in two lanes appears twice, suffixed). */
+const selected = ref<string[]>([])
+const selectedKeys = computed(() => [
+  ...new Set(selected.value.map((id) => id.split('@@')[0])),
+])
+watch([() => props.spaceKey, view], () => (selected.value = []))
+
+const batchPeople = computed(() =>
+  (ws.overview.value?.actors ?? [])
+    .filter((a) => a.kind === 'human')
+    .map((a) => ({ handle: a.handle, name: a.name })),
+)
+const batchLabels = computed(() =>
+  labelOptions.value.map((o) => ({ id: o.value, name: o.label })),
+)
+
+/**
+ * Apply a change to several cards: on screen first, then one write for all
+ * of them. A refusal puts the board back to what the server holds, which
+ * is the one case worth a reload.
+ */
+async function runBatch(
+  ops: Parameters<typeof api.itemWrite>[0],
+  apply: () => void,
+  done: string,
+): Promise<void> {
+  apply()
+  const count = selectedKeys.value.length
+  selected.value = []
+  try {
+    const { results } = await api.itemWrite(ops)
+    const failed = results.filter((r) => !r.ok)
+    if (failed.length > 0) {
+      toast.error(String((failed[0] as { error?: string }).error ?? 'failed'), {
+        title: `${failed.length} of ${count} cards could not be changed`,
+      })
+      await loadItems()
+      return
+    }
+    toast.success(done)
+  } catch (err) {
+    toast.error(humanise(err), { title: 'Nothing was changed' })
+    await loadItems()
+  }
+}
+
+const rowsOf = (keys: string[]) =>
+  keys
+    .map((k) => items.value.find((r) => r.key === k))
+    .filter((r): r is ISpaceItemRow => !!r)
+
+/** Dragged together: placed between the cards they were dropped between. */
+async function onMoveMany(event: IBoardMoveManyEvent): Promise<void> {
+  const keys = [...new Set(event.itemIds.map((id) => id.split('@@')[0]))]
+  const rows = rowsOf(keys)
+  const near = (id: string | null) =>
+    id ? items.value.find((r) => r.key === id.split('@@')[0]) : undefined
+  const sorted = sortBy.value !== 'manual'
+  const before = sorted ? undefined : near(event.beforeItemId)
+  const after = sorted ? undefined : near(event.afterItemId)
+  const low =
+    before?.pos ??
+    (after
+      ? after.pos - 1024 * (rows.length + 1)
+      : tailPos(event.toColumnId, ''))
+  const high = after?.pos ?? low + 1024 * (rows.length + 1)
+  const step = (high - low) / (rows.length + 1)
+  const positions = rows.map((_, i) => low + step * (i + 1))
+  const done = doneLists.value.has(event.toColumnId)
+  await runBatch(
+    rows.map((row, i) => ({
+      op: 'move' as const,
+      op_id: newOpId(),
+      key: row.key,
+      list: event.toColumnId,
+      pos: positions[i],
+    })),
+    () =>
+      rows.forEach((row, i) => {
+        row.list = event.toColumnId
+        row.pos = positions[i]
+        row.done = done || undefined
+        patchCard({ key: row.key, list: row.list, done })
+      }),
+    `${rows.length} cards moved to ${event.toColumnId}.`,
+  )
+}
+
+function batchMove(list: string): Promise<void> {
+  const rows = rowsOf(selectedKeys.value)
+  let pos = tailPos(list, '')
+  const positions = rows.map(() => (pos += 1024))
+  const done = doneLists.value.has(list)
+  return runBatch(
+    rows.map((row, i) => ({
+      op: 'move' as const,
+      op_id: newOpId(),
+      key: row.key,
+      list,
+      pos: positions[i],
+    })),
+    () =>
+      rows.forEach((row, i) => {
+        row.list = list
+        row.pos = positions[i]
+        row.done = done || undefined
+        patchCard({ key: row.key, list, done })
+      }),
+    `${rows.length} cards moved to ${list}.`,
+  )
+}
+
+function batchAssign(handle: string): Promise<void> {
+  const rows = rowsOf(selectedKeys.value)
+  return runBatch(
+    rows.map((row) => ({
+      op: 'assign' as const,
+      op_id: newOpId(),
+      key: row.key,
+      add: [handle],
+    })),
+    () =>
+      rows.forEach((row) => {
+        row.assignees = [...new Set([...(row.assignees ?? []), handle])]
+      }),
+    `${rows.length} cards assigned.`,
+  )
+}
+
+function batchLabel(labelId: string): Promise<void> {
+  const rows = rowsOf(selectedKeys.value)
+  const name =
+    labelOptions.value.find((o) => o.value === labelId)?.label ?? labelId
+  return runBatch(
+    rows.map((row) => ({
+      op: 'label' as const,
+      op_id: newOpId(),
+      key: row.key,
+      add: [labelId],
+    })),
+    () =>
+      rows.forEach((row) => {
+        if (row.label_ids?.includes(labelId)) return
+        row.label_ids = [...(row.label_ids ?? []), labelId]
+        row.labels = [...(row.labels ?? []), name]
+      }),
+    `${rows.length} cards labelled ${name}.`,
+  )
+}
+
+function batchPriority(priority: TPriority | null): Promise<void> {
+  const rows = rowsOf(selectedKeys.value)
+  return runBatch(
+    rows.map((row) => ({
+      op: 'prioritize' as const,
+      op_id: newOpId(),
+      key: row.key,
+      priority,
+    })),
+    () => rows.forEach((row) => (row.priority = priority ?? undefined)),
+    priority
+      ? `${rows.length} cards set to ${priority}.`
+      : `Priority cleared on ${rows.length} cards.`,
+  )
+}
+
+function batchArchive(): Promise<void> {
+  const keys = selectedKeys.value
+  return runBatch(
+    keys.map((key) => ({ op: 'archive' as const, op_id: newOpId(), key })),
+    () => (items.value = items.value.filter((r) => !keys.includes(r.key))),
+    `${keys.length} cards archived. Find them under Archived.`,
+  )
+}
 
 /** Just past the last card in a list, by hand. */
 function tailPos(list: string, except: string): number {

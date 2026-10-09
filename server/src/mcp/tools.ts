@@ -128,7 +128,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'space_write',
     description:
-      'Batch space/list mutations, idempotent via op_id. Ops: create (template kanban6 seeds the standard six lists), update, archive, list_create, list_update (rename/role/pos), list_archive (refuses if open items remain).',
+      'Batch space/list mutations, idempotent via op_id. Ops: create (template kanban6 seeds the standard six lists), update, archive, restore, delete (admins only; a space with cards must be archived first, an empty one can go directly; its cards and space labels go with it, documents are kept unfiled), list_create, list_update (rename/role/pos), list_archive (refuses if open items remain).',
     schema: zSpaceWrite,
     write: true,
     handler: async (ctx, args) => {

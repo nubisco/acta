@@ -120,30 +120,56 @@
       </template>
     </template>
 
-    <!--
-      Activity used to be a twelve-row feed at the bottom of this page, which
-      is a whole nav destination reprinted underneath the thing it competes
-      with. Everything anyone did is rarely what a person came here for, so
-      what is left is the way through to it.
-    -->
-    <p v-if="spaces.length > 0" class="home__activity">
-      <NbButton
-        size="sm"
-        variant="ghost"
-        icon="pulse"
-        :href="wpath('/activity')"
-      >
-        See everything happening in this workspace
-      </NbButton>
-    </p>
+    <!-- Archived spaces: out of the way, kept, and where they come back
+         from or go for good (Jose, 2026-10-09). -->
+    <details v-if="archived.length > 0" class="home__archived">
+      <summary>
+        Archived spaces
+        <SectionCount
+          :text="String(archived.length)"
+          :tip="`${archived.length} archived ${archived.length === 1 ? 'space' : 'spaces'}, kept with everything in them`"
+        />
+      </summary>
+      <ul class="home__archived-list">
+        <li
+          v-for="space in archived"
+          :key="space.key"
+          class="home__archived-row"
+        >
+          <span class="home__archived-name">
+            <span class="home__archived-key">{{ space.key }}</span>
+            {{ space.name }}
+          </span>
+          <NbButton
+            size="xs"
+            variant="ghost"
+            icon="arrow-counter-clockwise"
+            @click="restore(space)"
+          >
+            Restore
+          </NbButton>
+          <NbButton
+            v-if="ws.isAdmin.value"
+            size="xs"
+            variant="danger"
+            outlined
+            icon="trash"
+            @click="removeForGood(space)"
+          >
+            Delete permanently
+          </NbButton>
+        </li>
+      </ul>
+    </details>
   </NbPanel>
 </template>
 
 <script setup lang="ts">
 /** The spaces grid, as one of Home's panels: favourites first, then the rest. */
 import { computed } from 'vue'
-import { useToast } from '@nubisco/ui'
-import { api } from '@/api/client'
+import { useConfirm, useToast } from '@nubisco/ui'
+import { api, newOpId } from '@/api/client'
+import SectionCount from '@/components/SectionCount.vue'
 import type { TOverviewSpace } from '@/types/api'
 import { chartColorFor, roleColor } from '@/lib/colors'
 import { humanise, useLoadState } from '@/lib/state'
@@ -159,12 +185,52 @@ import {
 
 const ws = useWorkspace()
 const toast = useToast()
+const confirm = useConfirm()
 const ui = useUiState()
 const load = useLoadState()
 
 const spaces = computed(() =>
   (ws.overview.value?.spaces ?? []).filter((b) => !b.archived),
 )
+const archived = computed(() =>
+  (ws.overview.value?.spaces ?? []).filter((b) => b.archived),
+)
+
+async function spaceOp(op: 'restore' | 'delete', key: string): Promise<void> {
+  const { results } = await api.spaceWrite([{ op, op_id: newOpId(), key }])
+  if (!results[0]?.ok) throw new Error(String(results[0]?.error ?? 'failed'))
+  await ws.refresh()
+}
+
+async function restore(space: TOverviewSpace): Promise<void> {
+  try {
+    await spaceOp('restore', space.key)
+    toast.success(`${space.name} is back.`)
+  } catch (err) {
+    toast.error(humanise(err), { title: 'Could not restore it' })
+  }
+}
+
+/** For good: the confirmation says what goes with it. */
+async function removeForGood(space: TOverviewSpace): Promise<void> {
+  const cards = itemCount(space)
+  await confirm({
+    title: `Delete ${space.name} permanently?`,
+    message:
+      cards > 0
+        ? `Its ${cards} ${cards === 1 ? 'card' : 'cards'}, with their comments, checklists and attachments, and its ${space.lists.length} lists go with it. Pages filed under it are kept. This cannot be undone.`
+        : `It has no cards, so only its ${space.lists.length} lists go with it. This cannot be undone.`,
+    subject: space.name,
+    subjectLabel: 'Space',
+    confirmLabel: 'Delete permanently',
+    cancelLabel: 'Keep it',
+    onConfirm: async () => {
+      await spaceOp('delete', space.key)
+      toast.success(`${space.name} deleted.`)
+    },
+    formatError: humanise,
+  })
+}
 
 /**
  * Favourites first, then the rest. Only headed when there are favourites:
@@ -307,6 +373,40 @@ void reload()
   &__caption {
     margin: 0;
     font-size: var(--nb-type-label-sm-size);
+    color: var(--nb-c-text-subtle);
+  }
+
+  &__archived summary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nb-spacing-8);
+    margin-block-start: var(--nb-spacing-8);
+    color: var(--nb-c-text-muted);
+    cursor: pointer;
+  }
+
+  &__archived-list {
+    list-style: none;
+    margin: var(--nb-spacing-8) 0 0;
+    padding: 0;
+  }
+
+  &__archived-row {
+    display: flex;
+    align-items: center;
+    gap: var(--nb-spacing-8);
+    padding-block: var(--nb-spacing-4);
+    border-block-end: 1px solid var(--nb-c-border);
+  }
+
+  &__archived-name {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  &__archived-key {
+    font-family: var(--nb-font-family-mono);
+    font-size: var(--nb-type-code-sm-size);
     color: var(--nb-c-text-subtle);
   }
 

@@ -119,6 +119,81 @@ async function reopenListOf(ctx: ICtx, item: IItemRow): Promise<string | null> {
   return fallback[0]?.id ?? null
 }
 
+/**
+ * Remove a card and everything that hangs off it: comments, checklists,
+ * attachments (their stored files too), labels, assignees, aliases, links,
+ * dependencies and its goal links. Its parts are detached, never deleted.
+ * Used by a card's own delete and by deleting a space.
+ */
+export async function purgeItem(
+  ctx: ICtx,
+  item: IItemRow,
+  store?: AttachmentStore,
+): Promise<void> {
+  // Comments carry their own search rows and outbound links.
+  const comments = await ctx.db.query<{ id: string }>(
+    'SELECT id FROM comment WHERE item_id = ?',
+    [item.id],
+  )
+  for (const comment of comments) {
+    await ftsDelete(ctx, 'comment', comment.id)
+    await ctx.db.run(
+      "DELETE FROM link WHERE src_kind = 'comment' AND src_id = ?",
+      [comment.id],
+    )
+  }
+  await ctx.db.run('DELETE FROM comment WHERE item_id = ?', [item.id])
+
+  // Checklist items hang off checklists, not off the item.
+  await ctx.db.run(
+    'DELETE FROM checklist_item WHERE checklist_id IN (SELECT id FROM checklist WHERE item_id = ?)',
+    [item.id],
+  )
+  await ctx.db.run('DELETE FROM checklist WHERE item_id = ?', [item.id])
+
+  // Stored blobs go with the rows that name them, or the bucket keeps
+  // paying for files nothing can reach.
+  const attachments = await ctx.db.query<{ id: string; kind: string }>(
+    "SELECT id, kind FROM attachment WHERE owner_kind = 'item' AND owner_id = ?",
+    [item.id],
+  )
+  for (const attachment of attachments) {
+    if (attachment.kind === 'file') await store?.remove(attachment.id)
+  }
+  await ctx.db.run(
+    "DELETE FROM attachment WHERE owner_kind = 'item' AND owner_id = ?",
+    [item.id],
+  )
+
+  await ctx.db.run('DELETE FROM item_label WHERE item_id = ?', [item.id])
+  await ctx.db.run('DELETE FROM item_assignee WHERE item_id = ?', [item.id])
+  await ctx.db.run('DELETE FROM item_key_alias WHERE item_id = ?', [item.id])
+  await ctx.db.run('DELETE FROM external_link WHERE item_id = ?', [item.id])
+  // The goals it served lose it, which is all deleting a card should do
+  // to a goal. Its parts were never linked here, so they stay counted
+  // only if something else still links them.
+  await ctx.db.run('DELETE FROM goal_item WHERE item_id = ?', [item.id])
+  // Blocking and blocked-by both go: a dependency on a card that is gone is
+  // a blocker nobody can clear.
+  await ctx.db.run(
+    'DELETE FROM item_dependency WHERE blocker_id = ? OR blocked_id = ?',
+    [item.id, item.id],
+  )
+  await ctx.db.run("DELETE FROM link WHERE src_kind = 'item' AND src_id = ?", [
+    item.id,
+  ])
+  // Whatever was part of this now stands on its own. The column is a
+  // foreign key with no ON DELETE (SQLite would want the pragma on), so
+  // without this the children point at a row that is gone and every read
+  // of them fails. Detaching rather than cascading on purpose: deleting a
+  // card must not silently delete the work underneath it.
+  await ctx.db.run('UPDATE item SET parent_id = NULL WHERE parent_id = ?', [
+    item.id,
+  ])
+  await ftsDelete(ctx, 'item', item.key)
+  await ctx.db.run('DELETE FROM item WHERE id = ?', [item.id])
+}
+
 async function bumpRev(
   ctx: ICtx,
   item: IItemRow,
@@ -960,65 +1035,7 @@ async function applyItemOp(
         )
       }
 
-      // Comments carry their own search rows and outbound links.
-      const comments = await ctx.db.query<{ id: string }>(
-        'SELECT id FROM comment WHERE item_id = ?',
-        [item.id],
-      )
-      for (const comment of comments) {
-        await ftsDelete(ctx, 'comment', comment.id)
-        await ctx.db.run(
-          "DELETE FROM link WHERE src_kind = 'comment' AND src_id = ?",
-          [comment.id],
-        )
-      }
-      await ctx.db.run('DELETE FROM comment WHERE item_id = ?', [item.id])
-
-      // Checklist items hang off checklists, not off the item.
-      await ctx.db.run(
-        'DELETE FROM checklist_item WHERE checklist_id IN (SELECT id FROM checklist WHERE item_id = ?)',
-        [item.id],
-      )
-      await ctx.db.run('DELETE FROM checklist WHERE item_id = ?', [item.id])
-
-      // Stored blobs go with the rows that name them, or the bucket keeps
-      // paying for files nothing can reach.
-      const attachments = await ctx.db.query<{ id: string; kind: string }>(
-        "SELECT id, kind FROM attachment WHERE owner_kind = 'item' AND owner_id = ?",
-        [item.id],
-      )
-      for (const attachment of attachments) {
-        if (attachment.kind === 'file') await store?.remove(attachment.id)
-      }
-      await ctx.db.run(
-        "DELETE FROM attachment WHERE owner_kind = 'item' AND owner_id = ?",
-        [item.id],
-      )
-
-      await ctx.db.run('DELETE FROM item_label WHERE item_id = ?', [item.id])
-      await ctx.db.run('DELETE FROM item_assignee WHERE item_id = ?', [item.id])
-      await ctx.db.run('DELETE FROM item_key_alias WHERE item_id = ?', [
-        item.id,
-      ])
-      await ctx.db.run('DELETE FROM external_link WHERE item_id = ?', [item.id])
-      // The goals it served lose it, which is all deleting a card should do
-      // to a goal. Its parts were never linked here, so they stay counted
-      // only if something else still links them.
-      await ctx.db.run('DELETE FROM goal_item WHERE item_id = ?', [item.id])
-      await ctx.db.run(
-        "DELETE FROM link WHERE src_kind = 'item' AND src_id = ?",
-        [item.id],
-      )
-      // Whatever was part of this now stands on its own. The column is a
-      // foreign key with no ON DELETE (SQLite would want the pragma on), so
-      // without this the children point at a row that is gone and every read
-      // of them fails. Detaching rather than cascading on purpose: deleting a
-      // card must not silently delete the work underneath it.
-      await ctx.db.run('UPDATE item SET parent_id = NULL WHERE parent_id = ?', [
-        item.id,
-      ])
-      await ftsDelete(ctx, 'item', item.key)
-      await ctx.db.run('DELETE FROM item WHERE id = ?', [item.id])
+      await purgeItem(ctx, item, store)
 
       // Inbound [[KEY]] references elsewhere are deliberately left alone:
       // they already render as a "gone" chip, which is more honest than

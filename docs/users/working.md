@@ -61,6 +61,16 @@ which is most cards. Set it from the card's Priority field. Urgent and High
 show on the card on a board, the Table view has a sortable Priority column, and
 [Next up](#home) ranks by it.
 
+## Spaces
+
+A space's **⋯** menu, at the top right of its board, can archive it: it leaves
+the sidebar and Home with everything in it kept, and **Archived spaces** at the
+foot of Home's Spaces panel brings it back. Deleting a space is for admins and
+cannot be undone. An empty space can be deleted straight from its ⋯ menu. A
+space with cards is archived first, then deleted from Archived spaces, where
+the confirmation says how many cards go with it. Pages filed under a deleted
+space are kept.
+
 ## Views
 
 A space can be read five ways. They are the same cards, not five feature sets.
@@ -118,6 +128,23 @@ the same shape as a full one, and only a long title makes a card taller.
 Those empty slots are buttons. Click "No goal", "No labels", the empty
 calendar, the empty face or the dashed size to set it right there, without
 opening the card.
+
+### Several cards at once
+
+Select cards to move or change them together:
+
+- **Cmd-click** (Ctrl-click on Windows and Linux) adds a card to the selection
+  or takes it out, and **Shift-click** selects every card between the last one
+  you picked and this one, in the same column.
+- From the keyboard, the arrow keys move between cards and **X** selects the
+  one in focus.
+- **Esc** clears the selection.
+
+Drag any selected card and they all move, landing together where you drop
+them. Picking up a selected card with Space or Enter and moving it with the
+arrow keys does the same. While cards are selected, a bar at the foot of the
+board can **Move** them to a list, **Assign** someone, add a **Label**, set the
+**Priority** or **Archive** them, all at once.
 
 ### Sorting a board
 

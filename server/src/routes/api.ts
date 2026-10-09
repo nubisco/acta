@@ -270,7 +270,7 @@ export function apiRoutes(
     const ctx = ctxOf(c)
     requireScope(ctx, 'write')
     const body = zSpaceWrite.parse(await c.req.json())
-    return c.json({ results: await spaceWrite(ctx, body.ops) })
+    return c.json({ results: await spaceWrite(ctx, body.ops, store) })
   })
 
   app.post('/goals/write', async (c) => {

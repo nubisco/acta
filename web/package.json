@@ -13,7 +13,7 @@
   "dependencies": {
     "@nubisco/acta-importers": "workspace:*",
     "@nubisco/acta-shared": "workspace:*",
-    "@nubisco/ui": "^5.17.0",
+    "@nubisco/ui": "^5.18.0",
     "@tiptap/core": "^2.27.3",
     "@tiptap/extension-code-block": "^2.27.3",
     "@tiptap/extension-italic": "^2.27.3",
