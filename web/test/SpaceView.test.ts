@@ -211,6 +211,33 @@ describe('SpaceView card menu', () => {
     expect(card.exists()).toBe(true)
   })
 
+  it('while sorted, a drop in the same column changes nothing, and in another goes last', async () => {
+    window.localStorage.setItem('acta:board-sort:nubisco/SU', 'updated')
+    const view = await render()
+    const board = view.findComponent({ name: 'Board' })
+    board.vm.$emit('move', {
+      itemId: 'SU-2',
+      toColumnId: 'Backlog',
+      beforeItemId: null,
+      afterItemId: 'SU-1',
+    })
+    await flushPromises()
+    expect(itemWrite).not.toHaveBeenCalled()
+    board.vm.$emit('move', {
+      itemId: 'SU-1',
+      toColumnId: 'Doing',
+      beforeItemId: null,
+      afterItemId: null,
+    })
+    await flushPromises()
+    const [ops] = itemWrite.mock.calls.at(-1) as unknown as [
+      { op: string; list: string; pos: number }[],
+    ]
+    expect(ops[0]).toMatchObject({ op: 'move', list: 'Doing' })
+    window.localStorage.removeItem('acta:board-sort:nubisco/SU')
+    view.unmount()
+  })
+
   it('moving to the top actually writes a move', async () => {
     const view = await render()
     const entries = await openMenu(view, 'Last')

@@ -93,6 +93,14 @@
             Clear filters
           </NbButton>
           <NbSelect
+            v-if="view === 'board'"
+            id="field-board-sort"
+            v-model="sortBy"
+            size="sm"
+            :options="BOARD_SORTS"
+            aria-label="Order cards in each column by"
+          />
+          <NbSelect
             id="field-swimlane"
             v-model="swimlane"
             size="sm"
@@ -346,6 +354,13 @@ import {
 } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
 import { cardPath } from '@/lib/paths'
+import {
+  BOARD_SORTS,
+  compareBy,
+  recallSort,
+  rememberSort,
+  type TBoardSort,
+} from '@/lib/boardSort'
 import { onCardPatched, patchCard } from '@/stores/workspace'
 import type { ISpaceItemRow } from '@/types/api'
 import { humanise, useLoadState } from '@/lib/state'
@@ -793,10 +808,23 @@ const lanes = computed(() => {
   ]
 })
 
+/** How each column orders its cards, for this person on this board. */
+const sortBy = ref<TBoardSort>('manual')
+watch(
+  () => props.spaceKey,
+  (space) => {
+    if (space) sortBy.value = recallSort(space)
+  },
+  { immediate: true },
+)
+watch(sortBy, (sort) => {
+  if (props.spaceKey) rememberSort(props.spaceKey, sort)
+})
+
 const spaceItems = computed<IBoardItem[]>(() =>
   // Cell order is the array order, so sort by pos before handing over.
   [...items.value]
-    .sort((a, b) => a.pos - b.pos)
+    .sort(compareBy(sortBy.value))
     // A card with two assignees belongs in both lanes, so it is emitted once
     // per lane with an id that stays unique; the key rides along untouched so
     // every interaction still addresses the real card.
@@ -1087,8 +1115,20 @@ async function onMove(event: IBoardMoveEvent): Promise<void> {
     : undefined
   const previousList = row.list
   const previousPos = row.pos
+  // Sorted by a field, the sort decides a card's place in its column. A drop
+  // within the column changes nothing, and a drop in another column puts it
+  // last there by hand, where it will be if Manual order is chosen again.
+  const sorted = sortBy.value !== 'manual'
+  if (sorted && event.toColumnId === row.list) {
+    toast.info(
+      'Cards are sorted, so their order in a column follows the sort. Choose Manual order to arrange them by hand.',
+    )
+    return
+  }
   row.list = event.toColumnId
-  row.pos = posBetween(before, after)
+  row.pos = sorted
+    ? tailPos(event.toColumnId, row.key)
+    : posBetween(before, after)
   try {
     const { results } = await api.itemWrite([
       {
@@ -1142,6 +1182,15 @@ onScopeDispose(
       row.priority = (patch.priority ?? undefined) as typeof row.priority
   }),
 )
+
+/** Just past the last card in a list, by hand. */
+function tailPos(list: string, except: string): number {
+  return (
+    items.value
+      .filter((r) => r.list === list && r.key !== except)
+      .reduce((max, r) => Math.max(max, r.pos), 0) + 1024
+  )
+}
 
 /**
  * A card dropped onto another becomes part of it.

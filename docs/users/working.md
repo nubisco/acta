@@ -119,6 +119,16 @@ Those empty slots are buttons. Click "No goal", "No labels", the empty
 calendar, the empty face or the dashed size to set it right there, without
 opening the card.
 
+### Sorting a board
+
+The sort control in the board's bar orders the cards inside every column:
+**Manual order** (the order you drag them into, and the default), **Priority**
+(most urgent first), **Due date** (soonest first, undated last), **Recently
+updated** or **Newest first**. Your choice is kept for each board in your
+browser. While a board is sorted, you can still drag a card to another column,
+where it is placed last in the manual order, but not up or down within a
+column, since the sort decides that.
+
 ### Done cards leave the board
 
 A card in a done list stays on the board for **14 days** after it became done,
