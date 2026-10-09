@@ -1,3 +1,16 @@
+# [1.41.0](https://github.com/nubisco/acta/compare/v1.40.0...v1.41.0) (2026-10-09)
+
+
+### Bug Fixes
+
+* **deps:** @nubisco/ui 5.15.1, so select values match the other fields ([117ff7e](https://github.com/nubisco/acta/commit/117ff7e86bd395411c26b26da4b004fa9def43f1))
+* **docs:** a deleted private page's history stays private ([3ecbdac](https://github.com/nubisco/acta/commit/3ecbdac4b8fe4ced52e40c249a01c1171509ce89))
+
+
+### Features
+
+* **docs:** every page has an owner, and starts private until shared ([5ee3445](https://github.com/nubisco/acta/commit/5ee3445491cda756597f3de5725a804c45cc0226))
+
 # [1.40.0](https://github.com/nubisco/acta/compare/v1.39.0...v1.40.0) (2026-10-09)
 
 
