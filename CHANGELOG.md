@@ -1,3 +1,10 @@
+# [1.43.0](https://github.com/nubisco/acta/compare/v1.42.0...v1.43.0) (2026-10-09)
+
+
+### Features
+
+* **home:** a greeting and a ranked Next up, and cards get a priority ([dd17d68](https://github.com/nubisco/acta/commit/dd17d68b40c296526f702e761efdabaccb652580))
+
 # [1.42.0](https://github.com/nubisco/acta/compare/v1.41.1...v1.42.0) (2026-10-09)
 
 
