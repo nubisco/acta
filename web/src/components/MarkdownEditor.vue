@@ -23,6 +23,7 @@
   <Teleport v-if="rowControls" :to="rowControls">
     <div class="md-editor__table-bar" @mousedown.prevent>
       <NbButton
+        v-nb-tooltip="{ body: 'Insert row above' }"
         size="xxs"
         variant="ghost"
         icon="rows-plus-top"
@@ -30,6 +31,7 @@
         @click="editor.chain().focus().addRowBefore().run()"
       />
       <NbButton
+        v-nb-tooltip="{ body: 'Insert row below' }"
         size="xxs"
         variant="ghost"
         icon="rows-plus-bottom"
@@ -37,6 +39,7 @@
         @click="editor.chain().focus().addRowAfter().run()"
       />
       <NbButton
+        v-nb-tooltip="{ body: 'Delete row' }"
         size="xxs"
         variant="danger"
         icon="trash-simple"
@@ -49,6 +52,7 @@
   <Teleport v-if="columnControls" :to="columnControls">
     <div class="md-editor__table-bar" @mousedown.prevent>
       <NbButton
+        v-nb-tooltip="{ body: 'Insert column before' }"
         size="xxs"
         variant="ghost"
         icon="columns-plus-left"
@@ -56,6 +60,7 @@
         @click="editor.chain().focus().addColumnBefore().run()"
       />
       <NbButton
+        v-nb-tooltip="{ body: 'Insert column after' }"
         size="xxs"
         variant="ghost"
         icon="columns-plus-right"
@@ -63,6 +68,7 @@
         @click="editor.chain().focus().addColumnAfter().run()"
       />
       <NbButton
+        v-nb-tooltip="{ body: 'Align left' }"
         size="xxs"
         variant="ghost"
         icon="text-align-left"
@@ -71,6 +77,7 @@
         @click="align('left')"
       />
       <NbButton
+        v-nb-tooltip="{ body: 'Align centre' }"
         size="xxs"
         variant="ghost"
         icon="text-align-center"
@@ -79,6 +86,7 @@
         @click="align('center')"
       />
       <NbButton
+        v-nb-tooltip="{ body: 'Align right' }"
         size="xxs"
         variant="ghost"
         icon="text-align-right"
@@ -87,6 +95,7 @@
         @click="align('right')"
       />
       <NbButton
+        v-nb-tooltip="{ body: 'Delete column' }"
         size="xxs"
         variant="danger"
         icon="trash-simple"

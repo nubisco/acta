@@ -225,6 +225,7 @@
           <div class="automation__actions">
             <NbButton
               v-if="ws.isAdmin.value"
+              v-nb-tooltip="{ body: `Edit rule ${row.name}` }"
               size="sm"
               variant="ghost"
               icon="pencil-simple"
@@ -233,6 +234,7 @@
             />
             <NbButton
               v-if="ws.isAdmin.value"
+              v-nb-tooltip="{ body: `Delete rule ${row.name}` }"
               size="sm"
               variant="danger"
               outlined

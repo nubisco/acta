@@ -58,6 +58,7 @@
          Settings under Notifications now, alongside the email window. -->
     <template #header-actions="{ markAllProps, markAllText }">
       <NbButton
+        v-nb-tooltip="{ body: 'Notification settings' }"
         size="xs"
         variant="ghost"
         icon="sliders-horizontal"

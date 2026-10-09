@@ -25,6 +25,7 @@
 
     <div class="img-tools__bar" role="toolbar" aria-label="Image">
       <NbButton
+        v-nb-tooltip="{ body: 'Align left' }"
         size="xs"
         variant="ghost"
         icon="text-align-left"
@@ -34,6 +35,7 @@
         @click="setAlign('left')"
       />
       <NbButton
+        v-nb-tooltip="{ body: 'Align centre' }"
         size="xs"
         variant="ghost"
         icon="text-align-center"
@@ -43,6 +45,7 @@
         @click="setAlign('center')"
       />
       <NbButton
+        v-nb-tooltip="{ body: 'Align right' }"
         size="xs"
         variant="ghost"
         icon="text-align-right"
@@ -52,6 +55,7 @@
         @click="setAlign('right')"
       />
       <NbButton
+        v-nb-tooltip="{ body: 'Reset width' }"
         size="xs"
         variant="ghost"
         icon="arrows-in-simple"
@@ -61,6 +65,7 @@
       />
       <NbButton
         v-if="upload"
+        v-nb-tooltip="{ body: 'Replace image' }"
         size="xs"
         variant="ghost"
         icon="image"
@@ -68,6 +73,7 @@
         @click="fileEl?.click()"
       />
       <NbButton
+        v-nb-tooltip="{ body: 'View full screen' }"
         size="xs"
         variant="ghost"
         icon="frame-corners"

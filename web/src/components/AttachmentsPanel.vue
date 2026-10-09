@@ -23,6 +23,7 @@
           {{ formatBytes(att.size) }}
         </span>
         <NbButton
+          v-nb-tooltip="{ body: `Remove ${att.filename}` }"
           size="xxs"
           variant="ghost"
           icon="trash-simple"

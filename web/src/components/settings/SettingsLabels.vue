@@ -75,6 +75,7 @@
             </span>
             <div class="labels-settings__actions">
               <NbButton
+                v-nb-tooltip="{ body: `Edit label ${item.name}` }"
                 size="sm"
                 variant="ghost"
                 icon="pencil-simple"
@@ -82,6 +83,7 @@
                 @click="openEdit(group, item.id)"
               />
               <NbButton
+                v-nb-tooltip="{ body: `Merge label ${item.name} into another` }"
                 size="sm"
                 variant="ghost"
                 icon="arrows-merge"
@@ -90,6 +92,7 @@
                 @click="openMerge(group, item.id)"
               />
               <NbButton
+                v-nb-tooltip="{ body: `Delete label ${item.name}` }"
                 size="sm"
                 variant="danger"
                 outlined

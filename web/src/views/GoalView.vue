@@ -355,7 +355,8 @@
                   <span class="goal-view__entry-tools">
                     <NbButton
                       v-if="entry.can_edit"
-                      size="xxs"
+                      v-nb-tooltip="{ body: 'Edit this check-in' }"
+                      size="xs"
                       variant="ghost"
                       icon="pencil-simple"
                       aria-label="Edit this check-in"
@@ -363,7 +364,8 @@
                     />
                     <NbButton
                       v-if="entry.can_delete"
-                      size="xxs"
+                      v-nb-tooltip="{ body: 'Delete this check-in' }"
+                      size="xs"
                       variant="ghost"
                       icon="trash-simple"
                       aria-label="Delete this check-in"
