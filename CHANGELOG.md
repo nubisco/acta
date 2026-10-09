@@ -1,3 +1,10 @@
+## [1.44.3](https://github.com/nubisco/acta/compare/v1.44.2...v1.44.3) (2026-10-09)
+
+
+### Bug Fixes
+
+* **ui:** every icon-only button says what it does on hover ([6dfed10](https://github.com/nubisco/acta/commit/6dfed1041bda2a6cb8f5f1fab8cc79681e201968))
+
 ## [1.44.2](https://github.com/nubisco/acta/compare/v1.44.1...v1.44.2) (2026-10-09)
 
 
