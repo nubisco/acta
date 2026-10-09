@@ -23,3 +23,71 @@ export const SECTION_INFO = {
   comments:
     'The conversation about this card. Mention someone with @ and their handle to notify them.',
 } as const
+
+// Section counts, shared by the side panel and the full-size view so the
+// two say the same numbers the same way.
+
+/**
+ * Every section header carries a count in a pill that says on hover what it
+ * counts (Jose, 2026-10-08: a bare "1" beside "Plan" read as nothing). Zero
+ * is drawn too, dimmed, so the pill is always where the reader looks.
+ */
+export interface ICount {
+  text: string
+  tip: string
+  empty?: boolean
+}
+
+export function plural(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? '' : 's'}`
+}
+
+export function plainCount(
+  list: unknown[] | undefined,
+  noun: string,
+  none: string,
+): ICount {
+  const n = list?.length ?? 0
+  return { text: String(n), tip: n ? plural(n, noun) : none, empty: n === 0 }
+}
+
+export function ticked(checklist: { items: { done: boolean }[] }): number {
+  return checklist.items.filter((entry) => entry.done).length
+}
+
+export function goalsCount(item: { goals?: unknown[] }): ICount {
+  const n = item.goals?.length ?? 0
+  return {
+    text: String(n),
+    tip: n ? `Serves ${plural(n, 'goal')}` : 'Serves no goal yet',
+    empty: n === 0,
+  }
+}
+
+/** Both directions in one number, and the split in the tooltip. */
+export function planCount(item: {
+  blocked_by?: unknown[]
+  blocks?: unknown[]
+}): ICount {
+  const waits = item.blocked_by?.length ?? 0
+  const holds = item.blocks?.length ?? 0
+  const n = waits + holds
+  if (n === 0)
+    return { text: '0', tip: 'Waits on nothing, holds nothing up', empty: true }
+  return {
+    text: String(n),
+    tip: `Waits on ${plural(waits, 'card')}, holds up ${plural(holds, 'card')}`,
+  }
+}
+
+/** Done over total, because a bare count cannot say whether the work under a
+ *  collapsed header is finished, which is the only reason to open it. */
+export function partsCount(item: { parts?: { done?: boolean }[] }): ICount {
+  const parts = item.parts ?? []
+  if (parts.length === 0) return { text: '0', tip: 'No parts', empty: true }
+  const done = parts.filter((p) => p.done).length
+  return {
+    text: `${done}/${parts.length}`,
+    tip: `${done} of ${plural(parts.length, 'part')} done`,
+  }
+}

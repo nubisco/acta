@@ -65,6 +65,24 @@
               :dwell="1200"
               reserve-space
             />
+            <!-- The side panel's actions, in the same order, so the two sizes
+                 of one card offer the same things (UX audit, 2026-10-09). -->
+            <NbButton
+              v-nb-tooltip="{ body: `Show on ${it.item.value.space}` }"
+              size="sm"
+              variant="ghost"
+              icon="kanban"
+              :aria-label="`Show ${it.item.value.key} on its space`"
+              @click="viewOnBoard"
+            />
+            <NbButton
+              v-nb-tooltip="{ body: 'Move to another space' }"
+              size="sm"
+              variant="ghost"
+              icon="arrow-square-right"
+              :aria-label="`Move ${it.item.value.key} to another space`"
+              @click="moveOpen = true"
+            />
             <!-- Back to the side panel, on the same card. The pair reads as
                  one control that toggles size rather than two ways to open a
                  card that happen to look alike. -->
@@ -229,11 +247,34 @@
               :size="14"
               label="About goals"
             />
+            <SectionCount v-bind="goalsCount(it.item.value)" />
           </h3>
           <ItemGoalsPanel
             :item-key="it.item.value.key"
             :goals="it.item.value.goals ?? []"
             @changed="it.load"
+          />
+        </section>
+
+        <section class="item-modal__section">
+          <h3>
+            Plan
+            <NbInfoHint
+              :text="SECTION_INFO.plan"
+              :size="14"
+              label="About the plan"
+            />
+            <SectionCount v-bind="planCount(it.item.value)" />
+          </h3>
+          <DependencyPanel
+            :item-key="it.item.value.key"
+            :space="it.item.value.space"
+            :blocked-by="it.item.value.blocked_by ?? []"
+            :blocks="it.item.value.blocks ?? []"
+            :size="it.item.value.size"
+            :is-milestone="it.item.value.is_milestone"
+            @changed="it.load"
+            @open="onOpenRelated"
           />
         </section>
 
@@ -247,32 +288,12 @@
               :size="14"
               label="About parts"
             />
+            <SectionCount v-bind="partsCount(it.item.value)" />
           </h3>
           <PartsPanel
             :item-key="it.item.value.key"
             :space="it.item.value.space"
             :parts="it.item.value.parts ?? []"
-            @changed="it.load"
-            @open="onOpenRelated"
-          />
-        </section>
-
-        <section class="item-modal__section">
-          <h3>
-            Plan
-            <NbInfoHint
-              :text="SECTION_INFO.plan"
-              :size="14"
-              label="About the plan"
-            />
-          </h3>
-          <DependencyPanel
-            :item-key="it.item.value.key"
-            :space="it.item.value.space"
-            :blocked-by="it.item.value.blocked_by ?? []"
-            :blocks="it.item.value.blocks ?? []"
-            :size="it.item.value.size"
-            :is-milestone="it.item.value.is_milestone"
             @changed="it.load"
             @open="onOpenRelated"
           />
@@ -390,6 +411,15 @@
               :size="14"
               label="About attachments"
             />
+            <SectionCount
+              v-bind="
+                plainCount(
+                  it.item.value.attachments,
+                  'attachment',
+                  'Nothing attached',
+                )
+              "
+            />
           </h3>
           <AttachmentsPanel
             :owner="{ item: it.item.value.key }"
@@ -405,6 +435,15 @@
               :text="SECTION_INFO.history"
               :size="14"
               label="About history"
+            />
+            <SectionCount
+              v-bind="
+                plainCount(
+                  it.item.value.activity,
+                  'recorded change',
+                  'No changes yet',
+                )
+              "
             />
           </h3>
           <ItemHistory
@@ -430,6 +469,11 @@
               :size="14"
               label="About comments"
             />
+            <SectionCount
+              v-bind="
+                plainCount(it.item.value.comments, 'comment', 'No comments yet')
+              "
+            />
           </h3>
           <CommentThread
             v-model="it.commentDraft.value"
@@ -442,6 +486,15 @@
         </section>
       </aside>
     </div>
+    <MoveCardModal
+      v-if="it.item.value"
+      :open="moveOpen"
+      :item-key="it.item.value.key"
+      :current-space="it.item.value.space"
+      :current-list="it.item.value.list"
+      @close="moveOpen = false"
+      @moved="onMoved"
+    />
   </NbModal>
 </template>
 
@@ -449,11 +502,20 @@
 import { ref, toRef, watch } from 'vue'
 import RefText from '@/components/RefText.vue'
 import SectionCount from '@/components/SectionCount.vue'
-import { SECTION_INFO } from '@/lib/sections'
+import {
+  SECTION_INFO,
+  goalsCount,
+  partsCount,
+  planCount,
+  plainCount,
+  ticked,
+} from '@/lib/sections'
 import { wpath } from '@/lib/paths'
-import { useConfirm } from '@nubisco/ui'
+import { useConfirm, useToast } from '@nubisco/ui'
 import { useItem } from '@/composables/useItem'
-import { useInspector } from '@/stores/workspace'
+import { useInspector, useUiState } from '@/stores/workspace'
+import { useRouter } from 'vue-router'
+import MoveCardModal from '@/components/MoveCardModal.vue'
 import ActorChip from '@/components/ActorChip.vue'
 import AttachmentsPanel from '@/components/AttachmentsPanel.vue'
 import ChecklistBody from '@/components/ChecklistBody.vue'
@@ -477,6 +539,9 @@ const emit = defineEmits<{ close: [] }>()
 const it = useItem(toRef(props, 'itemKey'))
 const confirm = useConfirm()
 const inspector = useInspector()
+const ui = useUiState()
+const toast = useToast()
+const router = useRouter()
 
 /** Follow a dependency without leaving the full-size view. It goes on the
  *  card trail like any other hop, so the way back is in the header. */
@@ -489,6 +554,31 @@ function onOpenRelated(key: string): void {
  *  card's size rather than two separate ways to open it. */
 function collapse(): void {
   inspector.setFull(false)
+}
+
+/** To the card's space, with the card open there, at the panel's size. */
+function viewOnBoard(): void {
+  const item = it.item.value
+  if (!item) return
+  ui.revealCard.value = { key: item.key, at: Date.now() }
+  inspector.setFull(false)
+  void router.push({
+    path: wpath(`/s/${item.space}`),
+    query: { item: item.key },
+  })
+}
+
+const moveOpen = ref(false)
+function onMoved(key: string): void {
+  moveOpen.value = false
+  const previous = it.item.value?.key
+  if (key !== previous) {
+    inspector.close()
+    inspector.open(key, { full: true })
+    toast.success(`${previous} is ${key} now. The old key still works.`)
+  } else {
+    void it.load()
+  }
 }
 
 const newChecklist = ref('')
@@ -524,10 +614,6 @@ function confirmDelete(): void {
       if (await it.remove()) emit('close')
     },
   })
-}
-
-function ticked(checklist: { items: { done: boolean }[] }): number {
-  return checklist.items.filter((entry) => entry.done).length
 }
 
 function confirmDeleteChecklist(name: string): void {

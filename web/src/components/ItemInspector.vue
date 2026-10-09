@@ -528,12 +528,18 @@ import ItemGoalsPanel from '@/components/goals/ItemGoalsPanel.vue'
 import ItemHistory from '@/components/ItemHistory.vue'
 import MoveCardModal from '@/components/MoveCardModal.vue'
 import PartOfChip from '@/components/PartOfChip.vue'
-import type { IPartRef } from '@/types/api'
 import SectionCount from '@/components/SectionCount.vue'
 import { PRIORITY_OPTIONS } from '@/lib/priority'
 import CardTrail from '@/components/CardTrail.vue'
 import RefText from '@/components/RefText.vue'
-import { SECTION_INFO } from '@/lib/sections'
+import {
+  SECTION_INFO,
+  goalsCount,
+  partsCount,
+  planCount,
+  plainCount,
+  ticked,
+} from '@/lib/sections'
 
 // Outside setup, so it survives the panel unmounting between cards.
 const moduleOpenSections = ref<string[]>([
@@ -557,71 +563,6 @@ const ui = useUiState()
  * open would undo the change they just made. Reset only by a reload.
  */
 const openSections = moduleOpenSections
-
-/**
- * Every section header carries a count in a pill that says on hover what it
- * counts (Jose, 2026-10-08: a bare "1" beside "Plan" read as nothing). Zero
- * is drawn too, dimmed, so the pill is always where the reader looks.
- */
-interface ICount {
-  text: string
-  tip: string
-  empty?: boolean
-}
-
-function plural(n: number, noun: string): string {
-  return `${n} ${noun}${n === 1 ? '' : 's'}`
-}
-
-function plainCount(
-  list: unknown[] | undefined,
-  noun: string,
-  none: string,
-): ICount {
-  const n = list?.length ?? 0
-  return { text: String(n), tip: n ? plural(n, noun) : none, empty: n === 0 }
-}
-
-function ticked(checklist: { items: { done: boolean }[] }): number {
-  return checklist.items.filter((entry) => entry.done).length
-}
-
-function goalsCount(item: { goals?: unknown[] }): ICount {
-  const n = item.goals?.length ?? 0
-  return {
-    text: String(n),
-    tip: n ? `Serves ${plural(n, 'goal')}` : 'Serves no goal yet',
-    empty: n === 0,
-  }
-}
-
-/** Both directions in one number, and the split in the tooltip. */
-function planCount(item: {
-  blocked_by?: unknown[]
-  blocks?: unknown[]
-}): ICount {
-  const waits = item.blocked_by?.length ?? 0
-  const holds = item.blocks?.length ?? 0
-  const n = waits + holds
-  if (n === 0)
-    return { text: '0', tip: 'Waits on nothing, holds nothing up', empty: true }
-  return {
-    text: String(n),
-    tip: `Waits on ${plural(waits, 'card')}, holds up ${plural(holds, 'card')}`,
-  }
-}
-
-/** Done over total, because a bare count cannot say whether the work under a
- *  collapsed header is finished, which is the only reason to open it. */
-function partsCount(item: { parts?: IPartRef[] }): ICount {
-  const parts = item.parts ?? []
-  if (parts.length === 0) return { text: '0', tip: 'No parts', empty: true }
-  const done = parts.filter((p) => p.done).length
-  return {
-    text: `${done}/${parts.length}`,
-    tip: `${done} of ${plural(parts.length, 'part')} done`,
-  }
-}
 
 /**
  * Escape closes the panel, as it closes every other overlay (UX audit,
