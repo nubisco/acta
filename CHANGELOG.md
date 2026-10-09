@@ -1,3 +1,15 @@
+# [1.40.0](https://github.com/nubisco/acta/compare/v1.39.0...v1.40.0) (2026-10-09)
+
+
+### Bug Fixes
+
+* the full-size card has an address and a way back, and phones get the goal page ([3fe3b4b](https://github.com/nubisco/acta/commit/3fe3b4b64c0de50d28544bd7454912dda33c76ed))
+
+
+### Features
+
+* **board:** people, goal and status filters sit in the bar, always visible ([e91c8a5](https://github.com/nubisco/acta/commit/e91c8a502db05e6a302bb1a88781ed8a862751a7))
+
 # [1.39.0](https://github.com/nubisco/acta/compare/v1.38.0...v1.39.0) (2026-10-08)
 
 
