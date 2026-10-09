@@ -106,3 +106,25 @@ export async function foreignDescendants(
   )
   return rows.map((r) => r.slug)
 }
+
+/**
+ * The owner of a page that is private, itself or through a page above it, or
+ * null when it is shared (or gone). An ownerless private page answers '',
+ * which matches nobody.
+ */
+export async function privateOwnerOf(
+  db: ICtx['db'],
+  documentId: string,
+): Promise<string | null> {
+  const rows = await db.query<{ owner_id: string | null }>(
+    `WITH RECURSIVE up(id, parent_id, owner_id, visibility) AS (
+       SELECT id, parent_id, owner_id, visibility FROM document WHERE id = ?
+       UNION
+       SELECT d.id, d.parent_id, d.owner_id, d.visibility FROM document d JOIN up ON d.id = up.parent_id
+     )
+     SELECT owner_id FROM up WHERE visibility = 'private' LIMIT 1`,
+    [documentId],
+  )
+  if (rows.length === 0) return null
+  return rows[0].owner_id ?? ''
+}

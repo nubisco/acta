@@ -1151,12 +1151,14 @@ export async function activityQuery(ctx: ICtx, params: TActivityQuery) {
     where.push('e.id < ?')
     args.push(params.cursor)
   }
-  // What happens to a page hidden from this reader is not theirs to see.
-  const visibleEvents = visibleDocSql('e.entity_id', await hiddenDocIds(ctx))
-  if (visibleEvents.params.length > 0) {
-    where.push(`(e.entity != 'doc' OR ${visibleEvents.sql})`)
-    args.push(...visibleEvents.params)
-  }
+  // What happens to a page hidden from this reader is not theirs to see. A
+  // page that still exists answers for itself. A deleted one cannot, so its
+  // events answer with what was stamped on them when they happened.
+  const visibleEvents = visibleDocSql('d.id', await hiddenDocIds(ctx))
+  where.push(
+    `(e.entity != 'doc' OR (d.id IS NOT NULL AND ${visibleEvents.sql}) OR (d.id IS NULL AND (e.private_to IS NULL OR e.private_to = ?)))`,
+  )
+  args.push(...visibleEvents.params, viewerOf(ctx))
   const rows = await ctx.db.query<{
     id: string
     ts: number

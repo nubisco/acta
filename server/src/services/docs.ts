@@ -737,8 +737,10 @@ async function applyDocOp(
         [doc.id],
       )
       await ftsDelete(ctx, 'doc', doc.slug)
-      await ctx.db.run('DELETE FROM document WHERE id = ?', [doc.id])
+      // Emitted first, while the page can still say whether it was private.
+      // Events are flushed after the transaction either way.
       await emitEvent(ctx, 'doc.deleted', 'doc', doc.id, `deleted ${doc.slug}`)
+      await ctx.db.run('DELETE FROM document WHERE id = ?', [doc.id])
       return { slug: doc.slug }
     }
   }

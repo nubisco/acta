@@ -209,6 +209,17 @@ describe('a private page is invisible to everyone else', () => {
     expect(card.items[0].links?.in.map((l) => l.src)).not.toContain('draft')
   })
 
+  it('even after it is deleted, when it can no longer say it was private', async () => {
+    await ok(jose, [
+      { op: 'archive', op_id: 'a', ref: 'draft' },
+      { op: 'delete', op_id: 'd', ref: 'draft' },
+    ])
+    const theirs = await activityQuery(ivan, { limit: 200 })
+    expect(JSON.stringify(theirs.events)).not.toContain('draft')
+    const own = await activityQuery(jose, { limit: 200 })
+    expect(own.events.some((e) => e.verb === 'doc.deleted')).toBe(true)
+  })
+
   it('and nobody else can write to it', async () => {
     const error = await fails(ivan, [
       { op: 'comment', op_id: 'x', ref: 'draft', body: 'hi' },

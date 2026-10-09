@@ -894,4 +894,9 @@ export const ADDITIVE_COLUMNS = [
   'ALTER TABLE document ADD COLUMN owner_id TEXT REFERENCES actor(id)',
   "ALTER TABLE document ADD COLUMN visibility TEXT NOT NULL DEFAULT 'workspace'",
   'ALTER TABLE document ADD COLUMN ask_share INTEGER NOT NULL DEFAULT 0',
+  // Set on an event about a page that was private when it happened: the one
+  // person who may see it. Read from the event rather than the page, because
+  // a deleted page can no longer say it was private, and its history must not
+  // become public the moment it goes.
+  'ALTER TABLE event ADD COLUMN private_to TEXT',
 ]

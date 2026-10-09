@@ -233,8 +233,7 @@ export function startWebhookDispatcher(
     // A private page's goings-on stay with its owner: a webhook posts to a
     // channel, a Slack room or another system, all of which other people
     // read (Jose, 2026-10-09).
-    if (event.entity === 'doc' && (await isPrivatePage(db, event.entity_id)))
-      return
+    if (event.private_to !== undefined) return
     const hooks = await db.query<{
       id: string
       url: string
@@ -261,23 +260,6 @@ export function startWebhookDispatcher(
       defer(deliver(db, hook, event, fetchImpl, backoffMs, context))
     }
   })
-}
-
-/** Whether a page is private, itself or through a page above it. */
-async function isPrivatePage(
-  db: ISqlDriver,
-  documentId: string,
-): Promise<boolean> {
-  const rows = await db.query<{ n: number }>(
-    `WITH RECURSIVE up(id, parent_id, visibility) AS (
-       SELECT id, parent_id, visibility FROM document WHERE id = ?
-       UNION
-       SELECT d.id, d.parent_id, d.visibility FROM document d JOIN up ON d.id = up.parent_id
-     )
-     SELECT COUNT(*) AS n FROM up WHERE visibility = 'private'`,
-    [documentId],
-  )
-  return (rows[0]?.n ?? 0) > 0
 }
 
 async function deliver(

@@ -1,6 +1,7 @@
 import { newId } from '@nubisco/acta-shared'
 import { notifyForEvent, type INotifyHints } from '../services/notifications'
 import { defer } from './defer'
+import { privateOwnerOf } from './docAccess'
 import type { ICtx } from './ctx'
 import { now } from './ctx'
 
@@ -17,6 +18,8 @@ export interface IEvent {
   summary: string
   payload?: unknown
   caused_by?: string
+  /** Set when the event is about a private page: the one person it is for. */
+  private_to?: string
 }
 
 type TListener = (event: IEvent) => void | Promise<void>
@@ -60,9 +63,14 @@ export async function emitEvent(
     payload,
     caused_by: ctx.causedBy,
   }
+  // Stamped now, while the page still exists to say whether it is private.
+  if (entity === 'doc') {
+    const owner = await privateOwnerOf(ctx.db, entityId)
+    if (owner !== null) event.private_to = owner
+  }
   await ctx.db.run(
-    `INSERT INTO event (id, workspace_id, ts, actor_id, actor_kind, on_behalf_of, verb, entity, entity_id, summary, payload, caused_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO event (id, workspace_id, ts, actor_id, actor_kind, on_behalf_of, verb, entity, entity_id, summary, payload, caused_by, private_to)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       event.id,
       event.workspace_id,
@@ -76,6 +84,7 @@ export async function emitEvent(
       event.summary,
       event.payload ? JSON.stringify(event.payload) : null,
       event.caused_by ?? null,
+      event.private_to ?? null,
     ],
   )
   // Inside the caller's transaction on purpose: an op that rolls back must
