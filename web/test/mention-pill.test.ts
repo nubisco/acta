@@ -2,10 +2,11 @@
  * The mention pill, on both surfaces.
  *
  * A mention is stored as `[[@handle]]` and must never be read as one: what a
- * sentence shows is the person, as an avatar and their display name. The
- * reader used to patch its own disc and name into the rendered HTML while the
- * editor rendered a component, so the two already disagreed about the image
- * fallback and about the tooltip. These pin that they are now one component.
+ * sentence shows is the person, as `@` and their display name. No avatar: in
+ * a comment a face means the author, and a second face in the text read as a
+ * second author (Jose, 2026-10-10). The reader used to patch its own disc and
+ * name into the rendered HTML while the editor rendered a component, so the
+ * two disagreed about the tooltip. These pin that they are now one component.
  */
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
@@ -71,8 +72,8 @@ describe('the reader mention pill', () => {
     await flushPromises()
 
     const pill = view.find('.md__mention')
-    expect(pill.text()).toContain('Ivan Petrov')
-    expect(pill.find('.avatar').exists()).toBe(true)
+    expect(pill.text()).toBe('@Ivan Petrov')
+    expect(pill.find('.avatar').exists()).toBe(false)
   })
 
   it('names the person in a tooltip rather than a title attribute', async () => {
@@ -81,11 +82,11 @@ describe('the reader mention pill', () => {
     await flushPromises()
     await nextTick()
 
-    const avatar = view.find('.md__mention .avatar')
-    // The library directive, not a native title: the same affordance the
-    // editor has always had.
-    expect(avatar.attributes('data-nb-tooltip-anchor')).toBeDefined()
-    expect(avatar.attributes('aria-label')).toContain('Ivan Petrov')
+    const name = view.find('.md__mention .mention-name')
+    // The library directive, not a native title: the same hint the avatar
+    // gives, so who it is stays one hover away without the face.
+    expect(name.attributes('data-nb-tooltip-anchor')).toBeDefined()
+    expect(name.attributes('aria-label')).toContain('Ivan Petrov')
     expect(view.find('.md__mention').attributes('title')).toBeUndefined()
   })
 
@@ -96,9 +97,9 @@ describe('the reader mention pill', () => {
     await nextTick()
 
     const pill = view.find('.md__mention')
-    // A pill saying @ghost, not raw markup and not a bare word in a sentence.
-    expect(pill.find('.avatar').exists()).toBe(true)
-    expect(pill.text()).toContain('@ghost')
+    // A mention saying @ghost, not raw markup and not a bare word.
+    expect(pill.find('.mention-name').exists()).toBe(true)
+    expect(pill.text()).toBe('@ghost')
     expect(view.text()).not.toContain('[[')
   })
 })
@@ -113,32 +114,32 @@ describe('the two surfaces', () => {
     await nextTick()
 
     // One component, so the assertion is that both surfaces mounted it.
-    expect(read.find('.md__mention .actor-chip').exists()).toBe(true)
-    expect(write.find('.actor-chip').exists()).toBe(true)
-    expect(read.find('.md__mention .actor-chip').text()).toBe(
-      write.find('.actor-chip').text(),
+    expect(read.find('.md__mention .mention-name').exists()).toBe(true)
+    expect(write.find('.mention-name').exists()).toBe(true)
+    expect(read.find('.md__mention').text()).toBe(
+      write.find('.mention-name').text(),
     )
-    expect(read.find('.md__mention .avatar').attributes('aria-label')).toBe(
-      write.find('.avatar').attributes('aria-label'),
-    )
+    expect(
+      read.find('.md__mention .mention-name').attributes('aria-label'),
+    ).toBe(write.find('.mention-name').attributes('aria-label'))
   })
 
-  it('falls back to initials on both when the avatar image fails', async () => {
-    // The platform gives every upload a new URL and 404s the old one, so a
-    // stale URL is routine. The reader used to emit a bare <img> with nothing
-    // behind it, which is a broken-image glyph in the middle of a sentence.
+  it('draw no face on either', async () => {
+    // In a comment the avatar is the author. A face inside the text read as
+    // a second author, so a mention is a name only.
     overview.value = {
-      actors: [{ ...IVAN, avatar_url: '/api/avatars/gone.png' }],
+      actors: [{ ...IVAN, avatar_url: '/api/avatars/ivan.png' }],
     }
     const read = reader('Ask [[@ivan]] about it.')
     await flushPromises()
     await nextTick()
+    const write = editor('@ivan')
+    await nextTick()
 
-    const img = read.find('.md__mention img')
-    expect(img.exists()).toBe(true)
-    await img.trigger('error')
     expect(read.find('.md__mention img').exists()).toBe(false)
-    expect(read.find('.md__mention').text()).toContain('Ivan Petrov')
+    expect(read.find('.md__mention .avatar').exists()).toBe(false)
+    expect(write.find('img').exists()).toBe(false)
+    expect(write.find('.avatar').exists()).toBe(false)
   })
 })
 

@@ -841,30 +841,16 @@ button.md__ref {
 }
 
 .md__mention {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  /* Measured, not guessed. The pill is an inline-flex box holding a 16px
-     avatar beside 13px text, so its own baseline is not the sentence's. At
-     the -0.3em this used to carry, the name sat 6.3px below the surrounding
-     text and pushed the line box from 23.8px to 29.4px, which is why a
-     mention read as a subscript and why a paragraph containing one was
-     visibly taller than the one under it. `middle` measures 0.7px off the
-     sentence and leaves the line height alone. */
-  vertical-align: middle;
+  /* A name in the sentence, not a pill: `@Name` at the text's own size and
+     baseline, in the link colour, with no avatar (see MentionName). It used
+     to be an inline-flex box with a 16px avatar beside 13px text, which
+     needed vertical-align tuning to stop it lifting the line box. As plain
+     inline text there is nothing to tune. The editor wraps it in .md__ref
+     as well, so its dashed underline is taken off to match the reader. */
   color: var(--nb-c-primary);
   font-weight: var(--nb-type-label-lg-weight);
-
-  /* Both surfaces put an ActorChip inside this wrapper, so the mention's
-     own spacing and type live here rather than in either of them. */
-  .actor-chip {
-    gap: inherit;
-  }
-
-  .actor-chip__name {
-    font-family: var(--nb-font-family-sans);
-    font-size: var(--nb-font-size-13);
-  }
+  border-block-end: 0;
+  white-space: nowrap;
 }
 
 .md__embed {

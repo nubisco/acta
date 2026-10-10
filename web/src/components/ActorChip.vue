@@ -6,8 +6,10 @@
 </template>
 
 <script setup lang="ts">
-// The law of people-rendering: wherever a person appears, it is avatar +
-// display name. The @handle stays the storage format, never the visible one.
+// The law of people-rendering: wherever a person appears as part of the
+// interface (an author, an assignee, an owner), it is avatar + display name.
+// The @handle stays the storage format, never the visible one. A mention
+// inside text is the one exception, `@Name` with no face: see MentionName.
 import { computed } from 'vue'
 import { useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'

@@ -7,14 +7,11 @@
     :data-ref-type="target.kind"
     :data-ref="target.value"
   >
-    <!-- A mention is a person: avatar and display name, never the handle,
-         which is storage rather than presentation. The same ActorChip the
-         reader mounts, so the two surfaces cannot drift apart. -->
-    <ActorChip
-      v-if="target.kind === 'actor'"
-      :handle="target.value"
-      :size="16"
-    />
+    <!-- A mention is a person: `@` and display name, never the handle,
+         which is storage rather than presentation, and no face (see
+         MentionName). The same component the reader mounts, so the two
+         surfaces cannot drift apart. -->
+    <MentionName v-if="target.kind === 'actor'" :handle="target.value" />
 
     <template v-else-if="chip">
       <span v-if="!chip.gone" class="md__chip-dot" aria-hidden="true" />
@@ -45,7 +42,7 @@
  */
 import { computed } from 'vue'
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/vue-3'
-import ActorChip from '@/components/ActorChip.vue'
+import MentionName from '@/components/MentionName.vue'
 import { useRefCards } from '@/stores/refs'
 import {
   classifyRef,
@@ -100,7 +97,7 @@ const chipClasses = computed(() => {
   return chip.value?.classes ?? []
 })
 
-// No native title on a mention. ActorAvatar already carries a tooltip with
+// No native title on a mention. MentionName already carries a tooltip with
 // the name, the handle and what kind of actor it is, and a title on top of
 // it is a second, slower box that says less.
 const tooltip = computed(() => {

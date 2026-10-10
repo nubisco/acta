@@ -32,7 +32,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { chartColorFor } from '@/lib/colors'
-import { useWorkspace } from '@/stores/workspace'
+import { useActorLabel } from '@/composables/useActorLabel'
 
 // The domain avatar: it resolves a handle against the workspace directory,
 // hints name, handle and kind on hover, and colours the initials fallback per
@@ -62,33 +62,10 @@ const props = withDefaults(
   { size: 20, name: undefined },
 )
 
-const ws = useWorkspace()
-
-const actor = computed(() =>
-  ws.overview.value?.actors.find((a) => a.handle === props.handle),
+const { actor, displayName, handleLabel, kindLabel } = useActorLabel(
+  () => props.handle,
+  () => props.name,
 )
-
-const displayName = computed(
-  () => actor.value?.name ?? props.name ?? `@${props.handle}`,
-)
-
-/** Only members have a handle worth showing; a foreign author has none. */
-const handleLabel = computed(() =>
-  actor.value || !props.name ? `@${props.handle}` : undefined,
-)
-
-const kindLabel = computed(() => {
-  switch (actor.value?.kind) {
-    case 'agent':
-      return 'AI agent'
-    case 'system':
-      return 'System account'
-    case 'human':
-      return 'Member'
-    default:
-      return undefined
-  }
-})
 
 const initials = computed(() => {
   const name = actor.value?.name ?? props.name ?? props.handle

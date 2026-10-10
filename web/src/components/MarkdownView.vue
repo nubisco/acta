@@ -49,7 +49,7 @@ import { useLinkPreviews } from '@/stores/linkPreviews'
 import { DOC_NAV_KEY } from '@/lib/keys'
 import { cardKeysPlugin } from '@/lib/cardKeys'
 import { cardPath, wantsNewTab, wpath } from '@/lib/paths'
-import ActorChip from '@/components/ActorChip.vue'
+import MentionName from '@/components/MentionName.vue'
 import { safeUrl } from '@/lib/safeUrl'
 import { imageClass, imageStyle, parseImageAttrs } from '@/lib/imageAttrs'
 import { mathPlugin } from '@/lib/math'
@@ -672,14 +672,13 @@ function hydrateLinkCards(): void {
  * @mentions become the same pill the editor draws.
  *
  * Mounted as a real component rather than patched in as a string of HTML.
- * The pill is now ActorChip on both surfaces, so the avatar's image-failure
- * fallback and its tooltip come with it and a change to one surface cannot
- * miss the other. The reader renders through v-html, so there is no Vue tree
+ * The pill is MentionName on both surfaces, so its tooltip comes with it
+ * and a change to one surface cannot miss the other. The reader renders through v-html, so there is no Vue tree
  * to slot into and the component is mounted into the placeholder the renderer
  * left behind. That is the price of one pill instead of two.
  *
  * A handle nobody answers to is still drawn as a pill, showing `@handle`.
- * See ActorChip for why.
+ * See ActorChip for why, and MentionName for why there is no face.
  */
 const mentionMounts: HTMLElement[] = []
 
@@ -781,9 +780,9 @@ function hydrateMentions(): void {
     if (!handle || el.dataset.hydrated === '1') continue
     el.dataset.hydrated = '1'
     el.textContent = ''
-    const vnode = h(ActorChip, { handle, size: 16 })
+    const vnode = h(MentionName, { handle })
     // Without the app context a standalone render() resolves no directives,
-    // and the avatar's tooltip is a directive.
+    // and the mention's tooltip is a directive.
     vnode.appContext = instance?.appContext ?? null
     render(vnode, el)
     mentionMounts.push(el)
