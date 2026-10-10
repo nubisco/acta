@@ -1,3 +1,10 @@
+## [1.48.1](https://github.com/nubisco/acta/compare/v1.48.0...v1.48.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* **card:** the full-size title gets the width, and the description editor its frame ([990cc35](https://github.com/nubisco/acta/commit/990cc35c5e28ed57758c9ef272e1c638f5f9cde3))
+
 # [1.48.0](https://github.com/nubisco/acta/compare/v1.47.1...v1.48.0) (2026-10-10)
 
 
