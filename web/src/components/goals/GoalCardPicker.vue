@@ -182,4 +182,20 @@ async function link(key: string): Promise<void> {
     color: var(--nb-c-text-subtle);
   }
 }
+
+/* A phone. Each result kept its title on one line, and the implicit track
+   grew to fit it, so the list ran past the column. The track follows the
+   column, the title ellipsises, and a result is a finger's height. */
+@include variables.phone {
+  .goal-picker,
+  .goal-picker__hits {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@include variables.phone-touch {
+  .goal-picker__hit {
+    min-block-size: 44px;
+  }
+}
 </style>

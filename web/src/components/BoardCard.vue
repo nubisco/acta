@@ -53,6 +53,18 @@
           </NbBadge>
         </span>
         <NbBadge v-if="row.done" size="sm" variant="green">Done</NbBadge>
+        <!-- A touch screen has no right-click, and a long press is the
+             browser's own (text selection, the link preview), so the card's
+             menu gets a button of its own there. -->
+        <NbButton
+          v-if="phoneTouch"
+          class="board-card__more-actions board-card__live"
+          size="xs"
+          variant="ghost"
+          icon="dots-three"
+          :aria-label="`Actions for ${row.key}`"
+          @click.stop="emit('menu', $event, row.key)"
+        />
         <span
           v-if="size"
           v-nb-tooltip="{ body: `Size ${size}` }"
@@ -258,6 +270,7 @@
  */
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { usePhoneLayout } from '@nubisco/ui'
 import type { ISpaceItemRow } from '@/types/api'
 import {
   CARD_FACES,
@@ -286,6 +299,8 @@ const props = defineProps<{
   arrived?: boolean
   tourStep?: string | null
 }>()
+
+const { phoneTouch } = usePhoneLayout()
 
 const emit = defineEmits<{
   open: [key: string]
@@ -587,6 +602,18 @@ function edit(field: TCardField, event: MouseEvent): void {
     display: inline-flex;
     align-items: center;
     gap: var(--nb-spacing-2);
+  }
+}
+
+/* A phone. Under three cards fit on screen when every empty field keeps its
+   placeholder row, and those placeholders are too small to tap. The card
+   shows what it has, and the empty fields are set from the card itself,
+   which opens full screen. Desktop keeps the six rows in their fixed order. */
+@include variables.phone {
+  .board-card__summary--empty,
+  .board-card__row:has(> .board-card__slot:only-child),
+  .board-card__row > .board-card__slot {
+    display: none;
   }
 }
 </style>

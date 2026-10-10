@@ -1,5 +1,18 @@
 <template>
+  <!-- A phone's topbar has room for one field or the page's actions, not
+       both, and the palette already searches as you type, full screen. So
+       the field becomes the button that opens it. -->
+  <NbButton
+    v-if="phone"
+    class="global-search__phone"
+    size="sm"
+    variant="ghost"
+    icon="magnifying-glass"
+    aria-label="Search Acta"
+    @click="palette.open()"
+  />
   <form
+    v-else
     ref="rootEl"
     class="global-search"
     role="search"
@@ -85,6 +98,7 @@
 // else, so a card key, a half-typed word, or operator soup all behave.
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useCommandPalette, usePhoneLayout } from '@nubisco/ui'
 import { api } from '@/api/client'
 import type { ISearchResult } from '@/types/api'
 import { useInspector } from '@/stores/workspace'
@@ -92,6 +106,8 @@ import { openHit as navigateToHit } from '@/lib/paletteSearch'
 
 const router = useRouter()
 const inspector = useInspector()
+const palette = useCommandPalette()
+const { phone } = usePhoneLayout()
 
 const rootEl = ref<HTMLElement | null>(null)
 const query = ref('')

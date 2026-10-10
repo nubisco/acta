@@ -352,4 +352,12 @@ function remove(label: ILabelEntry): void {
     justify-content: end;
   }
 }
+
+/* A phone: the action goes under the heading and its description, rather
+   than beside them squeezing the text to half the width. */
+@include variables.phone {
+  .labels-settings__head {
+    flex-wrap: wrap;
+  }
+}
 </style>

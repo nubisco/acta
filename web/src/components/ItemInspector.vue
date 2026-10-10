@@ -51,86 +51,99 @@
               :dwell="1200"
               reserve-space
             />
-            <!-- Finding a card through search or a link drops you into this
+            <!-- A phone: the sheet's own close is the shell's, in the
+                 corner, and a card has one size there, so the rest fold
+                 into one menu rather than wrapping into a row of bare icons
+                 under the key. -->
+            <NbActionGroup
+              v-if="phone"
+              :items="phoneActions"
+              overflow="phone"
+              :phone-visible="0"
+              :overflow-label="`Actions for ${it.item.value.key}`"
+            />
+            <template v-else>
+              <!-- Finding a card through search or a link drops you into this
                panel with no sense of where the card actually lives. The space
                marks the open card, so arriving there puts it under the
                reader's eye rather than making them hunt the column. -->
-            <NbButton
-              v-nb-tooltip="{ body: `Show on ${it.item.value.space}` }"
-              size="sm"
-              variant="ghost"
-              icon="kanban"
-              :aria-label="`Show ${it.item.value.key} on its space`"
-              @click="viewOnBoard"
-            />
-            <!-- To another space or list. The server always could; nothing
+              <NbButton
+                v-nb-tooltip="{ body: `Show on ${it.item.value.space}` }"
+                size="sm"
+                variant="ghost"
+                icon="kanban"
+                :aria-label="`Show ${it.item.value.key} on its space`"
+                @click="viewOnBoard"
+              />
+              <!-- To another space or list. The server always could; nothing
                here offered it until LA-361 needed an agent to do it. -->
-            <NbButton
-              v-nb-tooltip="{ body: 'Move to another space' }"
-              size="sm"
-              variant="ghost"
-              icon="arrow-square-right"
-              :aria-label="`Move ${it.item.value.key} to another space`"
-              @click="moveOpen = true"
-            />
-            <!-- Archive was only ever reachable through the Status select,
+              <NbButton
+                v-nb-tooltip="{ body: 'Move to another space' }"
+                size="sm"
+                variant="ghost"
+                icon="arrow-square-right"
+                :aria-label="`Move ${it.item.value.key} to another space`"
+                @click="moveOpen = true"
+              />
+              <!-- Archive was only ever reachable through the Status select,
                which is why it read as missing. Same set as the space's
                right-click menu, so both surfaces agree. -->
-            <NbButton
-              v-if="it.item.value.archived"
-              v-nb-tooltip="{ body: 'Restore to its list' }"
-              size="sm"
-              variant="secondary"
-              icon="arrow-counter-clockwise"
-              :aria-label="`Restore ${it.item.value.key}`"
-              @click="it.toggle('restore')"
-            />
-            <NbButton
-              v-else
-              v-nb-tooltip="{ body: 'Archive this card' }"
-              size="sm"
-              variant="ghost"
-              icon="archive"
-              :aria-label="`Archive ${it.item.value.key}`"
-              @click="it.toggle('archive')"
-            />
-            <!-- Delete only on an archived card: archive is the reversible
+              <NbButton
+                v-if="it.item.value.archived"
+                v-nb-tooltip="{ body: 'Restore to its list' }"
+                size="sm"
+                variant="secondary"
+                icon="arrow-counter-clockwise"
+                :aria-label="`Restore ${it.item.value.key}`"
+                @click="it.toggle('restore')"
+              />
+              <NbButton
+                v-else
+                v-nb-tooltip="{ body: 'Archive this card' }"
+                size="sm"
+                variant="ghost"
+                icon="archive"
+                :aria-label="`Archive ${it.item.value.key}`"
+                @click="it.toggle('archive')"
+              />
+              <!-- Delete only on an archived card: archive is the reversible
                action, and the server refuses a delete before it. -->
-            <NbButton
-              v-if="it.item.value.archived"
-              v-nb-tooltip="{ body: 'Delete permanently' }"
-              size="sm"
-              variant="danger"
-              outlined
-              icon="trash"
-              :aria-label="`Delete ${it.item.value.key} permanently`"
-              @click="confirmDelete"
-            />
-            <!-- Opening a card was a one-way door: the panel had a way back to
+              <NbButton
+                v-if="it.item.value.archived"
+                v-nb-tooltip="{ body: 'Delete permanently' }"
+                size="sm"
+                variant="danger"
+                outlined
+                icon="trash"
+                :aria-label="`Delete ${it.item.value.key} permanently`"
+                @click="confirmDelete"
+              />
+              <!-- Opening a card was a one-way door: the panel had a way back to
                the previous card but no way out, so the only exit was opening
                something else. Closing clears the trail too, otherwise the
                next card you open inherits a way "back" to one you already
                dismissed. -->
-            <!-- Same card, more room. The panel is a column beside the space;
+              <!-- Same card, more room. The panel is a column beside the space;
                some cards want the width, and switching should not mean losing
                your place and opening it again. -->
-            <NbButton
-              v-nb-tooltip="{ body: 'Open full size' }"
-              size="sm"
-              variant="ghost"
-              icon="arrows-out-simple"
-              :aria-label="`Open ${it.item.value.key} full size`"
-              @click="expand"
-            />
-            <NbButton
-              v-nb-tooltip="{ body: 'Close' }"
-              size="sm"
-              variant="ghost"
-              icon="x"
-              class="inspector-close"
-              aria-label="Close the details panel"
-              @click="inspector.dismiss()"
-            />
+              <NbButton
+                v-nb-tooltip="{ body: 'Open full size' }"
+                size="sm"
+                variant="ghost"
+                icon="arrows-out-simple"
+                :aria-label="`Open ${it.item.value.key} full size`"
+                @click="expand"
+              />
+              <NbButton
+                v-nb-tooltip="{ body: 'Close' }"
+                size="sm"
+                variant="ghost"
+                icon="x"
+                class="inspector-close"
+                aria-label="Close the details panel"
+                @click="inspector.dismiss()"
+              />
+            </template>
           </span>
         </div>
         <!-- Above the title, because it is what the title is a part of. -->
@@ -146,6 +159,7 @@
           v-model="it.draft.title"
           label="Item title"
           size="lg"
+          :multiline="phone"
           class="inspector-title"
           @commit="it.commitTitle"
         />
@@ -507,8 +521,18 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
-import { useConfirm, useToast } from '@nubisco/ui'
+import { computed, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
+import {
+  useConfirm,
+  usePhoneLayout,
+  useToast,
+  type IActionGroupItem,
+} from '@nubisco/ui'
+import * as iconKanban from '@nubisco/ui/icons/kanban'
+import * as iconMove from '@nubisco/ui/icons/arrow-square-right'
+import * as iconArchive from '@nubisco/ui/icons/archive'
+import * as iconRestore from '@nubisco/ui/icons/arrow-counter-clockwise'
+import * as iconTrash from '@nubisco/ui/icons/trash'
 import { useItem } from '@/composables/useItem'
 import { useRouter } from 'vue-router'
 import { useInspector, useUiState } from '@/stores/workspace'
@@ -637,6 +661,52 @@ function addChecklist(): void {
  * Names what goes with the card. A confirm that only says "are you sure"
  * makes the reader guess whether comments and files survive.
  */
+/** The header's actions as one menu on a phone. Same set, same order. */
+const { phone } = usePhoneLayout()
+const phoneActions = computed<IActionGroupItem[]>(() => {
+  const item = it.item.value
+  if (!item) return []
+  const actions: IActionGroupItem[] = [
+    {
+      id: 'board',
+      label: `Show on ${item.space}`,
+      icon: iconKanban,
+      onSelect: viewOnBoard,
+    },
+    {
+      id: 'move',
+      label: 'Move to another space',
+      icon: iconMove,
+      onSelect: () => (moveOpen.value = true),
+    },
+  ]
+  if (item.archived) {
+    actions.push(
+      {
+        id: 'restore',
+        label: 'Restore to its list',
+        icon: iconRestore,
+        onSelect: () => void it.toggle('restore'),
+      },
+      {
+        id: 'delete',
+        label: 'Delete permanently',
+        icon: iconTrash,
+        danger: true,
+        onSelect: confirmDelete,
+      },
+    )
+  } else {
+    actions.push({
+      id: 'archive',
+      label: 'Archive this card',
+      icon: iconArchive,
+      onSelect: () => void it.toggle('archive'),
+    })
+  }
+  return actions
+})
+
 function confirmDelete(): void {
   const item = it.item.value
   if (!item) return
@@ -878,5 +948,26 @@ function commitDescription(): void {
   gap: 10px;
   flex-wrap: wrap;
   min-inline-size: 0;
+}
+
+/* A phone. The sheet fills the screen, so the column's widest child must not
+   set its width: a grid's implicit track grows to its min-content, and the
+   header row of key, badge and buttons is wider than a phone. The header
+   wraps, and keeps clear of the shell's own close button in the corner. */
+@include variables.phone {
+  .inspector {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inspector-top {
+    padding-inline-end: calc(
+      var(--nb-spacing-12) + var(--nb-shell-inspector-dismiss-inset, 0px)
+    );
+  }
+
+  .inspector-head {
+    flex-wrap: wrap;
+    min-inline-size: 0;
+  }
 }
 </style>

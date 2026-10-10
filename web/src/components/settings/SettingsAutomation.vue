@@ -57,6 +57,7 @@
       </header>
 
       <NbDataTable
+        stack-on-phone
         :columns="ingestColumns"
         :rows="ingestRows"
         row-key="id"
@@ -114,6 +115,7 @@
       </header>
 
       <NbDataTable
+        stack-on-phone
         :columns="connectionColumns"
         :rows="connectionRows"
         row-key="id"
@@ -159,6 +161,7 @@
       </header>
 
       <NbDataTable
+        stack-on-phone
         :columns="webhookColumns"
         :rows="webhookRows"
         row-key="id"
@@ -204,6 +207,7 @@
       </header>
 
       <NbDataTable
+        stack-on-phone
         :columns="ruleColumns"
         :rows="ruleRows"
         row-key="id"
@@ -278,6 +282,7 @@
       </header>
 
       <NbDataTable
+        stack-on-phone
         :columns="agentColumns"
         :rows="agentRows"
         row-key="id"
@@ -668,6 +673,14 @@ function deleteRule(id: string, name: string): void {
      word carries a little less weight than a date rather than more. */
   &__never {
     color: var(--nb-c-text-subtle);
+  }
+}
+
+/* A phone: the action goes under the heading and its description, rather
+   than beside them squeezing the text to half the width. */
+@include variables.phone {
+  .automation__head {
+    flex-wrap: wrap;
   }
 }
 </style>

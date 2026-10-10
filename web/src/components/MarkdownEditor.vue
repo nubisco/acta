@@ -115,7 +115,13 @@
     />
     <!-- After the text in the DOM, so Tab from the editor reaches the grip of
          the block the caret is in. -->
-    <BlockGutter v-if="blockTools" :editor="editor" :frame="frameEl" />
+    <!-- The gutter hangs in the margin left of the text, which a phone does
+         not have: it sat off screen there. -->
+    <BlockGutter
+      v-if="blockTools && !phone"
+      :editor="editor"
+      :frame="frameEl"
+    />
   </div>
 </template>
 
@@ -129,7 +135,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
-import { useToast } from '@nubisco/ui'
+import { usePhoneLayout, useToast } from '@nubisco/ui'
 import { api } from '@/api/client'
 import { humanise } from '@/lib/state'
 import {
@@ -162,6 +168,7 @@ import { ColorSwatches } from '@/components/editor/decorations'
 import { CommentHighlights } from '@/components/comments/commentHighlights'
 import { FocusMode } from '@/components/editor/focusMode'
 
+const { phone } = usePhoneLayout()
 const props = defineProps<{
   modelValue: string
   placeholder?: string

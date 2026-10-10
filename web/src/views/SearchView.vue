@@ -60,6 +60,7 @@
 
     <NbDataTable
       v-else
+      stack-on-phone
       :columns="columns"
       :rows="rows"
       row-key="ref"
@@ -110,11 +111,11 @@ const typeOptions = [
 ]
 
 const columns = [
-  { key: 'type', header: 'Type' },
-  { key: 'key', header: 'Key', width: '6rem' },
-  { key: 'title', header: 'Title' },
+  { key: 'type', header: 'Type', phoneHidden: true },
+  { key: 'key', header: 'Key', width: '6rem', phoneMeta: true },
+  { key: 'title', header: 'Title', primary: true },
   { key: 'snippet', header: 'Match' },
-  { key: 'space', header: 'Space' },
+  { key: 'space', header: 'Space', phoneMeta: true },
 ]
 
 const rows = computed(() =>
@@ -214,5 +215,18 @@ function openResult(row: {
   margin-inline: var(--nb-spacing-8) 0;
   color: var(--nb-c-text-subtle);
   flex-shrink: 0;
+}
+
+/* A phone: the field below already says Search, and the heading above it
+   cost a tenth of the screen saying it again. Kept for screen readers. */
+@include variables.phone {
+  .search > h1 {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 </style>

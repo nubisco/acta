@@ -40,6 +40,7 @@
       </header>
 
       <NbDataTable
+        stack-on-phone
         :columns="tokenColumns"
         :rows="tokenRows"
         row-key="id"
@@ -86,6 +87,7 @@
       </header>
 
       <NbDataTable
+        stack-on-phone
         :columns="appColumns"
         :rows="appRows"
         row-key="client_id"
@@ -302,6 +304,14 @@ function revokeApp(clientId: string, name: string): void {
     display: flex;
     gap: var(--nb-spacing-8);
     align-items: end;
+  }
+}
+
+/* A phone: the action goes under the heading and its description, rather
+   than beside them squeezing the text to half the width. */
+@include variables.phone {
+  .account__head {
+    flex-wrap: wrap;
   }
 }
 </style>

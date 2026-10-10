@@ -1,3 +1,5 @@
+@use '@nubisco/ui/variables';
+
 /**
  * Prose: the typography and block rhythm of a markdown document.
  *
@@ -225,5 +227,45 @@
       margin: 0;
       max-width: none;
     }
+  }
+}
+
+/* A phone. A table wider than the column used to squeeze each cell until its
+   words broke mid-letter ("Own/er"), because the prose rule that keeps a
+   pasted URL inside the column reaches the cells too. On a phone the table
+   keeps its words whole and scrolls sideways inside its own block, the way
+   a code block does. The editor wraps its tables in .tableWrapper, which is
+   the scroller there, so both readings scroll the same table. */
+@include variables.phone {
+  :where(.md-prose) {
+    table {
+      display: block;
+      max-inline-size: 100%;
+      overflow-x: auto;
+    }
+
+    .tableWrapper {
+      max-inline-size: 100%;
+      overflow-x: auto;
+
+      table {
+        display: table;
+      }
+    }
+
+    th,
+    td {
+      overflow-wrap: normal;
+      min-inline-size: 6rem;
+    }
+  }
+}
+
+/* A phone touch screen. iOS Safari zooms the page in when an editable field
+   with text under 16px takes focus, and leaves it zoomed. The editor is that
+   field, and the reader keeps the same size so the two stay one layout. */
+@include variables.phone-touch {
+  .md-prose {
+    font-size: max(16px, var(--nb-type-body-md-size));
   }
 }

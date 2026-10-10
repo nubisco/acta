@@ -220,6 +220,7 @@
             />
             <NbDataTable
               v-else
+              stack-on-phone
               :columns="cardColumns"
               :rows="items"
               row-key="key"
@@ -479,10 +480,10 @@ const checkIns = computed(() => goal.value?.check_ins ?? [])
 const spaces = computed(() => [...new Set(items.value.map((i) => i.space))])
 
 const cardColumns = [
-  { key: 'title', header: 'Card' },
+  { key: 'title', header: 'Card', primary: true },
   { key: 'people', header: 'Assignees', width: 110 },
-  { key: 'where', header: 'Where', width: 110 },
-  { key: 'state', header: 'State', width: 90 },
+  { key: 'where', header: 'Where', width: 110, phoneMeta: true },
+  { key: 'state', header: 'State', width: 90, phoneMeta: true },
   { key: 'how', header: 'Counted as', width: 100 },
 ]
 

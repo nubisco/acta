@@ -13,6 +13,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     NbAccordion: typeof import('@nubisco/ui/components/Accordion')['NbAccordion']
     NbAccordionItem: typeof import('@nubisco/ui/components/AccordionItem')['NbAccordionItem']
+    NbActionGroup: typeof import('@nubisco/ui/components/ActionGroup')['NbActionGroup']
     NbAiLabel: typeof import('@nubisco/ui/components/AiLabel')['NbAiLabel']
     NbBadge: typeof import('@nubisco/ui/components/Badge')['NbBadge']
     NbBanner: typeof import('@nubisco/ui/components/Banner')['NbBanner']

@@ -186,4 +186,12 @@ async function askForDesktop(): Promise<void> {
     gap: var(--nb-spacing-8);
   }
 }
+
+/* A phone: the action goes under the heading and its description, rather
+   than beside them squeezing the text to half the width. */
+@include variables.phone {
+  .notify__head {
+    flex-wrap: wrap;
+  }
+}
 </style>

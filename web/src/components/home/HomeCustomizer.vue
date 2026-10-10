@@ -10,7 +10,14 @@
         Done
       </NbButton>
     </header>
-    <p class="home-customizer__lede">
+    <!-- A phone shows Home as one column, so "wide" means nothing there,
+         and a touch screen has no Space key to pick a panel up with. -->
+    <p v-if="phone" class="home-customizer__lede">
+      Drag a panel by its handle to move it, and switch off what you do not
+      need. Your layout is saved on your account, so it is the same in every
+      browser.
+    </p>
+    <p v-else class="home-customizer__lede">
       Drag the panels into the order you want, or pick one up with Space and
       move it with the arrow keys. Switch off what you do not need, and make a
       panel wide to give it the whole row. Your layout is saved on your account,
@@ -38,6 +45,7 @@
             }}</span>
           </span>
           <NbButton
+            v-if="!phone"
             v-nb-tooltip="{
               body: item.wide ? 'Make it half width' : 'Give it the whole row',
             }"
@@ -86,12 +94,13 @@
  * Arranging Home, in the inspector beside it (Jose, 2026-10-09). Changes show
  * on the page as they are made and are saved a moment later.
  */
-import { useConfirm } from '@nubisco/ui'
+import { useConfirm, usePhoneLayout } from '@nubisco/ui'
 import { useHomeLayout } from '@/composables/useHomeLayout'
 import { HOME_PANELS, type IHomePanelPlace } from '@/lib/homePanels'
 
 const layout = useHomeLayout()
 const confirm = useConfirm()
+const { phone } = usePhoneLayout()
 
 const defOf = (id: string) => HOME_PANELS.find((p) => p.id === id)
 
@@ -157,6 +166,14 @@ async function confirmReset(): Promise<void> {
   &__desc {
     color: var(--nb-c-text-subtle);
     font-size: var(--nb-type-body-sm-size);
+  }
+}
+
+/* A phone: the panel is a sheet and the shell's close button sits in its
+   top right corner, over where Done was. */
+@include variables.phone {
+  .home-customizer__head {
+    padding-inline-end: var(--nb-shell-inspector-dismiss-inset, 0px);
   }
 }
 </style>

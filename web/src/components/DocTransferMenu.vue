@@ -52,6 +52,12 @@
       label="Import pages"
       @select="importing = true"
     />
+    <!-- The page's other actions, when the topbar has no room for their own
+         buttons (a phone). -->
+    <template v-if="$slots.default">
+      <NbMenuDivider />
+      <slot />
+    </template>
   </NbMenu>
 
   <DocImportModal

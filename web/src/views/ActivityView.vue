@@ -61,6 +61,7 @@
 
     <template v-else>
       <NbDataTable
+        stack-on-phone
         :columns="columns"
         :rows="rows"
         row-key="id"
@@ -177,9 +178,21 @@ const pendingCount = ref(0)
 const loadingMore = ref(false)
 
 const columns = [
-  { key: 'when', header: 'When', sortable: true, width: '10rem' },
-  { key: 'who', header: 'Who', sortable: true, width: '14rem' },
-  { key: 'what', header: 'What', sortable: true },
+  {
+    key: 'when',
+    header: 'When',
+    sortable: true,
+    width: '10rem',
+    phoneMeta: true,
+  },
+  {
+    key: 'who',
+    header: 'Who',
+    sortable: true,
+    width: '14rem',
+    phoneMeta: true,
+  },
+  { key: 'what', header: 'What', sortable: true, primary: true },
 ]
 
 interface IRow extends Record<string, unknown> {

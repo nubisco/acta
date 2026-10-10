@@ -109,4 +109,12 @@ async function save(next: string): Promise<void> {
     font-size: var(--nb-type-body-sm-size);
   }
 }
+
+/* A phone: the action goes under the heading and its description, rather
+   than beside them squeezing the text to half the width. */
+@include variables.phone {
+  .workspace__head {
+    flex-wrap: wrap;
+  }
+}
 </style>

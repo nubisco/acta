@@ -69,6 +69,7 @@
 
       <NbDataTable
         v-nb-tour-step="'goals-table'"
+        stack-on-phone
         :columns="columns"
         :rows="rows"
         row-key="number"
@@ -194,9 +195,9 @@ const scopeTabs = [
 ]
 
 const columns = [
-  { key: 'title', header: 'Goal' },
-  { key: 'status', header: 'Status', width: 150 },
-  { key: 'owner', header: 'Owner', width: 90 },
+  { key: 'title', header: 'Goal', primary: true },
+  { key: 'status', header: 'Status', width: 150, phoneMeta: true },
+  { key: 'owner', header: 'Owner', width: 90, phoneMeta: true },
   { key: 'progress', header: 'Work', width: 280 },
   { key: 'target', header: 'Target', width: 140 },
   { key: 'checkin', header: 'Last check-in', width: 130 },

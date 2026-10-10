@@ -69,8 +69,11 @@
     </p>
 
     <div class="doc-chrome__controls">
+      <!-- Not on a phone: every page is as wide as the screen there, so the
+           toggle changed nothing you could see and still saved a width that
+           every desktop reader then got. -->
       <NbButton
-        v-if="canEdit"
+        v-if="canEdit && !phone"
         v-nb-tooltip="{
           body: wide ? 'Use the default page width' : 'Use a wide page',
         }"
@@ -115,7 +118,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useToast } from '@nubisco/ui'
+import { usePhoneLayout, useToast } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
 import { humanise } from '@/lib/state'
 import { useViewCommands } from '@/lib/commands'
@@ -127,6 +130,7 @@ import {
 import type { IDocStats } from '@/lib/docText'
 import ActorChip from '@/components/ActorChip.vue'
 
+const { phone } = usePhoneLayout()
 const props = defineProps<{
   slug: string
   stats: IDocStats

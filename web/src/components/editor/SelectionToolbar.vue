@@ -18,6 +18,7 @@
     :anchor="anchor"
     placement="top"
     label="Selection"
+    dock="phone"
   >
     <NbButton
       v-for="action in ACTIONS"

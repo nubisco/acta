@@ -417,4 +417,15 @@ function onClose(): void {
     gap: var(--nb-spacing-16);
   }
 }
+
+/* A phone. The form's implicit track grows to its widest field, and two
+   14rem columns are wider than the dialog, so the fields ran off its edge.
+   One column, sized by the dialog. */
+@include variables.phone {
+  .goal-form,
+  .goal-form__row,
+  .goal-form__metric {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 </style>

@@ -160,7 +160,10 @@
           :to="wpath('/settings')"
           :active="route.name === 'settings'"
         />
+        <!-- A phone's drawer slides over the page and closes itself, so
+             there is no rail for it to collapse into. -->
         <NbSidebarMenuItem
+          v-if="!phone"
           label="Collapse sidebar"
           icon="caret-line-left"
           @click="toggleSidebar"
@@ -178,7 +181,7 @@
         :accounts-unknown="accounts.accountsUnknown.value"
         :show-account-actions="ws.signsInThroughNubisco.value"
         :show-profile="ws.platformUrl.value !== null"
-        placement="right-end"
+        :placement="phone ? 'top-start' : 'right-end'"
         trigger="identity"
         @open="loadAccounts"
         @switch="accounts.switchTo"
@@ -219,7 +222,11 @@
     <template #topbar-left>
       <!-- The workspace leads every trail, the way an org does on GitHub, so
            you can always see which one you are looking at. -->
-      <NbBreadcrumbs v-if="trail.length > 0" :title="namespace">
+      <NbBreadcrumbs
+        v-if="trail.length > 0"
+        :title="namespace"
+        collapse="phone"
+      >
         <RouterLink
           v-for="crumb in trail.slice(0, -1)"
           :key="crumb.to ?? crumb.text"
@@ -257,8 +264,10 @@
     @close="ui.newGoal.value = null"
     @saved="onGoalCreated"
   />
+  <!-- A phone has one size for a card: the sheet already fills the screen,
+       so ?full=1 opens the same sheet rather than a dialog inside it. -->
   <ItemModal
-    v-if="inspector.full.value && inspector.itemKey.value"
+    v-if="inspector.full.value && inspector.itemKey.value && !phone"
     :open="true"
     :item-key="inspector.itemKey.value"
     @close="inspector.dismiss()"
@@ -305,7 +314,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useCommandPalette, useTheme } from '@nubisco/ui'
+import { useCommandPalette, usePhoneLayout, useTheme } from '@nubisco/ui'
 import type { IUserMenuAccount, NbMenu, NbShell, TTheme } from '@nubisco/ui'
 import { useAccounts } from '@/stores/accounts'
 import { goalsTour, introTour, notificationsTour, tourLabels } from '@/lib/tour'
@@ -436,13 +445,30 @@ router.afterEach(() => {
 
 // Dual-flavor sidebar: route density decides; the user's toggle overrides
 // until the next navigation.
-const sidebarVariant = computed(
-  () => ui.sidebarChoice.value ?? sidebarDefaultFor(route.name),
+// On a phone the sidebar is a drawer over the page, and a drawer of bare
+// icons whose names live in hover tooltips cannot be read by touch, so it is
+// always the labelled one there.
+const { phone } = usePhoneLayout()
+const sidebarVariant = computed(() =>
+  phone.value
+    ? 'verbose'
+    : (ui.sidebarChoice.value ?? sidebarDefaultFor(route.name)),
 )
 watch(
   () => route.name,
   () => {
     ui.sidebarChoice.value = null
+  },
+)
+// A drawer that stays open after you chose where to go covers the place you
+// went. The shell closes it when a link inside it is used; this catches the
+// rest (a notification, a card's link to its board, Back).
+watch(
+  () => route.fullPath,
+  () => {
+    if (!phone.value) return
+    shell.value?.setSidebarOpen(false)
+    shell.value?.setContextbarOpen?.(false)
   },
 )
 function toggleSidebar(): void {
@@ -631,9 +657,9 @@ const inspectorVisible = ref(false)
 // The panel shows the card at its side size. At full size the same card is
 // on view, in the dialog, so the panel steps aside without closing it.
 watch(
-  [inspector.itemKey, inspector.full, homeLayout.editing],
-  ([key, full, editing]) => {
-    inspectorVisible.value = (key !== null && !full) || editing
+  [inspector.itemKey, inspector.full, homeLayout.editing, phone],
+  ([key, full, editing, onPhone]) => {
+    inspectorVisible.value = (key !== null && (!full || onPhone)) || editing
   },
 )
 watch(
@@ -648,7 +674,7 @@ watch(inspectorVisible, (visible) => {
   // Closing the panel closes whatever it held: a card, or the customizer.
   if (homeLayout.editing.value && !inspector.itemKey.value)
     homeLayout.editing.value = false
-  if (!inspector.full.value) inspector.dismiss()
+  if (!inspector.full.value || phone.value) inspector.dismiss()
 })
 
 async function signOut(): Promise<void> {

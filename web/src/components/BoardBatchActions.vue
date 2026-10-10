@@ -4,7 +4,21 @@
        Labels and literal icon names, since the library links icon artwork at
        build time. -->
   <span class="batch">
+    <!-- A phone: the same actions as icons, named for screen readers, so
+         the bar is one row at the foot of the screen rather than a column
+         of labelled buttons covering a third of it. Two branches per button
+         because NbButton is icon-only when it has no default slot. -->
     <NbButton
+      v-if="phone"
+      ref="moveBtn"
+      variant="ghost"
+      size="sm"
+      icon="arrow-square-right"
+      aria-label="Move to"
+      @click="toggle('move', moveBtn)"
+    />
+    <NbButton
+      v-else
       ref="moveBtn"
       variant="ghost"
       size="sm"
@@ -14,6 +28,16 @@
       Move to
     </NbButton>
     <NbButton
+      v-if="phone"
+      ref="assignBtn"
+      variant="ghost"
+      size="sm"
+      icon="user-plus"
+      aria-label="Assign"
+      @click="toggle('assign', assignBtn)"
+    />
+    <NbButton
+      v-else
       ref="assignBtn"
       variant="ghost"
       size="sm"
@@ -23,6 +47,16 @@
       Assign
     </NbButton>
     <NbButton
+      v-if="phone"
+      ref="labelBtn"
+      variant="ghost"
+      size="sm"
+      icon="tag"
+      aria-label="Label"
+      @click="toggle('label', labelBtn)"
+    />
+    <NbButton
+      v-else
       ref="labelBtn"
       variant="ghost"
       size="sm"
@@ -32,6 +66,16 @@
       Label
     </NbButton>
     <NbButton
+      v-if="phone"
+      ref="priorityBtn"
+      variant="ghost"
+      size="sm"
+      icon="flag"
+      aria-label="Priority"
+      @click="toggle('priority', priorityBtn)"
+    />
+    <NbButton
+      v-else
       ref="priorityBtn"
       variant="ghost"
       size="sm"
@@ -40,7 +84,21 @@
     >
       Priority
     </NbButton>
-    <NbButton variant="ghost" size="sm" icon="archive" @click="emit('archive')">
+    <NbButton
+      v-if="phone"
+      variant="ghost"
+      size="sm"
+      icon="archive"
+      aria-label="Archive"
+      @click="emit('archive')"
+    />
+    <NbButton
+      v-else
+      variant="ghost"
+      size="sm"
+      icon="archive"
+      @click="emit('archive')"
+    >
       Archive
     </NbButton>
 
@@ -90,7 +148,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { NbMenu } from '@nubisco/ui'
+import { usePhoneLayout, type NbMenu } from '@nubisco/ui'
 import { PRIORITY_OPTIONS, type TPriority } from '@/lib/priority'
 
 defineProps<{
@@ -108,6 +166,7 @@ const emit = defineEmits<{
 }>()
 
 type TWhich = 'move' | 'assign' | 'label' | 'priority'
+const { phone } = usePhoneLayout()
 const which = ref<TWhich>('move')
 const open = ref(false)
 const menu = ref<InstanceType<typeof NbMenu> | null>(null)

@@ -4,23 +4,39 @@
          every column (adds in place); the title is asked for in the modal, so
          the filter bar is purely filters. -->
     <component :is="topbarActions.Outlet">
-      <NbButton
-        size="sm"
-        :variant="stateFilter === 'archived' ? 'secondary' : 'ghost'"
-        icon="archive"
-        :aria-pressed="stateFilter === 'archived'"
-        @click="toggleArchived"
-      >
-        {{ stateFilter === 'archived' ? 'Back to space' : 'Archived' }}
-      </NbButton>
-      <NbButton size="sm" variant="primary" icon="plus" @click="openNewItem()">
-        Add item
-      </NbButton>
+      <!-- On a phone the topbar holds Add item as an icon and one menu for
+           the rest; the space's own menu folds into it. Desktop renders the
+           same buttons as before. -->
+      <NbActionGroup :items="topbarItems" overflow="phone">
+        <template #menu>
+          <!-- A touch screen has no X key and no modifier click, so picking
+               several cards is a mode: tap them, then act on them from the
+               bar at the foot of the screen. -->
+          <NbMenuItem
+            v-if="view === 'board'"
+            icon="check-square"
+            label="Select cards"
+            @select="selectMode = true"
+          />
+          <NbMenuItem
+            icon="archive"
+            label="Archive space"
+            @select="spaceActions.archive()"
+          />
+          <NbMenuItem
+            v-if="spaceActions.isAdmin.value"
+            icon="trash"
+            label="Delete space"
+            :disabled="spaceCardCount > 0"
+            @select="spaceActions.remove()"
+          />
+        </template>
+      </NbActionGroup>
       <SpaceActionsMenu
-        v-if="spaceMeta"
+        v-if="spaceMeta && !phone"
         :space-key="spaceMeta.key"
         :space-name="spaceMeta.name"
-        :cards="spaceMeta.lists.reduce((sum, l) => sum + l.items, 0)"
+        :cards="spaceCardCount"
       />
     </component>
 
@@ -45,77 +61,147 @@
             size="sm"
             placeholder="Filter cards on this space..."
           />
-          <!-- Labels alone keep a dropdown: there are too many for the bar,
+          <!-- A phone has room for the text filter and one button. The rest
+               of the bar opens in a sheet, the controls themselves moved
+               rather than copied, so the two can never disagree. Desktop
+               keeps every control in the bar (Jose, 2026-10-09). -->
+          <NbButton
+            v-if="phone"
+            size="sm"
+            :variant="filtersActive ? 'secondary' : 'ghost'"
+            icon="funnel"
+            aria-haspopup="dialog"
+            @click="filtersSheetOpen = true"
+          >
+            Filters
+            <NbBadge v-if="filtersActive" size="sm" variant="primary">
+              {{ filterCount }}
+            </NbBadge>
+          </NbButton>
+          <Teleport
+            :to="filtersSheetBody ?? 'body'"
+            :disabled="!filtersSheetBody"
+          >
+            <div
+              class="space__extras"
+              :class="{ 'space__extras--parked': phone && !filtersSheetBody }"
+            >
+              <!-- Labels alone keep a dropdown: there are too many for the bar,
                and a label's colour is half of what identifies it. The count
                is on the button, because a collapsed filter that does not say
                it is active is how you end up staring at a space that is
                missing cards. -->
-          <NbButton
-            ref="filtersButton"
-            size="sm"
-            :variant="
-              filtersOpen || labelFilter.length > 0 ? 'secondary' : 'ghost'
-            "
-            icon="tag"
-            :aria-pressed="filtersOpen"
-            aria-controls="space-filter-panel"
-            @click="toggleFilters"
-          >
-            Labels
-            <NbBadge v-if="labelFilter.length > 0" size="sm" variant="primary">
-              {{ labelFilter.length }}
-            </NbBadge>
-          </NbButton>
-          <!-- Everything else is in the bar, always visible: opening a
+              <div class="space__field" data-label="Labels">
+                <NbButton
+                  ref="filtersButton"
+                  size="sm"
+                  :variant="
+                    filtersOpen || labelFilter.length > 0
+                      ? 'secondary'
+                      : 'ghost'
+                  "
+                  icon="tag"
+                  :aria-pressed="filtersOpen"
+                  aria-controls="space-filter-panel"
+                  @click="toggleFilters"
+                >
+                  Labels
+                  <NbBadge
+                    v-if="labelFilter.length > 0"
+                    size="sm"
+                    variant="primary"
+                  >
+                    {{ labelFilter.length }}
+                  </NbBadge>
+                </NbButton>
+              </div>
+              <!-- Everything else is in the bar, always visible: opening a
                dropdown for every change of person, goal or status was the
                problem (Jose, 2026-10-09). -->
-          <ActorFilter v-model="assigneeFilter" label="Filter by assignee" />
-          <NbSelect
-            v-if="goalOptions.length > 1"
-            id="field-space-filter-goal"
-            size="sm"
-            :model-value="goalFilter === null ? '' : String(goalFilter)"
-            :options="goalOptions"
-            aria-label="Filter by goal"
-            @update:model-value="
-              goalFilter =
-                $event === '' || $event === null ? null : Number($event)
-            "
-          />
-          <NbSelect
-            id="field-space-filter-state"
-            v-model="stateFilter"
-            size="sm"
-            :options="STATE_OPTIONS"
-            aria-label="Filter by status"
-          />
-          <NbButton
-            v-if="filtersActive"
-            size="sm"
-            variant="ghost"
-            icon="x-circle"
-            @click="clearFilters"
-          >
-            Clear filters
-          </NbButton>
-          <NbSelect
-            v-if="view === 'board'"
-            id="field-board-sort"
-            v-model="sortBy"
-            size="sm"
-            :options="BOARD_SORTS"
-            aria-label="Order cards in each column by"
-          />
-          <NbSelect
-            id="field-swimlane"
-            v-model="swimlane"
-            size="sm"
-            :options="swimlaneOptions"
-            aria-label="Group cards into swimlanes"
-          />
+              <div class="space__field" data-label="People">
+                <ActorFilter
+                  v-model="assigneeFilter"
+                  label="Filter by assignee"
+                />
+              </div>
+              <div
+                v-if="goalOptions.length > 1"
+                class="space__field"
+                data-label="Goal"
+              >
+                <NbSelect
+                  id="field-space-filter-goal"
+                  size="sm"
+                  :model-value="goalFilter === null ? '' : String(goalFilter)"
+                  :options="goalOptions"
+                  aria-label="Filter by goal"
+                  @update:model-value="
+                    goalFilter =
+                      $event === '' || $event === null ? null : Number($event)
+                  "
+                />
+              </div>
+              <div class="space__field" data-label="Status">
+                <NbSelect
+                  id="field-space-filter-state"
+                  v-model="stateFilter"
+                  size="sm"
+                  :options="STATE_OPTIONS"
+                  aria-label="Filter by status"
+                />
+              </div>
+              <div v-if="filtersActive" class="space__field">
+                <NbButton
+                  size="sm"
+                  variant="ghost"
+                  icon="x-circle"
+                  @click="clearFilters"
+                >
+                  Clear filters
+                </NbButton>
+              </div>
+              <div
+                v-if="view === 'board'"
+                class="space__field"
+                data-label="Order cards by"
+              >
+                <NbSelect
+                  id="field-board-sort"
+                  v-model="sortBy"
+                  size="sm"
+                  :options="BOARD_SORTS"
+                  aria-label="Order cards in each column by"
+                />
+              </div>
+              <div class="space__field" data-label="Swimlanes">
+                <NbSelect
+                  id="field-swimlane"
+                  v-model="swimlane"
+                  size="sm"
+                  :options="swimlaneOptions"
+                  aria-label="Group cards into swimlanes"
+                />
+              </div>
+            </div>
+          </Teleport>
         </div>
       </div>
     </component>
+
+    <NbModal
+      v-if="phone"
+      :open="filtersSheetOpen"
+      size="md"
+      title="Filters"
+      @close="filtersSheetOpen = false"
+    >
+      <div ref="filtersSheetBody" class="space__sheet" />
+      <template #footer>
+        <NbButton variant="primary" @click="filtersSheetOpen = false">
+          Show cards
+        </NbButton>
+      </template>
+    </NbModal>
 
     <div v-if="load.state.value === 'loading'" class="space__skeleton">
       <NbSkeleton
@@ -192,6 +278,7 @@
     <NbBoard
       v-else
       v-model:selected="selected"
+      v-model:select-mode="selectMode"
       class="space__board"
       :columns="columns"
       :lanes="lanes"
@@ -271,7 +358,7 @@
     <NbMenu
       ref="filterMenu"
       v-model:open="filtersOpen"
-      :min-width="420"
+      :min-width="phone ? undefined : 420"
       :max-width="680"
       @close="filtersOpen = false"
     >
@@ -331,6 +418,19 @@
         :disabled="menuItem?.atBottom"
         @select="runCardAction('bottom')"
       />
+      <!-- A phone cannot drag a card, so the lists it could be dropped on
+           are offered here instead, the way Jira and Linear move an issue
+           from its menu. -->
+      <template v-if="phone && menuItem">
+        <NbMenuDivider />
+        <NbMenuItem
+          v-for="list in moveTargets"
+          :key="list.id"
+          icon="arrow-square-right"
+          :label="`Move to ${list.name}`"
+          @select="moveFromMenu(list.id)"
+        />
+      </template>
       <NbMenuDivider />
       <NbMenuItem
         v-if="menuItem?.row.archived"
@@ -369,13 +469,18 @@ import { computed, nextTick, onScopeDispose, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   useConfirm,
+  usePhoneLayout,
   useShellSlot,
   useToast,
   type IBoardItem,
   type IBoardMoveEvent,
   type IBoardMoveManyEvent,
   type IBoardNestEvent,
+  type IActionGroupItem,
 } from '@nubisco/ui'
+import * as iconArchive from '@nubisco/ui/icons/archive'
+import * as iconPlus from '@nubisco/ui/icons/plus'
+import { useSpaceActions } from '@/composables/useSpaceActions'
 import { api, newOpId } from '@/api/client'
 import { cardPath } from '@/lib/paths'
 import {
@@ -503,6 +608,42 @@ watch(
 // --- card context menu ------------------------------------------------------
 // Right-click is how a space is worked in Trello and Jira, and it is the only
 // place with room for actions that do not deserve a permanent button.
+const { phone } = usePhoneLayout()
+
+const spaceCardCount = computed(
+  () => spaceMeta.value?.lists.reduce((sum, l) => sum + l.items, 0) ?? 0,
+)
+const spaceActions = useSpaceActions(() => ({
+  spaceKey: spaceMeta.value?.key ?? '',
+  spaceName: spaceMeta.value?.name ?? '',
+}))
+const topbarItems = computed<IActionGroupItem[]>(() => [
+  {
+    id: 'archived',
+    label: stateFilter.value === 'archived' ? 'Back to space' : 'Archived',
+    icon: iconArchive,
+    variant: stateFilter.value === 'archived' ? 'secondary' : 'ghost',
+    pressed: stateFilter.value === 'archived',
+    onSelect: toggleArchived,
+  },
+  {
+    id: 'add',
+    label: 'Add item',
+    icon: iconPlus,
+    variant: 'primary',
+    priority: 'primary',
+    onSelect: () => openNewItem(),
+  },
+])
+
+/* The filters sheet on a phone. Its body is where the bar's controls are
+ * teleported while it is open, and back in the bar (parked) while it is not. */
+const filtersSheetOpen = ref(false)
+const selectMode = ref(false)
+const filtersSheetBody = ref<HTMLElement | null>(null)
+watch(phone, (onPhone) => {
+  if (!onPhone) filtersSheetOpen.value = false
+})
 const cardMenu = ref<InstanceType<typeof NbMenu> | null>(null)
 const cardMenuOpen = ref(false)
 const menuKey = ref('')
@@ -539,6 +680,19 @@ function openQuickEdit(
   anchor: HTMLElement,
 ): void {
   Object.assign(quickEdit, { open: true, field, key, anchor })
+}
+
+/** Every list but the card's own, for the phone's Move entries. */
+const moveTargets = computed(() =>
+  (spaceMeta.value?.lists ?? []).filter(
+    (l) => l.id !== menuItem.value?.row.list,
+  ),
+)
+
+function moveFromMenu(list: string): void {
+  const key = menuKey.value
+  cardMenuOpen.value = false
+  void moveRows([key], list)
 }
 
 function openCardMenu(event: MouseEvent, key: string): void {
@@ -1301,7 +1455,12 @@ async function onMoveMany(event: IBoardMoveManyEvent): Promise<void> {
 }
 
 function batchMove(list: string): Promise<void> {
-  const rows = rowsOf(selectedKeys.value)
+  return moveRows(selectedKeys.value, list)
+}
+
+/** To the end of another list, in order: what a drop on its foot does. */
+function moveRows(keys: string[], list: string): Promise<void> {
+  const rows = rowsOf(keys)
   let pos = tailPos(list, '')
   const positions = rows.map(() => (pos += 1024))
   const done = doneLists.value.has(list)
@@ -1320,8 +1479,14 @@ function batchMove(list: string): Promise<void> {
         row.done = done || undefined
         patchCard({ key: row.key, list, done })
       }),
-    `${rows.length} cards moved to ${list}.`,
+    rows.length === 1
+      ? `${rows[0].key} moved to ${listName(list)}.`
+      : `${rows.length} cards moved to ${listName(list)}.`,
   )
+}
+
+function listName(id: string): string {
+  return spaceMeta.value?.lists.find((l) => l.id === id)?.name ?? id
 }
 
 function batchAssign(handle: string): Promise<void> {
@@ -1466,12 +1631,49 @@ async function onNest(event: IBoardNestEvent): Promise<void> {
      * characters and the row read as cramped. A floor keeps the controls a
      * consistent size and stops the row reflowing every time a longer label
      * is chosen. */
-    > :deep(.nb-select) {
+    > :deep(.nb-select),
+    > .space__extras > .space__field > :deep(.nb-select) {
       min-inline-size: 9rem;
     }
 
     > :deep(.nb-text-input) {
       min-inline-size: 14rem;
+    }
+  }
+
+  /* No box of its own in the bar: its controls are the bar's flex items,
+     exactly as they were before the phone sheet needed a handle on them. */
+  &__extras,
+  &__field {
+    display: contents;
+  }
+
+  &__extras--parked {
+    display: none;
+  }
+
+  /* In the sheet each control is a labelled row: the bar's controls carry
+     their names as aria-labels only, which a row of bare selects and a lone
+     avatar stack cannot spare on a screen of their own. */
+  &__sheet .space__extras {
+    display: grid;
+    gap: var(--nb-spacing-16);
+  }
+
+  &__sheet .space__field {
+    display: grid;
+    gap: var(--nb-spacing-4);
+    justify-items: start;
+
+    &[data-label]::before {
+      content: attr(data-label);
+      font-size: var(--nb-type-label-md-size);
+      font-weight: var(--nb-type-label-md-weight);
+      color: var(--nb-c-text-muted);
+    }
+
+    > :deep(.nb-select) {
+      justify-self: stretch;
     }
   }
 
@@ -1505,6 +1707,20 @@ async function onNest(event: IBoardNestEvent): Promise<void> {
     max-block-size: calc(100dvh - var(--space-chrome, 13rem));
     overflow: auto;
     overscroll-behavior: contain;
+  }
+}
+
+/* A phone: the bar is one row, the text filter taking what the Filters
+   button leaves. */
+@include variables.phone {
+  .space__filters {
+    flex-wrap: nowrap;
+    gap: var(--nb-spacing-8);
+
+    > :deep(.nb-text-input) {
+      flex: 1;
+      min-inline-size: 0;
+    }
   }
 }
 </style>

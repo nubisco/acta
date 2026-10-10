@@ -21,6 +21,7 @@
     </header>
 
     <NbDataTable
+      stack-on-phone
       :columns="columns"
       :rows="rows"
       row-key="id"
@@ -189,6 +190,14 @@ function onCreated(): void {
       outline: 1px solid var(--nb-c-focus-ring);
       outline-offset: 2px;
     }
+  }
+}
+
+/* A phone: the action goes under the heading and its description, rather
+   than beside them squeezing the text to half the width. */
+@include variables.phone {
+  .people-settings__head {
+    flex-wrap: wrap;
   }
 }
 </style>

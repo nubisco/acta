@@ -9,28 +9,50 @@
     </header>
 
     <component :is="actions.Outlet">
-      <NbButton
-        v-nb-tooltip="{
-          body: layout.editing.value
-            ? 'Close the customizer'
-            : 'Choose and arrange what Home shows',
-        }"
-        size="sm"
-        :variant="layout.editing.value ? 'secondary' : 'ghost'"
-        icon="sliders-horizontal"
-        :aria-pressed="layout.editing.value"
-        @click="layout.editing.value = !layout.editing.value"
-      >
-        Customize
-      </NbButton>
-      <NbButton
-        size="sm"
-        variant="primary"
-        icon="plus"
-        @click="ui.newSpaceOpen.value = true"
-      >
-        Create space
-      </NbButton>
+      <!-- A phone: both as icons, since two labelled buttons beside the
+           breadcrumb were wider than the screen and pushed Create space off
+           it. Their names stay as the accessible names. -->
+      <template v-if="phone">
+        <NbButton
+          size="sm"
+          :variant="layout.editing.value ? 'secondary' : 'ghost'"
+          icon="sliders-horizontal"
+          aria-label="Customize Home"
+          :aria-pressed="layout.editing.value"
+          @click="layout.editing.value = !layout.editing.value"
+        />
+        <NbButton
+          size="sm"
+          variant="primary"
+          icon="plus"
+          aria-label="Create space"
+          @click="ui.newSpaceOpen.value = true"
+        />
+      </template>
+      <template v-else>
+        <NbButton
+          v-nb-tooltip="{
+            body: layout.editing.value
+              ? 'Close the customizer'
+              : 'Choose and arrange what Home shows',
+          }"
+          size="sm"
+          :variant="layout.editing.value ? 'secondary' : 'ghost'"
+          icon="sliders-horizontal"
+          :aria-pressed="layout.editing.value"
+          @click="layout.editing.value = !layout.editing.value"
+        >
+          Customize
+        </NbButton>
+        <NbButton
+          size="sm"
+          variant="primary"
+          icon="plus"
+          @click="ui.newSpaceOpen.value = true"
+        >
+          Create space
+        </NbButton>
+      </template>
     </component>
 
     <!-- The panels, in the order this person chose. Wide ones take the full
@@ -69,7 +91,7 @@
  * lib/homePanels.ts and the customizer in the inspector).
  */
 import { computed, onBeforeUnmount, onMounted, type Component } from 'vue'
-import { useShellSlot } from '@nubisco/ui'
+import { usePhoneLayout, useShellSlot } from '@nubisco/ui'
 import { useUiState, useWorkspace } from '@/stores/workspace'
 import { useHomeLayout } from '@/composables/useHomeLayout'
 import { useNextUp } from '@/composables/useNextUp'
@@ -94,6 +116,7 @@ const PANEL_COMPONENTS: Record<string, Component> = {
 
 const ws = useWorkspace()
 const ui = useUiState()
+const { phone } = usePhoneLayout()
 const actions = useShellSlot('topbar-right')
 const layout = useHomeLayout()
 const nextUp = useNextUp()

@@ -12,7 +12,55 @@
 
     <div class="docs__content">
       <component :is="topbarActions.Outlet">
-        <template v-if="doc && !editing">
+        <!-- A phone: Edit, and one menu for everything else. The topbar is
+             a third of the width the desktop row needs, and the row was
+             clipped with Edit past the edge of the screen. -->
+        <template v-if="doc && !editing && phone">
+          <NbButton
+            size="sm"
+            variant="primary"
+            icon="pencil-simple"
+            aria-label="Edit"
+            @click="startEdit"
+          />
+          <DocTransferMenu :doc="doc">
+            <NbMenuItem
+              icon="clock-counter-clockwise"
+              :label="`Version history (v${doc.rev})`"
+              @select="showHistory = !showHistory"
+            />
+            <NbMenuItem
+              v-if="canEdit"
+              icon="arrow-square-right"
+              label="Move page"
+              @select="moving = true"
+            />
+            <NbMenuItem
+              icon="trash"
+              label="Delete page"
+              danger
+              @select="removeDoc"
+            />
+          </DocTransferMenu>
+        </template>
+        <template v-else-if="doc && editing && phone">
+          <NbButton
+            size="sm"
+            variant="ghost"
+            icon="x"
+            aria-label="Cancel editing"
+            @click="cancelEdit"
+          />
+          <NbButton
+            size="sm"
+            variant="primary"
+            :loading="saving"
+            @click="save()"
+          >
+            Save
+          </NbButton>
+        </template>
+        <template v-else-if="doc && !editing">
           <NbButton
             size="sm"
             variant="secondary"
@@ -123,6 +171,7 @@
 
         <div v-if="showHistory && doc.versions" class="docs__history">
           <NbDataTable
+            stack-on-phone
             :columns="versionColumns"
             :rows="versionRows"
             row-key="rev"
@@ -256,6 +305,7 @@ import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import {
   prefersReducedMotion,
   useConfirm,
+  usePhoneLayout,
   useShellSlot,
   useToast,
 } from '@nubisco/ui'
@@ -295,6 +345,7 @@ const props = defineProps<{ slug?: string }>()
 const toast = useToast()
 const confirm = useConfirm()
 const router = useRouter()
+const { phone } = usePhoneLayout()
 
 // Inside the docs space a doc ref navigates for real; the quick-look modal
 // is for every other surface.
@@ -553,9 +604,9 @@ onMounted(() => window.addEventListener('keydown', onSaveShortcut))
 onBeforeUnmount(() => window.removeEventListener('keydown', onSaveShortcut))
 
 const versionColumns = [
-  { key: 'version', header: 'Version' },
-  { key: 'by', header: 'By' },
-  { key: 'when', header: 'When' },
+  { key: 'version', header: 'Version', primary: true },
+  { key: 'by', header: 'By', phoneMeta: true },
+  { key: 'when', header: 'When', phoneMeta: true },
 ]
 
 const versionRows = computed(() =>
@@ -1104,6 +1155,17 @@ async function restoreVersion(): Promise<void> {
         font-weight: 400;
       }
     }
+  }
+}
+
+/* A phone. The page column is a grid whose implicit track grows to its
+   widest child, and in the editor that is a table at its full width, so the
+   text ran past the screen edge. The track follows the column, and the
+   table scrolls inside its own block (styles/prose.scss). */
+@include variables.phone {
+  .docs__content,
+  .docs__doc {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

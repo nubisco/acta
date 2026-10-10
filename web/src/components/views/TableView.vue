@@ -1,5 +1,6 @@
 <template>
   <NbDataTable
+    stack-on-phone
     :columns="columns"
     :rows="rows"
     row-key="key"
@@ -100,9 +101,15 @@ const props = defineProps<{ items: ISpaceItemRow[] }>()
 const emit = defineEmits<{ open: [key: string] }>()
 
 const columns = [
-  { key: 'key', header: 'Key', sortable: true, width: '7rem' },
-  { key: 'title', header: 'Title', sortable: true },
-  { key: 'list', header: 'List', sortable: true, width: '10rem' },
+  { key: 'key', header: 'Key', sortable: true, width: '7rem', phoneMeta: true },
+  { key: 'title', header: 'Title', sortable: true, primary: true },
+  {
+    key: 'list',
+    header: 'List',
+    sortable: true,
+    width: '10rem',
+    phoneMeta: true,
+  },
   { key: 'labels', header: 'Labels', width: '12rem' },
   { key: 'assignees', header: 'Assignees', width: '8rem' },
   { key: 'priority', header: 'Priority', sortable: true, width: '7rem' },

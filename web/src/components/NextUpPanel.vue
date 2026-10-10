@@ -249,7 +249,15 @@ function why(item: INextItem): string {
 
     &__reasons {
       grid-column: 1 / -1;
+      grid-row: 2;
       justify-content: flex-start;
+    }
+
+    /* The (i) beside the title, not on a line of its own under the badges,
+       where it made every row a third taller. */
+    &__row > :last-child {
+      grid-column: 2;
+      grid-row: 1;
     }
   }
 }
