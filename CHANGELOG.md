@@ -1,3 +1,10 @@
+# [1.48.0](https://github.com/nubisco/acta/compare/v1.47.1...v1.48.0) (2026-10-10)
+
+
+### Features
+
+* **mobile:** Acta works on a phone, and the desktop is unchanged ([697ae65](https://github.com/nubisco/acta/commit/697ae6599a812a9fdd59f46d88f912ccc04bee4c))
+
 ## [1.47.1](https://github.com/nubisco/acta/compare/v1.47.0...v1.47.1) (2026-10-09)
 
 
