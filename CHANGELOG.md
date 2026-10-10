@@ -1,3 +1,10 @@
+## [1.48.2](https://github.com/nubisco/acta/compare/v1.48.1...v1.48.2) (2026-10-10)
+
+
+### Bug Fixes
+
+* **mentions:** a mention is @Name in the text, with no face ([e3f99ff](https://github.com/nubisco/acta/commit/e3f99ff7cd0596999111f7831cee7f1860ab286e))
+
 ## [1.48.1](https://github.com/nubisco/acta/compare/v1.48.0...v1.48.1) (2026-10-10)
 
 
