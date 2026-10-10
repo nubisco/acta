@@ -325,7 +325,7 @@
             v-if="editingDescription"
             v-model="it.draft.description"
             placeholder="Describe this item... headings, lists and code all work"
-            class="item-modal__editor"
+            frame-class="item-modal__editor"
             autofocus
             @blur="commitDescription"
           />
@@ -702,8 +702,13 @@ function commitDescription(): void {
     flex: none;
   }
 
+  /* The title asks for 24rem before the badge and the row of actions get
+     theirs, and the row wraps when it cannot have it. Without that the
+     actions kept their width and the title was squeezed to 188px at 1440,
+     five lines for a short sentence (Jose, 2026-10-10). */
   &__title-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: start;
     gap: var(--nb-spacing-12);
 
@@ -714,7 +719,7 @@ function commitDescription(): void {
   }
 
   &__title {
-    flex: 1;
+    flex: 1 1 24rem;
     min-inline-size: 0;
 
     /* Same reason as the inspector: at 16px the title matched the body prose
@@ -739,24 +744,6 @@ function commitDescription(): void {
     :deep(.nb-badge) {
       text-transform: none;
       letter-spacing: 0;
-    }
-  }
-
-  &__editor {
-    border: 1px solid var(--nb-c-primary);
-    border-radius: var(--nb-radius-sm);
-    padding: var(--nb-spacing-12);
-
-    :deep(.tiptap h1),
-    :deep(.tiptap h2) {
-      font-size: var(--nb-type-heading-02-size);
-      line-height: 1.25;
-    }
-
-    :deep(.tiptap h3),
-    :deep(.tiptap h4) {
-      font-size: var(--nb-type-heading-01-size);
-      line-height: 1.3;
     }
   }
 
@@ -832,5 +819,25 @@ function commitDescription(): void {
   gap: 10px;
   flex-wrap: wrap;
   min-inline-size: 0;
+}
+
+/* Inside MarkdownEditor, which is a child component, so the scoped style
+ reaches it through :deep. */
+:deep(.item-modal__editor) {
+  border: 1px solid var(--nb-c-primary);
+  border-radius: var(--nb-radius-sm);
+  padding: var(--nb-spacing-12);
+
+  .tiptap h1,
+  .tiptap h2 {
+    font-size: var(--nb-type-heading-02-size);
+    line-height: 1.25;
+  }
+
+  .tiptap h3,
+  .tiptap h4 {
+    font-size: var(--nb-type-heading-01-size);
+    line-height: 1.3;
+  }
 }
 </style>

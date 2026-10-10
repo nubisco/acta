@@ -297,7 +297,7 @@
           v-if="editingDescription"
           v-model="it.draft.description"
           placeholder="Describe this item..."
-          class="inspector-editor"
+          frame-class="inspector-editor"
           autofocus
           @blur="commitDescription"
         />
@@ -863,19 +863,21 @@ function commitDescription(): void {
   line-height: 1.25;
 }
 
-.inspector-editor {
+/* Inside MarkdownEditor, which is a child component, so the scoped style
+   reaches it through :deep. */
+:deep(.inspector-editor) {
   border: 1px solid var(--nb-c-primary);
   border-radius: var(--nb-radius-sm);
   padding: var(--nb-spacing-8);
 
-  :deep(.tiptap h1),
-  :deep(.tiptap h2) {
+  .tiptap h1,
+  .tiptap h2 {
     font-size: var(--nb-type-heading-02-size);
     line-height: 1.25;
   }
 
-  :deep(.tiptap h3),
-  :deep(.tiptap h4) {
+  .tiptap h3,
+  .tiptap h4 {
     font-size: var(--nb-type-heading-01-size);
     line-height: 1.3;
   }

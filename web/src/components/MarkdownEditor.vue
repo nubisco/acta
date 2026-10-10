@@ -107,7 +107,7 @@
   <!-- The positioning context the image controls measure against. They are
        absolutely placed over whichever picture is hovered or selected, so
        they need a frame that does not move when the page scrolls. -->
-  <div ref="frameEl" class="md-editor__frame">
+  <div ref="frameEl" class="md-editor__frame" :class="frameClass">
     <EditorContent :editor="editor" class="md-editor" />
     <ImageTools
       :editor="editor"
@@ -188,6 +188,12 @@ const props = defineProps<{
    * has a margin to put them in, not for a card description or a comment box.
    */
   blockTools?: boolean
+  /**
+   * A class for the box around the text. The editor has several root
+   * elements (the toolbars are siblings of the box), so a plain `class` on
+   * it lands nowhere, which is how the card's editing frame went missing.
+   */
+  frameClass?: string
 }>()
 
 const emit = defineEmits<{
