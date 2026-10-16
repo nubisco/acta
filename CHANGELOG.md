@@ -1,3 +1,10 @@
+## [1.48.3](https://github.com/nubisco/acta/compare/v1.48.2...v1.48.3) (2026-10-16)
+
+
+### Bug Fixes
+
+* LA-373 (Acta Labs card): finish the change already in this w ([b7ca275](https://github.com/nubisco/acta/commit/b7ca275f0d18620d817d7befd8e5821b455a7d4e))
+
 ## [1.48.2](https://github.com/nubisco/acta/compare/v1.48.1...v1.48.2) (2026-10-10)
 
 
