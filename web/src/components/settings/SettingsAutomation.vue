@@ -9,30 +9,52 @@
       that actually distinguishes them, so each section leads with it.
     -->
 
-    <NbBanner
-      v-if="fresh"
-      status="info"
-      variant="inline"
-      :title="fresh.title"
-      dismissible
-      @close="fresh = null"
+    <!--
+      A modal rather than a banner at the top of the page: the secret is shown
+      once, and a user scrolled down to the section they just used never saw a
+      banner above the fold. It stays until dismissed with Done or the close
+      button, and a stray click on the overlay does not lose it.
+    -->
+    <NbModal
+      close-appearance="button"
+      :open="fresh !== null"
+      :title="fresh?.title ?? ''"
+      size="sm"
+      :close-on-overlay="false"
+      @close="dismissFresh"
     >
-      <NbField
-        v-for="field in fresh.fields"
-        :key="field.label"
-        v-slot="{ id }"
-        :label="field.label"
-        orientation="stack"
-      >
-        <div class="automation__reveal">
-          <NbTextInput :id="id" :model-value="field.value" readonly size="sm" />
-          <NbButton size="sm" variant="secondary" @click="copy(field.value)">
-            Copy
-          </NbButton>
-        </div>
-      </NbField>
-      <p v-if="fresh.hint" class="automation__hint">{{ fresh.hint }}</p>
-    </NbBanner>
+      <template v-if="fresh">
+        <NbField
+          v-for="field in fresh.fields"
+          :key="field.label"
+          v-slot="{ id }"
+          :label="field.label"
+          orientation="stack"
+        >
+          <div class="automation__reveal">
+            <NbTextInput
+              :id="id"
+              :model-value="field.value"
+              readonly
+              size="sm"
+            />
+            <NbButton
+              size="sm"
+              variant="secondary"
+              :icon="copyState[field.label] === 'copied' ? 'check' : undefined"
+              :data-copy="field.label"
+              @click="copy(field.label, field.value)"
+            >
+              {{ copyLabel(field.label) }}
+            </NbButton>
+          </div>
+        </NbField>
+        <p v-if="fresh.hint" class="automation__hint">{{ fresh.hint }}</p>
+      </template>
+      <template #footer>
+        <NbButton variant="primary" @click="dismissFresh">Done</NbButton>
+      </template>
+    </NbModal>
 
     <!-- Inbound, unauthenticated senders ------------------------------- -->
     <NbPanel class="automation__section">
@@ -337,7 +359,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { useConfirm, useToast } from '@nubisco/ui'
 import { api, newOpId as opId } from '@/api/client'
 import { humanise } from '@/lib/state'
@@ -516,10 +538,43 @@ async function refresh(): Promise<void> {
 
 void refresh()
 
-async function copy(text: string): Promise<void> {
-  await navigator.clipboard.writeText(text)
-  toast.success('Copied')
+const COPIED_MS = 2000
+const copyState = ref<Record<string, 'copied' | 'failed'>>({})
+const copyTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+function copyLabel(label: string): string {
+  const state = copyState.value[label]
+  if (state === 'copied') return 'Copied'
+  return state === 'failed' ? 'Copy failed' : 'Copy'
 }
+
+/** The button says what happened for a moment, then goes back to "Copy". */
+async function copy(label: string, text: string): Promise<void> {
+  let state: 'copied' | 'failed' = 'copied'
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    state = 'failed'
+  }
+  copyState.value = { ...copyState.value, [label]: state }
+  clearTimeout(copyTimers.get(label))
+  copyTimers.set(
+    label,
+    setTimeout(() => {
+      const rest = { ...copyState.value }
+      delete rest[label]
+      copyState.value = rest
+      copyTimers.delete(label)
+    }, COPIED_MS),
+  )
+}
+
+function dismissFresh(): void {
+  fresh.value = null
+  copyState.value = {}
+}
+
+onBeforeUnmount(() => copyTimers.forEach((t) => clearTimeout(t)))
 
 function onIngestCreated(token: string): void {
   creatingIngest.value = false
@@ -542,6 +597,7 @@ function onAgentCreated(token: string): void {
     title: 'Copy this token now. It is shown once.',
     fields: [{ label: 'Token', value: token }],
   }
+  void refresh()
 }
 
 function onWebhookCreated(): void {
