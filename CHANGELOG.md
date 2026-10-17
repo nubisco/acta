@@ -1,3 +1,10 @@
+## [1.48.4](https://github.com/nubisco/acta/compare/v1.48.3...v1.48.4) (2026-10-17)
+
+
+### Bug Fixes
+
+* **avatars:** the [@acta](https://github.com/acta) account wears the Acta mark ([f855332](https://github.com/nubisco/acta/commit/f8553323e190a4a6bffcb5a5abfdaefc546862b6))
+
 ## [1.48.3](https://github.com/nubisco/acta/compare/v1.48.2...v1.48.3) (2026-10-16)
 
 
