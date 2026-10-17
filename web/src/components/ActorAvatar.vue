@@ -8,6 +8,7 @@
       focusable: true,
     }"
     class="avatar"
+    :class="{ 'avatar--system': isSystem }"
     :style="{
       background: color,
       inlineSize: `${size}px`,
@@ -76,10 +77,21 @@ const initials = computed(() => {
 
 const color = computed(() => chartColorFor(props.handle))
 
+/**
+ * Acta itself (the `@acta` system account, which reminders, automations and
+ * imports are credited to) wears the app's own mark rather than "AC" on a
+ * coloured disc. Nobody uploads a picture for it, and its initials read as a
+ * colleague called Ac. Squared off like an app icon, so it is not mistaken
+ * for a person either.
+ */
+const isSystem = computed(() => actor.value?.kind === 'system')
+
 const imageFailed = ref(false)
-const avatarUrl = computed(() =>
-  imageFailed.value ? null : (actor.value?.avatar_url ?? null),
-)
+const avatarUrl = computed(() => {
+  if (imageFailed.value) return null
+  if (isSystem.value) return actor.value?.avatar_url ?? '/icons/acta-128.png'
+  return actor.value?.avatar_url ?? null
+})
 </script>
 
 <style scoped lang="scss">
@@ -93,6 +105,10 @@ const avatarUrl = computed(() =>
   color: var(--nb-c-bg);
   flex: none;
   overflow: hidden;
+}
+
+.avatar--system {
+  border-radius: 22%;
 }
 
 .avatar__img {

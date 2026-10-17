@@ -88,8 +88,8 @@
             "
           >
             <ActorAvatar
-              v-if="(row as IRow).handle"
-              :handle="(row as IRow).handle"
+              v-if="(row as IRow).face"
+              :handle="(row as IRow).face"
               :size="22"
             />
             {{ (row as IRow).who }}
@@ -200,7 +200,10 @@ interface IRow extends Record<string, unknown> {
   ts: number
   when: string
   who: string
+  /** Whose filter a click sets: empty when there is no person to filter by. */
   handle: string
+  /** Whose avatar the row wears, Acta's own for a row nobody did. */
+  face: string
   what: string
   /** The summary, split into the things it names. See lib/activity.ts. */
   parts: TActivitySegment[]
@@ -244,6 +247,9 @@ function onlyThisPerson(handle: string): void {
  * pulled in. Load more, and the sort covers more.
  */
 const rows = computed<IRow[]>(() => {
+  // A row nobody in the directory did is Acta's own doing, so it wears
+  // Acta's face (the system account's), not none.
+  const acta = ws.overview.value?.actors.find((a) => a.kind === 'system')
   const mapped: IRow[] = events.value.map((event) => {
     const actor = ws.overview.value?.actors.find((a) => a.id === event.actor_id)
     return {
@@ -252,6 +258,7 @@ const rows = computed<IRow[]>(() => {
       when: relativeTime(event.ts),
       who: actor?.name ?? 'Acta',
       handle: actor?.handle ?? '',
+      face: actor?.handle ?? acta?.handle ?? '',
       // Kept as plain text as well: it is what the column sorts on, and what
       // a screen reader gets if the cell is read as a whole.
       what: event.summary,

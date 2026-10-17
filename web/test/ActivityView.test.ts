@@ -164,4 +164,21 @@ describe('the activity feed', () => {
     // feed to nobody.
     expect(view.find('.activity-view__who--live').exists()).toBe(false)
   })
+
+  it("puts Acta's face on a row nobody did", async () => {
+    const before = overview.value
+    overview.value = {
+      actors: [
+        ...(before?.actors ?? []),
+        { id: 'a9', handle: 'acta', kind: 'system', name: 'Acta' },
+      ],
+    }
+    const view = await render([
+      { ...EVENT, actor_id: 'system', actor_kind: 'system' },
+    ])
+    expect(view.find('.activity-view__who img').attributes('src')).toBe(
+      '/icons/acta-128.png',
+    )
+    overview.value = before
+  })
 })
