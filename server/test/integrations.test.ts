@@ -536,7 +536,7 @@ describe('ingest attachments', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         title: 'A billing question',
-        assignees: ['jose', 'nobody-by-that-name'],
+        assignees: ['jose', 'nobody-by-that-name', 'acta'],
       }),
     })
     const json = (await res.json()) as {
@@ -547,7 +547,9 @@ describe('ingest attachments', () => {
     // The card survives the unknown handle, the real owner still lands, and
     // the caller is told exactly which handle was not recognised.
     expect(json.ok).toBe(true)
-    expect(json.assignees_skipped).toEqual(['nobody-by-that-name'])
+    // `acta` is the system actor: a real handle, and still not somebody a
+    // form may hand work to.
+    expect(json.assignees_skipped).toEqual(['nobody-by-that-name', 'acta'])
     const { items } = await itemGet(ctx, { keys: [json.key] })
     expect(items[0].assignees).toEqual(['jose'])
   })

@@ -135,9 +135,21 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
     // Owners follow the same rule as labels: one op each, and a handle that
     // names nobody (a person who left, a typo in the sender's routing table)
     // costs that assignee alone. The caller is told which ones did not land.
+    //
+    // Only an active person can be named. A token is a credential held by a
+    // form's backend, and what it may do with it is file a card for one of
+    // us, not put work on a bot or on an account that was switched off.
     const assigneesSkipped: string[] = []
     if (result.key) {
       for (const handle of body.assignees ?? []) {
+        const person = await db.query(
+          `SELECT 1 FROM actor WHERE workspace_id = ? AND handle = ? AND kind = 'human' AND disabled = 0`,
+          [token.workspace_id, handle],
+        )
+        if (person.length === 0) {
+          assigneesSkipped.push(handle)
+          continue
+        }
         const assigned = await itemWrite(ctx, [
           {
             op: 'assign',
