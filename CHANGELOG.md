@@ -1,3 +1,15 @@
+# [1.49.0](https://github.com/nubisco/acta/compare/v1.48.4...v1.49.0) (2026-10-19)
+
+
+### Bug Fixes
+
+* **ingest:** only an active person can be named as a card's owner ([00f2e18](https://github.com/nubisco/acta/commit/00f2e1886e7847cc4a24109a06fdc85d69999418))
+
+
+### Features
+
+* **ingest:** a sender can name the card's owners (MA-130) ([6e8f9e6](https://github.com/nubisco/acta/commit/6e8f9e6787686d71c54549c02d23b308abb481a8))
+
 ## [1.48.4](https://github.com/nubisco/acta/compare/v1.48.3...v1.48.4) (2026-10-17)
 
 
