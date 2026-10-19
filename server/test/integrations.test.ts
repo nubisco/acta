@@ -521,6 +521,37 @@ describe('ingest attachments', () => {
     expect(items[0].labels).toEqual(['real-label'])
   })
 
+  it('assigns the owners the sender names, and skips a handle that is nobody', async () => {
+    const created = await app.request('/api/v1/ingest_tokens', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${await tokenFor()}`,
+      },
+      body: JSON.stringify({ name: 'Contact form owners', space: 'SUP' }),
+    })
+    const { token } = (await created.json()) as { token: string }
+    const res = await app.request(`/api/v1/ingest/${token}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'A billing question',
+        assignees: ['jose', 'nobody-by-that-name'],
+      }),
+    })
+    const json = (await res.json()) as {
+      ok: boolean
+      key: string
+      assignees_skipped?: string[]
+    }
+    // The card survives the unknown handle, the real owner still lands, and
+    // the caller is told exactly which handle was not recognised.
+    expect(json.ok).toBe(true)
+    expect(json.assignees_skipped).toEqual(['nobody-by-that-name'])
+    const { items } = await itemGet(ctx, { keys: [json.key] })
+    expect(items[0].assignees).toEqual(['jose'])
+  })
+
   it('still creates the card when an attachment cannot be stored', async () => {
     const created = await app.request('/api/v1/ingest_tokens', {
       method: 'POST',

@@ -808,6 +808,13 @@ export const zIngest = z.object({
   title: z.string().min(1).max(500),
   description: z.string().max(100_000).optional(),
   labels: z.array(z.string()).max(20).optional(),
+  /**
+   * Handles of the people the card is for. A sender that already knows who
+   * owns a message (a contact form routing billing to the person who handles
+   * money) names them here, so the card is never unowned, not even for the
+   * moment a rule would take to fire.
+   */
+  assignees: z.array(z.string()).max(10).optional(),
   meta: z.record(z.string(), z.string()).optional(),
   /**
    * Text too long to belong in a description: a pasted stack trace, an

@@ -132,6 +132,24 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
       }
     }
 
+    // Owners follow the same rule as labels: one op each, and a handle that
+    // names nobody (a person who left, a typo in the sender's routing table)
+    // costs that assignee alone. The caller is told which ones did not land.
+    const assigneesSkipped: string[] = []
+    if (result.key) {
+      for (const handle of body.assignees ?? []) {
+        const assigned = await itemWrite(ctx, [
+          {
+            op: 'assign',
+            op_id: `ingest:${result.key}:assign:${handle}`,
+            key: result.key,
+            add: [handle],
+          },
+        ])
+        if (!assigned[0].ok) assigneesSkipped.push(handle)
+      }
+    }
+
     // Attachments are best-effort by design. The card is the outcome that
     // has to survive: a caller whose log failed to upload would rather have
     // the ticket without it than a 500 and no ticket at all. Failures are
@@ -163,6 +181,9 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
       ...(attached.length > 0 ? { attached } : {}),
       ...(failed.length > 0 ? { attachments_failed: failed } : {}),
       ...(labelsSkipped.length > 0 ? { labels_skipped: labelsSkipped } : {}),
+      ...(assigneesSkipped.length > 0
+        ? { assignees_skipped: assigneesSkipped }
+        : {}),
     })
   })
 
