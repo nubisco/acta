@@ -1,3 +1,10 @@
+## [1.51.1](https://github.com/nubisco/acta/compare/v1.51.0...v1.51.1) (2026-10-21)
+
+
+### Bug Fixes
+
+* **report:** reasons are separate facts, never causes of each other ([5d80218](https://github.com/nubisco/acta/commit/5d80218cdf07c51627139a94d8638f4b57f24dc5))
+
 # [1.51.0](https://github.com/nubisco/acta/compare/v1.50.0...v1.51.0) (2026-10-21)
 
 
