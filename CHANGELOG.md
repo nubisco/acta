@@ -1,3 +1,15 @@
+# [1.51.0](https://github.com/nubisco/acta/compare/v1.50.0...v1.51.0) (2026-10-21)
+
+
+### Bug Fixes
+
+* **report:** escape display names in Slack, and make the dev AI secret opt-in ([6be24a4](https://github.com/nubisco/acta/commit/6be24a4a99b6793ea4d8c3f2da7c7040b183ad90))
+
+
+### Features
+
+* **report:** a daily progress report to Slack, built around goals and hand-offs (LA-389) ([8ca66fc](https://github.com/nubisco/acta/commit/8ca66fc05ff0accc3d3b108b8922034efe08159f))
+
 # [1.50.0](https://github.com/nubisco/acta/compare/v1.49.0...v1.50.0) (2026-10-21)
 
 
