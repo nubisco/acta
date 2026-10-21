@@ -24,6 +24,11 @@ export function cardPath(key: string): string {
   )
 }
 
+/** A card's full address, for pasting somewhere outside Acta. */
+export function cardUrl(key: string): string {
+  return new URL(cardPath(key), window.location.origin).toString()
+}
+
 /**
  * Whether a click asks for a new tab or window. Every card has an address, so
  * a modified click on a card mention gets one instead of the in-app panel.

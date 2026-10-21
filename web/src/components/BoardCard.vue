@@ -25,6 +25,16 @@
     <div class="board-card__body">
       <div class="board-card__row board-card__head">
         <span class="board-card__key">{{ row.key }}</span>
+        <!-- The card's address, for pasting into a chat. Shown on hover and
+             focus with a pointer, so a board of cards is not a column of
+             icons, and always on touch, where there is no hover. -->
+        <NbCopyButton
+          class="board-card__copy board-card__live"
+          :text="cardUrl(row.key)"
+          :label="`Copy link to ${row.key}`"
+          copied-label="Link copied"
+          @error="copyFailed"
+        />
         <span
           v-if="row.parent_key"
           class="board-card__chip"
@@ -270,7 +280,7 @@
  */
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { usePhoneLayout } from '@nubisco/ui'
+import { usePhoneLayout, useToast } from '@nubisco/ui'
 import type { ISpaceItemRow } from '@/types/api'
 import {
   CARD_FACES,
@@ -282,7 +292,7 @@ import {
 } from '@/lib/cards'
 import { goalStatus } from '@/lib/goals'
 import { rowLabels } from '@/lib/labels'
-import { wpath } from '@/lib/paths'
+import { cardUrl, wpath } from '@/lib/paths'
 import { useWorkspace } from '@/stores/workspace'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import PriorityBadge from '@/components/PriorityBadge.vue'
@@ -301,6 +311,12 @@ const props = defineProps<{
 }>()
 
 const { phoneTouch } = usePhoneLayout()
+const toast = useToast()
+
+/** The link is still worth having when the browser will not copy it. */
+function copyFailed(): void {
+  toast.error(cardUrl(props.row.key), { title: 'Could not copy the link' })
+}
 
 const emit = defineEmits<{
   open: [key: string]
@@ -452,6 +468,29 @@ function edit(field: TCardField, event: MouseEvent): void {
     font-family: var(--nb-font-family-mono);
     font-size: var(--nb-type-code-sm-size);
     color: var(--nb-c-text-subtle);
+  }
+
+  /* The button is 24px and the row 22px. The negative margin keeps it from
+     setting the row's height, so no card grows by having it. */
+  &__copy {
+    margin-block: -4px;
+  }
+
+  /* Out of sight until the card is pointed at or reached by keyboard, and
+     held while it shows its checkmark. Hidden by opacity, not removed, so
+     the row does not shift when it appears. Keyboard focus only: a mouse
+     click leaves focus on the button, and that would pin it on screen. */
+  @media (hover: hover) {
+    &__copy {
+      opacity: 0;
+      transition: opacity 120ms ease;
+    }
+
+    &:hover &__copy,
+    &:has(:focus-visible) &__copy,
+    &__copy:has(.nb-copy-button__button--copied) {
+      opacity: 1;
+    }
   }
 
   &__chip {

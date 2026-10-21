@@ -27,15 +27,32 @@
       </NbBreadcrumbs>
     </template>
     <span v-else class="card-trail__key">{{ cardKey }}</span>
+    <!-- The card's address, for pasting into a chat. Next to the key because
+         the key is what people already point at when they share a card. -->
+    <NbCopyButton
+      :text="cardUrl(cardKey)"
+      :label="`Copy link to ${cardKey}`"
+      copied-label="Link copied"
+      @error="copyFailed"
+    />
   </span>
 </template>
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import { useToast } from '@nubisco/ui'
 import { useInspector } from '@/stores/workspace'
 import { useRefCards } from '@/stores/refs'
+import { cardUrl } from '@/lib/paths'
 
-defineProps<{ cardKey: string }>()
+const props = defineProps<{ cardKey: string }>()
+
+const toast = useToast()
+
+/** The link is still worth having when the browser will not copy it. */
+function copyFailed(): void {
+  toast.error(cardUrl(props.cardKey), { title: 'Could not copy the link' })
+}
 
 const inspector = useInspector()
 const refCards = useRefCards()

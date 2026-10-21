@@ -14,7 +14,11 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push }),
   useRoute: () => ({ query: {}, params: {} }),
 }))
-vi.mock('@/lib/paths', () => ({ wpath: (p: string) => `/nubisco${p}` }))
+vi.mock('@/lib/paths', () => ({
+  wpath: (p: string) => `/nubisco${p}`,
+  cardUrl: (key: string) =>
+    `https://acta.test/nubisco/s/${key.split('-')[0]}?item=${key}`,
+}))
 
 const itemGet = vi.fn()
 vi.mock('@/api/client', () => ({

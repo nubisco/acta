@@ -16,7 +16,11 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ query: {}, params: {} }),
 }))
 
-vi.mock('@/lib/paths', () => ({ wpath: (p: string) => `/nubisco${p}` }))
+vi.mock('@/lib/paths', () => ({
+  wpath: (p: string) => `/nubisco${p}`,
+  cardUrl: (key: string) =>
+    `https://acta.test/nubisco/s/${key.split('-')[0]}?item=${key}`,
+}))
 
 const itemGet = vi.fn()
 vi.mock('@/api/client', () => ({
@@ -218,6 +222,29 @@ describe('ItemInspector', () => {
     const view = await render()
     expect(view.find('.card-trail__crumbs').exists()).toBe(false)
     expect(view.find('.card-trail__key').text()).toBe('ST-73')
+  })
+
+  // Sharing a card in a chat meant opening its menu for "Copy link". The
+  // key is what people already point at, so the link is copied from there.
+  it('copies the card link from beside its key', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    useInspector().close()
+    useInspector().open('ST-73')
+    const view = await render()
+    const copy = view.find('.card-trail [aria-label="Copy link to ST-73"]')
+    expect(copy.exists()).toBe(true)
+    await copy.trigger('click')
+    await flushPromises()
+    expect(writeText).toHaveBeenCalledWith(
+      'https://acta.test/nubisco/s/ST?item=ST-73',
+    )
+    expect(view.find('.card-trail [aria-label="Link copied"]').exists()).toBe(
+      true,
+    )
   })
 
   // People did not know what Plan or Parts meant, or that "Build" was a

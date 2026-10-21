@@ -482,7 +482,7 @@ import * as iconArchive from '@nubisco/ui/icons/archive'
 import * as iconPlus from '@nubisco/ui/icons/plus'
 import { useSpaceActions } from '@/composables/useSpaceActions'
 import { api, newOpId } from '@/api/client'
-import { cardPath } from '@/lib/paths'
+import { cardUrl } from '@/lib/paths'
 import {
   BOARD_SORTS,
   compareBy,
@@ -725,7 +725,7 @@ async function runCardAction(action: TCardAction): Promise<void> {
     return
   }
   if (action === 'copy') {
-    const url = new URL(cardPath(key), window.location.origin).toString()
+    const url = cardUrl(key)
     try {
       await navigator.clipboard.writeText(url)
       toast.success(`Link to ${key} copied.`)
