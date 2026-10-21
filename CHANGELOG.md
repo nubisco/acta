@@ -1,3 +1,10 @@
+# [1.50.0](https://github.com/nubisco/acta/compare/v1.49.0...v1.50.0) (2026-10-21)
+
+
+### Features
+
+* **cards:** copy a card's link from beside its key ([bd7dfc6](https://github.com/nubisco/acta/commit/bd7dfc6ec6278c369ed476e32a5ba0a2e31aca7e))
+
 # [1.49.0](https://github.com/nubisco/acta/compare/v1.48.4...v1.49.0) (2026-10-19)
 
 
