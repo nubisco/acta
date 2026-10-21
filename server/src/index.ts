@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs'
-import { bunAssetReader, createApp } from './app'
+import { bunAssetReader, createApp, reportRunOptions } from './app'
+import { dailyReportTick } from './services/dailyReport'
 import { ssoConfigFromEnv } from './core/sso'
 import { oidcConfigFromEnv } from './core/oidc'
 import { openDb } from './db'
@@ -24,6 +25,10 @@ const app = await createApp(db, {
   oidc: oidcConfigFromEnv(process.env) ?? undefined,
   otpFallback: process.env.ACTA_OTP_FALLBACK === 'true',
   platformWebhookSecret: process.env.PLATFORM_WEBHOOK_SECRET,
+  aiEncryptionKey: process.env.ACTA_AI_ENCRYPTION_KEY,
+  // A local instance may store a key under a built-in secret, so the
+  // feature can be tried without configuring one. Production never does.
+  aiDevSecret: process.env.NODE_ENV !== 'production',
   live: bunLive,
   bootstrap: {
     workspaceName: process.env.ACTA_WORKSPACE ?? 'Nubisco',
@@ -53,6 +58,14 @@ setInterval(() => {
     channels,
     baseUrl: process.env.ACTA_BASE_URL,
   }).catch((err) => console.error('notification sweep failed', err))
+  void dailyReportTick(
+    db,
+    reportRunOptions({
+      aiEncryptionKey: process.env.ACTA_AI_ENCRYPTION_KEY,
+      aiDevSecret: process.env.NODE_ENV !== 'production',
+      baseUrl: process.env.ACTA_BASE_URL,
+    }),
+  ).catch((err) => console.error('daily report tick failed', err))
 }, SWEEP_INTERVAL_MS)
 
 export default {

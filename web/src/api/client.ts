@@ -401,6 +401,44 @@ export const api = {
       body: JSON.stringify(policy),
     }),
 
+  /** The workspace's AI provider. Admin only, and the key is write-only. */
+  aiSettings: () =>
+    req<{
+      settings: IAiSettings
+      defaults: Record<TAiProvider, string>
+      usage: IAiUsage
+    }>('/settings/ai'),
+  setAiSettings: (input: {
+    provider?: TAiProvider
+    model?: string | null
+    apiKey?: string | null
+  }) =>
+    req<{ settings: IAiSettings }>('/settings/ai', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
+
+  /** The daily progress report to Slack (LA-389). Admin only. */
+  dailyReport: () =>
+    req<{ config: IDailyReportConfig; runs: IDailyReportRun[] }>(
+      '/settings/daily-report',
+    ),
+  setDailyReport: (
+    input: Partial<Omit<IDailyReportConfig, 'hasWebhook'>> & {
+      slackWebhookUrl?: string | null
+    },
+  ) =>
+    req<{ config: IDailyReportConfig }>('/settings/daily-report', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
+  previewDailyReport: () =>
+    req<IDailyReportPreview>('/settings/daily-report/preview', {
+      method: 'POST',
+    }),
+  testDailyReport: () =>
+    req<IDailyReportPreview>('/settings/daily-report/test', { method: 'POST' }),
+
   docTree: () => req<{ docs: IDocNode[] }>('/docs'),
 
   docGet: (slug: string, include?: string[], atVersion?: number) =>
@@ -750,4 +788,57 @@ export function subscribeEvents(
     socket?.close()
     stream?.close()
   }
+}
+
+export type TAiProvider = 'anthropic' | 'openai' | 'gemini'
+
+export interface IAiSettings {
+  provider: TAiProvider
+  model: string | null
+  hasKey: boolean
+  updatedAt: number | null
+}
+
+export interface IAiUsage {
+  days: number
+  requests: number
+  inputTokens: number
+  outputTokens: number
+  estimatedCostUsd: number | null
+  unpricedModels: string[]
+  pricingVerifiedOn: string
+}
+
+export interface IDailyReportConfig {
+  enabled: boolean
+  mode: 'preview' | 'post'
+  hasWebhook: boolean
+  sendHour: number
+  timezone: string
+  weekdaysOnly: boolean
+  holidays: string[]
+  stallDays: number
+  slackIds: Record<string, string>
+  aiWriting: boolean
+}
+
+export interface IDailyReportRun {
+  id: string
+  runDate: string
+  status: 'pending' | 'posted' | 'preview' | 'skipped' | 'failed'
+  since: number
+  until: number
+  text: string | null
+  writer: 'ai' | 'plain' | null
+  error: string | null
+  createdAt: number
+}
+
+export interface IDailyReportPreview {
+  since: number
+  until: number
+  empty: boolean
+  text: string
+  writer: 'ai' | 'plain'
+  fallbackReason?: string
 }

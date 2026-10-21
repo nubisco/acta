@@ -29,6 +29,7 @@ import { startRulesEngine } from './services/rules'
 import { startWebhookDispatcher } from './services/webhooks'
 import { onEvent } from './core/events'
 import { liveFrame, type ILiveTransport } from './core/live'
+import type { IRunOptions } from './services/dailyReport'
 
 export interface IAppEnv {
   Variables: {
@@ -99,6 +100,31 @@ export interface IAppOptions {
    * which is right for tests and for anything running as one process.
    */
   live?: ILiveTransport
+  /**
+   * The secret workspace AI provider keys are encrypted under
+   * (ACTA_AI_ENCRYPTION_KEY). Unset, a key cannot be stored, unless
+   * `aiDevSecret` lets a local instance use a built-in one.
+   */
+  aiEncryptionKey?: string
+  aiDevSecret?: boolean
+}
+
+/**
+ * What the AI settings and the daily report run with, from the app options.
+ * The cron builds the same thing, so a scheduled report and a preview from
+ * Settings use one secret and one address.
+ */
+export function reportRunOptions(
+  opts: Pick<
+    IAppOptions,
+    'aiEncryptionKey' | 'aiDevSecret' | 'baseUrl' | 'fetchImpl'
+  >,
+): IRunOptions {
+  return {
+    secret: { secret: opts.aiEncryptionKey, devSecret: opts.aiDevSecret },
+    baseUrl: opts.baseUrl,
+    fetchImpl: opts.fetchImpl,
+  }
 }
 
 export async function createApp(
@@ -126,6 +152,7 @@ export async function createApp(
     )
 
   const app = new Hono<IAppEnv>()
+  const reportOpts = reportRunOptions(opts)
 
   app.use('*', async (c, next) => {
     c.set('db', db)
@@ -243,6 +270,7 @@ export async function createApp(
     apiRoutes(store, {
       remoteFetchDeps: opts.remoteFetchDeps,
       liveSocket: opts.live?.socket,
+      report: reportOpts,
     }),
   )
 
@@ -256,6 +284,7 @@ export async function createApp(
     apiRoutes(store, {
       remoteFetchDeps: opts.remoteFetchDeps,
       liveSocket: opts.live?.socket,
+      report: reportOpts,
     }),
   )
 

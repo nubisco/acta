@@ -626,6 +626,83 @@ CREATE TABLE IF NOT EXISTS link_preview (
 );
 CREATE INDEX IF NOT EXISTS idx_link_preview_expires ON link_preview(expires_at);
 
+-- The workspace's own AI provider key, the same bring-your-own-key deal
+-- Analytics and Verba offer: an admin supplies it, Nubisco never ships one,
+-- and with none configured the features that need it are simply off. The key
+-- is AES-GCM encrypted under ACTA_AI_ENCRYPTION_KEY and never read back out.
+CREATE TABLE IF NOT EXISTS ai_settings (
+  workspace_id TEXT PRIMARY KEY REFERENCES workspace(id),
+  provider TEXT NOT NULL DEFAULT 'anthropic'
+    CHECK (provider IN ('anthropic', 'openai', 'gemini')),
+  -- Null means the provider's default (see DEFAULT_MODELS).
+  model TEXT,
+  api_key_encrypted TEXT,
+  updated_at INTEGER NOT NULL
+);
+
+-- One row per request to the provider, so an admin can see what the key is
+-- spending. The provider bills them directly, so nothing else would show it.
+CREATE TABLE IF NOT EXISTS ai_usage_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  source TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  input_tokens INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_ws ON ai_usage_log(workspace_id, created_at);
+
+-- The daily progress report (LA-389): what moved, what it opened up, and
+-- where each person might look today, posted to Slack once a working day.
+CREATE TABLE IF NOT EXISTS daily_report (
+  workspace_id TEXT PRIMARY KEY REFERENCES workspace(id),
+  enabled INTEGER NOT NULL DEFAULT 0,
+  -- 'preview' writes the report and keeps it here, posting nothing. 'post'
+  -- sends it to the webhook. The rollout is preview first, then a test
+  -- channel, then the real one, and only the webhook changes between the two.
+  mode TEXT NOT NULL DEFAULT 'preview' CHECK (mode IN ('preview', 'post')),
+  slack_webhook_url TEXT,
+  -- Local time the report goes out, in the zone below.
+  send_hour INTEGER NOT NULL DEFAULT 9,
+  timezone TEXT NOT NULL DEFAULT 'Europe/Lisbon',
+  weekdays_only INTEGER NOT NULL DEFAULT 1,
+  -- JSON array of YYYY-MM-DD dates with no report.
+  holidays TEXT NOT NULL DEFAULT '[]',
+  -- How long a card holding up another may sit untouched before it is named.
+  stall_days INTEGER NOT NULL DEFAULT 5,
+  -- JSON object of Acta handle to Slack member id, so a mention notifies.
+  slack_ids TEXT NOT NULL DEFAULT '{}',
+  -- Have the workspace's AI provider write the prose. Off, the report is the
+  -- plain version built straight from the facts.
+  ai_writing INTEGER NOT NULL DEFAULT 1,
+  updated_at INTEGER NOT NULL
+);
+
+-- Every report written, posted or not. The unique date is what makes a
+-- scheduled run idempotent: two isolates or a retried cron both try to claim
+-- the day, and only one gets it. "Since the last report" reads its window
+-- from here.
+CREATE TABLE IF NOT EXISTS daily_report_run (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  -- The local date it was for, YYYY-MM-DD.
+  run_date TEXT NOT NULL,
+  claim TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'posted', 'preview', 'skipped', 'failed')),
+  since_ts INTEGER NOT NULL,
+  until_ts INTEGER NOT NULL,
+  text TEXT,
+  -- 'ai' when the provider wrote it, 'plain' when it was built from the facts.
+  writer TEXT,
+  error TEXT,
+  created_at INTEGER NOT NULL,
+  UNIQUE (workspace_id, run_date)
+);
+CREATE INDEX IF NOT EXISTS idx_daily_report_run_ws ON daily_report_run(workspace_id, until_ts);
+
 -- Full-text search over items, comments, docs (mvp F7).
 CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
   kind, ref, title, body, space_key, tokenize = 'unicode61'

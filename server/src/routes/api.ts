@@ -73,6 +73,22 @@ import {
 import type { IFetchDeps } from '../core/safeFetch'
 import { ruleList, ruleWrite, zRuleWrite } from '../services/rules'
 import {
+  AiConfigError,
+  DEFAULT_MODELS,
+  getAiSettings,
+  getUsageSummary,
+  saveAiSettings,
+} from '../services/ai'
+import {
+  ReportConfigError,
+  getReportConfig,
+  previewReport,
+  recentRuns,
+  saveReportConfig,
+  sendTestReport,
+  type IRunOptions,
+} from '../services/dailyReport'
+import {
   connectionList,
   connectionWrite,
   zConnectionWrite,
@@ -121,6 +137,23 @@ export interface IApiRouteOptions {
   remoteFetchDeps?: IFetchDeps
   /** Answers /events/socket. Unset means 404, and tabs use the stream. */
   liveSocket?: ILiveTransport['socket']
+  /**
+   * What the AI provider settings and the daily report need: the secret the
+   * provider key is encrypted under, Acta's address for links, and a fetch
+   * tests can replace.
+   */
+  report?: IRunOptions
+}
+
+/** Settings errors carry their own status. Anything else stays a 500. */
+async function settingsCall<T>(work: () => Promise<T>): Promise<T> {
+  try {
+    return await work()
+  } catch (err) {
+    if (err instanceof AiConfigError || err instanceof ReportConfigError)
+      throw new ApiError(err.status, err.message)
+    throw err
+  }
 }
 
 export function apiRoutes(
@@ -128,6 +161,7 @@ export function apiRoutes(
   options: IApiRouteOptions = {},
 ): Hono<IAuthEnv> {
   const app = new Hono<IAuthEnv>()
+  const reportOpts: IRunOptions = options.report ?? { secret: {} }
 
   app.onError((err, c) => {
     if (err instanceof ApiError) {
@@ -706,6 +740,91 @@ export function apiRoutes(
       ctx.workspaceId,
     ])
     return c.json({ comment_delete: body.comment_delete })
+  })
+
+  /**
+   * The workspace's AI provider (bring your own key, as in Analytics). Admin
+   * only, and the key is write-only: it is never in a response.
+   */
+  app.get('/settings/ai', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    return c.json({
+      settings: await getAiSettings(ctx.db, ctx.workspaceId),
+      defaults: DEFAULT_MODELS,
+      usage: await getUsageSummary(ctx.db, ctx.workspaceId),
+    })
+  })
+
+  app.put('/settings/ai', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    const body = z
+      .object({
+        provider: z.enum(['anthropic', 'openai', 'gemini']).optional(),
+        model: z.string().max(120).nullable().optional(),
+        apiKey: z.string().max(400).nullable().optional(),
+      })
+      .parse(await c.req.json())
+    const settings = await settingsCall(() =>
+      saveAiSettings(ctx.db, ctx.workspaceId, body, reportOpts.secret),
+    )
+    return c.json({ settings })
+  })
+
+  /** The daily progress report to Slack (LA-389). Admin only. */
+  app.get('/settings/daily-report', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    return c.json({
+      config: await getReportConfig(ctx.db, ctx.workspaceId),
+      runs: await recentRuns(ctx.db, ctx.workspaceId),
+    })
+  })
+
+  app.put('/settings/daily-report', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    const body = z
+      .object({
+        enabled: z.boolean().optional(),
+        mode: z.enum(['preview', 'post']).optional(),
+        slackWebhookUrl: z.string().max(500).nullable().optional(),
+        sendHour: z.number().int().optional(),
+        timezone: z.string().max(80).optional(),
+        weekdaysOnly: z.boolean().optional(),
+        holidays: z.array(z.string()).max(100).optional(),
+        stallDays: z.number().int().optional(),
+        slackIds: z.record(z.string(), z.string().max(40)).optional(),
+        aiWriting: z.boolean().optional(),
+      })
+      .parse(await c.req.json())
+    const config = await settingsCall(() =>
+      saveReportConfig(ctx.db, ctx.workspaceId, body),
+    )
+    return c.json({ config })
+  })
+
+  /** Today's report, written now and posted nowhere. */
+  app.post('/settings/daily-report/preview', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    return c.json(
+      await settingsCall(() =>
+        previewReport(ctx.db, ctx.workspaceId, reportOpts),
+      ),
+    )
+  })
+
+  /** The same preview, posted to the webhook and marked as a test. */
+  app.post('/settings/daily-report/test', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    return c.json(
+      await settingsCall(() =>
+        sendTestReport(ctx.db, ctx.workspaceId, reportOpts),
+      ),
+    )
   })
 
   app.patch('/members/:id', async (c) => {

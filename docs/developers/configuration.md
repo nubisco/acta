@@ -151,6 +151,30 @@ Every step in it is idempotent, which is what makes a retried cron or a
 second isolate harmless: due-date events are keyed on the card and the date,
 and a reminder is stamped in the same statement that selects it.
 
+## AI provider and the daily report
+
+The daily report posts one Slack message each working day: what was finished,
+what that opened up and for whom, where each goal stands, and focus points per
+person. An admin turns it on under **Settings, Daily report**, with a Slack
+incoming webhook. It can be written by the workspace's own AI provider
+(Anthropic, OpenAI or Gemini), the same bring-your-own-key deal Analytics
+offers: Acta never ships a key, and with none set the report goes out as a
+plain message built from the facts.
+
+| Variable                 | Default | What it does                                                                                                                                                                                      |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ACTA_AI_ENCRYPTION_KEY` | _unset_ | The secret provider keys are encrypted under (AES-GCM). Unset, a key cannot be saved. A local Bun instance not run with `NODE_ENV=production` falls back to a built-in secret so it can be tried. |
+
+On Cloudflare Workers it is a secret, not a var:
+
+```sh
+wrangler secret put ACTA_AI_ENCRYPTION_KEY
+```
+
+Changing it makes every stored provider key unreadable, and an admin has to
+enter the key again. The report rides the same cron as the sweep above, and
+claims each local date once, so a retried cron never posts twice.
+
 ## Importer variables
 
 Used by the [migration CLIs](/developers/migrate-trello), not by the server.

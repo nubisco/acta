@@ -31,6 +31,8 @@ export const ID_PREFIXES = [
   // Goals and the check-ins posted on them.
   'gol',
   'gup',
+  // A daily report run (LA-389).
+  'drr',
 ] as const
 
 export type TIdPrefix = (typeof ID_PREFIXES)[number]

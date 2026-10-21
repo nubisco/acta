@@ -13,6 +13,9 @@
 
     <SettingsPeople v-if="tab === 'people'" />
     <SettingsWorkspace v-else-if="tab === 'workspace' && ws.isAdmin.value" />
+    <SettingsDailyReport
+      v-else-if="tab === 'daily-report' && ws.isAdmin.value"
+    />
     <SettingsLabels v-else-if="tab === 'labels'" />
     <SettingsAutomation v-else-if="tab === 'automation'" />
     <SettingsNotifications v-else-if="tab === 'notifications'" />
@@ -58,6 +61,7 @@ import SettingsPeople from '@/components/settings/SettingsPeople.vue'
 import SettingsWorkspace from '@/components/settings/SettingsWorkspace.vue'
 import SettingsLabels from '@/components/settings/SettingsLabels.vue'
 import SettingsAutomation from '@/components/settings/SettingsAutomation.vue'
+import SettingsDailyReport from '@/components/settings/SettingsDailyReport.vue'
 import SettingsNotifications from '@/components/settings/SettingsNotifications.vue'
 import SettingsAccount from '@/components/settings/SettingsAccount.vue'
 import SettingsWalkthroughs from '@/components/settings/SettingsWalkthroughs.vue'
@@ -70,7 +74,12 @@ const router = useRouter()
 
 const tabs = computed(() => [
   { id: 'people', label: 'People' },
-  ...(ws.isAdmin.value ? [{ id: 'workspace', label: 'Workspace' }] : []),
+  ...(ws.isAdmin.value
+    ? [
+        { id: 'workspace', label: 'Workspace' },
+        { id: 'daily-report', label: 'Daily report' },
+      ]
+    : []),
   { id: 'labels', label: 'Labels' },
   { id: 'automation', label: 'Automation' },
   { id: 'notifications', label: 'Notifications' },

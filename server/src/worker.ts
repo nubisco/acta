@@ -5,7 +5,8 @@
  */
 
 import type { Hono } from 'hono'
-import { createApp, type IAppEnv } from './app'
+import { createApp, reportRunOptions, type IAppEnv } from './app'
+import { dailyReportTick } from './services/dailyReport'
 import { setDeferrer } from './core/defer'
 import { ssoConfigFromEnv } from './core/sso'
 import { oidcConfigFromEnv } from './core/oidc'
@@ -59,6 +60,8 @@ interface IWorkerEnv {
   ACTA_OTP_FALLBACK?: string
   /** Public address, used to link back from outbound messages. */
   ACTA_BASE_URL?: string
+  /** What workspace AI provider keys are encrypted under. A secret. */
+  ACTA_AI_ENCRYPTION_KEY?: string
   /**
    * Shared secret the identity provider signs webhook deliveries with. A
    * secret, so it is set with `wrangler secret put PLATFORM_WEBHOOK_SECRET`
@@ -148,6 +151,7 @@ function getApp(env: IWorkerEnv, origin: string): Promise<Hono<IAppEnv>> {
         ) ?? undefined,
       otpFallback: env.ACTA_OTP_FALLBACK === 'true',
       platformWebhookSecret: env.PLATFORM_WEBHOOK_SECRET,
+      aiEncryptionKey: env.ACTA_AI_ENCRYPTION_KEY,
       live: hubLive(env.LIVE),
       bootstrap: {
         workspaceName: env.ACTA_WORKSPACE ?? 'Workspace',
@@ -190,11 +194,21 @@ export default {
   ): Promise<void> {
     setDeferrer((work) => executionCtx.waitUntil(work))
     await getApp(env, env.ACTA_BASE_URL ?? '')
-    await notificationSweep(await getDriver(env), {
+    const driver = await getDriver(env)
+    await notificationSweep(driver, {
       channels: channelsFromEnv(
         env as unknown as Record<string, string | undefined>,
       ),
       baseUrl: env.ACTA_BASE_URL,
     })
+    // The daily report rides the same tick. It is cheap when it is not
+    // time, and a failure is logged rather than failing the sweep above.
+    await dailyReportTick(
+      driver,
+      reportRunOptions({
+        aiEncryptionKey: env.ACTA_AI_ENCRYPTION_KEY,
+        baseUrl: env.ACTA_BASE_URL,
+      }),
+    ).catch((err) => console.error('daily report tick failed', err))
   },
 }
