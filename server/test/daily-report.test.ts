@@ -425,6 +425,16 @@ describe('the words', () => {
     expect(slack).not.toContain('<!channel>')
     expect(slack).toContain('&lt;!channel&gt; &amp;')
   })
+
+  it("cannot be made into markup by a person's name either", async () => {
+    const f = await facts()
+    const slack = toSlack(renderPlain(f), f, {
+      slackIds: {},
+      names: { ivan: '<!channel> Ivan', daniela: 'Daniela' },
+    })
+    expect(slack).not.toContain('<!channel>')
+    expect(slack).toContain('&lt;!channel&gt; Ivan')
+  })
 })
 
 describe('the schedule', () => {

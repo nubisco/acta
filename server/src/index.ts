@@ -27,8 +27,10 @@ const app = await createApp(db, {
   platformWebhookSecret: process.env.PLATFORM_WEBHOOK_SECRET,
   aiEncryptionKey: process.env.ACTA_AI_ENCRYPTION_KEY,
   // A local instance may store a key under a built-in secret, so the
-  // feature can be tried without configuring one. Production never does.
-  aiDevSecret: process.env.NODE_ENV !== 'production',
+  // feature can be tried without configuring one. Opt-in only: inferring it
+  // from NODE_ENV would quietly protect a self-hosted instance's keys with a
+  // published constant whenever NODE_ENV was simply not set.
+  aiDevSecret: process.env.ACTA_AI_DEV_SECRET === 'true',
   live: bunLive,
   bootstrap: {
     workspaceName: process.env.ACTA_WORKSPACE ?? 'Nubisco',
@@ -62,7 +64,7 @@ setInterval(() => {
     db,
     reportRunOptions({
       aiEncryptionKey: process.env.ACTA_AI_ENCRYPTION_KEY,
-      aiDevSecret: process.env.NODE_ENV !== 'production',
+      aiDevSecret: process.env.ACTA_AI_DEV_SECRET === 'true',
       baseUrl: process.env.ACTA_BASE_URL,
     }),
   ).catch((err) => console.error('daily report tick failed', err))

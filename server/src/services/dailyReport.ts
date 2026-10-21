@@ -1018,7 +1018,9 @@ export function toSlack(
     const h = handle.toLowerCase()
     if (!allowed.handles.has(h)) return whole
     const id = links.slackIds[h]
-    return `${pre}${id ? `<@${id}>` : (links.names[h] ?? h)}`
+    // A display name comes from the identity provider, so it is escaped
+    // like any other text: this runs after the escape pass above.
+    return `${pre}${id ? `<@${id}>` : escapeSlack(links.names[h] ?? h)}`
   })
   return out
 }

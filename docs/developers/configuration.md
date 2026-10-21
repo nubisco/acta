@@ -161,9 +161,9 @@ incoming webhook. It can be written by the workspace's own AI provider
 offers: Acta never ships a key, and with none set the report goes out as a
 plain message built from the facts.
 
-| Variable                 | Default | What it does                                                                                                                                                                                      |
-| ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ACTA_AI_ENCRYPTION_KEY` | _unset_ | The secret provider keys are encrypted under (AES-GCM). Unset, a key cannot be saved. A local Bun instance not run with `NODE_ENV=production` falls back to a built-in secret so it can be tried. |
+| Variable                 | Default | What it does                                                                                                                                                                                                                                      |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ACTA_AI_ENCRYPTION_KEY` | _unset_ | The secret provider keys are encrypted under (AES-GCM). Unset, a key cannot be saved. For trying the feature locally, `ACTA_AI_DEV_SECRET=true` uses a built-in secret instead. Never set that on a real instance: the built-in secret is public. |
 
 On Cloudflare Workers it is a secret, not a var:
 
