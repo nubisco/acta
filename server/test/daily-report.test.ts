@@ -379,6 +379,37 @@ describe('the words', () => {
     expect(usage[0].n).toBe(2)
   })
 
+  it('tells the model reasons are separate facts, not causes', async () => {
+    const f = await facts()
+    await saveAiSettings(
+      db,
+      workspaceId,
+      { provider: 'anthropic', apiKey: 'sk-ant-test-key-123456' },
+      SECRET,
+    )
+    let sent: { system: string; messages: { content: string }[] } | null = null
+    await compose(f, {
+      db,
+      workspaceId,
+      secret: SECRET,
+      aiWriting: true,
+      fetchImpl: (async (_url: unknown, init?: RequestInit) => {
+        sent = JSON.parse(String(init?.body))
+        return new Response(
+          JSON.stringify({ content: [{ type: 'text', text: 'CM-2.' }] }),
+        )
+      }) as unknown as typeof fetch,
+    })
+    const request = sent as unknown as {
+      system: string
+      messages: { content: string }[]
+    }
+    expect(request.system).toContain('Never join them with "because"')
+    // The person's reasons go over as a list under their own name.
+    expect(request.messages[0].content).toContain('"reasons":[')
+    expect(request.messages[0].content).not.toContain('"why"')
+  })
+
   it('writes plain when there is no key, without calling anyone', async () => {
     const f = await facts()
     let called = false
