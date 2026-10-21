@@ -25,6 +25,7 @@ declare module 'vue' {
     NbCardGrid: typeof import('@nubisco/ui/components/CardGrid')['NbCardGrid']
     NbCheckbox: typeof import('@nubisco/ui/components/Checkbox')['NbCheckbox']
     NbCommandPalette: typeof import('@nubisco/ui/components/CommandPalette')['NbCommandPalette']
+    NbCopyButton: typeof import('@nubisco/ui/components/CopyButton')['NbCopyButton']
     NbDataTable: typeof import('@nubisco/ui/components/DataTable')['NbDataTable']
     NbDatePicker: typeof import('@nubisco/ui/components/DatePicker')['NbDatePicker']
     NbDefinitionList: typeof import('@nubisco/ui/components/DefinitionList')['NbDefinitionList']
