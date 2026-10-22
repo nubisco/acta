@@ -73,7 +73,8 @@ space are kept.
 
 ## Views
 
-A space can be read five ways. They are the same cards, not five feature sets.
+A space can be read five ways, and reported on in a sixth. They are the same
+cards, not five feature sets.
 
 ![The board view](/media/board.jpg)
 
@@ -100,6 +101,32 @@ path only_ filters to it.
 Sequence is computed from dependencies you declare, not guessed. If nothing
 declares a dependency, everything is in step 1, which is correct and not very
 useful.
+
+### Response times
+
+**Response times** is not a view of the cards but a report on them: how long
+people waited. Pick this week, last week or the last 30 days. The first row is
+the whole space, and every label on its cards gets a row of its own, so
+_Need: Bug report_ can be read on its own.
+
+- **Received** is the cards created in the period, and **Waiting** is those of
+  them nobody had answered by the end of it.
+- **First response** is how long until the first comment, move to another
+  list, completion or reopening by a person other than whoever created the
+  card. Agents and automations never count: a contact form filing a card, a
+  rule moving it or an assistant commenting on it is not somebody answering.
+  Moving a card up or down inside its list is not a move.
+- **Resolution** is how long until the card reached a done list or was
+  completed. A card that was reopened counts from its creation to the last time
+  it was resolved. A card created straight into a done list has none.
+
+Each shows the median, the 90th percentile (P90: nine in ten were quicker) and
+how many cards it is measured over. A card counts in the period its response or
+resolution happened in, judged on what had happened by the end of that period,
+so last week reads the same whenever you look. Times are calendar time, not
+working hours, and labels are the ones the cards carry now.
+
+The same numbers are available to an agent through the `response_times` tool.
 
 ## Cards
 

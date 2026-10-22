@@ -1,6 +1,6 @@
 # Tools
 
-Sixteen tools, plus `attachment_add` when the instance has an attachment
+Seventeen tools, plus `attachment_add` when the instance has an attachment
 store configured (it does in every standard deployment). Those marked
 **write** require a token with the write scope.
 
@@ -19,6 +19,7 @@ store configured (it does in every standard deployment). Those marked
 | `doc_write`          | **write** | Batch document mutations. See below.                                                                                                                                                                                                                                                                               |
 | `search`             |           | Full-text across item titles and descriptions, comments and documents. Returns type, key or slug, title, snippet.                                                                                                                                                                                                  |
 | `activity_query`     |           | The audit trail. Filter by entity, actor, `actor_kind`, verb pattern (`item.*`), and `since` for a cheap delta.                                                                                                                                                                                                    |
+| `response_times`     |           | Time to first response and time to resolution, per space and per label, as count, median and P90, plus cards received and still waiting. See [Response times](#response-times).                                                                                                                                    |
 | `label_write`        | **write** | `group_create`, `label_create`, `label_update`, `label_merge` (folds one label into another and reassigns every item), `label_delete`.                                                                                                                                                                             |
 | `webhook_write`      | **write** | Outbound webhooks: `create` (url plus event patterns, optional HMAC secret), `update`, `delete`.                                                                                                                                                                                                                   |
 | `rule_write`         | **write** | Automation rules from a fixed catalogue. See below.                                                                                                                                                                                                                                                                |
@@ -234,6 +235,79 @@ omitting the field.
 
 Rule actions are attributed to the system actor with `caused_by` chaining, and
 never re-trigger rules, so a pair of rules cannot loop.
+
+## Response times
+
+`response_times` reports how long people wait, computed from the event log.
+
+```json
+{ "space": "SU", "from": 1792368000000, "to": 1792972800000 }
+```
+
+All three are optional. `from` is inclusive and `to` exclusive, both epoch
+milliseconds, and without them the range is the seven days up to now. Without
+`space` it covers every space that is not archived and leaves out the ones
+where nothing happened.
+
+```json
+{
+  "from": 1792368000000,
+  "to": 1792972800000,
+  "spaces": [
+    {
+      "key": "SU",
+      "name": "Support",
+      "all": {
+        "received": 7,
+        "unanswered": 1,
+        "first_response": {
+          "count": 7,
+          "median_ms": 12600000,
+          "p90_ms": 97200000
+        },
+        "resolution": { "count": 3, "median_ms": 86400000, "p90_ms": 172800000 }
+      },
+      "labels": [
+        {
+          "id": "lbl_...",
+          "name": "Bug report",
+          "color": "red",
+          "group": "Need",
+          "received": 6,
+          "unanswered": 1,
+          "first_response": {
+            "count": 6,
+            "median_ms": 12600000,
+            "p90_ms": 97200000
+          },
+          "resolution": {
+            "count": 2,
+            "median_ms": 72000000,
+            "p90_ms": 165600000
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+- **First response**: the first comment, move to another list, completion or
+  reopening by a human who is not the card's creator. Agents and the system
+  never count, including an agent acting on a person's behalf. A personal
+  access token is its owner, so it counts. Reordering within a list does not.
+- **Resolution**: reaching a done-role list, or completion in a space without
+  one. A reopened card is resolved at the last resolution, measured from
+  creation. A card created already done has no resolution.
+- A card counts toward the range its response or resolution happened in, judged
+  only on events before `to`, so a past range never changes when a card is
+  reopened later.
+- `received` counts cards created in the range, and `unanswered` those of them
+  with no first response before `to`.
+- Median and P90 interpolate between neighbours (`PERCENTILE.INC`). A duration
+  with nothing to measure is `null`.
+- Cards are grouped by the space they are in and the labels they carry now.
+  Durations are calendar time.
 
 ## Errors
 
