@@ -13,9 +13,6 @@
 
     <SettingsPeople v-if="tab === 'people'" />
     <SettingsWorkspace v-else-if="tab === 'workspace' && ws.isAdmin.value" />
-    <SettingsDailyReport
-      v-else-if="tab === 'daily-report' && ws.isAdmin.value"
-    />
     <SettingsAiBriefings
       v-else-if="tab === 'ai-briefings' && ws.isAdmin.value"
     />
@@ -64,7 +61,6 @@ import SettingsPeople from '@/components/settings/SettingsPeople.vue'
 import SettingsWorkspace from '@/components/settings/SettingsWorkspace.vue'
 import SettingsLabels from '@/components/settings/SettingsLabels.vue'
 import SettingsAutomation from '@/components/settings/SettingsAutomation.vue'
-import SettingsDailyReport from '@/components/settings/SettingsDailyReport.vue'
 import SettingsAiBriefings from '@/components/settings/SettingsAiBriefings.vue'
 import SettingsNotifications from '@/components/settings/SettingsNotifications.vue'
 import SettingsAccount from '@/components/settings/SettingsAccount.vue'
@@ -81,7 +77,6 @@ const tabs = computed(() => [
   ...(ws.isAdmin.value
     ? [
         { id: 'workspace', label: 'Workspace' },
-        { id: 'daily-report', label: 'Daily report' },
         { id: 'ai-briefings', label: 'AI briefings' },
       ]
     : []),
@@ -97,7 +92,11 @@ const tabs = computed(() => [
  * walkthrough that ends here) can land on the right one, and a reload stays
  * where it was.
  */
+/** Tabs folded into another, so an old link still lands on the right one. */
+const MOVED_TABS: Record<string, string> = { 'daily-report': 'ai-briefings' }
+
 function tabFrom(raw: unknown): string {
+  if (typeof raw === 'string' && raw in MOVED_TABS) raw = MOVED_TABS[raw]
   return typeof raw === 'string' && tabs.value.some((t) => t.id === raw)
     ? raw
     : 'people'

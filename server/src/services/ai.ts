@@ -286,7 +286,7 @@ async function readProviderError(
     (response.status === 404 || response.status === 400) &&
     MODEL_ERROR_PATTERN.test(raw)
   const message = modelProblem
-    ? `${raw} (using model "${model}". Set a different one in Settings, Daily report.)`
+    ? `${raw} (using model "${model}". Set a different one in Settings, AI briefings.)`
     : raw
   // 401/403 means the workspace's own key is bad, which is theirs to fix.
   throw new AiConfigError(
