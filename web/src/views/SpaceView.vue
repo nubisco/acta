@@ -270,6 +270,11 @@
       @open="(key: string) => inspector.open(key)"
     />
 
+    <ResponseTimesView
+      v-else-if="view === 'response-times'"
+      :space-key="spaceKey"
+    />
+
     <!-- Columns are capped rather than sharing the width equally. With two
          lists, `1fr` each gave every card half the screen and a space with
          six columns looked nothing like a space with two. A cap means the
@@ -506,6 +511,7 @@ import CalendarView from '@/components/views/CalendarView.vue'
 import TableView from '@/components/views/TableView.vue'
 import TimelineView from '@/components/views/TimelineView.vue'
 import SequenceView from '@/components/views/SequenceView.vue'
+import ResponseTimesView from '@/components/views/ResponseTimesView.vue'
 import SpaceFilterPanel from '@/components/SpaceFilterPanel.vue'
 import DoneColumnFoot from '@/components/DoneColumnFoot.vue'
 import BoardBatchActions from '@/components/BoardBatchActions.vue'
@@ -816,6 +822,8 @@ const viewTabs = [
   { id: 'calendar', label: 'Calendar' },
   { id: 'timeline', label: 'Timeline' },
   { id: 'sequence', label: 'Sequence' },
+  // Not a view of the cards but a report on them: how long people wait.
+  { id: 'response-times', label: 'Response times' },
 ]
 
 const view = computed({

@@ -550,3 +550,36 @@ export interface IHomeLayout {
   version: 1
   panels: { id: string; hidden?: boolean; wide?: boolean }[]
 }
+
+/** One measurement: how many cards, and how long the middle and the slow end took. */
+export interface IDurationStats {
+  count: number
+  median_ms: number | null
+  p90_ms: number | null
+}
+
+/** Response times for one space or one label over a range (LA-370). */
+export interface IResponseStats {
+  /** Cards created in the range. */
+  received: number
+  /** Of those, still without a first response when the range ended. */
+  unanswered: number
+  first_response: IDurationStats
+  resolution: IDurationStats
+}
+
+export interface IResponseTimes {
+  from: number
+  to: number
+  spaces: {
+    key: string
+    name: string
+    all: IResponseStats
+    labels: (IResponseStats & {
+      id: string
+      name: string
+      color: string
+      group: string
+    })[]
+  }[]
+}

@@ -106,6 +106,7 @@ import type {
   IHomeBehind,
   IHomeDocs,
   IHomeLayout,
+  IResponseTimes,
 } from '@/types/api'
 
 // -- Auth -------------------------------------------------------------------
@@ -352,6 +353,16 @@ export const api = {
       layers: number
       critical_size: number
     }>(`/spaces/${encodeURIComponent(space)}/sequence`),
+
+  /** Time to first response and to resolution, per label. See LA-370. */
+  responseTimes: (params: { space: string; from: number; to?: number }) => {
+    const query = new URLSearchParams({
+      space: params.space,
+      from: String(params.from),
+    })
+    if (params.to !== undefined) query.set('to', String(params.to))
+    return req<IResponseTimes>(`/response-times?${query}`)
+  },
 
   notifications: () =>
     req<{
