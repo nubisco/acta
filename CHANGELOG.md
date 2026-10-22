@@ -1,3 +1,12 @@
+# [1.52.0](https://github.com/nubisco/acta/compare/v1.51.1...v1.52.0) (2026-10-22)
+
+
+### Features
+
+* **app:** a space's response times, on a tab of its own (LA-370) ([d52d2bb](https://github.com/nubisco/acta/commit/d52d2bb87cc2a793fc8f25b4669504fd72266b3d))
+* **reports:** time to first response and to resolution, from the event log (LA-370) ([c717b80](https://github.com/nubisco/acta/commit/c717b80eb2697e1b961046419047e7397907cd07))
+* **settings:** an AI briefings tab, the same as Analytics, and the daily report beside its preview ([12b75c2](https://github.com/nubisco/acta/commit/12b75c2c01e68b68a04bdd32267a21edf9e34ff0))
+
 ## [1.51.1](https://github.com/nubisco/acta/compare/v1.51.0...v1.51.1) (2026-10-21)
 
 
