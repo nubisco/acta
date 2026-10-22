@@ -16,6 +16,9 @@
     <SettingsDailyReport
       v-else-if="tab === 'daily-report' && ws.isAdmin.value"
     />
+    <SettingsAiBriefings
+      v-else-if="tab === 'ai-briefings' && ws.isAdmin.value"
+    />
     <SettingsLabels v-else-if="tab === 'labels'" />
     <SettingsAutomation v-else-if="tab === 'automation'" />
     <SettingsNotifications v-else-if="tab === 'notifications'" />
@@ -62,6 +65,7 @@ import SettingsWorkspace from '@/components/settings/SettingsWorkspace.vue'
 import SettingsLabels from '@/components/settings/SettingsLabels.vue'
 import SettingsAutomation from '@/components/settings/SettingsAutomation.vue'
 import SettingsDailyReport from '@/components/settings/SettingsDailyReport.vue'
+import SettingsAiBriefings from '@/components/settings/SettingsAiBriefings.vue'
 import SettingsNotifications from '@/components/settings/SettingsNotifications.vue'
 import SettingsAccount from '@/components/settings/SettingsAccount.vue'
 import SettingsWalkthroughs from '@/components/settings/SettingsWalkthroughs.vue'
@@ -78,6 +82,7 @@ const tabs = computed(() => [
     ? [
         { id: 'workspace', label: 'Workspace' },
         { id: 'daily-report', label: 'Daily report' },
+        { id: 'ai-briefings', label: 'AI briefings' },
       ]
     : []),
   { id: 'labels', label: 'Labels' },

@@ -157,9 +157,10 @@ The daily report posts one Slack message each working day: what was finished,
 what that opened up and for whom, where each goal stands, and focus points per
 person. An admin turns it on under **Settings, Daily report**, with a Slack
 incoming webhook. It can be written by the workspace's own AI provider
-(Anthropic, OpenAI or Gemini), the same bring-your-own-key deal Analytics
-offers: Acta never ships a key, and with none set the report goes out as a
-plain message built from the facts.
+(Anthropic, OpenAI or Gemini), set under **Settings, AI briefings**, the same
+bring-your-own-key deal and the same tab Analytics offers: Acta never ships a
+key, and with none set the report goes out as a plain message built from the
+facts.
 
 | Variable                 | Default | What it does                                                                                                                                                                                                                                      |
 | ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

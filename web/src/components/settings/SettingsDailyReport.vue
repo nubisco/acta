@@ -2,87 +2,6 @@
   <div class="report">
     <NbPanel class="report__section">
       <header>
-        <h2 class="type-heading-01">AI provider</h2>
-        <p class="report__lede">
-          Bring your own provider key, the same as Analytics and Verba. Nubisco
-          never supplies one and never charges for tokens: every request is
-          billed by your provider, to this key. What is sent is what the report
-          is about: card keys and titles, goal titles and statuses, and people's
-          handles. Never descriptions or comments.
-        </p>
-      </header>
-
-      <div class="report__form">
-        <NbField v-slot="{ id }" label="Provider">
-          <NbSelect
-            :id="id"
-            v-model="provider"
-            :options="PROVIDER_OPTIONS"
-            :disabled="busy"
-          />
-        </NbField>
-        <NbField
-          v-slot="{ id }"
-          label="Model"
-          hint="Empty uses the provider's default."
-        >
-          <NbTextInput
-            :id="id"
-            v-model="model"
-            :placeholder="defaults[provider] ?? ''"
-            :disabled="busy"
-          />
-        </NbField>
-        <NbField
-          v-slot="{ id }"
-          label="API key"
-          hint="Encrypted at rest and never sent back to the browser, so this field is always empty when the page loads."
-        >
-          <NbTextInput
-            :id="id"
-            v-model="apiKey"
-            type="password"
-            autocomplete="off"
-            :placeholder="
-              ai?.hasKey ? 'Stored. Type a new key to replace it.' : 'sk-...'
-            "
-            :disabled="busy"
-          />
-        </NbField>
-      </div>
-
-      <div class="report__actions">
-        <NbButton variant="primary" :loading="busy" @click="saveAi">
-          Save provider
-        </NbButton>
-        <NbButton
-          v-if="ai?.hasKey"
-          variant="ghost"
-          :disabled="busy"
-          @click="removeKey"
-        >
-          Remove key
-        </NbButton>
-      </div>
-
-      <p v-if="usage && usage.requests > 0" class="report__usage">
-        Last {{ usage.days }} days: {{ usage.requests }}
-        {{ usage.requests === 1 ? 'request' : 'requests' }},
-        {{ formatTokens(usage.inputTokens + usage.outputTokens) }} tokens,
-        <template v-if="usage.estimatedCostUsd !== null">
-          about {{ formatUsd(usage.estimatedCostUsd) }} at list prices as of
-          {{ usage.pricingVerifiedOn }}.
-        </template>
-        <template v-else>
-          no published price on file for
-          {{ usage.unpricedModels.join(', ') }}.
-        </template>
-        Check your provider's console for the real figure.
-      </p>
-    </NbPanel>
-
-    <NbPanel class="report__section">
-      <header>
         <h2 class="type-heading-01">Daily report</h2>
         <p class="report__lede">
           Once a working day, one Slack message: what was finished since the
@@ -166,15 +85,18 @@
         </NbField>
         <NbField
           label="Written by the AI provider"
-          hint="Off, the report is the plain version built from the facts."
+          hint="Off, the report is the plain version built from the facts. The provider and its key are in the AI briefings tab."
           control="fit"
         >
-          <NbSwitch
-            v-model="config.aiWriting"
-            name="report-ai"
-            label="Written by the AI provider"
-            hide-label
-          />
+          <span class="report__ai-control">
+            <NbSwitch
+              v-model="config.aiWriting"
+              name="report-ai"
+              label="Written by the AI provider"
+              hide-label
+            />
+            <NbAiLabel static size="sm" />
+          </span>
         </NbField>
       </div>
 
@@ -206,90 +128,84 @@
       </div>
     </NbPanel>
 
-    <NbPanel class="report__section">
-      <header>
-        <h2 class="type-heading-01">Preview</h2>
-        <p class="report__lede">
-          Today's report, written now from everything since the last one. A
-          preview posts nothing and does not count as a report, so it can be run
-          as often as you like. A test posts the same preview to the webhook,
-          marked as a test.
-        </p>
-      </header>
-      <div class="report__actions">
-        <NbButton variant="secondary" :loading="previewing" @click="preview">
-          Preview now
-        </NbButton>
-        <NbButton
-          variant="ghost"
-          :disabled="!config.hasWebhook || previewing"
-          @click="sendTest"
-        >
-          Send a test to Slack
-        </NbButton>
-      </div>
-      <template v-if="previewed">
-        <p class="report__meta">
-          {{
-            previewed.writer === 'ai'
-              ? 'Written by the AI provider.'
-              : 'The plain version.'
-          }}
-          <template v-if="previewed.fallbackReason">
-            {{ previewed.fallbackReason }}
-          </template>
-          <template v-if="previewed.empty">
-            Nothing moved since the last report, so the scheduled one would post
-            nothing.
-          </template>
-        </p>
-        <pre class="report__text">{{ previewed.text }}</pre>
-      </template>
-    </NbPanel>
-
-    <NbPanel v-if="runs.length > 0" class="report__section">
-      <header>
-        <h2 class="type-heading-01">Recent reports</h2>
-      </header>
-      <details v-for="run in runs" :key="run.id" class="report__run">
-        <summary>
-          {{ run.runDate }}: {{ STATUS_LABELS[run.status] }}
-          <template v-if="run.writer">
-            ({{ run.writer === 'ai' ? 'AI' : 'plain' }})</template
+    <div class="report__aside">
+      <NbPanel class="report__section">
+        <header>
+          <h2 class="type-heading-01">Preview</h2>
+          <p class="report__lede">
+            Today's report, written now from everything since the last one. A
+            preview posts nothing and does not count as a report, so it can be
+            run as often as you like. A test posts the same preview to the
+            webhook, marked as a test.
+          </p>
+        </header>
+        <div class="report__actions">
+          <NbButton variant="secondary" :loading="previewing" @click="preview">
+            Preview now
+          </NbButton>
+          <NbButton
+            variant="ghost"
+            :disabled="!config.hasWebhook || previewing"
+            @click="sendTest"
           >
-        </summary>
-        <p v-if="run.error" class="report__meta">{{ run.error }}</p>
-        <pre v-if="run.text" class="report__text">{{ run.text }}</pre>
-      </details>
-    </NbPanel>
+            Send a test to Slack
+          </NbButton>
+        </div>
+        <template v-if="previewed">
+          <p class="report__meta">
+            <template v-if="previewed.writer === 'ai'">
+              <NbAiLabel static size="sm" variant="inline" />
+              Written by the AI provider.
+            </template>
+            <template v-else>The plain version.</template>
+            <template v-if="previewed.fallbackReason">
+              {{ previewed.fallbackReason }}
+            </template>
+            <template v-if="previewed.empty">
+              Nothing moved since the last report, so the scheduled one would
+              post nothing.
+            </template>
+          </p>
+          <pre class="report__text">{{ previewed.text }}</pre>
+        </template>
+      </NbPanel>
+
+      <NbPanel v-if="runs.length > 0" class="report__section">
+        <header>
+          <h2 class="type-heading-01">Recent reports</h2>
+        </header>
+        <details v-for="run in runs" :key="run.id" class="report__run">
+          <summary>
+            {{ run.runDate }}: {{ STATUS_LABELS[run.status] }}
+            <template v-if="run.writer">
+              ({{ run.writer === 'ai' ? 'AI' : 'plain' }})</template
+            >
+          </summary>
+          <p v-if="run.error" class="report__meta">{{ run.error }}</p>
+          <pre v-if="run.text" class="report__text">{{ run.text }}</pre>
+        </details>
+      </NbPanel>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * The daily progress report (LA-389) and the AI provider it writes with.
- * Admin only. The provider settings mirror Analytics' AI briefings, because
- * they are the same deal: the workspace's key, never ours.
+ * The daily progress report (LA-389). Admin only. The provider it writes with
+ * has its own tab, AI briefings (SettingsAiBriefings.vue), the same as
+ * Analytics.
  */
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useToast } from '@nubisco/ui'
 import {
   api,
-  type IAiSettings,
-  type IAiUsage,
   type IDailyReportConfig,
   type IDailyReportPreview,
   type IDailyReportRun,
-  type TAiProvider,
 } from '@/api/client'
 import { useWorkspace } from '@/stores/workspace'
 import { humanise } from '@/lib/state'
 
-const PROVIDER_OPTIONS = [
-  { label: 'Anthropic', value: 'anthropic' },
-  { label: 'OpenAI', value: 'openai' },
-  { label: 'Google Gemini', value: 'gemini' },
-]
 const MODE_OPTIONS = [
   { label: 'Keep it here as a preview, post nothing', value: 'preview' },
   { label: 'Post it to Slack', value: 'post' },
@@ -312,13 +228,6 @@ const toast = useToast()
 const humans = computed(() =>
   (ws.overview.value?.actors ?? []).filter((a) => a.kind === 'human'),
 )
-
-const ai = ref<IAiSettings | null>(null)
-const usage = ref<IAiUsage | null>(null)
-const defaults = ref<Partial<Record<TAiProvider, string>>>({})
-const provider = ref<TAiProvider>('anthropic')
-const model = ref('')
-const apiKey = ref('')
 
 const config = reactive<IDailyReportConfig>({
   enabled: false,
@@ -346,13 +255,6 @@ const previewed = ref<IDailyReportPreview | null>(null)
 const busy = ref(false)
 const previewing = ref(false)
 
-function applyAi(settings: IAiSettings): void {
-  ai.value = settings
-  provider.value = settings.provider
-  model.value = settings.model ?? ''
-  apiKey.value = ''
-}
-
 function applyConfig(next: IDailyReportConfig): void {
   Object.assign(config, next)
   holidays.value = next.holidays.join(', ')
@@ -363,13 +265,7 @@ function applyConfig(next: IDailyReportConfig): void {
 
 async function load(): Promise<void> {
   try {
-    const [aiRes, reportRes] = await Promise.all([
-      api.aiSettings(),
-      api.dailyReport(),
-    ])
-    applyAi(aiRes.settings)
-    usage.value = aiRes.usage
-    defaults.value = aiRes.defaults
+    const reportRes = await api.dailyReport()
     applyConfig(reportRes.config)
     runs.value = reportRes.runs
   } catch (err) {
@@ -377,35 +273,6 @@ async function load(): Promise<void> {
   }
 }
 onMounted(load)
-
-async function saveAi(): Promise<void> {
-  busy.value = true
-  try {
-    const res = await api.setAiSettings({
-      provider: provider.value,
-      model: model.value.trim() || null,
-      ...(apiKey.value.trim() ? { apiKey: apiKey.value.trim() } : {}),
-    })
-    applyAi(res.settings)
-    toast.success('Provider saved')
-  } catch (err) {
-    toast.error(humanise(err), { title: 'Could not save the provider' })
-  } finally {
-    busy.value = false
-  }
-}
-
-async function removeKey(): Promise<void> {
-  busy.value = true
-  try {
-    applyAi((await api.setAiSettings({ apiKey: null })).settings)
-    toast.success('Key removed. The report will use the plain version.')
-  } catch (err) {
-    toast.error(humanise(err), { title: 'Could not remove the key' })
-  } finally {
-    busy.value = false
-  }
-}
 
 async function saveReport(): Promise<void> {
   busy.value = true
@@ -458,20 +325,32 @@ async function sendTest(): Promise<void> {
     previewing.value = false
   }
 }
-
-function formatTokens(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
-}
-
-function formatUsd(n: number): string {
-  return n < 0.01 ? 'under $0.01' : `$${n.toFixed(2)}`
-}
 </script>
 
 <style scoped lang="scss">
 .report {
   display: grid;
+  // The settings on the left, the preview and past reports beside them, so a
+  // change and its effect are on one screen. One column below 75rem.
+  grid-template-columns: minmax(0, 48rem) minmax(24rem, 1fr);
   gap: var(--nb-spacing-16);
+  align-items: start;
+
+  @media (max-width: 75rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  &__aside {
+    display: grid;
+    gap: var(--nb-spacing-16);
+    min-inline-size: 0;
+  }
+
+  &__ai-control {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nb-spacing-8);
+  }
 
   &__section {
     display: grid;
@@ -500,7 +379,6 @@ function formatUsd(n: number): string {
     gap: var(--nb-spacing-8);
   }
 
-  &__usage,
   &__meta {
     margin: 0;
     font-size: var(--nb-type-body-sm-size);
