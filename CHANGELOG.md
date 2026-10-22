@@ -1,3 +1,10 @@
+# [1.53.0](https://github.com/nubisco/acta/compare/v1.52.0...v1.53.0) (2026-10-22)
+
+
+### Features
+
+* **settings:** the daily report is a briefing on AI briefings, built from @nubisco/ui ([f459c78](https://github.com/nubisco/acta/commit/f459c78921bf71796743f8fecce0ebbe68106f73))
+
 # [1.52.0](https://github.com/nubisco/acta/compare/v1.51.1...v1.52.0) (2026-10-22)
 
 
