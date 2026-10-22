@@ -798,6 +798,17 @@ export const zActivityQuery = z.object({
   limit: z.number().int().min(1).max(200).default(50),
 })
 
+/**
+ * Time to first response and time to resolution over a date range. Epoch ms,
+ * `from` inclusive and `to` exclusive. Without them, the seven days up to
+ * now. Without a space, every space that is not archived.
+ */
+export const zResponseTimes = z.object({
+  space: zSpaceKey.optional(),
+  from: z.number().int().min(0).optional(),
+  to: z.number().int().min(0).optional(),
+})
+
 // --------------------------------------------------------------------------
 // Ingest
 // --------------------------------------------------------------------------

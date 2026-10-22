@@ -12,6 +12,7 @@ import {
   zItemGet,
   zItemWrite,
   zLabelWrite,
+  zResponseTimes,
   zSearch,
 } from '@nubisco/acta-shared'
 import { ApiError, type ICtx } from '../core/ctx'
@@ -39,6 +40,7 @@ import {
 import { sequenceGet } from '../services/sequence'
 import { itemWrite } from '../services/items'
 import { labelWrite } from '../services/labels'
+import { responseTimes } from '../services/responseTimes'
 import { goalGet, goalList, goalWrite } from '../services/goals'
 import {
   activityQuery,
@@ -289,6 +291,22 @@ export function apiRoutes(
       ),
     ),
   )
+
+  /** Time to first response and to resolution. Same as the MCP tool. */
+  app.get('/response-times', async (c) => {
+    const num = (name: string) =>
+      c.req.query(name) ? Number(c.req.query(name)) : undefined
+    return c.json(
+      await responseTimes(
+        ctxOf(c),
+        zResponseTimes.parse({
+          space: c.req.query('space'),
+          from: num('from'),
+          to: num('to'),
+        }),
+      ),
+    )
+  })
 
   // Writes ------------------------------------------------------------------
   app.post('/items/write', async (c) => {

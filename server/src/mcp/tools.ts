@@ -17,6 +17,7 @@ import {
   zItemGet,
   zItemWrite,
   zLabelWrite,
+  zResponseTimes,
   zSearch,
 } from '@nubisco/acta-shared'
 import type { ICtx } from '../core/ctx'
@@ -32,6 +33,7 @@ import { spaceWrite } from '../services/spaces'
 import { docWrite } from '../services/docs'
 import { itemWrite } from '../services/items'
 import { labelWrite } from '../services/labels'
+import { responseTimes } from '../services/responseTimes'
 import { goalGet, goalList, goalWrite } from '../services/goals'
 import { ruleList, ruleWrite, zRuleWrite } from '../services/rules'
 import { webhookList, webhookWrite, zWebhookWrite } from '../services/webhooks'
@@ -184,6 +186,14 @@ export const MCP_TOOLS: IMcpTool[] = [
     schema: zActivityQuery,
     handler: (ctx, args) =>
       activityQuery(ctx, args as z.infer<typeof zActivityQuery>),
+  },
+  {
+    name: 'response_times',
+    description:
+      "How long people wait, per space and per label: time to first response and time to resolution, each as count, median_ms and p90_ms, plus received (cards created in the range) and unanswered (of those, still without a first response when the range ended). from/to are epoch ms, from inclusive and to exclusive, and default to the seven days up to now. space narrows to one space, and without it the report covers every unarchived space where something happened. First response: the first comment, move to another list, completion or reopening by a person who is not the card's creator. Agents and the system never count, whoever they act for. Resolution: reaching a done-role list or being completed, measured from creation to the last such time if the card was reopened. A card created already done has none. A card counts in the range its response or resolution happened in, judged on what had happened by the end of the range, so a past week always reads the same. Labels are the ones a card carries now, with their group (e.g. Need/Bug report). Calendar time, not working hours.",
+    schema: zResponseTimes,
+    handler: (ctx, args) =>
+      responseTimes(ctx, args as z.infer<typeof zResponseTimes>),
   },
   {
     name: 'label_write',

@@ -1042,4 +1042,8 @@ export const ADDITIVE_COLUMNS = [
          ELSE NULL END
       WHERE list_id = NEW.id;
    END`,
+  // A card's own history. The response-times report reads it for
+  // every card in a space, and a card's activity tail and reopening a card
+  // read it for one. Until this, each of those scanned the whole event table.
+  'CREATE INDEX IF NOT EXISTS idx_event_entity ON event(entity_id)',
 ]

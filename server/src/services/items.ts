@@ -373,7 +373,9 @@ async function applyItemOp(
         'item',
         id,
         `created ${key}: ${op.title}`,
-        { list: list.name },
+        // The id as well as the name: a name can be reused or renamed, and
+        // the response-times report needs to know which list, by role.
+        { list: list.name, list_id: list.id },
         // Naming somebody in a card's description is a mention, exactly as it
         // is in a comment. This was not passed, so it silently told nobody:
         // the mention rendered as a chip and never reached an inbox.
@@ -459,6 +461,9 @@ async function applyItemOp(
         `moved ${key} to ${list.name}`,
         {
           list: list.name,
+          // Where it went, by id: the name alone cannot say whether this was
+          // a done list once two lists share a name or one is renamed.
+          to_list: list.id,
           // Where it came from, so reopening a done card can put it back.
           from_list: item.list_id !== list.id ? item.list_id : undefined,
           from_key: item.key !== key ? item.key : undefined,

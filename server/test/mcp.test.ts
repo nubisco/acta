@@ -87,6 +87,7 @@ describe('mcp endpoint', () => {
       'doc_write',
       'search',
       'activity_query',
+      'response_times',
       'label_write',
       'webhook_write',
       'rule_write',
@@ -154,6 +155,85 @@ describe('mcp endpoint', () => {
     const activity = await call('activity_query', { actor_kind: 'agent' })
     expect(activity.data.events.length).toBeGreaterThan(0)
     expect(activity.data.events[0].on_behalf_of).toBeTruthy()
+  })
+
+  it('reports response times per label, and the agent that filed a card never answers it', async () => {
+    const ws = (await db.query<{ id: string }>('SELECT id FROM workspace'))[0]
+      .id
+    const jose = (
+      await db.query<{ id: string }>(
+        "SELECT id FROM actor WHERE handle = 'jose'",
+      )
+    )[0].id
+    const human = await createToken(db, ws, jose, 'session', ['read', 'write'])
+    await call('space_write', {
+      ops: [
+        {
+          op: 'create',
+          op_id: 'rt-s',
+          key: 'SUP',
+          name: 'Support',
+          template: 'kanban6',
+        },
+      ],
+    })
+    await call('label_write', {
+      ops: [
+        { op: 'group_create', op_id: 'rt-g', name: 'Need' },
+        {
+          op: 'label_create',
+          op_id: 'rt-l',
+          group: 'Need',
+          name: 'Bug report',
+        },
+      ],
+    })
+    await call('item_write', {
+      default_space: 'SUP',
+      ops: [
+        {
+          op: 'create',
+          op_id: 'rt-1',
+          list: 'Backlog',
+          title: 'Crash on load',
+          labels: ['Need/Bug report'],
+        },
+        { op: 'comment', op_id: 'rt-2', key: 'SUP-1', body: 'Thanks, filed.' },
+      ],
+    })
+    const waiting = await call('response_times', { space: 'SUP' })
+    expect(waiting.isError).toBe(false)
+    expect(waiting.data.spaces[0].labels[0]).toMatchObject({
+      group: 'Need',
+      name: 'Bug report',
+      received: 1,
+      unanswered: 1,
+      first_response: { count: 0, median_ms: null, p90_ms: null },
+    })
+
+    await call(
+      'item_write',
+      {
+        ops: [{ op: 'comment', op_id: 'rt-3', key: 'SUP-1', body: 'Looking.' }],
+      },
+      human,
+    )
+    const answered = await call('response_times', { space: 'SUP' })
+    const bug = answered.data.spaces[0].labels[0]
+    expect(bug.unanswered).toBe(0)
+    expect(bug.first_response.count).toBe(1)
+    expect(bug.first_response.median_ms).toBeGreaterThanOrEqual(0)
+
+    // The REST route answers the same question the same way.
+    const res = await app.request('/api/v1/response-times?space=SUP', {
+      headers: { authorization: `Bearer ${human}` },
+    })
+    expect(res.status).toBe(200)
+    const rest = (await res.json()) as typeof answered.data
+    expect(rest.spaces[0].labels[0].first_response.count).toBe(1)
+
+    const bad = await call('response_times', { space: 'SUP', from: 10, to: 5 })
+    expect(bad.isError).toBe(true)
   })
 
   it('edits one doc section without transferring the whole doc', async () => {
