@@ -1,3 +1,10 @@
+# [1.55.0](https://github.com/nubisco/acta/compare/v1.54.0...v1.55.0) (2026-10-23)
+
+
+### Features
+
+* **shell:** workspace switching is a rail entry, the brand is only the brand ([9cd10ee](https://github.com/nubisco/acta/commit/9cd10ee1ae48f8d8eb1a67c8ebdd8fdb8edc18c9))
+
 # [1.54.0](https://github.com/nubisco/acta/compare/v1.53.1...v1.54.0) (2026-10-23)
 
 
