@@ -1,48 +1,67 @@
 <template>
-  <div class="workspaces">
-    <NbPanel class="workspaces__panel">
-      <NbNubiscoMark class="workspaces__mark" />
-      <h1 class="type-heading-03">Choose a workspace</h1>
+  <div class="workspaces" :class="{ 'workspaces--framed': framed }">
+    <header class="workspaces__header">
+      <NbNubiscoMark v-if="!framed" class="workspaces__mark" />
+      <h1 class="type-heading-03">
+        {{ framed ? 'Workspaces' : 'Choose a workspace' }}
+      </h1>
+    </header>
 
-      <NbBanner
-        v-if="error"
-        status="error"
-        variant="inline"
-        :title="error"
-        class="workspaces__banner"
-      />
+    <NbBanner
+      v-if="error"
+      status="error"
+      variant="inline"
+      :title="error"
+      class="workspaces__banner"
+    />
 
-      <div v-if="loading" class="workspaces__list">
-        <NbSkeleton variant="block" height="3rem" />
-        <NbSkeleton variant="block" height="3rem" />
-      </div>
+    <div v-if="loading" class="workspaces__loading">
+      <NbSkeleton variant="block" height="6rem" />
+      <NbSkeleton variant="block" height="6rem" />
+    </div>
 
-      <NbEmptyState
-        v-else-if="workspaces.length === 0"
-        size="sm"
-        title="No workspaces yet"
-        description="This account is not a member of any workspace. Ask an admin to add you."
-      />
+    <NbEmptyState
+      v-else-if="workspaces.length === 0"
+      size="sm"
+      title="No workspaces yet"
+      description="This account is not a member of any workspace. Ask an admin to add you."
+    />
 
-      <ul v-else class="workspaces__list">
-        <li v-for="workspace in workspaces" :key="workspace.id">
-          <RouterLink class="workspaces__item" :to="destinationIn(workspace)">
-            <span class="workspaces__name">{{ workspace.name }}</span>
-            <span class="workspaces__slug">/{{ workspace.slug }}</span>
-          </RouterLink>
-        </li>
-      </ul>
-    </NbPanel>
+    <NbCardGrid v-else min="16rem" class="workspaces__grid">
+      <NbCard
+        v-for="workspace in workspaces"
+        :key="workspace.id"
+        clickable
+        :selected="isCurrent(workspace)"
+        :title="workspace.name"
+        :subtitle="`/${workspace.slug}`"
+        :data-workspace="workspace.slug"
+        @select="choose(workspace)"
+      >
+        <template #icon>
+          <NbAvatar :name="workspace.name" size="md" decorative />
+        </template>
+        <template v-if="isCurrent(workspace)" #footer>
+          <NbBadge size="sm" variant="primary">Current</NbBadge>
+        </template>
+      </NbCard>
+    </NbCardGrid>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * The entry point, before any workspace is chosen. A single workspace is the
- * common case and should never make anyone choose, so this redirects straight
- * through and is only ever seen by someone who genuinely has more than one.
+ * Every workspace this person belongs to, and the one place to switch.
+ *
+ * Two ways in. Before any workspace is chosen it is the entry point, outside
+ * the frame, and a single workspace (the common case) never makes anyone
+ * choose: it redirects straight through. From the rail's Workspaces entry,
+ * with a workspace already open, it is a page inside the frame and always
+ * lists, because bouncing someone who asked for the list back to where they
+ * came from would look like the entry did nothing. App.vue frames it on the
+ * same condition.
  */
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { humanise } from '@/lib/state'
 import { useWorkspace, type IWorkspaceSummary } from '@/stores/workspace'
@@ -50,6 +69,12 @@ import { useWorkspace, type IWorkspaceSummary } from '@/stores/workspace'
 const router = useRouter()
 const route = useRoute()
 const ws = useWorkspace()
+
+const framed = computed(() => ws.workspaceSlug.value !== '')
+
+function isCurrent(workspace: IWorkspaceSummary): boolean {
+  return workspace.slug === ws.workspaceSlug.value
+}
 
 /**
  * Where choosing this workspace should land. A deep link that arrived without
@@ -63,6 +88,10 @@ function destinationIn(workspace: IWorkspaceSummary): string {
     : `/${workspace.slug}`
 }
 
+function choose(workspace: IWorkspaceSummary): void {
+  void router.push(destinationIn(workspace))
+}
+
 const workspaces = ref<IWorkspaceSummary[]>([])
 const loading = ref(true)
 const error = ref('')
@@ -74,7 +103,7 @@ async function load(): Promise<void> {
       return
     }
     workspaces.value = await ws.listWorkspaces()
-    if (workspaces.value.length === 1) {
+    if (!framed.value && workspaces.value.length === 1) {
       void router.replace(destinationIn(workspaces.value[0]))
       return
     }
@@ -91,12 +120,13 @@ void load()
 <style scoped lang="scss">
 .workspaces {
   display: grid;
-  place-items: center;
+  align-content: center;
+  justify-items: center;
+  gap: var(--nb-spacing-16);
   min-block-size: 100vh;
   padding: var(--nb-spacing-24);
 
-  &__panel {
-    inline-size: min(28rem, 100%);
+  &__header {
     display: grid;
     gap: var(--nb-spacing-16);
     justify-items: center;
@@ -107,44 +137,39 @@ void load()
     inline-size: 2.5rem;
   }
 
-  &__banner {
-    inline-size: 100%;
+  h1 {
+    margin: 0;
   }
 
-  &__list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+  &__banner,
+  &__loading,
+  &__grid {
+    inline-size: min(40rem, 100%);
+  }
+
+  &__loading {
     display: grid;
     gap: var(--nb-spacing-8);
-    inline-size: 100%;
-    text-align: start;
   }
 
-  &__item {
-    display: flex;
-    align-items: baseline;
-    gap: var(--nb-spacing-8);
-    padding: var(--nb-spacing-12);
-    border: 1px solid var(--nb-c-border);
-    border-radius: var(--nb-radius-sm);
-    color: inherit;
-    text-decoration: none;
+  // Inside the frame it is an ordinary page: a heading at the top, the
+  // cards under it, nothing centred in the viewport.
+  &--framed {
+    align-content: start;
+    justify-items: stretch;
+    min-block-size: 0;
+    padding: 0;
 
-    &:hover {
-      border-color: var(--nb-c-primary);
-      background: var(--nb-c-surface-hover);
+    .workspaces__header {
+      justify-items: start;
+      text-align: start;
     }
-  }
 
-  &__name {
-    font-weight: 600;
-  }
-
-  &__slug {
-    color: var(--nb-c-text-subtle);
-    font-family: var(--nb-font-family-mono);
-    font-size: var(--nb-type-body-sm-size);
+    .workspaces__banner,
+    .workspaces__loading,
+    .workspaces__grid {
+      inline-size: 100%;
+    }
   }
 }
 </style>

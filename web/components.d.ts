@@ -17,6 +17,7 @@ declare module 'vue' {
     NbAiLabel: typeof import('@nubisco/ui/components/AiLabel')['NbAiLabel']
     NbAiProvider: typeof import('@nubisco/ui/components/AiProvider')['NbAiProvider']
     NbAiUsage: typeof import('@nubisco/ui/components/AiUsage')['NbAiUsage']
+    NbAvatar: typeof import('@nubisco/ui/components/Avatar')['NbAvatar']
     NbBadge: typeof import('@nubisco/ui/components/Badge')['NbBadge']
     NbBanner: typeof import('@nubisco/ui/components/Banner')['NbBanner']
     NbBoard: typeof import('@nubisco/ui/components/Board')['NbBoard']

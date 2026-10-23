@@ -1,5 +1,5 @@
 <template>
-  <RouterView v-if="route.meta.frameless" />
+  <RouterView v-if="frameless" />
 
   <NbShell
     v-else
@@ -18,51 +18,15 @@
   >
     <!-- Page focus mode on a document takes the rail and the topbar away. -->
     <template v-if="!docChrome.frameHidden.value" #sidebar-logo>
-      <!-- The brand doubles as the workspace switcher, which is where a
-           person looks for it: the name they are trying to change is already
-           printed there. Only interactive when there is somewhere to go. -->
-      <button
-        v-if="otherWorkspaces.length > 0"
-        ref="workspaceTrigger"
-        type="button"
-        class="brand-switch"
-        :aria-expanded="workspaceMenuOpen"
-        aria-haspopup="menu"
-        @click="toggleWorkspaceMenu"
-      >
-        <NbSidebarBrand
-          title="Acta"
-          :subtitle="ws.overview.value?.workspace.name"
-        >
-          <template #icon>
-            <img class="brand-mark" src="/acta-icon.svg" alt="" />
-          </template>
-        </NbSidebarBrand>
-      </button>
-      <NbSidebarBrand
-        v-else
-        title="Acta"
-        :subtitle="ws.overview.value?.workspace.name"
-      >
+      <!-- The brand is only the brand. Switching workspace is the first
+           entry in the rail, because with the toggle swapped onto the
+           collapsed brand under the pointer, the brand cannot also open a
+           menu. -->
+      <NbSidebarBrand title="Acta">
         <template #icon>
           <img class="brand-mark" src="/acta-icon.svg" alt="" />
         </template>
       </NbSidebarBrand>
-      <NbMenu
-        ref="workspaceMenu"
-        v-model:open="workspaceMenuOpen"
-        size="sm"
-        :min-width="220"
-        @close="workspaceMenuOpen = false"
-      >
-        <NbMenuItem
-          v-for="workspace in ws.workspaces.value"
-          :key="workspace.id"
-          :label="workspace.name"
-          :selected="workspace.slug === ws.workspaceSlug.value"
-          @select="goToWorkspace(workspace.slug)"
-        />
-      </NbMenu>
     </template>
 
     <!-- The rail collapses from the top, beside the brand (the fleet
@@ -73,72 +37,7 @@
     </template>
 
     <template v-if="!docChrome.frameHidden.value" #sidebar-nav>
-      <template v-if="sidebarVariant === 'compact'">
-        <NbSidebarLink
-          v-for="entry in navEntries"
-          :key="entry.to"
-          v-nb-tooltip="{ body: entry.label }"
-          v-nb-tour-step="entry.tour"
-          :to="entry.to"
-          :active="entry.active"
-          @click.prevent="router.push(entry.to)"
-        >
-          <NbIcon :name="entry.icon" :size="18" />
-        </NbSidebarLink>
-        <!-- The rail cannot afford a row per space (a dozen two-letter codes
-             read as noise), so spaces fold behind one icon whose menu carries
-             what the rail cannot: full names and open counts. -->
-        <NbSidebarLink
-          ref="spacesRailTrigger"
-          v-nb-tooltip="{ body: 'Spaces' }"
-          :active="route.name === 'space'"
-          aria-label="Spaces"
-          aria-haspopup="menu"
-          :aria-expanded="spacesMenuOpen"
-          @click.prevent="toggleSpacesMenu"
-        >
-          <NbIcon name="kanban" :size="18" />
-        </NbSidebarLink>
-        <NbMenu
-          ref="spacesMenu"
-          v-model:open="spacesMenuOpen"
-          size="sm"
-          :min-width="220"
-          @close="spacesMenuOpen = false"
-        >
-          <NbMenuItem
-            v-for="space in spaces"
-            :key="space.key"
-            :label="space.name"
-            :shortcut="String(openCount(space) ?? '')"
-            @select="openSpaceFromMenu(space.key)"
-          />
-        </NbMenu>
-      </template>
-      <NbSidebarMenu v-else density="compact">
-        <NbSidebarMenuItem
-          v-for="entry in navEntries"
-          :key="entry.to"
-          v-nb-tour-step="entry.tour"
-          :label="entry.label"
-          :icon="entry.icon"
-          :to="entry.to"
-          :active="entry.active"
-        />
-        <NbSidebarMenuGroup v-if="spaces.length > 0" label="Spaces">
-          <NbSidebarMenuItem
-            v-for="space in spaces"
-            :key="space.key"
-            :label="space.name"
-            :badge="openCount(space)"
-            badge-variant="neutral"
-            :to="wpath(`/s/${space.key}`)"
-            :active="
-              route.name === 'space' && route.params.spaceKey === space.key
-            "
-          />
-        </NbSidebarMenuGroup>
-      </NbSidebarMenu>
+      <RailNav :compact="sidebarVariant === 'compact'" />
     </template>
 
     <template v-if="!docChrome.frameHidden.value" #sidebar-bottom>
@@ -146,17 +45,7 @@
         v-nb-tour-step="'notifications'"
         :compact="sidebarVariant === 'compact'"
       />
-      <template v-if="sidebarVariant === 'compact'">
-        <NbSidebarLink
-          v-nb-tooltip="{ body: 'Settings' }"
-          :to="wpath('/settings')"
-          :active="route.name === 'settings'"
-          @click.prevent="router.push(wpath('/settings'))"
-        >
-          <NbIcon name="gear" :size="18" />
-        </NbSidebarLink>
-      </template>
-      <NbSidebarMenu v-else density="compact">
+      <NbSidebarMenu density="compact">
         <NbSidebarMenuItem
           label="Settings"
           icon="gear"
@@ -286,7 +175,7 @@
   <!-- Controlled rather than auto-start: the welcome has to have been
        answered first, or the tour spotlights the shell through a modal
        covering it. -->
-  <template v-if="!route.meta.frameless">
+  <template v-if="!frameless">
     <NbWalkthrough
       :walkthrough="introTour"
       :controller="tour"
@@ -315,7 +204,7 @@ import {
   useSidebarVariant,
   useTheme,
 } from '@nubisco/ui'
-import type { IUserMenuAccount, NbMenu, NbShell, TTheme } from '@nubisco/ui'
+import type { IUserMenuAccount, NbShell, TTheme } from '@nubisco/ui'
 import { useAccounts } from '@/stores/accounts'
 import { goalsTour, introTour, notificationsTour, tourLabels } from '@/lib/tour'
 import { setTourNavigator, useTours } from '@/lib/tours'
@@ -334,6 +223,7 @@ import GlobalSearch from '@/components/GlobalSearch.vue'
 import NewSpaceModal from '@/components/NewSpaceModal.vue'
 import GoalFormModal from '@/components/goals/GoalFormModal.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
+import RailNav from '@/components/RailNav.vue'
 import WelcomeModal from '@/components/WelcomeModal.vue'
 import { wpath } from '@/lib/paths'
 import { createPaletteSuggester } from '@/lib/paletteSearch'
@@ -464,117 +354,21 @@ watch(
   },
 )
 
+/**
+ * The workspace list is the app's entry point, frameless, while no workspace
+ * has been entered. Reached from the rail once one has, it is a page in the
+ * frame like any other, so the rail stays put and the way back is one click.
+ * WorkspacesView reads the same condition.
+ */
+const frameless = computed(
+  () =>
+    route.meta.frameless === true &&
+    !(route.name === 'workspaces' && ws.workspaceSlug.value !== ''),
+)
+
 const spaces = computed(() =>
   (ws.overview.value?.spaces ?? []).filter((b) => !b.archived),
 )
-
-// Collapsed-rail spaces menu: opens to the right of its rail icon.
-const spacesRailTrigger = ref<{ $el: HTMLElement } | null>(null)
-const workspaceMenu = ref<InstanceType<typeof NbMenu> | null>(null)
-const workspaceTrigger = ref<HTMLElement | null>(null)
-const workspaceMenuOpen = ref(false)
-
-/** Whether switching is even possible; one workspace needs no switcher. */
-const otherWorkspaces = computed(() =>
-  ws.workspaces.value.filter((w) => w.slug !== ws.workspaceSlug.value),
-)
-
-function toggleWorkspaceMenu(): void {
-  if (workspaceMenuOpen.value) {
-    workspaceMenuOpen.value = false
-    return
-  }
-  const rect = workspaceTrigger.value?.getBoundingClientRect()
-  if (rect && workspaceMenu.value) {
-    workspaceMenu.value.setPositionXY(rect.left, rect.bottom + 4)
-  }
-  workspaceMenuOpen.value = true
-}
-
-function goToWorkspace(slug: string): void {
-  workspaceMenuOpen.value = false
-  if (slug !== ws.workspaceSlug.value) void router.push(`/${slug}`)
-}
-
-const spacesMenu = ref<InstanceType<typeof NbMenu> | null>(null)
-const spacesMenuOpen = ref(false)
-
-function toggleSpacesMenu(): void {
-  if (spacesMenuOpen.value) {
-    spacesMenuOpen.value = false
-    return
-  }
-  const el = spacesRailTrigger.value?.$el
-  if (el && spacesMenu.value) {
-    const rect = el.getBoundingClientRect()
-    spacesMenu.value.setPositionXY(rect.right + 8, rect.top)
-  }
-  spacesMenuOpen.value = true
-}
-
-function openSpaceFromMenu(key: string): void {
-  spacesMenuOpen.value = false
-  void router.push(wpath(`/s/${key}`))
-}
-
-/*
- * Built with `wpath`, like every other link in the frame.
- *
- * `/` is not Home. It is the workspace picker, which is frameless, so a Home
- * link pointing there unmounted the whole app frame, showed the picker, and
- * rebuilt the frame on the way back into the workspace, refetching the
- * overview and notifications as a cold start does. Measured in a browser: the
- * one navigation that replaced every shell element was Home. That is what made
- * moving around the app feel like a page reload.
- *
- * `wpath` reads a plain value rather than reactive state, so the workspace
- * param is read here to rebuild the links when the workspace changes, even
- * between two routes with the same name.
- */
-const navEntries = computed(() => {
-  void route.params.workspace
-  return [
-    {
-      to: wpath('/'),
-      label: 'Home',
-      icon: 'house',
-      tour: 'nav-home',
-      active: route.name === 'home',
-    },
-    {
-      to: wpath('/activity'),
-      label: 'Activity',
-      icon: 'pulse',
-      tour: 'nav-activity',
-      active: route.name === 'activity',
-    },
-    // Right under the workspace-wide views and above Docs and the spaces,
-    // because goals are what the rest of the work is for. Jose set the order.
-    {
-      to: wpath('/goals'),
-      label: 'Goals',
-      icon: 'target',
-      tour: 'nav-goals',
-      active: route.name === 'goals' || route.name === 'goal',
-    },
-    {
-      to: wpath('/docs'),
-      label: 'Docs',
-      icon: 'book-open',
-      tour: 'nav-docs',
-      active: route.name === 'docs',
-    },
-  ]
-})
-
-function openCount(space: {
-  lists: { role?: string; items: number }[]
-}): number | undefined {
-  const n = space.lists
-    .filter((l) => l.role !== 'done')
-    .reduce((sum, l) => sum + l.items, 0)
-  return n > 0 ? n : undefined
-}
 
 interface ICrumb {
   text: string
@@ -591,11 +385,15 @@ function humaniseSlug(part: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
-/** The workspace name, which leads the breadcrumb trail on every route. */
-// Loaded once so the switcher knows whether it has anywhere to go.
-void ws.listWorkspaces().catch(() => undefined)
-
-const namespace = computed(() => ws.overview.value?.workspace.name ?? 'Acta')
+/**
+ * The workspace name, which leads the breadcrumb trail on every route. Not on
+ * the workspace list, which is above any one workspace.
+ */
+const namespace = computed(() =>
+  route.name === 'workspaces'
+    ? 'Acta'
+    : (ws.overview.value?.workspace.name ?? 'Acta'),
+)
 
 const trail = computed<ICrumb[]>(() => {
   if (route.meta.crumb === 'space') {
@@ -629,6 +427,7 @@ const trail = computed<ICrumb[]>(() => {
   // all, so the topbar was simply empty.
   const named: Record<string, string> = {
     home: 'Home',
+    workspaces: 'Workspaces',
     settings: 'Settings',
     activity: 'Activity',
     goals: 'Goals',
@@ -866,28 +665,6 @@ watch(
     font-size: var(--nb-type-body-sm-size);
   }
 }
-.brand-switch {
-  display: block;
-  inline-size: 100%;
-  background: none;
-  border: 0;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-  border-radius: var(--nb-radius-sm);
-
-  &:hover {
-    background: var(--nb-c-surface-hover);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--nb-c-focus-ring);
-    outline-offset: 2px;
-  }
-}
-
 .brand-mark {
   display: block;
   width: 28px;
