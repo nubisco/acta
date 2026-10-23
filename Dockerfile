@@ -1,7 +1,10 @@
 # Acta self-host image. The SPA and the server bundle are built OUTSIDE the
 # image (scripts/build-image.sh) because dev consumes @nubisco/ui via a local
 # pnpm link; the image only ships runtime artifacts.
-FROM oven/bun:1-slim
+# An exact Bun, never a floating tag: a floating tag hides which runtime an
+# image ships, and a cached layer can keep serving an old one. Bump it on a Bun
+# security release and rebuild.
+FROM oven/bun:1.4.4-slim
 
 WORKDIR /app
 
