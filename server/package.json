@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@nubisco/acta-shared": "workspace:*",
-    "hono": "^4.7.0",
+    "hono": "^4.13.13",
     "zod": "^4.3.5"
   },
   "devDependencies": {
