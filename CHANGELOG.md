@@ -1,3 +1,11 @@
+## [1.53.1](https://github.com/nubisco/acta/compare/v1.53.0...v1.53.1) (2026-10-23)
+
+
+### Bug Fixes
+
+* **deps:** hono 4.13.13, markdown-it 15.0.3, mermaid 12.2.0 ([5e96768](https://github.com/nubisco/acta/commit/5e9676868183d4465ed2348586c5f5c9f7c21262))
+* **deps:** ship a patched DOMPurify in the diff editor ([4c093b2](https://github.com/nubisco/acta/commit/4c093b2d79d517ca4482e5cd09d059c38399553d))
+
 # [1.53.0](https://github.com/nubisco/acta/compare/v1.52.0...v1.53.0) (2026-10-22)
 
 
