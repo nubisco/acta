@@ -480,14 +480,6 @@ const newGoal = ref<{ parent?: number } | null>(null)
 const goalsVersion = ref(0)
 
 /**
- * Dual-flavor sidebar: dense routes collapse to the icon rail, navigation-
- * heavy routes expand. The user's toggle overrides the route default until
- * the next navigation.
- */
-export type TSidebarVariant = 'compact' | 'verbose'
-const sidebarChoice = ref<TSidebarVariant | null>(null)
-
-/**
  * Cards opened from inside a card (a [[ref]] in a description, a part, a
  * blocker) form a trail, so the card view carries its own way back in
  * addition to browser history. `navMode` tells the URL sync how to record the
@@ -641,12 +633,6 @@ export function useDocPreview() {
 }
 
 /**
- * Routes that open on the icon rail. Goals joined boards and docs (Jose,
- * 2026-10-08): the goal list and a goal's card table want the width.
- */
-const DENSE_ROUTES = new Set(['space', 'docs', 'goals', 'goal'])
-
-/**
  * A card to point at once its space is on screen: scrolled to and briefly
  * ringed. Set by "Show on its space" in the inspector, which also keeps the
  * card open, so arriving at the board never means losing the card. `at`
@@ -657,13 +643,8 @@ const revealCard = ref<{ key: string; at: number } | null>(null)
 export function useUiState() {
   return {
     newSpaceOpen,
-    sidebarChoice,
     newGoal,
     goalsVersion,
     revealCard,
   }
-}
-
-export function sidebarDefaultFor(routeName: unknown): TSidebarVariant {
-  return DENSE_ROUTES.has(String(routeName)) ? 'compact' : 'verbose'
 }

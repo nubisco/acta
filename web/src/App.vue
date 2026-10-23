@@ -6,6 +6,8 @@
     ref="shell"
     v-model:inspector-visible="inspectorVisible"
     :sidebar-variant="sidebarVariant"
+    sidebar-header-action-position="start"
+    sidebar-header-action-compact="swap"
     sidebar-label="Acta sections"
     inspector-size="md"
     inspector-label="Item"
@@ -61,6 +63,13 @@
           @select="goToWorkspace(workspace.slug)"
         />
       </NbMenu>
+    </template>
+
+    <!-- The rail collapses from the top, beside the brand (the fleet
+         standard). The shell drops this on a phone, where the topbar's nav
+         button opens the drawer instead. -->
+    <template v-if="!docChrome.frameHidden.value" #sidebar-header-action>
+      <NbSidebarHeaderToggle @toggle="nav.toggle" />
     </template>
 
     <template v-if="!docChrome.frameHidden.value" #sidebar-nav>
@@ -146,12 +155,6 @@
         >
           <NbIcon name="gear" :size="18" />
         </NbSidebarLink>
-        <NbSidebarLink
-          v-nb-tooltip="{ body: 'Expand sidebar' }"
-          @click.prevent="toggleSidebar"
-        >
-          <NbIcon name="caret-line-right" :size="18" />
-        </NbSidebarLink>
       </template>
       <NbSidebarMenu v-else density="compact">
         <NbSidebarMenuItem
@@ -159,14 +162,6 @@
           icon="gear"
           :to="wpath('/settings')"
           :active="route.name === 'settings'"
-        />
-        <!-- A phone's drawer slides over the page and closes itself, so
-             there is no rail for it to collapse into. -->
-        <NbSidebarMenuItem
-          v-if="!phone"
-          label="Collapse sidebar"
-          icon="caret-line-left"
-          @click="toggleSidebar"
         />
       </NbSidebarMenu>
       <NbUserMenu
@@ -314,14 +309,18 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useCommandPalette, usePhoneLayout, useTheme } from '@nubisco/ui'
+import {
+  useCommandPalette,
+  usePhoneLayout,
+  useSidebarVariant,
+  useTheme,
+} from '@nubisco/ui'
 import type { IUserMenuAccount, NbMenu, NbShell, TTheme } from '@nubisco/ui'
 import { useAccounts } from '@/stores/accounts'
 import { goalsTour, introTour, notificationsTour, tourLabels } from '@/lib/tour'
 import { setTourNavigator, useTours } from '@/lib/tours'
 import {
   historyPosition,
-  sidebarDefaultFor,
   useInspector,
   useUiState,
   useWorkspace,
@@ -443,22 +442,15 @@ router.afterEach(() => {
   requestAnimationFrame(() => shell.value?.focusMain())
 })
 
-// Dual-flavor sidebar: route density decides; the user's toggle overrides
-// until the next navigation.
+// Expanded or collapsed is the person's choice, remembered across visits and
+// never derived from the route (the fleet standard).
 // On a phone the sidebar is a drawer over the page, and a drawer of bare
 // icons whose names live in hover tooltips cannot be read by touch, so it is
 // always the labelled one there.
 const { phone } = usePhoneLayout()
+const nav = useSidebarVariant({ storageKey: 'acta.sidebar' })
 const sidebarVariant = computed(() =>
-  phone.value
-    ? 'verbose'
-    : (ui.sidebarChoice.value ?? sidebarDefaultFor(route.name)),
-)
-watch(
-  () => route.name,
-  () => {
-    ui.sidebarChoice.value = null
-  },
+  phone.value ? 'verbose' : nav.variant.value,
 )
 // A drawer that stays open after you chose where to go covers the place you
 // went. The shell closes it when a link inside it is used; this catches the
@@ -471,10 +463,6 @@ watch(
     shell.value?.setContextbarOpen?.(false)
   },
 )
-function toggleSidebar(): void {
-  ui.sidebarChoice.value =
-    sidebarVariant.value === 'compact' ? 'verbose' : 'compact'
-}
 
 const spaces = computed(() =>
   (ws.overview.value?.spaces ?? []).filter((b) => !b.archived),
@@ -836,7 +824,7 @@ watch(
           label: 'Toggle sidebar',
           icon: 'sidebar-simple',
           namespace: 'View',
-          handler: toggleSidebar,
+          handler: nav.toggle,
         },
         {
           id: 'theme:toggle',

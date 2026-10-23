@@ -33,7 +33,7 @@
           {{ unread }}
         </NbBadge>
       </NbSidebarLink>
-      <!-- The same component Settings and Collapse sidebar use. A hand-rolled
+      <!-- The same component the Settings row uses. A hand-rolled
            button here inherited none of the sidebar's typography, which is why
            this one row rendered in a different size and weight to every other. -->
       <NbSidebarMenu v-else density="compact">
