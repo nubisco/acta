@@ -7,7 +7,7 @@
  * tab has to be admin-only: offering it to someone the server will refuse is
  * a control that exists only to produce an error.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
 const overview = vi.fn()
@@ -73,6 +73,20 @@ const BASE_OVERVIEW = {
   actors: [],
   policy: { comment_delete: 'author' },
 }
+
+/*
+ * Each test imports the views afresh, so each gets its own workspace store.
+ * The first import also transforms the view and everything it pulls in, which
+ * cost the first test to mount the settings page about 600ms against 8ms for
+ * the next, and once took it past the 5s timeout under the full parallel
+ * suite. Loading both once here pays that before any test's clock starts.
+ * resetModules keeps the transformed code, so later imports stay fresh and
+ * cheap.
+ */
+beforeAll(async () => {
+  await import('@/components/settings/SettingsWorkspace.vue')
+  await import('@/views/SettingsView.vue')
+})
 
 beforeEach(() => {
   vi.clearAllMocks()

@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, ref } from 'vue'
 import { goalCardTree } from '@/lib/goals'
+import GoalView from '@/views/GoalView.vue'
 import type { IGoalCard, IGoalDetail } from '@/types/api'
 
 const goalGet = vi.fn()
@@ -131,9 +132,15 @@ function detail(items: IGoalCard[] = ITEMS): IGoalDetail {
   } as unknown as IGoalDetail
 }
 
+/*
+ * GoalView is imported with the file rather than inside render(). Loaded on
+ * first use, transforming the view and everything it imports was charged to
+ * whichever test rendered first: around a second alone, against 20ms for
+ * every test after it, and past the 5s timeout under the full parallel suite.
+ * The mocks above are hoisted, so they still apply.
+ */
 async function render() {
   goalGet.mockResolvedValue({ goals: [detail()] })
-  const GoalView = (await import('@/views/GoalView.vue')).default
   const view = mount(GoalView, {
     props: { number: 1 },
     attachTo: document.body,

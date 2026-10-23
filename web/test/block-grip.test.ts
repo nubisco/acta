@@ -25,9 +25,23 @@ vi.mock('@/api/client', async (importOriginal) => {
   }
 })
 
-import type { Editor } from '@tiptap/core'
+/*
+ * A diagram drawn instantly, as nothing. The gutter tests below mount the
+ * editor over a document with a mermaid fence, and its node view starts a real
+ * Mermaid render that nothing awaits. Left in, those renders ran on behind
+ * each test and into the next, so how long a test took depended on what ran
+ * before it. What a diagram draws is tested in decorations.test.ts, and the
+ * markdown never depends on it.
+ */
+vi.mock('@/components/decorations/mermaid', async (importOriginal) => ({
+  ...((await importOriginal()) as object),
+  renderDiagram: async () => ({ svg: '' }),
+}))
+
+import { Editor } from '@tiptap/core'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
+import { documentExtensions } from '@/lib/transfer/normalize'
 import DocCommentLayer from '@/components/comments/DocCommentLayer.vue'
 import {
   blockConversions,
@@ -64,8 +78,10 @@ beforeAll(() => {
 })
 
 const mounted: VueWrapper[] = []
+const headless: Editor[] = []
 afterEach(() => {
   while (mounted.length) mounted.pop()!.unmount()
+  while (headless.length) headless.pop()!.destroy()
   document.body.replaceChildren()
 })
 
@@ -89,13 +105,35 @@ async function mountEditor(
 }
 
 /**
+ * The document's schema and markdown handling with nothing mounted around it.
+ *
+ * For the tests that only transform a document and read the markdown back.
+ * The block operations take an editor state and nothing else, so a mounted
+ * MarkdownEditor added only cost: every setContent rebuilt its Vue node views,
+ * and each mermaid fence started a real Mermaid render. Those renders were
+ * never awaited. They piled up behind the matrices below and ran on the same
+ * thread as whichever test came next, so a test's time depended on what ran
+ * before it and on how busy the machine was. Under a parallel run the file
+ * took 17.7s and a matrix went past its timeout.
+ */
+function documentEditor(source = ''): Editor {
+  const editor = new Editor({
+    element: document.createElement('div'),
+    content: source,
+    extensions: documentExtensions(),
+  })
+  headless.push(editor)
+  return editor
+}
+
+/**
  * A separate editor used only to read markdown back in. Stable means: what an
  * operation wrote, parsed and written again, is the same bytes.
  */
 let reader: Editor
-beforeAll(async () => {
-  reader = (await mountEditor('')).editor
-  mounted.length = 0
+beforeAll(() => {
+  reader = documentEditor()
+  headless.length = 0
 })
 
 function reparsed(markdown: string): string {
@@ -314,14 +352,18 @@ describe('turn into', () => {
   })
 
   it('round-trips every offered conversion to stable markdown that keeps the words', async () => {
-    const { editor } = await mountEditor('')
+    const editor = documentEditor('')
     let checked = 0
     for (const [name, source] of Object.entries(SOURCES)) {
       editor.commands.setContent(framed(source))
-      const offered = blockConversions(editor.state, 1)
+      // Parsed once per source. Each conversion starts from this state rather
+      // than from a fresh parse, which is the same document for a fifth of
+      // the work.
+      const start = editor.state
+      const offered = blockConversions(start, 1)
       expect(offered.length, name).toBeGreaterThan(0)
       for (const option of offered) {
-        editor.commands.setContent(framed(source))
+        editor.view.updateState(start)
         const before = markdownOf(editor)
         expect(
           apply(editor, (d) => convertBlock(editor.state, 1, option.target, d)),
@@ -340,13 +382,12 @@ describe('turn into', () => {
     }
     // Enough of the matrix ran that a regression cannot hide in it.
     expect(checked).toBeGreaterThan(80)
-    // Over eighty conversions, each one a full parse, convert and serialise
-    // through a mounted editor. That is around a second here and timed out at
-    // the 5s default on CI, where the runner is slower and the rest of the
-    // suite is running beside it. The work is real, so the budget is what is
-    // wrong: this says what the test actually costs rather than trimming the
-    // matrix it exists to cover.
-  }, 30_000)
+    // Over eighty parse, convert and serialise cycles. Without a mounted
+    // editor that is about 2s, half what it was, and all of it is the work
+    // the matrix exists to do. Four copies of this file beside two full
+    // suites took it to 5.5s, past the 5s default, so it gets a budget of
+    // its own rather than a smaller matrix.
+  }, 15_000)
 
   const EXPECTED: [string, TBlockKind, string][] = [
     ['paragraph', 'taskList', '- [ ] Ship the **audio host** on Friday.'],
@@ -382,7 +423,7 @@ describe('turn into', () => {
   ]
 
   it.each(EXPECTED)('turns a %s into %s', async (name, target, expected) => {
-    const { editor } = await mountEditor(framed(SOURCES[name]))
+    const editor = documentEditor(framed(SOURCES[name]))
     expect(apply(editor, (d) => convertBlock(editor.state, 1, target, d))).toBe(
       true,
     )
@@ -390,7 +431,7 @@ describe('turn into', () => {
   })
 
   it('says what a conversion loses when it keeps the words but not the rest', async () => {
-    const { editor } = await mountEditor(framed(SOURCES.paragraph))
+    const editor = documentEditor(framed(SOURCES.paragraph))
     const code = blockConversions(editor.state, 1).find(
       (c) => c.target === 'codeBlock',
     )
@@ -404,9 +445,7 @@ describe('turn into', () => {
   })
 
   it('offers nothing that would lose words', async () => {
-    const { editor } = await mountEditor(
-      framed('- first\n  - nested\n- second'),
-    )
+    const editor = documentEditor(framed('- first\n  - nested\n- second'))
     const targets = blockConversions(editor.state, 1).map((c) => c.target)
     // A nested list has no single line to become, and no flat paragraphs.
     expect(targets).not.toContain('paragraph')
@@ -420,7 +459,7 @@ describe('turn into', () => {
   })
 
   it('offers no conversions for tables, images, diagrams or maths', async () => {
-    const { editor } = await mountEditor(framed(SOURCES.paragraph))
+    const editor = documentEditor(framed(SOURCES.paragraph))
     for (const block of [
       '| a | b |\n| --- | --- |\n| 1 | 2 |',
       '![Chart](attachment:att_1){align=center width=50%}',
@@ -437,7 +476,7 @@ describe('turn into', () => {
   })
 
   it('joins a new list onto a list of the same kind beside it, as markdown will', async () => {
-    const { editor } = await mountEditor('- one\n- two\n\nthree')
+    const editor = documentEditor('- one\n- two\n\nthree')
     apply(editor, (d) => convertBlock(editor.state, 1, 'bulletList', d))
     expect(editor.state.doc.childCount).toBe(1)
     const out = markdownOf(editor)
@@ -478,15 +517,16 @@ describe('duplicate, delete and reorder', () => {
   }
 
   it('starts from a document the editor writes back unchanged', async () => {
-    const { editor } = await mountEditor(DOC)
+    const editor = documentEditor(DOC)
     expect(partIndices(editor)).toHaveLength(PARTS.length)
     expect(markdownOf(editor)).toBe(DOC)
   })
 
   it('duplicates every kind of block', async () => {
-    const { editor } = await mountEditor(DOC)
+    const editor = documentEditor(DOC)
+    const start = editor.state
     for (let i = 0; i < PARTS.length; i++) {
-      editor.commands.setContent(DOC)
+      editor.view.updateState(start)
       const at = partIndices(editor)[i]
       expect(apply(editor, (d) => duplicateBlock(editor.state, at, d))).toBe(
         true,
@@ -500,9 +540,10 @@ describe('duplicate, delete and reorder', () => {
   })
 
   it('deletes every kind of block', async () => {
-    const { editor } = await mountEditor(DOC)
+    const editor = documentEditor(DOC)
+    const start = editor.state
     for (let i = 0; i < PARTS.length; i++) {
-      editor.commands.setContent(DOC)
+      editor.view.updateState(start)
       const at = partIndices(editor)[i]
       expect(apply(editor, (d) => deleteBlock(editor.state, at, d))).toBe(true)
       const expected = PARTS.filter((_, j) => j !== i).join('\n\n')
@@ -512,18 +553,19 @@ describe('duplicate, delete and reorder', () => {
   })
 
   it('leaves an empty paragraph when the only block is deleted', async () => {
-    const { editor } = await mountEditor('Only block.')
+    const editor = documentEditor('Only block.')
     apply(editor, (d) => deleteBlock(editor.state, 0, d))
     expect(markdownOf(editor)).toBe('')
     expect(editor.state.doc.childCount).toBe(1)
   })
 
   it('moves every block to every position', async () => {
-    const { editor } = await mountEditor(DOC)
+    const editor = documentEditor(DOC)
+    const start = editor.state
     for (let from = 0; from < PARTS.length; from++) {
       for (let to = 0; to < PARTS.length; to++) {
         if (from === to) continue
-        editor.commands.setContent(DOC)
+        editor.view.updateState(start)
         const indices = partIndices(editor)
         expect(
           apply(editor, (d) =>
@@ -544,7 +586,7 @@ describe('duplicate, delete and reorder', () => {
   })
 
   it('joins two lists that a delete leaves touching', async () => {
-    const { editor } = await mountEditor('- a\n- b\n\nMiddle.\n\n- c')
+    const editor = documentEditor('- a\n- b\n\nMiddle.\n\n- c')
     apply(editor, (d) => deleteBlock(editor.state, 1, d))
     expect(editor.state.doc.childCount).toBe(1)
     const out = markdownOf(editor)

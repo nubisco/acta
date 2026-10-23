@@ -12,7 +12,7 @@
  * (placeholder, table grips, colour swatches) or only reacts to typing
  * (the `[[`, `@` and `/` menus), and none of it has a say in the markdown.
  */
-import { Editor } from '@tiptap/core'
+import { Editor, type AnyExtension } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { STARTER_KIT_PARITY } from '@/components/editor/starterKit'
 import Link from '@tiptap/extension-link'
@@ -30,41 +30,50 @@ import { MathBlock, MathInline, MathText } from '@/components/editor/nodes/Math'
 import { MermaidBlock } from '@/components/editor/nodes/MermaidBlock'
 import { LinkCard } from '@/components/editor/nodes/LinkCard'
 
+/**
+ * The editor's document schema and markdown handling, and nothing that draws
+ * or reacts to typing. Also what tests build an editor from when they only
+ * need its parse and serialize.
+ */
+export function documentExtensions(): AnyExtension[] {
+  return [
+    StarterKit.configure({
+      heading: { levels: [1, 2, 3, 4] },
+      ...STARTER_KIT_PARITY,
+      codeBlock: false,
+      text: false,
+    }),
+    MermaidBlock,
+    Link.configure({ openOnClick: false }),
+    Table.configure({ resizable: true }),
+    TableRow,
+    TableHeader,
+    TableCell,
+    TaskList,
+    TaskItem.configure({ nested: true }),
+    Callout,
+    ...Details,
+    Emphasis,
+    Ref,
+    Embed,
+    Image,
+    MathText,
+    MathBlock,
+    MathInline,
+    LinkCard,
+    Markdown.configure({
+      html: false,
+      linkify: true,
+      breaks: true,
+      transformPastedText: true,
+    }),
+  ]
+}
+
 function serializeOnce(markdown: string): string {
   const editor = new Editor({
     content: markdown,
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3, 4] },
-        ...STARTER_KIT_PARITY,
-        codeBlock: false,
-        text: false,
-      }),
-      MermaidBlock,
-      Link.configure({ openOnClick: false }),
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      Callout,
-      ...Details,
-      Emphasis,
-      Ref,
-      Embed,
-      Image,
-      MathText,
-      MathBlock,
-      MathInline,
-      LinkCard,
-      Markdown.configure({
-        html: false,
-        linkify: true,
-        breaks: true,
-        transformPastedText: true,
-      }),
-    ],
+    extensions: documentExtensions(),
   })
   try {
     return editor.storage.markdown.getMarkdown()
