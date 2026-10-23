@@ -1,5 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core'
-import type { MarkdownSerializerState } from '@tiptap/pm/markdown'
+import type { MarkdownSerializerState } from 'prosemirror-markdown'
 import type { Node as PMNode } from '@tiptap/pm/model'
 
 /**

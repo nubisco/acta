@@ -1,6 +1,8 @@
-import BaseTable from '@tiptap/extension-table'
-import BaseTableCell from '@tiptap/extension-table-cell'
-import BaseTableHeader from '@tiptap/extension-table-header'
+import {
+  Table as BaseTable,
+  TableCell as BaseTableCell,
+  TableHeader as BaseTableHeader,
+} from '@tiptap/extension-table'
 import {
   CellSelection,
   TableMap,

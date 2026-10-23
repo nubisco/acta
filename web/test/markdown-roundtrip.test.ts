@@ -15,10 +15,10 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
+import { STARTER_KIT_PARITY } from '@/components/editor/starterKit'
 import Link from '@tiptap/extension-link'
-import TableRow from '@tiptap/extension-table-row'
-import TaskList from '@tiptap/extension-task-list'
-import TaskItem from '@tiptap/extension-task-item'
+import { TableRow } from '@tiptap/extension-table'
+import { TaskItem, TaskList } from '@tiptap/extension-list'
 import { Markdown } from 'tiptap-markdown'
 import { Callout } from '@/components/editor/nodes/Callout'
 import { Emphasis } from '@/components/editor/nodes/Emphasis'
@@ -37,6 +37,7 @@ function roundtrip(md: string): string {
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4] },
+        ...STARTER_KIT_PARITY,
         codeBlock: {},
       }),
       Link.configure({ openOnClick: false }),
@@ -65,9 +66,7 @@ function roundtrip(md: string): string {
       }),
     ],
   })
-  const out = (
-    editor.storage as { markdown: { getMarkdown: () => string } }
-  ).markdown.getMarkdown()
+  const out = editor.storage.markdown.getMarkdown()
   editor.destroy()
   return out.trim()
 }
@@ -623,6 +622,7 @@ function tableEditor(md: string): Editor {
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4] },
+        ...STARTER_KIT_PARITY,
         codeBlock: {},
       }),
       Link.configure({ openOnClick: false }),
@@ -682,9 +682,7 @@ function edit(md: string, apply: (editor: Editor) => void): string {
   const editor = tableEditor(md)
   editor.commands.setTextSelection(firstBodyCell(editor))
   apply(editor)
-  const out = (
-    editor.storage as { markdown: { getMarkdown: () => string } }
-  ).markdown.getMarkdown()
+  const out = editor.storage.markdown.getMarkdown()
   editor.destroy()
   return out.trim()
 }

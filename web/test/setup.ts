@@ -53,3 +53,14 @@ if (!window.matchMedia) {
     dispatchEvent: () => false,
   })) as never
 }
+
+// jsdom has no layout engine, and ProseMirror asks for rectangles whenever it
+// scrolls a selection into view. Tiptap 3's focus() does that a frame after
+// focusing, so any test that focuses an editor reached a missing
+// Range#getClientRects after the test had finished. Empty answers, which
+// ProseMirror already handles, rather than an uncaught TypeError.
+const rangeProto = Range.prototype as unknown as Record<string, unknown>
+rangeProto.getClientRects ??= () => []
+rangeProto.getBoundingClientRect ??= () => new DOMRect()
+const elementProto = Element.prototype as unknown as Record<string, unknown>
+elementProto.getClientRects ??= () => []

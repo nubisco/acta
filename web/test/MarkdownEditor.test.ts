@@ -43,8 +43,9 @@ vi.mock('@/api/client', () => ({
 
 import { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
+import { STARTER_KIT_PARITY } from '@/components/editor/starterKit'
 import Link from '@tiptap/extension-link'
-import TableRow from '@tiptap/extension-table-row'
+import { TableRow } from '@tiptap/extension-table'
 import { Markdown } from 'tiptap-markdown'
 import { Table, TableCell, TableHeader } from '@/components/editor/nodes/Table'
 import { TableGrips, tableGripsKey } from '@/components/editor/tableGrips'
@@ -614,6 +615,7 @@ describe('table keyboard path', () => {
       extensions: [
         StarterKit.configure({
           heading: { levels: [1, 2, 3, 4] },
+          ...STARTER_KIT_PARITY,
           codeBlock: {},
         }),
         Link.configure({ openOnClick: false }),
@@ -651,9 +653,7 @@ describe('table keyboard path', () => {
   }
 
   function markdown(editor: Editor): string {
-    return (editor.storage as { markdown: { getMarkdown(): string } }).markdown
-      .getMarkdown()
-      .trim()
+    return editor.storage.markdown.getMarkdown().trim()
   }
 
   it('selects a row with Shift-Space, which opens the row controls', () => {
@@ -778,6 +778,7 @@ describe('table grip drag', () => {
       extensions: [
         StarterKit.configure({
           heading: { levels: [1, 2, 3, 4] },
+          ...STARTER_KIT_PARITY,
           codeBlock: {},
         }),
         Table.configure({ resizable: true }),

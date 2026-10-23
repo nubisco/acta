@@ -129,11 +129,11 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { Editor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
+import { STARTER_KIT_PARITY } from '@/components/editor/starterKit'
 import Link from '@tiptap/extension-link'
-import Placeholder from '@tiptap/extension-placeholder'
-import TableRow from '@tiptap/extension-table-row'
-import TaskList from '@tiptap/extension-task-list'
-import TaskItem from '@tiptap/extension-task-item'
+import { Placeholder } from '@tiptap/extensions'
+import { TableRow } from '@tiptap/extension-table'
+import { TaskItem, TaskList } from '@tiptap/extension-list'
 import { Markdown } from 'tiptap-markdown'
 import { usePhoneLayout, useToast } from '@nubisco/ui'
 import { api } from '@/api/client'
@@ -323,10 +323,14 @@ function readTableSelection(): void {
 
 const editor = new Editor({
   content: props.modelValue,
-  autofocus: props.autofocus ? 'end' : false,
+  // Focused in onCreate below rather than through `autofocus`, which in
+  // Tiptap 3 also scrolls the caret into view: opening a long page to edit it
+  // jumped to the bottom of the page.
+  autofocus: false,
   extensions: [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4] },
+      ...STARTER_KIT_PARITY,
       // Replaced below by the same code block carrying a node view, so a
       // mermaid fence draws its diagram. The node, its parse rule and its
       // serializer are untouched.
@@ -417,26 +421,28 @@ const editor = new Editor({
       return true
     },
   },
+  onCreate: ({ editor: instance }) => {
+    if (props.autofocus)
+      instance.commands.focus('end', { scrollIntoView: false })
+  },
   onBlur: () => emit('blur'),
   onSelectionUpdate: () => readTableSelection(),
   onUpdate: ({ editor: instance }) => {
     readTableSelection()
-    emit(
-      'update:modelValue',
-      (
-        instance.storage as { markdown: { getMarkdown: () => string } }
-      ).markdown.getMarkdown(),
-    )
+    emit('update:modelValue', instance.storage.markdown.getMarkdown())
   },
 })
 
 watch(
   () => props.modelValue,
   (value) => {
-    const current = (
-      editor.storage as { markdown: { getMarkdown: () => string } }
-    ).markdown.getMarkdown()
-    if (value !== current) editor.commands.setContent(value)
+    const current = editor.storage.markdown.getMarkdown()
+    // No update event: this is the owner handing the text in, not an edit.
+    // Tiptap 3 emits one from setContent by default (2 did not), and it
+    // would come straight back out as `update:modelValue` in the editor's
+    // own serialization, which marks an untouched page as changed.
+    if (value !== current)
+      editor.commands.setContent(value, { emitUpdate: false })
   },
 )
 
@@ -451,7 +457,7 @@ onBeforeUnmount(() => editor.destroy())
 // without this component knowing about them, and `root` for the element
 // headings render into, which the document's contents are built from.
 defineExpose({
-  focus: () => editor.commands.focus('end'),
+  focus: () => editor.commands.focus('end', { scrollIntoView: false }),
   editor,
   /** The element headings render into, for the document's contents. */
   root: () => editor.view.dom as HTMLElement,

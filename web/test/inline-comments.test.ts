@@ -75,10 +75,7 @@ async function mountEditor(source = SOURCE) {
   mounted.push(view)
   await flushPromises()
   const editor = (view.vm as unknown as { editor: Editor }).editor
-  const markdown = () =>
-    (
-      editor.storage as { markdown: { getMarkdown: () => string } }
-    ).markdown.getMarkdown()
+  const markdown = () => editor.storage.markdown.getMarkdown()
   return { view, editor, markdown }
 }
 

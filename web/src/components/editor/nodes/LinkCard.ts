@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import type { MarkdownSerializerState } from '@tiptap/pm/markdown'
+import type { MarkdownSerializerState } from 'prosemirror-markdown'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import LinkCardView from '@/components/decorations/LinkCardView.vue'
 import { bareUrlParagraph } from '@/components/decorations/linkCards'
