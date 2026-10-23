@@ -1,3 +1,10 @@
+# [1.56.0](https://github.com/nubisco/acta/compare/v1.55.0...v1.56.0) (2026-10-23)
+
+
+### Features
+
+* **ai:** fetch model prices from LiteLLM's public list instead of a hard-coded table ([c4fd402](https://github.com/nubisco/acta/commit/c4fd402d2bfa283ac0712a5cff8824fda4f616cb))
+
 # [1.55.0](https://github.com/nubisco/acta/compare/v1.54.0...v1.55.0) (2026-10-23)
 
 
