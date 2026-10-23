@@ -7,3 +7,11 @@ packages:
 # distrust strangers' fresh publishes, and we are not strangers to ourselves.
 minimumReleaseAgeExclude:
   - '@nubisco/*'
+
+# monaco-editor pins dompurify to an exact version, and every release up to
+# 0.57.0 pins one with known advisories (GHSA-cg2g-xh64-v4q7, GHSA-mrv2-3pqr-j5jr).
+# This lifts the declared dependency only. monaco bundles its own vendored copy,
+# and the plugin in web/vite.config.ts is what makes the build use the patched
+# one. Drop both once monaco vendors 3.4.17 or later.
+overrides:
+  dompurify: ^3.4.17

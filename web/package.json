@@ -30,6 +30,7 @@
     "@tiptap/starter-kit": "^2.27.3",
     "@tiptap/suggestion": "^2.27.3",
     "@tiptap/vue-3": "^2.27.3",
+    "dompurify": "^3.4.17",
     "fflate": "^0.8.3",
     "katex": "^0.18.7",
     "mammoth": "^1.12.3",

@@ -5,6 +5,40 @@ import vue from '@vitejs/plugin-vue'
 import { fonts } from '@nubisco/ui/plugins/fonts'
 import { nubiscoUI } from '@nubisco/ui/vite'
 import { fileURLToPath } from 'node:url'
+import type { Plugin } from 'vite'
+
+/**
+ * Builds monaco-editor against the DOMPurify in our own dependencies.
+ *
+ * monaco does not import the dompurify package. It ships a vendored copy of it
+ * at esm/vs/base/browser/dompurify/dompurify.js (3.4.8 in monaco 0.56.0, 3.4.15
+ * in 0.57.0, both with known advisories), so the override in
+ * pnpm-workspace.yaml quiets the audit without changing a byte of what ships.
+ * This swaps the vendored file for the real package at build time. Both export
+ * the same DOMPurify instance as their default, so monaco's only importer
+ * (vs/base/browser/domSanitize.js) is unaffected.
+ *
+ * Drop it, together with the direct dompurify dependency and the override, once
+ * monaco vendors a patched release: check the @license line of that file.
+ */
+function monacoUsesPatchedDompurify(): Plugin {
+  const vendored =
+    /[\\/]monaco-editor[\\/]esm[\\/]vs[\\/]base[\\/]browser[\\/]dompurify[\\/]dompurify\.js$/
+  const self = fileURLToPath(import.meta.url)
+  return {
+    name: 'acta:monaco-patched-dompurify',
+    enforce: 'pre',
+    async resolveId(source, importer, options) {
+      if (!importer || !source.endsWith('dompurify/dompurify.js')) return null
+      const resolved = await this.resolve(source, importer, {
+        ...options,
+        skipSelf: true,
+      })
+      if (!resolved || !vendored.test(resolved.id)) return null
+      return this.resolve('dompurify', self, { ...options, skipSelf: true })
+    },
+  }
+}
 
 export default defineConfig({
   // @nubisco/ui 4.0.0 resolves components and glyphs at compile time instead
@@ -19,7 +53,12 @@ export default defineConfig({
   // name, which is the payload this release exists to avoid. The trade is
   // that a name we forget to register raises at first render; that error
   // names the icon, and the fix is one line in lib/icons.ts.
-  plugins: [vue(), fonts(), ...nubiscoUI({ glyphs: { catalog: 'off' } })],
+  plugins: [
+    vue(),
+    fonts(),
+    ...nubiscoUI({ glyphs: { catalog: 'off' } }),
+    monacoUsesPatchedDompurify(),
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
