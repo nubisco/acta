@@ -1,3 +1,10 @@
+# [1.54.0](https://github.com/nubisco/acta/compare/v1.53.1...v1.54.0) (2026-10-23)
+
+
+### Features
+
+* **shell:** collapse the rail from the top, beside the brand ([0ffe0ed](https://github.com/nubisco/acta/commit/0ffe0ed63a9199b255a808f8a888dfd3cd6ee1c8))
+
 ## [1.53.1](https://github.com/nubisco/acta/compare/v1.53.0...v1.53.1) (2026-10-23)
 
 
