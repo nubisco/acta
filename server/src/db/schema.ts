@@ -654,6 +654,18 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
 );
 CREATE INDEX IF NOT EXISTS idx_ai_usage_ws ON ai_usage_log(workspace_id, created_at);
 
+-- The last good copy of LiteLLM's public price list, trimmed to the three
+-- providers and the two prices read (services/aiPrices.ts). One row for the
+-- instance, like link_preview: a list price does not differ per workspace.
+-- It is here so a restart or another instance reads the copy instead of
+-- fetching it again, and so a failed fetch still has a copy to fall back on.
+CREATE TABLE IF NOT EXISTS ai_price_list (
+  id TEXT PRIMARY KEY CHECK (id = 'litellm'),
+  -- JSON: provider to model id to [input, output] in USD per token.
+  prices TEXT NOT NULL,
+  fetched_at INTEGER NOT NULL
+);
+
 -- The daily progress report (LA-389): what moved, what it opened up, and
 -- where each person might look today, posted to Slack once a working day.
 CREATE TABLE IF NOT EXISTS daily_report (

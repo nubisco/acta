@@ -9,6 +9,13 @@
  * One consumer today, the daily report (services/dailyReport.ts).
  */
 import type { ISqlDriver } from '../db'
+import {
+  costOf,
+  findPrice,
+  getPriceList,
+  type IPriceList,
+  type IPriceOptions,
+} from './aiPrices'
 
 export type TAiProvider = 'anthropic' | 'openai' | 'gemini'
 
@@ -439,27 +446,19 @@ export async function callModel(
 // ─── Usage and cost ──────────────────────────────────────────────────────────
 
 /**
- * USD per million tokens, per exact model id.
- *
- * Deliberately incomplete, and identical to Analytics' table. Admins can type
- * any model, providers change prices, and a confidently wrong number is worse
- * than none. An unknown model reports tokens and no cost.
+ * What a request cost at list prices, or null when the price list does not
+ * have the model (or there is no price list yet). Prices come from
+ * services/aiPrices.ts, never from a table here: a confidently wrong number
+ * is worse than none.
  */
-const PRICE_PER_MILLION: Record<string, { input: number; output: number }> = {
-  'claude-haiku-4-5': { input: 1.0, output: 5.0 },
-  'gpt-5.6-luna': { input: 0.2, output: 1.2 },
-  'gemini-3.5-flash-lite': { input: 0.3, output: 2.5 },
-}
-
-export const PRICING_VERIFIED_ON = '2026-08-21'
-
-export function estimateCost(model: string, usage: ITokenUsage): number | null {
-  const price = PRICE_PER_MILLION[model]
-  if (!price) return null
-  return (
-    (usage.inputTokens / 1_000_000) * price.input +
-    (usage.outputTokens / 1_000_000) * price.output
-  )
+export function estimateCost(
+  prices: IPriceList | null,
+  provider: string,
+  model: string,
+  usage: ITokenUsage,
+): number | null {
+  const price = findPrice(prices, provider, model)
+  return price ? costOf(price, usage) : null
 }
 
 /** Never throws: a lost usage row must not cost the report already paid for. */
@@ -494,9 +493,10 @@ export interface IAiUsageSummary {
   requests: number
   inputTokens: number
   outputTokens: number
-  /** Null when any model used has no published price on file. */
+  /** Null when any model used has no price in the fetched list. */
   estimatedCostUsd: number | null
   unpricedModels: string[]
+  /** The day the price list was fetched, YYYY-MM-DD, or '' with none. */
   pricingVerifiedOn: string
 }
 
@@ -504,19 +504,23 @@ export async function getUsageSummary(
   db: ISqlDriver,
   workspaceId: string,
   days = 30,
+  priceOptions: IPriceOptions = {},
 ): Promise<IAiUsageSummary> {
   const rows = await db.query<{
+    provider: string
     model: string
     requests: number
     input_tokens: number
     output_tokens: number
   }>(
-    `SELECT model, COUNT(*) AS requests, SUM(input_tokens) AS input_tokens,
+    `SELECT provider, model, COUNT(*) AS requests, SUM(input_tokens) AS input_tokens,
             SUM(output_tokens) AS output_tokens
        FROM ai_usage_log WHERE workspace_id = ? AND created_at >= ?
-      GROUP BY model`,
+      GROUP BY provider, model`,
     [workspaceId, Date.now() - days * 86_400_000],
   )
+  // Only when there is usage to price: an unused key never fetches the list.
+  const prices = rows.length > 0 ? await getPriceList(db, priceOptions) : null
   let cost: number | null = 0
   const unpriced: string[] = []
   let requests = 0
@@ -530,9 +534,10 @@ export async function getUsageSummary(
     requests += Number(row.requests) || 0
     inputTokens += usage.inputTokens
     outputTokens += usage.outputTokens
-    const priced = estimateCost(row.model, usage)
-    if (priced === null) unpriced.push(row.model)
-    else if (cost !== null) cost += priced
+    const priced = estimateCost(prices, row.provider, row.model, usage)
+    if (priced === null) {
+      if (!unpriced.includes(row.model)) unpriced.push(row.model)
+    } else if (cost !== null) cost += priced
   }
   if (unpriced.length > 0) cost = null
   return {
@@ -542,6 +547,8 @@ export async function getUsageSummary(
     outputTokens,
     estimatedCostUsd: cost,
     unpricedModels: unpriced,
-    pricingVerifiedOn: PRICING_VERIFIED_ON,
+    pricingVerifiedOn: prices
+      ? new Date(prices.fetchedAt).toISOString().slice(0, 10)
+      : '',
   }
 }
