@@ -14,7 +14,7 @@
     "@floating-ui/dom": "^1.8.0",
     "@nubisco/acta-importers": "workspace:*",
     "@nubisco/acta-shared": "workspace:*",
-    "@nubisco/ui": "^5.27.0",
+    "@nubisco/ui": "^5.27.3",
     "@tiptap/core": "^3.32.0",
     "@tiptap/extension-code-block": "^3.32.0",
     "@tiptap/extension-italic": "^3.32.0",
@@ -52,7 +52,6 @@
     "jsdom": "^30.0.1",
     "sass-embedded": "^1.83.0",
     "typescript": "^5.9.3",
-    "unplugin-fonts": "^2.0.0",
     "vite": "^8.3.5",
     "vitest": "^4.0.5",
     "vue-tsc": "^3.0.0"
