@@ -3,6 +3,12 @@ packages:
   - web
   - shared
   - importers
+
+# The only dependencies whose install scripts run. This lived under "pnpm" in
+# package.json, which pnpm 10 no longer reads.
+onlyBuiltDependencies:
+  - esbuild
+  - simple-git-hooks
 # Our own releases install immediately: the release-age check exists to
 # distrust strangers' fresh publishes, and we are not strangers to ourselves.
 minimumReleaseAgeExclude:
