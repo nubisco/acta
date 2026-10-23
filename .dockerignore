@@ -1,0 +1,9 @@
+# The image copies server/dist and web/dist built by CI on the host, so dist
+# stays in the context. Everything else from the host is kept out.
+node_modules
+**/node_modules
+**/*.tsbuildinfo
+.git
+.env
+**/.env
+coverage
