@@ -89,11 +89,19 @@ function findClose(
   return -1
 }
 
+/** The instances the rule is already on. */
+const applied = new WeakSet<MarkdownIt>()
+
 /**
  * The markdown-it plugin. Applied to every instance that renders documents,
  * which is the reader's and the one tiptap-markdown parses with.
+ *
+ * tiptap-markdown runs its setup on every parse, so this has to do nothing
+ * the second time rather than add the rule again.
  */
 export function detailsPlugin(md: MarkdownIt): void {
+  if (applied.has(md)) return
+  applied.add(md)
   md.block.ruler.before(
     'fence',
     'details',

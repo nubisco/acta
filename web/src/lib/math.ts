@@ -244,8 +244,16 @@ export function guardMathDelimiters(text: string): string {
   return out
 }
 
-/** Adds `$$ ... $$` and `$...$` to a markdown-it instance. */
+/** The instances the rules are already on. */
+const applied = new WeakSet<MarkdownIt>()
+
+/**
+ * Adds `$$ ... $$` and `$...$` to a markdown-it instance, once. tiptap-markdown
+ * runs its setup on every parse, and from more than one node.
+ */
 export function mathPlugin(md: MarkdownIt): void {
+  if (applied.has(md)) return
+  applied.add(md)
   md.inline.ruler.before('escape', 'math_inline', mathInline)
   md.block.ruler.before('fence', 'math_block', mathBlock, {
     alt: ['paragraph', 'reference', 'blockquote', 'list'],
