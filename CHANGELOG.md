@@ -1,3 +1,10 @@
+# [1.59.0](https://github.com/nubisco/acta/compare/v1.58.0...v1.59.0) (2026-10-24)
+
+
+### Features
+
+* **ui:** built-in theme picker in the user menu ([85717ab](https://github.com/nubisco/acta/commit/85717ab01760cbde7799bb5b36ddda351e66cc65))
+
 # [1.58.0](https://github.com/nubisco/acta/compare/v1.57.0...v1.58.0) (2026-10-24)
 
 
