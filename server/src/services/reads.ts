@@ -374,6 +374,10 @@ export async function spaceGet(ctx: ICtx, params: TSpaceGet) {
     space: {
       key: space.key,
       name: space.name,
+      // Only when there is one, so an agent reading a board pays nothing for
+      // a space that was never described. The space's Settings page edits it.
+      description: space.description || undefined,
+      archived: space.archived === 1 || undefined,
       done_window_days: space.done_window_days ?? null,
     },
     items,

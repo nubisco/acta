@@ -15,6 +15,12 @@
     :min-width="240"
     @close="open = false"
   >
+    <NbMenuItem
+      icon="sliders-horizontal"
+      label="Space settings"
+      @select="pick(openSettings)"
+    />
+    <NbMenuDivider />
     <NbMenuItem icon="archive" label="Archive space" @select="pick(archive)" />
     <NbMenuItem
       v-if="ws.isAdmin.value"
@@ -27,11 +33,16 @@
 </template>
 
 <script setup lang="ts">
-/** The space's own menu. The actions are in useSpaceActions. */
+/**
+ * The space's own menu: a way to its Settings, and archive and delete kept as
+ * shortcuts from there. The actions are in useSpaceActions.
+ */
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import type { NbMenu } from '@nubisco/ui'
 import { useSpaceActions } from '@/composables/useSpaceActions'
 import { useWorkspace } from '@/stores/workspace'
+import { wpath } from '@/lib/paths'
 
 const props = defineProps<{
   spaceKey: string
@@ -41,7 +52,12 @@ const props = defineProps<{
 
 const ws = useWorkspace()
 const { archive, remove } = useSpaceActions(() => props)
+const router = useRouter()
 const open = ref(false)
+
+function openSettings(): void {
+  void router.push(wpath(`/s/${props.spaceKey}/settings`))
+}
 const menu = ref<InstanceType<typeof NbMenu> | null>(null)
 const trigger = ref<{ $el: HTMLElement } | null>(null)
 

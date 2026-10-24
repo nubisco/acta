@@ -266,7 +266,14 @@ export const api = {
 
   spaceGet: (space: string, params: Record<string, string> = {}) =>
     req<{
-      space: { key: string; name: string; done_window_days?: number | null }
+      space: {
+        key: string
+        name: string
+        /** Only when the space has one. */
+        description?: string
+        archived?: boolean
+        done_window_days?: number | null
+      }
       items: ISpaceItemRow[]
       /** With done=space: done cards the board's window left out. */
       done_hidden?: number

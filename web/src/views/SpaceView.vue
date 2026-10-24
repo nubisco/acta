@@ -19,6 +19,11 @@
             @select="selectMode = true"
           />
           <NbMenuItem
+            icon="sliders-horizontal"
+            label="Space settings"
+            @select="router.push(wpath(`/s/${spaceKey}/settings`))"
+          />
+          <NbMenuItem
             icon="archive"
             label="Archive space"
             @select="spaceActions.archive()"
@@ -486,8 +491,9 @@ import {
 import * as iconArchive from '@nubisco/ui/icons/archive'
 import * as iconPlus from '@nubisco/ui/icons/plus'
 import { useSpaceActions } from '@/composables/useSpaceActions'
+import { SPACE_VIEWS, spaceViewOf } from '@/lib/spaceViews'
 import { api, newOpId } from '@/api/client'
-import { cardUrl } from '@/lib/paths'
+import { cardUrl, wpath } from '@/lib/paths'
 import {
   BOARD_SORTS,
   compareBy,
@@ -816,21 +822,10 @@ async function runOps(
  * link to a timeline stays a timeline, and so the back button steps through
  * views the way it steps through anything else.
  */
-const viewTabs = [
-  { id: 'board', label: 'Board' },
-  { id: 'table', label: 'Table' },
-  { id: 'calendar', label: 'Calendar' },
-  { id: 'timeline', label: 'Timeline' },
-  { id: 'sequence', label: 'Sequence' },
-  // Not a view of the cards but a report on them: how long people wait.
-  { id: 'response-times', label: 'Response times' },
-]
+const viewTabs = SPACE_VIEWS.map(({ id, label }) => ({ id, label }))
 
 const view = computed({
-  get: () => {
-    const wanted = String(route.query.view ?? 'board')
-    return viewTabs.some((t) => t.id === wanted) ? wanted : 'board'
-  },
+  get: () => spaceViewOf(route.query.view),
   set: (value: string) => {
     const query = { ...route.query }
     if (value === 'board') delete query.view

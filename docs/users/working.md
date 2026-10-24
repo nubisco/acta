@@ -63,13 +63,25 @@ show on the card on a board, the Table view has a sortable Priority column, and
 
 ## Spaces
 
-A space's **⋯** menu, at the top right of its board, can archive it: it leaves
-the sidebar and Home with everything in it kept, and **Archived spaces** at the
-foot of Home's Spaces panel brings it back. Deleting a space is for admins and
-cannot be undone. An empty space can be deleted straight from its ⋯ menu. A
-space with cards is archived first, then deleted from Archived spaces, where
-the confirmation says how many cards go with it. Pages filed under a deleted
-space are kept.
+The space you are in has its own group in the sidebar, headed with its name:
+its views (Board, Table, Calendar, Timeline, Sequence, Response times), then
+**Settings**, always last. **Spaces**, under the workspace's own entries,
+opens the list of every space to switch to another, and Home lists them too.
+
+A space's **Settings** hold everything that is configured per space: its name
+and description, its lists (rename, reorder by dragging, change what a list
+means, add one, archive an empty one), how long done cards stay on the board,
+and archiving or deleting it. The key is shown there but does not change,
+because every card key and every link to a card is made from it. These are the
+same things an agent can change with the `space_write` tool.
+
+Archiving takes a space out of the sidebar and Home with everything in it
+kept, and **Archived spaces** at the foot of Home's Spaces panel brings it
+back. Deleting a space is for admins and cannot be undone. An empty space can
+be deleted straight from its Settings or its **⋯** menu at the top right of
+the board. A space with cards is archived first, then deleted from Archived
+spaces, where the confirmation says how many cards go with it. Pages filed
+under a deleted space are kept.
 
 ## Views
 
@@ -199,7 +211,7 @@ menu (the three dots) can:
 - **Clear done now**: every card that is done right now leaves the board at
   once, for teams that clear the column after a release or a sprint.
 - **Change the window** for the whole space: 1, 7, 14, 30 or 60 days, or keep
-  every done card.
+  every done card. The space's Settings have the same choice.
 
 ### Opening a card
 

@@ -414,6 +414,15 @@ const trail = computed<ICrumb[]>(() => {
     const space = spaces.value.find((b) => b.key === key)
     return [{ text: 'Spaces', to: wpath('/') }, { text: space?.name ?? key }]
   }
+  if (route.meta.crumb === 'space-settings') {
+    const key = String(route.params.spaceKey ?? '')
+    const space = ws.overview.value?.spaces.find((b) => b.key === key)
+    return [
+      { text: 'Spaces', to: wpath('/') },
+      { text: space?.name ?? key, to: wpath(`/s/${key}`) },
+      { text: 'Settings' },
+    ]
+  }
   if (route.meta.crumb === 'goal') {
     const number = Number(String(route.params.goal ?? '').replace(/^G-/i, ''))
     const goal = ws.overview.value?.goals?.find((g) => g.number === number)
@@ -599,7 +608,7 @@ watch(
         {
           id: 'go:docs',
           label: 'Docs',
-          icon: 'book-open',
+          icon: 'file-text',
           namespace: 'Go',
           handler: () => void router.push(wpath('/docs')),
         },

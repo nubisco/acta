@@ -16,9 +16,10 @@ import { registerIcons } from '@nubisco/ui'
 
 import * as archive from '@nubisco/ui/icons/archive'
 import * as arrowElbowDownRight from '@nubisco/ui/icons/arrow-elbow-down-right'
-import * as bookOpen from '@nubisco/ui/icons/book-open'
+import * as calendarBlank from '@nubisco/ui/icons/calendar-blank'
 import * as caretCircleRight from '@nubisco/ui/icons/caret-circle-right'
 import * as caretDown from '@nubisco/ui/icons/caret-down'
+import * as chartBarHorizontal from '@nubisco/ui/icons/chart-bar-horizontal'
 import * as chatCircle from '@nubisco/ui/icons/chat-circle'
 import * as checkSquare from '@nubisco/ui/icons/check-square'
 import * as clockCounterClockwise from '@nubisco/ui/icons/clock-counter-clockwise'
@@ -27,6 +28,7 @@ import * as codeBlock from '@nubisco/ui/icons/code-block'
 import * as cornersOut from '@nubisco/ui/icons/corners-out'
 import * as crosshairSimple from '@nubisco/ui/icons/crosshair-simple'
 import * as fileText from '@nubisco/ui/icons/file-text'
+import * as flowArrow from '@nubisco/ui/icons/flow-arrow'
 import * as fn from '@nubisco/ui/icons/function'
 import * as house from '@nubisco/ui/icons/house'
 import * as info from '@nubisco/ui/icons/info'
@@ -44,6 +46,7 @@ import * as pulse from '@nubisco/ui/icons/pulse'
 import * as quotes from '@nubisco/ui/icons/quotes'
 import * as robot from '@nubisco/ui/icons/robot'
 import * as sidebarSimple from '@nubisco/ui/icons/sidebar-simple'
+import * as table from '@nubisco/ui/icons/table'
 import * as target from '@nubisco/ui/icons/target'
 import * as textB from '@nubisco/ui/icons/text-b'
 import * as textHFour from '@nubisco/ui/icons/text-h-four'
@@ -53,6 +56,7 @@ import * as textHTwo from '@nubisco/ui/icons/text-h-two'
 import * as textItalic from '@nubisco/ui/icons/text-italic'
 import * as textStrikethrough from '@nubisco/ui/icons/text-strikethrough'
 import * as textT from '@nubisco/ui/icons/text-t'
+import * as timer from '@nubisco/ui/icons/timer'
 import * as trash from '@nubisco/ui/icons/trash'
 import * as treeStructure from '@nubisco/ui/icons/tree-structure'
 import * as user from '@nubisco/ui/icons/user'
@@ -63,9 +67,14 @@ export function registerActaIcons(): void {
   registerIcons({
     // Shell navigation and the collapsed rail's space menu (App.vue).
     house,
-    'book-open': bookOpen,
     pulse,
     kanban,
+    // A space's views, in its group in the rail (lib/spaceViews.ts).
+    table,
+    'calendar-blank': calendarBlank,
+    'chart-bar-horizontal': chartBarHorizontal,
+    'flow-arrow': flowArrow,
+    timer,
     'magnifying-glass': magnifyingGlass,
     plus,
     'sidebar-simple': sidebarSimple,
@@ -93,7 +102,7 @@ export function registerActaIcons(): void {
     // The @ typeahead's rows, one icon per kind of actor.
     user,
     robot,
-    // Search results, by hit kind.
+    // Search results, by hit kind, and the Docs destination (rail, palette).
     'file-text': fileText,
     'chat-circle': chatCircle,
     // Command palette entries, drawn by the library's own component.

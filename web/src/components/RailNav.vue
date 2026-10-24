@@ -27,15 +27,13 @@
         :to="entry.to"
         :active="entry.active"
       />
-      <!-- The collapsed rail cannot afford a row per space (a dozen
-           two-letter codes read as noise), so spaces fold behind one icon
-           whose flyout carries what the rail cannot: full names and open
-           counts. -->
+      <!-- The way to another space, from anywhere. Expanded it opens in
+           place, collapsed its flyout carries what the rail cannot: full
+           names and open counts. Home lists the spaces too, with more. -->
       <NbSidebarMenuItem
-        v-if="compact && spaces.length > 0"
+        v-if="spaces.length > 0"
         label="Spaces"
-        icon="kanban"
-        :active="route.name === 'space'"
+        icon="squares-four"
       >
         <NbSidebarMenuItem
           v-for="space in spaces"
@@ -44,20 +42,27 @@
           :badge="openCount(space)"
           badge-variant="neutral"
           :to="wpath(`/s/${space.key}`)"
-          :active="isSpace(space.key)"
+          :active="space.key === chosen?.key"
         />
       </NbSidebarMenuItem>
     </NbSidebarMenuGroup>
 
-    <NbSidebarMenuGroup v-if="!compact && spaces.length > 0" label="Spaces">
+    <!-- The space you are in, as its own group headed with its name (the
+         fleet rail anatomy): its views, then its Settings, always last. -->
+    <NbSidebarMenuGroup v-if="chosen" :label="chosen.name">
       <NbSidebarMenuItem
-        v-for="space in spaces"
-        :key="space.key"
-        :label="space.name"
-        :badge="openCount(space)"
-        badge-variant="neutral"
-        :to="wpath(`/s/${space.key}`)"
-        :active="isSpace(space.key)"
+        v-for="entry in spaceEntries"
+        :key="entry.id"
+        :label="entry.label"
+        :icon="entry.icon"
+        :to="entry.to"
+        :active="entry.active"
+      />
+      <NbSidebarMenuItem
+        label="Settings"
+        icon="sliders-horizontal"
+        :to="wpath(`/s/${chosen.key}/settings`)"
+        :active="route.name === 'space-settings'"
       />
     </NbSidebarMenuGroup>
   </NbSidebarMenu>
@@ -68,6 +73,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWorkspace } from '@/stores/workspace'
 import { wpath } from '@/lib/paths'
+import { SPACE_VIEWS, spaceViewOf, spaceViewPath } from '@/lib/spaceViews'
 
 defineProps<{
   /** Whether the rail is collapsed to icons. */
@@ -83,9 +89,28 @@ const spaces = computed(() =>
   (ws.overview.value?.spaces ?? []).filter((b) => !b.archived),
 )
 
-function isSpace(key: string): boolean {
-  return route.name === 'space' && route.params.spaceKey === key
-}
+/**
+ * The space the route is in, board or settings. Looked up among every space,
+ * archived ones too, so an archived space opened from Home still gets its
+ * group and the way to its Settings, where it can be brought back.
+ */
+const chosen = computed(() => {
+  const key = route.params?.spaceKey
+  if (typeof key !== 'string' || !key) return null
+  return (ws.overview.value?.spaces ?? []).find((s) => s.key === key) ?? null
+})
+
+const spaceEntries = computed(() => {
+  const space = chosen.value
+  if (!space) return []
+  void ws.workspaceSlug.value
+  const current = route.name === 'space' ? spaceViewOf(route.query?.view) : ''
+  return SPACE_VIEWS.map((view) => ({
+    ...view,
+    to: wpath(spaceViewPath(space.key, view.id)),
+    active: current === view.id,
+  }))
+})
 
 /*
  * Built with `wpath`, like every other link in the frame.
@@ -122,12 +147,14 @@ const navEntries = computed(() => {
       label: 'Goals',
       icon: 'target',
       tour: 'nav-goals',
-      active: route.name === 'goals' || route.name === 'goal',
+      active: route.name === 'goal' || route.name === 'goals',
     },
+    // `file-text`, not a book: the book is the product Documentation link at
+    // the foot of the rail, and the two must not read as the same thing.
     {
       to: wpath('/docs'),
       label: 'Docs',
-      icon: 'book-open',
+      icon: 'file-text',
       tour: 'nav-docs',
       active: route.name === 'docs',
     },
