@@ -60,7 +60,9 @@
     <!-- Signup (EE): only where the instance offers it, and within the
          per-account cap. Above it, the way to more is sales. -->
     <footer
-      v-if="!loading && workspaces.length > 0 && signup"
+      v-if="
+        !loading && workspaces.length > 0 && signup && signup.open !== false
+      "
       class="workspaces__more"
     >
       <NbButton
