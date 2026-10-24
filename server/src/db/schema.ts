@@ -1202,6 +1202,10 @@ export const ADDITIVE_COLUMNS = [
   // clears both.
   'ALTER TABLE workspace ADD COLUMN inactivity_warned_at INTEGER',
   'ALTER TABLE workspace ADD COLUMN frozen_at INTEGER',
+  // When a person last opened the workspace in a browser, at day precision
+  // (stamped at most once a day). What the inactivity job measures idleness
+  // by: an agent writing on its own is not someone using the workspace.
+  'ALTER TABLE workspace ADD COLUMN last_seen_at INTEGER',
   'CREATE INDEX IF NOT EXISTS idx_workspace_owner_email ON workspace(owner_email) WHERE owner_email IS NOT NULL',
   'CREATE INDEX IF NOT EXISTS idx_workspace_owner_sub ON workspace(owner_platform_user_id) WHERE owner_platform_user_id IS NOT NULL',
 ]

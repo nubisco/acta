@@ -17,12 +17,19 @@
  * - mountRoutes: extra HTTP routes, mounted ahead of the workspace API and
  *   its auth middleware, so each EE route authenticates for itself. Signup and
  *   provisioning (LA-398) and billing (LA-399) arrive here.
+ * - onUnknownSignIn: a person the identity provider vouched for who belongs
+ *   to no workspace. The core refuses them (not_a_member). Signup instead
+ *   sends them on to create one.
+ * - scheduled: work for the cron tick (signup's Free inactivity job).
+ * - features: named capabilities the SPA reads from /auth/config, so it shows
+ *   signup only where signup exists.
  */
 
-import type { Hono } from 'hono'
+import type { Context, Hono } from 'hono'
 import type { IAppEnv } from '../app'
 import type { ISqlDriver } from '../db'
 import { ApiError, type ICtx } from './ctx'
+import type { TEmailSender } from './email'
 
 /** Everything a plan can cap. Bytes are bytes, everything else is a count. */
 export type TLimitedResource =
@@ -53,6 +60,32 @@ export const UNLIMITED: Readonly<TPlanLimits> = Object.freeze({
 export interface IEditionDeps {
   db: ISqlDriver
   baseUrl?: string
+  /** Sends email, when the instance has a sender. */
+  emailSender?: TEmailSender
+  /**
+   * The deployment's variables (wrangler [vars] and secrets), so an EE
+   * feature reads its own settings without the core naming each one.
+   */
+  env?: Record<string, string | undefined>
+}
+
+/** Who the identity provider says just signed in. */
+export interface IVouchedIdentity {
+  email: string
+  name?: string
+  /** The provider's own id for this person. */
+  sub: string
+  /** Already checked to be on the provider's origin, or undefined. */
+  picture?: string
+}
+
+/** What the cron tick hands an edition. */
+export interface IEditionTickDeps {
+  db: ISqlDriver
+  send?: TEmailSender
+  baseUrl?: string
+  nowMs?: number
+  env?: Record<string, string | undefined>
 }
 
 export interface IEdition {
@@ -60,6 +93,19 @@ export interface IEdition {
   name: string
   getLimits(db: ISqlDriver, workspaceId: string): Promise<TPlanLimits>
   mountRoutes?(app: Hono<IAppEnv>, deps: IEditionDeps): void
+  /** Named capabilities, reported by /auth/config. */
+  features?: string[]
+  /**
+   * A vouched-for person with no workspace to land in. Answer with a response
+   * to take over (signup), or null and the core refuses them as before.
+   */
+  onUnknownSignIn?(
+    c: Context,
+    identity: IVouchedIdentity,
+    deps: IEditionDeps,
+  ): Promise<Response | null>
+  /** Runs on the cron tick, after the core's own work. */
+  scheduled?(deps: IEditionTickDeps): Promise<void>
 }
 
 export const CORE_EDITION: IEdition = {
@@ -76,6 +122,11 @@ export function registerEdition(next: IEdition): void {
 
 export function currentEdition(): IEdition {
   return edition
+}
+
+/** Whether the registered edition offers a named capability. */
+export function editionHas(feature: string): boolean {
+  return edition.features?.includes(feature) ?? false
 }
 
 /** For tests: back to the core edition. */

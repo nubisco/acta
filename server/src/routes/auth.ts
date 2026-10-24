@@ -13,6 +13,8 @@ import {
   allowedWhileDeleting,
   workspaceGate,
   workspacesForEmail,
+  notePersonSeen,
+  allowedWhileFrozen,
   type TOtpSender,
 } from '../core/auth'
 import { now, type IActorCtx, type ICtx } from '../core/ctx'
@@ -21,6 +23,7 @@ import { JwksVerifier, type ISsoClaims, type ISsoConfig } from '../core/sso'
 import { acceptedPicture, isNubiscoPlatform } from '../core/avatar'
 import { OidcClient, type IOidcConfig } from '../core/oidc'
 import { resolveOauthToken } from '../core/oauth'
+import { currentEdition, editionHas, type IEditionDeps } from '../core/edition'
 import type { ISqlDriver } from '../db'
 import {
   acceptInvitation,
@@ -119,6 +122,7 @@ async function signInWithClaims(
   claims: ISsoClaims,
   autoProvision: boolean,
   issuer?: string,
+  edition?: IEditionDeps,
 ): Promise<Response> {
   const db = c.get('db')
   const bootWorkspaceId = c.get('workspaceId')
@@ -175,8 +179,26 @@ async function signInWithClaims(
       [workspaceId],
     )
     const firstAdmin = admins.length === 0
-    if (!autoProvision && !firstAdmin)
-      return c.redirect('/login?error=not_a_member')
+    if (!autoProvision && !firstAdmin) {
+      // Nobody to sign in as. An edition with signup (the EE, LA-398) takes
+      // the person on to create a workspace of their own. Without one, or if
+      // it declines, they are refused exactly as before.
+      const hook = currentEdition().onUnknownSignIn
+      const taken =
+        hook && edition
+          ? await hook(
+              c,
+              {
+                email: claims.email,
+                name: claims.name,
+                sub: claims.sub,
+                picture: acceptedPicture(claims.picture, issuer) ?? undefined,
+              },
+              edition,
+            )
+          : null
+      return taken ?? c.redirect('/login?error=not_a_member')
+    }
     const id = newId('act')
     const base = claims.email
       .split('@')[0]
@@ -291,7 +313,13 @@ async function signInWithClaims(
 
 export function authRoutes(
   sso?: TSsoRuntime,
-  opts: { otpFallback?: boolean } = {},
+  opts: {
+    otpFallback?: boolean
+    /** What the registered edition is handed (core/edition.ts). */
+    edition?: IEditionDeps
+    /** Where the analytics tracker is served from, when there is one. */
+    analyticsUrl?: string
+  } = {},
 ): Hono<IAuthEnv> {
   const app = new Hono<IAuthEnv>()
 
@@ -335,6 +363,12 @@ export function authRoutes(
       platform_url: isNubiscoPlatform(sso?.config.issuer)
         ? sso!.config.issuer.replace(/\/$/, '')
         : undefined,
+      // Whether a person with no workspace can create one here. Only where
+      // the edition offers it, so a self-hosted instance never shows a
+      // "Create a workspace" that leads nowhere.
+      signup: editionHas('signup'),
+      // The tracker, where this instance has one (ACTA_ANALYTICS_URL).
+      analytics_url: opts.analyticsUrl,
     }),
   )
 
@@ -482,6 +516,7 @@ export function authRoutes(
       claims,
       sso.config.autoProvision,
       sso.config.issuer,
+      opts.edition,
     )
   })
 
@@ -972,6 +1007,10 @@ export function requireAuth(
         { error: 'workspace scheduled for deletion', purge_at: gate.purgeAt },
         403,
       )
+    if (authed.tokenKind === 'session')
+      await notePersonSeen(db, authed.workspaceId, gate)
+    else if (gate.frozenAt !== null && !allowedWhileFrozen(c.req.method))
+      return c.json({ error: 'workspace is read-only while idle' }, 403)
     c.set('actor', authed)
     // Without a workspace segment the request means "the one the token was
     // minted in", which keeps the unprefixed endpoints working.
@@ -1011,7 +1050,12 @@ async function walkthroughsOf(
   }
 }
 
-async function authedFrom(c: {
+/**
+ * Who is signed in on this request, from the bearer header or the session
+ * cookie, or null. For routes outside the workspace API (the EE's signup) that
+ * need to know who is asking without requiring a workspace.
+ */
+export async function authedFrom(c: {
   get: (k: 'db') => ISqlDriver
   req: { header: (n: string) => string | undefined }
 }) {
@@ -1065,6 +1109,15 @@ export function requireWorkspace(): MiddlewareHandler<IAuthEnv> {
         },
         403,
       )
+
+    const seen = {
+      frozenAt: workspace.frozen_at,
+      lastSeenAt: workspace.last_seen_at,
+    }
+    if (authed.tokenKind === 'session')
+      await notePersonSeen(db, workspace.id, seen)
+    else if (seen.frozenAt !== null && !allowedWhileFrozen(c.req.method))
+      return c.json({ error: 'workspace is read-only while idle' }, 403)
 
     c.set('actor', actor)
     c.set('workspaceId', workspace.id)

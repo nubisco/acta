@@ -94,6 +94,8 @@ describe('external sso', () => {
       // The test issuer is not a nubisco.io host, so the account menu's
       // platform parts stay off and no platform_url is offered at all.
       nubisco_platform: false,
+      // Self-serve signup is an EE feature, and no EE is registered.
+      signup: false,
     })
   })
 
@@ -135,6 +137,8 @@ describe('external sso', () => {
       otp: true,
       sso_label: 'Test IdP',
       nubisco_platform: false,
+      // Self-serve signup is an EE feature, and no EE is registered.
+      signup: false,
     })
   })
 

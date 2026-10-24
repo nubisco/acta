@@ -306,6 +306,8 @@ describe('openid connect', () => {
       // A test issuer, not a nubisco.io host, so the account menu's platform
       // parts stay off and no platform_url is offered.
       nubisco_platform: false,
+      // Self-serve signup is an EE feature, and no EE is registered.
+      signup: false,
     })
   })
 })

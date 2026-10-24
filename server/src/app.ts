@@ -3,7 +3,7 @@ import { getCookie } from 'hono/cookie'
 import type { ISqlDriver } from './db'
 import type { IActorCtx } from './core/ctx'
 import { bootstrapWorkspace, type IBootstrapOptions } from './core/bootstrap'
-import { currentEdition } from './core/edition'
+import { currentEdition, type IEditionDeps } from './core/edition'
 import { mcpRateLimited, mcpRoutes } from './mcp'
 import { apiRoutes } from './routes/api'
 import {
@@ -134,6 +134,16 @@ export interface IAppOptions {
    * the admin who made it, which is the self-hosted default with no email.
    */
   emailSender?: TEmailSender
+  /**
+   * The deployment's variables, handed to the Enterprise Edition so its
+   * features read their own settings (core/edition.ts). The core reads none.
+   */
+  editionEnv?: Record<string, string | undefined>
+  /**
+   * Where the Nubisco Analytics tracker is served from (ACTA_ANALYTICS_URL).
+   * Unset, the SPA loads no tracker, which is the self-hosted default.
+   */
+  analyticsUrl?: string
 }
 
 /**
@@ -304,7 +314,8 @@ export async function createApp(
         !(
           path === '/api/v1/auth/otp' ||
           path === '/api/v1/auth/verify' ||
-          path.startsWith('/api/v1/auth/invitations/')
+          path.startsWith('/api/v1/auth/invitations/') ||
+          path.startsWith('/api/v1/auth/signup/')
         ),
     }),
   )
@@ -336,9 +347,20 @@ export async function createApp(
         path === '/api/v1/auth/verify',
     }),
   )
+  // What an Enterprise Edition is handed: its routes, its sign-in hook.
+  const editionDeps: IEditionDeps = {
+    db,
+    baseUrl: opts.baseUrl,
+    emailSender: opts.emailSender,
+    env: opts.editionEnv,
+  }
   app.route(
     '/api/v1/auth',
-    authRoutes(ssoRuntime, { otpFallback: opts.otpFallback }),
+    authRoutes(ssoRuntime, {
+      otpFallback: opts.otpFallback,
+      edition: editionDeps,
+      analyticsUrl: opts.analyticsUrl,
+    }),
   )
   app.route('/api/v1/ingest', ingestRoutes(store))
   // Provider webhooks authenticate by signature, not by session, so they
@@ -376,7 +398,7 @@ export async function createApp(
   // Enterprise Edition routes (core/edition.ts), when one is registered. Ahead
   // of the workspace API and its auth middleware, so each authenticates for
   // itself. The core edition adds nothing.
-  currentEdition().mountRoutes?.(app, { db, baseUrl: opts.baseUrl })
+  currentEdition().mountRoutes?.(app, editionDeps)
 
   // Workspace-scoped API: the segment names the workspace, and the middleware
   // resolves who you are inside it. This is the path the app uses.
