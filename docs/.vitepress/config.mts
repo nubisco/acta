@@ -125,6 +125,7 @@ export default defineConfig({
           items: [
             { text: 'Architecture', link: '/developers/architecture' },
             { text: 'The data model', link: '/developers/data-model' },
+            { text: 'Data safety', link: '/developers/data-safety' },
           ],
         },
       ],
