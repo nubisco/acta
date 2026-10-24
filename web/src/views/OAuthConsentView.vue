@@ -39,8 +39,8 @@
           <strong>@{{ handle }}</strong
           >, with your role, and anything it does will be recorded under your
           name. It can read and change spaces, cards and documents, but not
-          administer the workspace. You can cut it off any time in Settings,
-          under Access tokens.
+          administer the workspace. You can cut it off any time in Your
+          settings, under Your account.
         </p>
         <div class="consent__row">
           <NbButton variant="ghost" @click="decide('deny')"> Cancel </NbButton>

@@ -48,6 +48,12 @@ const i18n = createI18n({
   fallbackWarn: false,
 })
 
+/**
+ * The tabs of Your settings (PersonalSettingsView). Named here so the
+ * workspace settings route can send an old link to one of them on.
+ */
+const PERSONAL_TABS = ['notifications', 'walkthroughs', 'account']
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -151,6 +157,26 @@ const router = createRouter({
           name: 'settings',
           component: () => import('./views/SettingsView.vue'),
           meta: { title: 'Settings' },
+          // The workspace's settings are the gear at the foot of the rail.
+          // What is yours alone moved to the user menu (the fleet's three
+          // settings levels), so a bookmark or an old link to one of those
+          // tabs still lands on it.
+          beforeEnter: (to) => {
+            const tab = to.query.tab
+            if (typeof tab !== 'string' || !PERSONAL_TABS.includes(tab))
+              return true
+            return {
+              name: 'personal-settings',
+              params: to.params,
+              query: { ...to.query, tab },
+            }
+          },
+        },
+        {
+          path: 'me',
+          name: 'personal-settings',
+          component: () => import('./views/PersonalSettingsView.vue'),
+          meta: { title: 'Your settings' },
         },
       ],
     },

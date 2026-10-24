@@ -20,23 +20,12 @@
     @retry="load"
   >
     <template #trigger="{ triggerProps, setTriggerRef, toggle }">
-      <NbSidebarLink
-        v-if="compact"
-        :ref="setTriggerRef"
-        v-bind="triggerProps"
-        v-nb-tooltip="{ body: bellTitle }"
-        :active="open"
-        @click.prevent="toggle"
-      >
-        <NbIcon :name="unread > 0 ? 'bell-ringing' : 'bell'" :size="18" />
-        <NbBadge v-if="unread > 0" variant="red" size="sm" class="bell__badge">
-          {{ unread }}
-        </NbBadge>
-      </NbSidebarLink>
-      <!-- The same component the Settings row uses. A hand-rolled
-           button here inherited none of the sidebar's typography, which is why
-           this one row rendered in a different size and weight to every other. -->
-      <NbSidebarMenu v-else density="compact">
+      <!-- One menu item in both rail states, like every other row. Expanded
+           it is a labelled row with the count at its end. Collapsed it is the
+           icon alone, and the library draws the count on the icon's corner,
+           so the bell stays where every other icon is. The hand-rolled
+           collapsed link with its own badge pushed the icon off centre. -->
+      <NbSidebarMenu density="compact">
         <NbSidebarMenuItem
           :ref="setTriggerRef"
           v-bind="triggerProps"
@@ -55,7 +44,7 @@
          focus) and adds the way out to the settings that govern this list.
          The desktop-permission prompt used to live in this panel, which made
          the panel a settings page that also showed notifications. It is in
-         Settings under Notifications now, alongside the email window. -->
+         Your settings under Notifications now, alongside the email window. -->
     <template #header-actions="{ markAllProps, markAllText }">
       <NbButton
         v-nb-tooltip="{ body: 'Notification settings' }"
@@ -115,8 +104,6 @@ import {
   type IAppNotification,
 } from '@/stores/workspace'
 
-defineProps<{ compact?: boolean }>()
-
 const ws = useWorkspace()
 const router = useRouter()
 const inspector = useInspector()
@@ -137,10 +124,6 @@ const failed = ref(false)
 
 const entries = computed(() => ws.notifications.value)
 const unread = computed(() => ws.unreadCount.value)
-const bellTitle = computed(() =>
-  unread.value > 0 ? `${unread.value} unread notifications` : 'Notifications',
-)
-
 const REASONS: Record<IAppNotification['reason'], string> = {
   mention: 'Mentioned you',
   assigned: 'Assigned to you',
@@ -192,7 +175,7 @@ function openEntry(entry: IAppNotification): void {
 
 function openSettings(): void {
   open.value = false
-  void router.push(wpath('/settings?tab=notifications'))
+  void router.push(wpath('/me?tab=notifications'))
 }
 
 async function markAllRead(): Promise<void> {
@@ -218,12 +201,3 @@ async function load(): Promise<void> {
 
 onMounted(load)
 </script>
-
-<style scoped lang="scss">
-/* Only what the component has no opinion about. Everything the panel draws,
-   the surface, the border, the rows, the unread affordance and the placement,
-   belongs to NbNotificationCenter and is not restyled here. */
-.bell__badge {
-  margin-inline-start: auto;
-}
-</style>

@@ -95,7 +95,7 @@ const controllers: Record<TTourName, IWalkthroughController> = {
     storage,
     onStepChange: (step) => {
       if (step.id === 'notify-go-settings')
-        void navigate?.('/settings?tab=notifications')
+        void navigate?.('/me?tab=notifications')
     },
   }),
 }

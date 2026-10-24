@@ -122,7 +122,7 @@ export const goalsTour: IWalkthrough = {
 }
 
 /**
- * Notifications, the first time someone closes the bell. Ends in Settings,
+ * Notifications, the first time someone closes the bell. Ends in Your settings,
  * on the control that allows desktop notifications on this device, because
  * that is the part nobody finds on their own.
  */

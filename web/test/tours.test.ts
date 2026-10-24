@@ -97,7 +97,7 @@ describe('playing a walkthrough', () => {
     const tours = useTours()
     tours.controllers.notifications.start()
     tours.controllers.notifications.next()
-    expect(go).toHaveBeenCalledWith('/settings?tab=notifications')
+    expect(go).toHaveBeenCalledWith('/me?tab=notifications')
   })
 })
 

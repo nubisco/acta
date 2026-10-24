@@ -18,9 +18,6 @@
     />
     <SettingsLabels v-else-if="tab === 'labels'" />
     <SettingsAutomation v-else-if="tab === 'automation'" />
-    <SettingsNotifications v-else-if="tab === 'notifications'" />
-    <SettingsAccount v-else-if="tab === 'account'" />
-    <SettingsWalkthroughs v-else-if="tab === 'walkthroughs'" />
   </div>
 </template>
 
@@ -33,21 +30,20 @@
  * different credentials scattered across four tabs with nothing explaining
  * how they differ, and put contact-form bots in a list headed "Members".
  *
- * Six groups now, by intent: who can sign in, what the whole workspace is
- * ruled by, how work is labelled, what runs without a person, what reaches
- * you, and what belongs to you alone. The last two are the ones a non-admin
- * can act in.
+ * Grouped by intent: who can sign in, what the whole workspace is ruled
+ * by, how work is labelled, and what runs without a person.
  *
- * Workspace is the sixth, and admin-only, so it is not offered to anyone who
+ * Workspace is admin-only, so it is not offered to anyone who
  * would only be told no. It exists because a workspace-wide rule is not a
  * rule about people, labels or automation, and putting the first one
  * (who may delete a comment) into People would have meant filing a policy
  * under a list of members. It is the home for the ones that follow.
  *
- * Notifications are a personal setting and could have sat inside Your
- * account, which is where tokens and connected apps live. They have a tab of
- * their own because that is the word somebody uses when they go looking:
- * nobody hunting for "stop emailing me" opens a page headed Access tokens.
+ * What is yours alone (notifications, walkthroughs, your account) is not
+ * here. It is in the user menu, under Your settings, because the fleet keeps
+ * each level of settings in one place: the person in the user menu, the
+ * workspace under the gear. The router sends an old link to one of those
+ * tabs to its new page.
  *
  * Each section owns its own data and dialogs. This view is only the switch,
  * which is why it is short: the old one had grown past a thousand lines with
@@ -62,9 +58,6 @@ import SettingsWorkspace from '@/components/settings/SettingsWorkspace.vue'
 import SettingsLabels from '@/components/settings/SettingsLabels.vue'
 import SettingsAutomation from '@/components/settings/SettingsAutomation.vue'
 import SettingsAiBriefings from '@/components/settings/SettingsAiBriefings.vue'
-import SettingsNotifications from '@/components/settings/SettingsNotifications.vue'
-import SettingsAccount from '@/components/settings/SettingsAccount.vue'
-import SettingsWalkthroughs from '@/components/settings/SettingsWalkthroughs.vue'
 
 const filterBar = useShellSlot('fixedbar')
 const ws = useWorkspace()
@@ -82,9 +75,6 @@ const tabs = computed(() => [
     : []),
   { id: 'labels', label: 'Labels' },
   { id: 'automation', label: 'Automation' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'walkthroughs', label: 'Walkthroughs' },
-  { id: 'account', label: 'Your account' },
 ])
 
 /**

@@ -40,11 +40,21 @@
       <RailNav :compact="sidebarVariant === 'compact'" />
     </template>
 
+    <!-- The foot of the rail in the fleet's order: Documentation,
+         Notifications, the workspace's Settings, then the person. -->
     <template v-if="!docChrome.frameHidden.value" #sidebar-bottom>
-      <NotificationBell
-        v-nb-tour-step="'notifications'"
-        :compact="sidebarVariant === 'compact'"
-      />
+      <!-- Acta's docs are public, so this is a link out rather than a route.
+           The menu item has no `target`, so the new tab is opened here:
+           stepping out to read the docs must not lose the card open here. -->
+      <NbSidebarMenu density="compact">
+        <NbSidebarMenuItem
+          label="Documentation"
+          icon="book"
+          :href="DOCS_URL"
+          @click.prevent="openDocs"
+        />
+      </NbSidebarMenu>
+      <NotificationBell v-nb-tour-step="'notifications'" />
       <NbSidebarMenu density="compact">
         <NbSidebarMenuItem
           label="Settings"
@@ -75,19 +85,29 @@
         @profile="openProfile"
         @sign-out="signOut"
       >
-        <!-- The design system's slot for product rows. Theme lived in the
-             command palette and in the welcome modal, and nowhere else, so
-             anyone who had been through onboarding once had no way left to
-             find it. This is where a person looks for their own settings. -->
-        <div class="user-theme">
-          <p class="user-theme__title">Appearance</p>
-          <NbRadio
-            name="user-menu-theme"
-            :options="themeOptions"
-            :model-value="theme.theme.value"
-            @update:model-value="theme.setTheme($event as TTheme)"
+        <template #default="{ close }">
+          <!-- The design system's slot for product rows, and the person's
+             level of the fleet's three settings levels: notifications,
+             walkthroughs, tokens and connected apps. -->
+          <NbMenuItem
+            icon="user-gear"
+            label="Your settings"
+            @select="openPersonalSettings(close)"
           />
-        </div>
+          <!-- Theme lived in the command palette and in the welcome modal, and
+             nowhere else, so anyone who had been through onboarding once had
+             no way left to find it. This is where a person looks for their
+             own settings. -->
+          <div class="user-theme">
+            <p class="user-theme__title">Appearance</p>
+            <NbRadio
+              name="user-menu-theme"
+              :options="themeOptions"
+              :model-value="theme.theme.value"
+              @update:model-value="theme.setTheme($event as TTheme)"
+            />
+          </div>
+        </template>
       </NbUserMenu>
     </template>
 
@@ -262,6 +282,18 @@ function openProfile(): void {
   const base = ws.platformUrl.value
   if (!base) return
   window.open(new URL('/profile', base).toString(), '_blank', 'noopener')
+}
+
+// One subdomain, one prefix per project (see "Documentation sites" in the
+// workspace AGENTS.md).
+const DOCS_URL = 'https://docs.nubisco.io/acta/'
+function openDocs(): void {
+  window.open(DOCS_URL, '_blank', 'noopener')
+}
+
+function openPersonalSettings(close: () => void): void {
+  close()
+  void router.push(wpath('/me'))
 }
 
 // The same three choices the welcome modal offers, worded the same way, so
