@@ -77,6 +77,7 @@
         :show-profile="ws.platformUrl.value !== null"
         :placement="phone ? 'top-start' : 'right-end'"
         trigger="identity"
+        show-theme
         @open="loadAccounts"
         @switch="accounts.switchTo"
         @switch-account="accounts.chooseAccount"
@@ -94,19 +95,6 @@
             label="Your settings"
             @select="openPersonalSettings(close)"
           />
-          <!-- Theme lived in the command palette and in the welcome modal, and
-             nowhere else, so anyone who had been through onboarding once had
-             no way left to find it. This is where a person looks for their
-             own settings. -->
-          <div class="user-theme">
-            <p class="user-theme__title">Appearance</p>
-            <NbRadio
-              name="user-menu-theme"
-              :options="themeOptions"
-              :model-value="theme.theme.value"
-              @update:model-value="theme.setTheme($event as TTheme)"
-            />
-          </div>
         </template>
       </NbUserMenu>
     </template>
@@ -224,7 +212,7 @@ import {
   useSidebarVariant,
   useTheme,
 } from '@nubisco/ui'
-import type { IUserMenuAccount, NbShell, TTheme } from '@nubisco/ui'
+import type { IUserMenuAccount, NbShell } from '@nubisco/ui'
 import { useAccounts } from '@/stores/accounts'
 import { goalsTour, introTour, notificationsTour, tourLabels } from '@/lib/tour'
 import { setTourNavigator, useTours } from '@/lib/tours'
@@ -296,13 +284,6 @@ function openPersonalSettings(close: () => void): void {
   void router.push(wpath('/me'))
 }
 
-// The same three choices the welcome modal offers, worded the same way, so
-// the two places cannot drift into describing different things.
-const themeOptions = [
-  { label: 'Light', value: 'light' },
-  { label: 'Dark', value: 'dark' },
-  { label: 'Match my system', value: 'system' },
-]
 const shell = ref<InstanceType<typeof NbShell> | null>(null)
 const tours = useTours()
 const tour = tours.controllers.intro
@@ -688,15 +669,6 @@ watch(
 </script>
 
 <style scoped lang="scss">
-.user-theme {
-  padding: var(--nb-spacing-8) var(--nb-spacing-12);
-
-  &__title {
-    margin: 0 0 var(--nb-spacing-8);
-    color: var(--nb-c-text-subtle);
-    font-size: var(--nb-type-body-sm-size);
-  }
-}
 .brand-mark {
   display: block;
   width: 28px;
