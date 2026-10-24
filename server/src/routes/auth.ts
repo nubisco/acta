@@ -10,7 +10,8 @@ import {
   resolveToken,
   sha256Hex,
   workspaceBySlug,
-  workspaceSuspended,
+  allowedWhileDeleting,
+  workspaceGate,
   workspacesForEmail,
   type TOtpSender,
 } from '../core/auth'
@@ -961,8 +962,16 @@ export function requireAuth(
       }
       return c.json({ error: 'unauthorized' }, 401)
     }
-    if (await workspaceSuspended(db, authed.workspaceId))
-      return c.json({ error: 'workspace suspended' }, 403)
+    const gate = await workspaceGate(db, authed.workspaceId)
+    if (gate.suspended) return c.json({ error: 'workspace suspended' }, 403)
+    if (
+      gate.purgeAt !== null &&
+      !allowedWhileDeleting(c.req.method, c.req.path)
+    )
+      return c.json(
+        { error: 'workspace scheduled for deletion', purge_at: gate.purgeAt },
+        403,
+      )
     c.set('actor', authed)
     // Without a workspace segment the request means "the one the token was
     // minted in", which keeps the unprefixed endpoints working.
@@ -1045,6 +1054,17 @@ export function requireWorkspace(): MiddlewareHandler<IAuthEnv> {
     // workspace exists by being told it is suspended.
     if (workspace.suspended_at !== null)
       return c.json({ error: 'workspace suspended' }, 403)
+    if (
+      workspace.purge_at !== null &&
+      !allowedWhileDeleting(c.req.method, c.req.path)
+    )
+      return c.json(
+        {
+          error: 'workspace scheduled for deletion',
+          purge_at: workspace.purge_at,
+        },
+        403,
+      )
 
     c.set('actor', actor)
     c.set('workspaceId', workspace.id)

@@ -97,30 +97,51 @@ export interface IWorkspaceRow {
 export async function workspaceBySlug(
   db: ISqlDriver,
   slug: string,
-): Promise<(IWorkspaceRow & { suspended_at: number | null }) | null> {
-  const rows = await db.query<IWorkspaceRow & { suspended_at: number | null }>(
-    'SELECT id, name, slug, suspended_at FROM workspace WHERE slug = ?',
+): Promise<
+  | (IWorkspaceRow & { suspended_at: number | null; purge_at: number | null })
+  | null
+> {
+  const rows = await db.query<
+    IWorkspaceRow & { suspended_at: number | null; purge_at: number | null }
+  >(
+    'SELECT id, name, slug, suspended_at, purge_at FROM workspace WHERE slug = ?',
     [slug],
   )
   return rows[0] ?? null
 }
 
 /**
- * Whether an operator has suspended this workspace (LA-397). Checked on
- * every authenticated request, so a suspension takes effect on the next one
- * rather than when sessions happen to expire. There is no route that sets it:
- * suspending is an operator's act on the database, not a workspace setting.
+ * Whether an operator has suspended this workspace (LA-397), and when it is
+ * due to be purged if an admin has deleted it (LA-401). Checked on every
+ * authenticated request, so either takes effect on the next one rather than
+ * when sessions happen to expire. Nothing sets a suspension through a route:
+ * it is an operator's act on the database, not a workspace setting.
  */
-export async function workspaceSuspended(
+export async function workspaceGate(
   db: ISqlDriver,
   workspaceId: string,
-): Promise<boolean> {
-  const rows = await db.query<{ suspended_at: number | null }>(
-    'SELECT suspended_at FROM workspace WHERE id = ?',
-    [workspaceId],
+): Promise<{ suspended: boolean; purgeAt: number | null }> {
+  const rows = await db.query<{
+    suspended_at: number | null
+    purge_at: number | null
+  }>('SELECT suspended_at, purge_at FROM workspace WHERE id = ?', [workspaceId])
+  const row = rows[0]
+  return {
+    suspended: row?.suspended_at !== null && row?.suspended_at !== undefined,
+    purgeAt: row?.purge_at ?? null,
+  }
+}
+
+/**
+ * What a workspace waiting to be purged still allows: reading, exporting, and
+ * cancelling the deletion. Everything else is refused, so the thirty days are
+ * for changing your mind or taking a copy, not for carrying on working.
+ */
+export function allowedWhileDeleting(method: string, path: string): boolean {
+  if (method === 'GET' || method === 'HEAD') return true
+  return (
+    path.endsWith('/workspace/deletion') || path.includes('/workspace/exports')
   )
-  const at = rows[0]?.suspended_at
-  return at !== null && at !== undefined
 }
 
 /**

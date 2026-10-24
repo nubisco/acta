@@ -319,3 +319,60 @@ export function invitationEmail(opts: {
   ].join('\n')
   return { subject, html, text }
 }
+
+/**
+ * The export-ready email, with the download link. The link is the
+ * credential, so it goes only to the admin who asked, at a confirmed address.
+ */
+export function exportReadyEmail(opts: {
+  workspace: string
+  downloadUrl: string
+  expiresInDays: number
+}): { subject: string; html: string; text: string } {
+  const subject = `Your export of ${opts.workspace} is ready`
+  const html = `<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /></head>
+  <body style="margin:0;padding:32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;">
+      <tr>
+        <td style="background:#1a1a1a;padding:24px 32px;border-radius:8px 8px 0 0;">
+          <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.3px;">${escapeHtml(opts.workspace)}</span>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#fff;padding:24px 32px 0;">
+          <p style="margin:0;font-size:15px;color:#555;line-height:1.6;">
+            The export you asked for is ready: every board, card, page and file in
+            <strong style="color:#111;">${escapeHtml(opts.workspace)}</strong>, in one zip.
+          </p>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#fff;padding:24px 32px 32px;">
+          <a href="${escapeHtml(opts.downloadUrl)}"
+             style="display:inline-block;background:#5b4fe0;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-size:14px;font-weight:600;">
+            Download the export
+          </a>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#f7f6f5;padding:16px 32px;border-radius:0 0 8px 8px;border-top:1px solid #e8e7e6;">
+          <p style="margin:0;font-size:12px;color:#999;">
+            The link works for ${opts.expiresInDays} days and needs no sign-in, so do not forward this email.
+            Admins can also download it from Settings, Workspace.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`
+  const text = [
+    `The export of ${opts.workspace} you asked for is ready: every board, card, page and file, in one zip.`,
+    '',
+    `Download it: ${opts.downloadUrl}`,
+    '',
+    `The link works for ${opts.expiresInDays} days and needs no sign-in, so do not forward this email. Admins can also download it from Settings, Workspace.`,
+  ].join('\n')
+  return { subject, html, text }
+}

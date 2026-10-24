@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { newId, zIngest } from '@nubisco/acta-shared'
-import { sha256Hex, workspaceSuspended } from '../core/auth'
+import { sha256Hex, workspaceGate } from '../core/auth'
 import { ApiError, now, type IActorCtx, type ICtx } from '../core/ctx'
 import type { ISqlDriver } from '../db'
 import { attachmentUpload, type AttachmentStore } from '../services/attachments'
@@ -41,8 +41,10 @@ export function ingestRoutes(store?: AttachmentStore): Hono<IIngestEnv> {
     )
     if (rows.length === 0) return c.json({ error: 'unauthorized' }, 401)
     const token = rows[0]
-    if (await workspaceSuspended(db, token.workspace_id))
-      return c.json({ error: 'workspace suspended' }, 403)
+    const gate = await workspaceGate(db, token.workspace_id)
+    if (gate.suspended) return c.json({ error: 'workspace suspended' }, 403)
+    if (gate.purgeAt !== null)
+      return c.json({ error: 'workspace scheduled for deletion' }, 403)
 
     let body: z.infer<typeof zIngest>
     try {

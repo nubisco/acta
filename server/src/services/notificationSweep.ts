@@ -149,7 +149,10 @@ export async function dueDateSweep(
         AND i.due <= ?
         -- Somebody has to care. A due date on a card nobody is assigned to
         -- is a date in a database, and there is no inbox to put it in.
-        AND EXISTS (SELECT 1 FROM item_assignee a WHERE a.item_id = i.id)`,
+        AND EXISTS (SELECT 1 FROM item_assignee a WHERE a.item_id = i.id)
+        -- A shut workspace, or one waiting to be purged, hears nothing.
+        AND EXISTS (SELECT 1 FROM workspace w WHERE w.id = i.workspace_id
+                     AND w.suspended_at IS NULL AND w.deleted_at IS NULL)`,
     [ts + DUE_SOON_MS],
   )
   if (rows.length === 0) return 0
@@ -266,7 +269,8 @@ export async function reminderSweep(
         `SELECT a.name, a.email, a.email_confirmed_at, w.id AS workspace_id,
                 w.name AS workspace, w.slug AS workspace_slug
            FROM actor a JOIN workspace w ON w.id = a.workspace_id
-          WHERE a.id = ? AND a.disabled = 0 AND w.suspended_at IS NULL`,
+          WHERE a.id = ? AND a.disabled = 0 AND w.suspended_at IS NULL
+            AND w.deleted_at IS NULL`,
         [actorId],
       )
     )[0]

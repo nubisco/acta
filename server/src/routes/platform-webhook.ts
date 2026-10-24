@@ -22,6 +22,7 @@ import { z } from 'zod'
 import type { ISqlDriver } from '../db'
 import { now } from '../core/ctx'
 import { acceptedPicture } from '../core/avatar'
+import { anonymiseAccount } from '../services/workspaceDeletion'
 
 interface IPlatformHookEnv {
   Variables: { db: ISqlDriver }
@@ -242,6 +243,15 @@ export function platformWebhookRoutes(
         // Someone who has never signed in has no actor. Their first sign-in
         // reads the claim, so nothing is lost by ignoring this.
         return c.json({ ok: true, handled: rows.length > 0 })
+      }
+
+      case 'user.deleted': {
+        // The account is gone from the provider (GDPR erasure). What the
+        // person wrote stays with the workspaces it was written in. Who they
+        // were does not: see anonymiseAccount (LA-401).
+        const { user_id } = zMembershipData.parse(delivery.data)
+        const anonymised = await anonymiseAccount(db, user_id)
+        return c.json({ ok: true, handled: anonymised > 0, anonymised })
       }
 
       default:

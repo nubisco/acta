@@ -62,9 +62,11 @@ export async function workspaceOverview(ctx: ICtx) {
       id: string
       name: string
       comment_delete: string | null
-    }>('SELECT id, name, comment_delete FROM workspace WHERE id = ?', [
-      ctx.workspaceId,
-    ])
+      purge_at: number | null
+    }>(
+      'SELECT id, name, comment_delete, purge_at FROM workspace WHERE id = ?',
+      [ctx.workspaceId],
+    )
   )[0]
   const spaces = await ctx.db.query<{
     key: string
@@ -145,6 +147,9 @@ export async function workspaceOverview(ctx: ICtx) {
     policy: {
       comment_delete: ws.comment_delete === 'admin' ? 'admin' : 'author',
     },
+    // Set while the workspace waits to be purged (LA-401): it is read-only
+    // until then, and every page says so.
+    deletion: ws.purge_at !== null ? { purge_at: ws.purge_at } : undefined,
     spaces: spaces.map((b) => ({
       key: b.key,
       name: b.name,

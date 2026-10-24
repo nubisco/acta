@@ -27,6 +27,8 @@
         @update:model-value="save"
       />
     </NbPanel>
+
+    <SettingsWorkspaceData />
   </div>
 </template>
 
@@ -40,6 +42,7 @@ import { useToast } from '@nubisco/ui'
 import { api, type TCommentDeletePolicy } from '@/api/client'
 import { useWorkspace } from '@/stores/workspace'
 import { humanise } from '@/lib/state'
+import SettingsWorkspaceData from './SettingsWorkspaceData.vue'
 
 const POLICY_OPTIONS = [
   { label: 'The person who wrote it, or an admin', value: 'author' },
