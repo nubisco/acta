@@ -1,3 +1,10 @@
+# [1.57.0](https://github.com/nubisco/acta/compare/v1.56.1...v1.57.0) (2026-10-24)
+
+
+### Features
+
+* **security:** close the isolation gate before signup (LA-397) ([a362a67](https://github.com/nubisco/acta/commit/a362a678552cbb6d3f35eb1c745cc47f7d8c8f2d))
+
 ## [1.56.1](https://github.com/nubisco/acta/compare/v1.56.0...v1.56.1) (2026-10-24)
 
 
