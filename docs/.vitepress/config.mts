@@ -141,7 +141,7 @@ export default defineConfig({
 
     footer: {
       message:
-        'Released under the <a href="https://github.com/nubisco/acta/blob/master/LICENSE">MIT License</a>. · <a href="https://github.com/sponsors/joseporto">♥ Sponsor this project</a>',
+        'Core released under the <a href="https://github.com/nubisco/acta/blob/master/LICENSE">AGPL-3.0-or-later</a>. · <a href="https://github.com/sponsors/joseporto">♥ Sponsor this project</a>',
       copyright: 'Copyright © 2026 <a href="https://nubisco.io">Nubisco</a>',
     },
   },
