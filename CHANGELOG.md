@@ -1,3 +1,20 @@
+# [1.61.0](https://github.com/nubisco/acta/compare/v1.60.0...v1.61.0) (2026-10-24)
+
+
+### Bug Fixes
+
+* **search:** scope the search index to the workspace ([7368d8b](https://github.com/nubisco/acta/commit/7368d8b8840d7444070be092419a5bd3428ef337))
+
+
+### Features
+
+* **data:** retention sweep and database size alert (LA-401) ([9b35720](https://github.com/nubisco/acta/commit/9b357209db085f9fd5ec0bc09a175dd104494325))
+* **data:** run retention, exports, purges and the size alert on the cron (LA-401) ([1c84adf](https://github.com/nubisco/acta/commit/1c84adfd5ce573639d9d7cbd073e75652d5700ac))
+* **data:** workspace export, deletion and account erasure (LA-401) ([9de1590](https://github.com/nubisco/acta/commit/9de1590319753b9d8dde798da91e63d211b0378c))
+* **edition:** one seam between the core and the Enterprise Edition (LA-400) ([a7b0c5e](https://github.com/nubisco/acta/commit/a7b0c5e3d202bb7d0efb3cb2b91ed0e09fe5761d))
+* **ee:** packages/ee, the proprietary Enterprise Edition, and the hosted entry (LA-400) ([a414c42](https://github.com/nubisco/acta/commit/a414c425277b1e2f35e498afd395fa414784631f))
+* **settings:** export and delete the workspace from Settings, Workspace (LA-401) ([c07ee3d](https://github.com/nubisco/acta/commit/c07ee3d086fb2e8886bcb673bc41cee4e1d57955))
+
 # [1.60.0](https://github.com/nubisco/acta/compare/v1.59.0...v1.60.0) (2026-10-24)
 
 
