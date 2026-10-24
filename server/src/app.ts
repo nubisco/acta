@@ -3,6 +3,7 @@ import { getCookie } from 'hono/cookie'
 import type { ISqlDriver } from './db'
 import type { IActorCtx } from './core/ctx'
 import { bootstrapWorkspace, type IBootstrapOptions } from './core/bootstrap'
+import { currentEdition } from './core/edition'
 import { mcpRateLimited, mcpRoutes } from './mcp'
 import { apiRoutes } from './routes/api'
 import {
@@ -194,6 +195,7 @@ export async function createApp(
       ok: true,
       service: 'acta',
       build: opts.buildSha ?? 'dev',
+      edition: currentEdition().name,
       ts: Date.now(),
     }),
   )
@@ -350,6 +352,11 @@ export async function createApp(
       ssoRuntime?.config.issuer,
     ),
   )
+  // Enterprise Edition routes (core/edition.ts), when one is registered. Ahead
+  // of the workspace API and its auth middleware, so each authenticates for
+  // itself. The core edition adds nothing.
+  currentEdition().mountRoutes?.(app, { db, baseUrl: opts.baseUrl })
+
   // Workspace-scoped API: the segment names the workspace, and the middleware
   // resolves who you are inside it. This is the path the app uses.
   app.use('/api/v1/w/:workspace/*', requireWorkspace())

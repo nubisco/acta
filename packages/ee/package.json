@@ -1,0 +1,19 @@
+{
+  "name": "@nubisco/acta-ee",
+  "version": "0.1.0",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE",
+  "description": "Acta Enterprise Edition: signup and provisioning, plans and billing for Nubisco's hosted service. Proprietary.",
+  "type": "module",
+  "scripts": {
+    "dev": "true",
+    "build": "true",
+    "test": "bun test",
+    "types:check": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.4",
+    "hono": "^4.13.13",
+    "typescript": "^5.9.3"
+  }
+}

@@ -4,7 +4,7 @@ Describe what changed and why.
 
 ## Contributor License Agreement (CLA)
 
-- [ ] I have read `docs/CLA-INDIVIDUAL.md` and I agree to its terms for this contribution.
+- [ ] I have read `CLA.md` and I agree to its terms for this contribution.
 - [ ] I confirm I am legally entitled to submit this contribution under the CLA.
 
 Required confirmation statement (do not remove):

@@ -9,6 +9,12 @@ A monorepo of four packages plus the docs you are reading.
 | `shared/`    | Ids, zod schemas, enhanced-Markdown utilities. Used by both sides and by the importers. |
 | `importers/` | Trello and Confluence CLIs.                                                             |
 
+`packages/ee/` is the Enterprise Edition: proprietary, not part of the
+open-source core, and absent from every self-hosted build. The core reaches it
+through one seam, `server/src/core/edition.ts`, and with nothing registered
+there the core has no plan limits and no extra routes. See
+[OPEN_CORE_MODEL.md](https://github.com/nubisco/acta/blob/master/OPEN_CORE_MODEL.md).
+
 ## Two runtimes, one app
 
 The server runs on Bun (`src/index.ts`) and on Cloudflare Workers

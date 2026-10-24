@@ -1,0 +1,99 @@
+Acta Enterprise Edition License
+
+Copyright (c) 2026 Nubisco, Lda. All Rights Reserved.
+
+Nubisco, Lda. is a private limited company registered in Portugal
+("Licensor"). This license governs the Acta Enterprise Edition: every file
+under the `packages/ee/` directory of this repository, and its documentation
+("EE Software"). Which files it covers is decided by that directory alone.
+
+--------------------------------------------------------------------------------
+ 1. PERMITTED USE: DEVELOPMENT AND EVALUATION
+--------------------------------------------------------------------------------
+
+Without a commercial agreement, you may:
+
+  a) clone, build and run the EE Software on a local development machine to
+     develop, test or evaluate Acta;
+  b) read, study and audit the EE source code.
+
+--------------------------------------------------------------------------------
+ 2. COMMERCIAL AGREEMENT REQUIRED
+--------------------------------------------------------------------------------
+
+A commercial agreement with Nubisco, Lda. is required to:
+
+  a) run the EE Software in any production, staging or pre-production
+     environment that end users can reach;
+  b) use the EE Software as part of a managed or hosted service offered to
+     third parties;
+  c) include the EE Software in a product or service that earns revenue,
+     directly or indirectly.
+
+To obtain one: licensing@nubisco.io
+
+--------------------------------------------------------------------------------
+ 3. RESTRICTIONS
+--------------------------------------------------------------------------------
+
+Unless permitted above or by a separate written agreement with Nubisco, Lda.,
+you may NOT:
+
+  a) redistribute, sublicense or resell the EE Software or any derivative;
+  b) build or offer a product or service that competes with Acta using the
+     EE Software;
+  c) remove or alter any copyright notice or license header;
+  d) circumvent or disable any license check in the EE Software.
+
+--------------------------------------------------------------------------------
+ 4. CONTRIBUTIONS
+--------------------------------------------------------------------------------
+
+Contributions to the EE Software are not accepted from outside Nubisco, Lda.
+
+--------------------------------------------------------------------------------
+ 5. INTELLECTUAL PROPERTY
+--------------------------------------------------------------------------------
+
+The EE Software is the proprietary property of Nubisco, Lda. Publishing the
+source code does not waive any intellectual property right. The source is
+available only for inspection, audit and local development, as Section 1
+states.
+
+--------------------------------------------------------------------------------
+ 6. TERMINATION
+--------------------------------------------------------------------------------
+
+Any right granted by this license ends automatically on breach of its terms.
+On termination you must stop all use and destroy every copy of the EE Software
+you hold.
+
+--------------------------------------------------------------------------------
+ 7. GOVERNING LAW AND VENUE
+--------------------------------------------------------------------------------
+
+This license is governed by the laws of Portugal, without regard to conflict-
+of-law principles. The courts of Portugal have exclusive jurisdiction over any
+dispute arising under it.
+
+--------------------------------------------------------------------------------
+ 8. NO WARRANTY
+--------------------------------------------------------------------------------
+
+THE EE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT. IN NO EVENT SHALL NUBISCO, LDA.
+BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM USE OF THE
+EE SOFTWARE.
+
+--------------------------------------------------------------------------------
+ 9. LEGAL REVIEW
+--------------------------------------------------------------------------------
+
+This license is a working draft adapted from the Verba Enterprise Edition
+License. It must be reviewed by qualified legal counsel (Acta card LA-402)
+before the EE Software is used in production.
+
+--------------------------------------------------------------------------------
+
+Contact: licensing@nubisco.io | legal@nubisco.io

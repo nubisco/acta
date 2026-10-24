@@ -1,21 +1,48 @@
-MIT License
+Acta: Split License
 
 Copyright (c) 2026 Nubisco, Lda.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This repository holds two components under two licenses. Which one applies
+to a file is decided by the directory it lives in, and by nothing else.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+--------------------------------------------------------------------------------
+ CORE (open source)
+--------------------------------------------------------------------------------
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Every file NOT under the `packages/ee/` directory is licensed under the GNU
+Affero General Public License, version 3 or later (AGPL-3.0-or-later). The full
+text is in:
+
+  ./LICENSE-AGPL.txt
+
+In short: you may use, modify and distribute the core, and run it for any
+purpose, including commercially. If you run a modified version over a network,
+you must offer its source to the users of that network under the same license.
+
+--------------------------------------------------------------------------------
+ ENTERPRISE EDITION (proprietary)
+--------------------------------------------------------------------------------
+
+Every file under the `packages/ee/` directory is proprietary software owned by
+Nubisco, Lda., licensed under the Acta Enterprise Edition License in:
+
+  ./packages/ee/LICENSE
+
+In short: the source is there to read, audit and run locally for development
+and evaluation. Running it in production, or as part of a service offered to
+others, requires a commercial agreement with Nubisco, Lda.
+
+--------------------------------------------------------------------------------
+ EARLIER RELEASES
+--------------------------------------------------------------------------------
+
+Every release up to and including v1.60.0 was published under the MIT License,
+and stays under it. See ./NOTICE.md.
+
+--------------------------------------------------------------------------------
+ CONTACT
+--------------------------------------------------------------------------------
+
+Licensing:  licensing@nubisco.io
+Legal:      legal@nubisco.io
+Website:    https://nubisco.io

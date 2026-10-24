@@ -116,9 +116,16 @@ other people.
 
 ## License and trademarks
 
-The code in this repository is [MIT licensed](./LICENSE). Hosted, multi-tenant, and SSO modules are developed separately and are not part of this repository.
+Acta is open core, and the split is by directory ([LICENSE](./LICENSE)):
 
-"Acta", "Nubisco", and the Nubisco logo are trademarks of Nubisco, Lda. The MIT license does not grant permission to use them; forks and derived products must use their own names and branding.
+- **Everything outside `packages/ee/` is [AGPL-3.0-or-later](./LICENSE-AGPL.txt).** That is the whole product: boards, docs, goals, MCP, notifications, SSO and OIDC, multi-workspace data, and the Docker and Bun builds. Self-hosting it is free, with every core feature and no limits.
+- **`packages/ee/` is proprietary** ([its license](./packages/ee/LICENSE)). It holds what Nubisco's hosted service needs to run as a business: self-serve signup and provisioning, plans and billing, and their limits. A build without it has none of those, and shows no plan or billing screens.
+
+What the hosted service at acta.nubisco.io sells is operations, scale and those business controls, not features withheld from the code. [OPEN_CORE_MODEL.md](./OPEN_CORE_MODEL.md) explains the split and [COMMERCIAL.md](./COMMERCIAL.md) covers commercial use.
+
+Every release up to and including v1.60.0 was MIT licensed and stays so. See [NOTICE.md](./NOTICE.md).
+
+"Acta", "Nubisco", and the Nubisco logo are trademarks of Nubisco, Lda. No license here grants permission to use them. Forks and derived products must use their own names and branding.
 
 ---
 
