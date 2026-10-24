@@ -42,7 +42,7 @@ Contributions are accepted under the [CLA](./CLA.md). In short:
 
 ## Earlier releases
 
-Every release up to and including v1.59.0 was published under the MIT License
+Every release up to and including v1.60.0 was published under the MIT License
 and stays under it. See [NOTICE.md](./NOTICE.md).
 
 ## Summary
