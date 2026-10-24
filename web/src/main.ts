@@ -67,6 +67,14 @@ const router = createRouter({
       meta: { public: true, frameless: true, title: 'Connect' },
     },
     {
+      // Accepting an invitation. Public: the person is not a member of
+      // anything yet, and the page sends them through sign-in itself.
+      path: '/invite/:token',
+      name: 'invite',
+      component: () => import('./views/InviteView.vue'),
+      meta: { public: true, frameless: true, title: 'Invitation' },
+    },
+    {
       // The entry point, the way CMS and Verba have one. Skips straight
       // through when there is only one workspace to choose.
       path: '/',

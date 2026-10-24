@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import {
   zActivityQuery,
@@ -97,6 +97,13 @@ import {
 } from '../services/connections'
 import { webhookList, webhookWrite, zWebhookWrite } from '../services/webhooks'
 import {
+  createInvitation,
+  listInvitations,
+  revokeInvitation,
+  zInvitationCreate,
+  type IInviteDelivery,
+} from '../services/invitations'
+import {
   createIngestToken,
   listIngestTokens,
   revokeIngestToken,
@@ -145,6 +152,8 @@ export interface IApiRouteOptions {
    * tests can replace.
    */
   report?: IRunOptions
+  /** How invitation emails go out, if they do. */
+  invites?: IInviteDelivery
 }
 
 /** Settings errors carry their own status. Anything else stays a 500. */
@@ -610,50 +619,34 @@ export function apiRoutes(
   })
 
   // Members (admin) ---------------------------------------------------------
-  app.post('/members', async (c) => {
+  /**
+   * Invite someone. Nobody becomes a member by an admin typing an address:
+   * they become one by accepting, which proves the address is theirs (see
+   * services/invitations.ts, LA-397). POST /members is the old name for this
+   * and does the same thing, so a script written against it invites rather
+   * than silently inserting a person.
+   */
+  const invite = async (c: Context<IAuthEnv>) => {
     const ctx = ctxOf(c)
     requireScope(ctx, 'admin')
-    const body = z
-      .object({
-        email: z.email(),
-        handle: z
-          .string()
-          .min(2)
-          .max(40)
-          .regex(/^[a-z0-9-]+$/),
-        name: z.string().min(1).max(120),
-        role: z.enum(['admin', 'member']).default('member'),
-      })
-      .parse(await c.req.json())
-    const clash = await ctx.db.query(
-      'SELECT id FROM actor WHERE workspace_id = ? AND (handle = ? OR email = ?)',
-      [ctx.workspaceId, body.handle, body.email],
-    )
-    if (clash.length > 0)
-      throw new ApiError(409, 'a member with that handle or email exists')
-    const id = newId('act')
-    await ctx.db.run(
-      `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
-       VALUES (?, ?, 'human', ?, ?, ?, ?, ?)`,
-      [
-        id,
-        ctx.workspaceId,
-        body.handle,
-        body.name,
-        body.email,
-        body.role,
-        now(),
-      ],
-    )
-    await emitEvent(
-      ctx,
-      'member.added',
-      'actor',
-      id,
-      `added member @${body.handle}`,
-    )
-    flushPendingEvents()
-    return c.json({ id, handle: body.handle })
+    const body = zInvitationCreate.parse(await c.req.json())
+    const out = await createInvitation(ctx, body, options.invites ?? {})
+    return c.json(out, 201)
+  }
+  app.post('/invitations', invite)
+  app.post('/members', invite)
+
+  app.get('/invitations', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    return c.json(await listInvitations(ctx))
+  })
+
+  app.delete('/invitations/:id', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    await revokeInvitation(ctx, c.req.param('id'))
+    return c.json({ ok: true })
   })
 
   /**

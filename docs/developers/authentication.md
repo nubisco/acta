@@ -96,13 +96,23 @@ carries no email, because the email is how a token becomes a member.
 
 ### Who gets in
 
-`ACTA_OIDC_AUTO_PROVISION=true` (the default) means anyone your provider
-vouches for becomes a member on first sign-in. That is usually right: the
-provider is already deciding who may reach Acta, and you configured which
-users or groups may use the client when you registered it.
+A token from your provider says who someone is. It does not say which workspace
+is theirs, so on its own it never creates a member. Sign-in lands a person:
 
-Set it to `false` to require that members are created in Acta first. Someone
-unknown then gets `not_a_member` rather than an account.
+1. in the workspace an invitation they are accepting is for, when the address
+   they signed in as is the one invited;
+2. otherwise in a workspace they are already a member of;
+3. otherwise nowhere, with `not_a_member`.
+
+`ACTA_OIDC_AUTO_PROVISION=true` changes step 3: anyone your provider vouches
+for becomes a member of this instance's workspace on first sign-in. It is off by
+default. Turn it on only when the provider already decides who may reach Acta
+(you limited the client to certain users or groups when you registered it), and
+never when the provider lets anyone sign up.
+
+One exception keeps a fresh install usable: when the instance's workspace has
+no administrator at all, the first person to sign in becomes it. Set
+`ACTA_ADMIN_EMAIL` to close that window on an instance strangers can reach.
 
 If the token carries a `role` claim of `admin`, that member is created as an
 administrator.
@@ -130,6 +140,50 @@ If a provider misconfiguration leaves nobody able to sign in, set
 `ACTA_OTP_FALLBACK=true` and restart. Codes come back alongside the provider,
 and `/login?code=1` reaches the form. Turn it off once you are back in.
 :::
+
+## Invitations
+
+Nobody joins a workspace because an admin typed their address. An admin
+invites them under **Settings, People**, and they join when they accept, which
+proves the address is theirs:
+
+- **Behind a provider**, accepting sends them through it, and the address they
+  sign in as must be the one invited. A forwarded link does not let somebody
+  else in.
+- **With one-time codes**, the link itself is the proof: it was only ever sent
+  to that address, which is the same proof a code is. It works once.
+
+An instance with email configured sends the link to the invitee and never shows
+it to the admin, because on a code-only instance holding the link is enough to
+join. An instance with no email shows the link to the admin to pass on by hand.
+Links expire after 7 days, inviting the same address again replaces the old
+link, and an admin can revoke one at any time. Until they accept, the person is
+not a member, cannot be mentioned or assigned, and is sent nothing else.
+
+The API is `POST /api/v1/invitations` (`POST /api/v1/members` is the old name
+and does the same), `GET /api/v1/invitations` and
+`DELETE /api/v1/invitations/:id`, all admin only. The invitee's side is
+`GET /api/v1/auth/invitations/:token` and
+`POST /api/v1/auth/invitations/:token/accept`.
+
+## Removing someone: the provider's webhook is account-wide
+
+`membership.removed` from the provider (see
+[Provider webhooks](/developers/configuration#provider-webhooks)) disables the
+person in **every** workspace on the instance and revokes every credential they
+hold. It means "this account may no longer use Acta here", which is an
+account-level ban. It must never be used to model "removed from one workspace":
+removing someone from a single workspace is an action inside Acta, an admin
+disabling them under **Settings, People**.
+
+## Suspending a workspace
+
+An operator can shut a workspace without deleting anything by setting
+`workspace.suspended_at` in the database. Every authenticated request into it,
+and its ingest endpoint, then answers `403 workspace suspended`, and no
+reminder is emailed from it. Clearing the column restores it. There is
+deliberately no route for this: it is an operator's act, not a workspace
+setting.
 
 ## JWT handover (legacy)
 

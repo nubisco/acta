@@ -26,7 +26,10 @@ export interface IOidcConfig {
    */
   clientSecret?: string
   scopes: string[]
-  /** Create members on first login. The provider gates who gets that far. */
+  /**
+   * Create members on first login. Off unless the instance opts in, because
+   * the provider only says who someone is, never which workspace is theirs.
+   */
   autoProvision: boolean
   /** Shown on the sign-in button, e.g. "Okta" or "your company account". */
   label: string
@@ -46,7 +49,11 @@ export function oidcConfigFromEnv(
     // how a token is mapped to a member, so a provider configured without it
     // would authenticate people Acta then cannot place.
     scopes: (env.ACTA_OIDC_SCOPES ?? 'openid email profile').split(/\s+/),
-    autoProvision: env.ACTA_OIDC_AUTO_PROVISION !== 'false',
+    // Opt-in (LA-397). A valid token says who someone is, not which
+    // workspace they belong to, and on an instance whose provider lets
+    // anyone sign up, "on" puts every stranger inside this instance's own
+    // workspace. Off, people join by invitation.
+    autoProvision: env.ACTA_OIDC_AUTO_PROVISION === 'true',
     label: env.ACTA_OIDC_LABEL ?? 'single sign-on',
   }
 }

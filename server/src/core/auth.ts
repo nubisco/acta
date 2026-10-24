@@ -97,12 +97,30 @@ export interface IWorkspaceRow {
 export async function workspaceBySlug(
   db: ISqlDriver,
   slug: string,
-): Promise<IWorkspaceRow | null> {
-  const rows = await db.query<IWorkspaceRow>(
-    'SELECT id, name, slug FROM workspace WHERE slug = ?',
+): Promise<(IWorkspaceRow & { suspended_at: number | null }) | null> {
+  const rows = await db.query<IWorkspaceRow & { suspended_at: number | null }>(
+    'SELECT id, name, slug, suspended_at FROM workspace WHERE slug = ?',
     [slug],
   )
   return rows[0] ?? null
+}
+
+/**
+ * Whether an operator has suspended this workspace (LA-397). Checked on
+ * every authenticated request, so a suspension takes effect on the next one
+ * rather than when sessions happen to expire. There is no route that sets it:
+ * suspending is an operator's act on the database, not a workspace setting.
+ */
+export async function workspaceSuspended(
+  db: ISqlDriver,
+  workspaceId: string,
+): Promise<boolean> {
+  const rows = await db.query<{ suspended_at: number | null }>(
+    'SELECT suspended_at FROM workspace WHERE id = ?',
+    [workspaceId],
+  )
+  const at = rows[0]?.suspended_at
+  return at !== null && at !== undefined
 }
 
 /**

@@ -11,6 +11,9 @@ import { setDeferrer } from './core/defer'
 import { ssoConfigFromEnv } from './core/sso'
 import { oidcConfigFromEnv } from './core/oidc'
 import { D1Driver, type ID1Database } from './db'
+import { emailSenderFromEnv } from './core/email'
+import { pruneOauthClients } from './core/oauth'
+import { rateLimitersFromBindings } from './core/rateLimit'
 import { hubLive, type IHubNamespace } from './live-hub'
 import type { IBlobStore } from './services/attachments'
 import {
@@ -153,6 +156,14 @@ function getApp(env: IWorkerEnv, origin: string): Promise<Hono<IAppEnv>> {
       platformWebhookSecret: env.PLATFORM_WEBHOOK_SECRET,
       aiEncryptionKey: env.ACTA_AI_ENCRYPTION_KEY,
       live: hubLive(env.LIVE),
+      // The `[[ratelimits]]` bindings in wrangler.toml, each falling back to
+      // an isolate-local counter if its block is missing.
+      rateLimiters: rateLimitersFromBindings(
+        env as unknown as Record<string, unknown>,
+      ),
+      emailSender: emailSenderFromEnv(
+        env as unknown as Record<string, string | undefined>,
+      ),
       bootstrap: {
         workspaceName: env.ACTA_WORKSPACE ?? 'Workspace',
         adminEmail: env.ACTA_ADMIN_EMAIL,
@@ -210,5 +221,9 @@ export default {
         baseUrl: env.ACTA_BASE_URL,
       }),
     ).catch((err) => console.error('daily report tick failed', err))
+    // OAuth clients registered and never used (core/oauth.ts).
+    await pruneOauthClients(driver).catch((err) =>
+      console.error('oauth client prune failed', err),
+    )
   },
 }

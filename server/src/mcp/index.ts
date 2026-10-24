@@ -147,3 +147,48 @@ export function mcpRoutes(store: AttachmentStore): Hono<IMcpEnv> {
 
   return app
 }
+
+/**
+ * The answer to an MCP request that went over its rate limit.
+ *
+ * A tool call gets a successful JSON-RPC result with `isError: true` and a
+ * sentence the model can act on, which is how every other refusal here is
+ * reported (AGENTS.md "MCP servers"). A bare HTTP 429 would reach most
+ * clients as a transport failure, and the agent would learn nothing about
+ * waiting. Anything that is not a tool call has no result to carry that in,
+ * so it gets a JSON-RPC error on a 429.
+ */
+export async function mcpRateLimited(
+  retryAfterSec: number,
+  req: Request,
+): Promise<Response> {
+  const message = `Rate limited: too many requests to Acta from this credential. Wait ${retryAfterSec} seconds, then retry. Writes are idempotent on op_id, so retrying the same batch is safe.`
+  let body: unknown = null
+  try {
+    body = await req.clone().json()
+  } catch {
+    // Unreadable: answered as a single error below.
+  }
+  const requests = (
+    Array.isArray(body) ? body : [body]
+  ) as Array<Partial<IJsonRpcRequest> | null>
+  let anyToolCall = false
+  const answers = requests
+    .filter((r) => !r?.method?.startsWith('notifications/'))
+    .map((r) => {
+      const id = r?.id ?? null
+      if (r?.method === 'tools/call') {
+        anyToolCall = true
+        return rpcResult(id, toolError(message))
+      }
+      return rpcError(id, -32000, message)
+    })
+  const payload = Array.isArray(body) ? answers : (answers[0] ?? null)
+  return new Response(JSON.stringify(payload), {
+    status: anyToolCall ? 200 : 429,
+    headers: {
+      'content-type': 'application/json',
+      'retry-after': String(retryAfterSec),
+    },
+  })
+}

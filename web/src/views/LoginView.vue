@@ -160,7 +160,14 @@ onMounted(async () => {
   const error = route.query.error
   if (typeof error === 'string') {
     const messages: Record<string, string> = {
-      not_a_member: 'Your account is not a member of this workspace',
+      not_a_member:
+        'Your account is not a member of any workspace here. Ask an admin to invite you.',
+      invite_email_mismatch:
+        'You signed in as a different address from the one invited. Sign in as the invited address.',
+      invite_expired: 'That invitation has expired. Ask for a new one.',
+      invite_revoked: 'That invitation was withdrawn.',
+      invite_invalid: 'That invitation does not exist.',
+      invite_accepted: 'That invitation was already used.',
       disabled: 'This account is disabled',
       sso_state: 'The sign-in attempt expired; try again',
       sso_token: 'Single sign-on failed; try again',

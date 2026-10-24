@@ -44,6 +44,8 @@ ACTA_EMAIL_FROM = "Acta <notifications@nubisco.io>"
 # this the reminders went out with the button pointing at the relative path
 # "/nubisco" and no card links (LA-361, reported by Ivan).
 ACTA_BASE_URL = "https://acta.nubisco.io"
+# ACTA_SSO_AUTO_PROVISION is left unset (off), so nobody joins on sign-in
+# alone: new colleagues are invited from Settings, People (LA-397).
 # No ACTA_ADMIN_* here: identity comes from platform.nubisco.io via SSO, and
 # the first person to sign in to a fresh workspace is made its admin. These
 # remain supported, and are still required, for an instance running on email
@@ -58,6 +60,54 @@ crons = ["*/5 * * * *"]
 
 [observability]
 enabled = true
+
+# Request rate limits (LA-397), on Cloudflare's native limiter: counted at the
+# edge, no storage operation per request. The numbers must match RATE_LIMITS in
+# src/core/rateLimit.ts, which the in-process fallback uses and a test compares
+# against this file. Periods can only be 10 or 60 seconds.
+#
+# namespace_id is per Cloudflare account, so Acta uses its own range (11xx)
+# rather than sharing a counter with another Worker. The platform uses 1001 and
+# 1002.
+[[ratelimits]]
+name = "ACTA_MCP_LIMITER"
+namespace_id = "1101"
+
+  [ratelimits.simple]
+  limit = 240
+  period = 60
+
+[[ratelimits]]
+name = "ACTA_WRITE_LIMITER"
+namespace_id = "1102"
+
+  [ratelimits.simple]
+  limit = 300
+  period = 60
+
+[[ratelimits]]
+name = "ACTA_INGEST_LIMITER"
+namespace_id = "1103"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60
+
+[[ratelimits]]
+name = "ACTA_OAUTH_REGISTER_LIMITER"
+namespace_id = "1104"
+
+  [ratelimits.simple]
+  limit = 5
+  period = 60
+
+[[ratelimits]]
+name = "ACTA_AUTH_LIMITER"
+namespace_id = "1105"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60
 
 [alias]
 "bun:sqlite" = "./src/db/bun-sqlite-stub.ts"

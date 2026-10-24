@@ -147,6 +147,39 @@ export function authorizationServerMetadata(origin: string): unknown {
 
 // ── Registration ────────────────────────────────────────────────────────────
 
+/**
+ * How long a registered client may sit unused before it is pruned.
+ *
+ * RFC 7591 registration is unauthenticated by design: a connector registers
+ * before anybody has signed in, so there is no one to authenticate. What
+ * keeps that from being a free write into a global table is a per-address
+ * rate limit in front of the route (core/rateLimit.ts), this expiry, and the
+ * ceiling below. A real connector is used within minutes of registering.
+ */
+export const UNUSED_CLIENT_TTL_MS = 3 * 24 * 60 * 60 * 1000
+
+/**
+ * The most never-used clients the instance will hold at once. Past this,
+ * registration answers 503 until pruning makes room. Far above anything
+ * honest traffic produces, and low enough that a distributed flood fills a
+ * small table rather than the database.
+ */
+export const MAX_UNUSED_CLIENTS = 1000
+
+/** Delete clients that were registered and never used. Run by the sweep. */
+export async function pruneOauthClients(
+  db: ISqlDriver,
+  nowMs: number = now(),
+): Promise<void> {
+  await db.run(
+    `DELETE FROM oauth_client
+      WHERE used_at IS NULL AND created_at < ?
+        AND NOT EXISTS (SELECT 1 FROM oauth_code c WHERE c.client_id = oauth_client.id)
+        AND NOT EXISTS (SELECT 1 FROM oauth_token t WHERE t.client_id = oauth_client.id)`,
+    [nowMs - UNUSED_CLIENT_TTL_MS],
+  )
+}
+
 export async function registerClient(
   db: ISqlDriver,
   body: { redirect_uris?: unknown; client_name?: unknown },
@@ -162,6 +195,16 @@ export async function registerClient(
       ok: false,
       error: 'invalid_redirect_uri',
       description: 'redirect_uris must be https URLs, or http on localhost',
+    }
+  }
+  const unused = await db.query<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM oauth_client WHERE used_at IS NULL',
+  )
+  if ((unused[0]?.n ?? 0) >= MAX_UNUSED_CLIENTS) {
+    return {
+      ok: false,
+      error: 'temporarily_unavailable',
+      description: 'Registration is paused. Try again later.',
     }
   }
   const id = newId('oac')
@@ -255,6 +298,11 @@ export async function issueCode(
       now() + CODE_TTL_MS,
       now(),
     ],
+  )
+  // A person approved this client, so it is in use and is never pruned.
+  await db.run(
+    'UPDATE oauth_client SET used_at = ? WHERE id = ? AND used_at IS NULL',
+    [now(), p.clientId],
   )
   const to = new URL(p.redirectUri)
   if (p.state) to.searchParams.set('state', p.state)

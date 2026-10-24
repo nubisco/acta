@@ -3,7 +3,7 @@ import { getCookie } from 'hono/cookie'
 import type { ISqlDriver } from './db'
 import type { IActorCtx } from './core/ctx'
 import { bootstrapWorkspace, type IBootstrapOptions } from './core/bootstrap'
-import { mcpRoutes } from './mcp'
+import { mcpRateLimited, mcpRoutes } from './mcp'
 import { apiRoutes } from './routes/api'
 import {
   authRoutes,
@@ -24,7 +24,15 @@ import { ingestRoutes } from './routes/ingest'
 import { JwksVerifier, type ISsoConfig } from './core/sso'
 import { OidcClient, type IOidcConfig } from './core/oidc'
 import { AttachmentStore, type IBlobStore } from './services/attachments'
-import type { IFetchDeps } from './core/safeFetch'
+import { outboundFetchDeps, type IFetchDeps } from './core/safeFetch'
+import {
+  memoryRateLimiters,
+  rateLimit,
+  clientIp,
+  WRITE_METHODS,
+  type TRateLimiters,
+} from './core/rateLimit'
+import type { TEmailSender } from './core/email'
 import { startRulesEngine } from './services/rules'
 import { startWebhookDispatcher } from './services/webhooks'
 import { onEvent } from './core/events'
@@ -107,6 +115,23 @@ export interface IAppOptions {
    */
   aiEncryptionKey?: string
   aiDevSecret?: boolean
+  /**
+   * Request rate limits (core/rateLimit.ts). On Workers, the native
+   * `[[ratelimits]]` bindings. Everywhere else, in-process counters, which is
+   * also the default.
+   */
+  rateLimiters?: TRateLimiters
+  /**
+   * Hostname resolver behind the SSRF guard on outbound webhooks and rule
+   * actions. Tests pass one that answers with a public address, so no test
+   * touches DNS. Defaults to the real resolver.
+   */
+  outboundResolve?: (hostname: string) => Promise<string[]>
+  /**
+   * Sends invitation emails. Unset means an invitation hands its link back to
+   * the admin who made it, which is the self-hosted default with no email.
+   */
+  emailSender?: TEmailSender
 }
 
 /**
@@ -136,12 +161,16 @@ export async function createApp(
     opts.blobStore ??
       (await fsBlobStore(`${opts.dataDir ?? './data'}/attachments`)),
   )
+  // Every outbound POST to an address a workspace typed in goes through the
+  // SSRF guard (LA-397), webhooks and rule actions alike.
+  const outbound = outboundFetchDeps(opts.fetchImpl, opts.outboundResolve)
   startWebhookDispatcher(db, {
-    fetchImpl: opts.fetchImpl,
+    fetchDeps: outbound,
     backoffMs: opts.webhookBackoffMs,
     baseUrl: opts.baseUrl,
   })
-  startRulesEngine(db, { fetchImpl: opts.fetchImpl })
+  startRulesEngine(db, { fetchDeps: outbound })
+  const limiters = opts.rateLimiters ?? memoryRateLimiters()
   const publish = opts.live?.publish
   if (publish)
     onEvent((event) =>
@@ -221,6 +250,17 @@ export async function createApp(
   app.get('/.well-known/oauth-protected-resource', prMeta)
   app.get('/.well-known/oauth-protected-resource/*', prMeta)
   app.get('/mcp/.well-known/oauth-protected-resource', prMeta)
+  // Registration is unauthenticated by design (RFC 7591), so it is limited
+  // per address, tightly. See core/oauth.ts for the rest of its guard.
+  app.use(
+    '/oauth/register',
+    rateLimit({
+      name: 'oauth_register',
+      limiter: limiters.oauth_register,
+      methods: ['POST'],
+      key: (c) => `ip:${clientIp(c.req.header.bind(c.req))}`,
+    }),
+  )
   app.route('/oauth', oauthRoutes())
 
   // Two provider modes, one runtime. OIDC wins when both are configured: it
@@ -245,6 +285,54 @@ export async function createApp(
   // and the SPA fallback decides whether there is anything to show but a
   // redirect.
   const otpEnabled = ssoRuntime === undefined || opts.otpFallback === true
+
+  // Rate limits (LA-397). Mounted before the routes they guard.
+  //
+  // Sign-in codes and invitation acceptance: by address, since nobody is
+  // signed in yet. Each one sends an email or checks a secret.
+  app.use(
+    '/api/v1/auth/*',
+    rateLimit({
+      name: 'auth',
+      limiter: limiters.auth,
+      methods: ['POST'],
+      key: (c) => `ip:${clientIp(c.req.header.bind(c.req))}`,
+      skip: (path) =>
+        !(
+          path === '/api/v1/auth/otp' ||
+          path === '/api/v1/auth/verify' ||
+          path.startsWith('/api/v1/auth/invitations/')
+        ),
+    }),
+  )
+  // The public ingest endpoint (a contact form): by address.
+  app.use(
+    '/api/v1/ingest/*',
+    rateLimit({
+      name: 'ingest',
+      limiter: limiters.ingest,
+      methods: ['POST'],
+      key: (c) => `ip:${clientIp(c.req.header.bind(c.req))}`,
+    }),
+  )
+  // Every other write, by credential. Provider webhooks are left alone: they
+  // are signature-authenticated, GitHub delivers in bursts, and a limit there
+  // would drop events rather than slow anyone down.
+  app.use(
+    '/api/v1/*',
+    rateLimit({
+      name: 'write',
+      limiter: limiters.write,
+      methods: WRITE_METHODS,
+      skip: (path) =>
+        path.startsWith('/api/v1/hooks/') ||
+        path.startsWith('/api/v1/platform/') ||
+        path.startsWith('/api/v1/ingest/') ||
+        path.startsWith('/api/v1/auth/invitations/') ||
+        path === '/api/v1/auth/otp' ||
+        path === '/api/v1/auth/verify',
+    }),
+  )
   app.route(
     '/api/v1/auth',
     authRoutes(ssoRuntime, { otpFallback: opts.otpFallback }),
@@ -271,6 +359,7 @@ export async function createApp(
       remoteFetchDeps: opts.remoteFetchDeps,
       liveSocket: opts.live?.socket,
       report: reportOpts,
+      invites: { send: opts.emailSender, baseUrl: opts.baseUrl },
     }),
   )
 
@@ -285,6 +374,7 @@ export async function createApp(
       remoteFetchDeps: opts.remoteFetchDeps,
       liveSocket: opts.live?.socket,
       report: reportOpts,
+      invites: { send: opts.emailSender, baseUrl: opts.baseUrl },
     }),
   )
 
@@ -322,6 +412,18 @@ export async function createApp(
     await next()
     for (const [k, v] of Object.entries(MCP_CORS)) c.res.headers.set(k, v)
   })
+  // By credential, inside the CORS wrapper so a refusal is still readable
+  // from a browser-based connector. A refused tool call comes back as a
+  // result the model can read (AGENTS.md "MCP servers"), not a dead socket.
+  app.use(
+    '/mcp',
+    rateLimit({
+      name: 'mcp',
+      limiter: limiters.mcp,
+      methods: ['POST'],
+      refuse: mcpRateLimited,
+    }),
+  )
   app.use('/mcp', requireAuth({ resourceMetadata: true }))
   app.route('/mcp', mcpRoutes(store))
 
@@ -358,11 +460,21 @@ export async function createApp(
        */
       if (path.startsWith('/.well-known/')) return c.notFound()
 
+      /**
+       * An invitation link opens the accept page as it is, signed in or not.
+       * The page explains what is about to happen and sends the person to the
+       * provider itself, carrying which invitation this is. Bouncing straight
+       * to the provider here would lose that, and the sign-in would end at
+       * "not a member" for someone who was invited.
+       */
+      const invitePage = path.startsWith('/invite/')
+
       const signedOut = !getCookie(c as never, SESSION_COOKIE)
       if (
         ssoRuntime &&
         !otpEnabled &&
         signedOut &&
+        !invitePage &&
         !url.searchParams.has('error')
       ) {
         // Carry where they were going. Without this, anyone sent to sign in

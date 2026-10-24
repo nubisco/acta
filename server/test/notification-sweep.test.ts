@@ -70,6 +70,11 @@ beforeEach(async () => {
      VALUES ('act_ivan', ?, 'human', 'ivan', 'Ivan Silva', 'ivan@nubisco.io', 'member', ?)`,
     [workspaceId, Date.now()],
   )
+  // Both have signed in, so both addresses are proved. The tests for an
+  // address nobody has proved set it back to null themselves.
+  await db.run(
+    "UPDATE actor SET email_confirmed_at = created_at WHERE kind = 'human'",
+  )
   const joseId = (
     await db.query<{ id: string }>("SELECT id FROM actor WHERE handle = 'jose'")
   )[0].id

@@ -2,12 +2,25 @@
   <NbModal
     close-appearance="button"
     :open="open"
-    title="Add member"
+    :title="link ? 'Invitation ready' : 'Invite member'"
     size="sm"
     :close-on-overlay="!isDirty"
     @close="emit('close')"
   >
-    <NbForm id="new-member-form" @submit.prevent="submit">
+    <div v-if="link" class="invite-link">
+      <p class="invite-link__note">
+        This instance does not send email, so pass this link to
+        {{ invitedName }} yourself. It works once, for {{ invitedEmail }}, and
+        expires in 7 days.
+      </p>
+      <NbTextInput
+        id="field-invite-link"
+        :model-value="link"
+        label="Invitation link"
+        readonly
+      />
+    </div>
+    <NbForm v-else id="new-member-form" @submit.prevent="submit">
       <NbBanner
         v-if="serverError"
         status="error"
@@ -28,7 +41,7 @@
         id="field-member-name"
         v-model="name"
         label="Name"
-        placeholder="Daniela Pinho"
+        placeholder="Their full name"
         :error="errors.name"
         @blur="validateName"
       />
@@ -40,32 +53,51 @@
       />
     </NbForm>
     <template #footer>
-      <NbButton type="button" variant="secondary" @click="emit('close')">
-        Cancel
-      </NbButton>
-      <NbButton
-        type="submit"
-        form="new-member-form"
-        variant="primary"
-        :loading="saving"
-      >
-        Add member
-      </NbButton>
+      <template v-if="link">
+        <NbButton type="button" variant="secondary" @click="copyLink">
+          Copy link
+        </NbButton>
+        <NbButton type="button" variant="primary" @click="emit('close')">
+          Done
+        </NbButton>
+      </template>
+      <template v-else>
+        <NbButton type="button" variant="secondary" @click="emit('close')">
+          Cancel
+        </NbButton>
+        <NbButton
+          type="submit"
+          form="new-member-form"
+          variant="primary"
+          :loading="saving"
+        >
+          Send invitation
+        </NbButton>
+      </template>
     </template>
   </NbModal>
 </template>
 
 <script setup lang="ts">
+/**
+ * Invite someone (LA-397). Nobody becomes a member by an admin typing an
+ * address: the person accepts, which proves the address is theirs, and only
+ * then exists in the workspace. On an instance that sends email the link goes
+ * to them and never to the admin. On one that does not, the admin is the
+ * delivery, so the link is shown here to pass on.
+ */
 import { computed, reactive, ref, watch } from 'vue'
-import type { NbTextInput } from '@nubisco/ui'
-import { api } from '@/api/client'
+import { useToast, type NbTextInput } from '@nubisco/ui'
+import { api, ApiHttpError } from '@/api/client'
 import { humanise } from '@/lib/state'
-import { useWorkspace } from '@/stores/workspace'
 
 const props = defineProps<{ open: boolean }>()
-const emit = defineEmits<{ close: []; created: [] }>()
+const emit = defineEmits<{ close: []; created: [emailed: boolean] }>()
 
-const ws = useWorkspace()
+const toast = useToast()
+const link = ref('')
+const invitedName = ref('')
+const invitedEmail = ref('')
 const email = ref('')
 const name = ref('')
 const role = ref<'admin' | 'member'>('member')
@@ -85,6 +117,7 @@ watch(
   () => props.open,
   (open) => {
     if (open) {
+      link.value = ''
       email.value = ''
       name.value = ''
       role.value = 'member'
@@ -112,24 +145,52 @@ async function submit(): Promise<void> {
   if (errors.email || errors.name) return
   saving.value = true
   serverError.value = ''
-  const handle = email.value
-    .split('@')[0]
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-|-$/g, '')
   try {
-    await api.createMember({
+    const out = await api.inviteMember({
       email: email.value.trim(),
-      handle,
       name: name.value.trim(),
       role: role.value,
     })
-    await ws.refresh()
-    emit('created')
+    emit('created', out.emailed)
+    if (out.accept_url) {
+      invitedName.value = name.value.trim()
+      invitedEmail.value = email.value.trim()
+      link.value = new URL(out.accept_url, window.location.origin).toString()
+    } else {
+      emit('close')
+    }
   } catch (err) {
-    serverError.value = humanise(err)
+    // The server's own words for the refusals an admin can act on: already a
+    // member, handle taken, today's invitations used up.
+    serverError.value =
+      err instanceof ApiHttpError && (err.status === 409 || err.status === 429)
+        ? err.message
+        : humanise(err)
   } finally {
     saving.value = false
   }
 }
+
+async function copyLink(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(link.value)
+    toast.success('Link copied')
+  } catch {
+    toast.error('Could not copy. Select the link and copy it instead.')
+  }
+}
 </script>
+
+<style scoped lang="scss">
+.invite-link {
+  display: grid;
+  gap: var(--nb-spacing-12);
+
+  &__note {
+    margin: 0;
+    color: var(--nb-c-text-subtle);
+    font-size: var(--nb-type-body-sm-size);
+    line-height: 1.55;
+  }
+}
+</style>

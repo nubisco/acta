@@ -71,7 +71,7 @@ export function oauthRoutes(): Hono<IOauthEnv> {
     if (!out.ok) {
       return c.json(
         { error: out.error, error_description: out.description },
-        400,
+        out.error === 'temporarily_unavailable' ? 503 : 400,
         OAUTH_CORS,
       )
     }

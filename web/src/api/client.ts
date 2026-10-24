@@ -68,6 +68,19 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
+/** An invitation as an admin sees it. */
+export interface IInvitation {
+  id: string
+  email: string
+  handle: string
+  name: string
+  role: 'admin' | 'member'
+  status: 'pending' | 'accepted' | 'expired' | 'revoked'
+  emailed: boolean
+  expires_at: number
+  created_at: number
+}
+
 export function newOpId(): string {
   return `web:${crypto.randomUUID()}`
 }
@@ -588,16 +601,48 @@ export const api = {
       '/workspaces',
     ),
 
-  createMember: (member: {
+  /**
+   * Invite someone. Nobody becomes a member until they accept, which proves
+   * the address is theirs. `accept_url` comes back only on an instance that
+   * sends no email, so the admin can pass it on by hand.
+   */
+  inviteMember: (invite: {
     email: string
-    handle: string
     name: string
     role: 'admin' | 'member'
   }) =>
-    req<{ id: string; handle: string }>('/members', {
+    req<{
+      invitation: IInvitation
+      emailed: boolean
+      accept_url?: string
+    }>('/invitations', {
       method: 'POST',
-      body: JSON.stringify(member),
+      body: JSON.stringify(invite),
     }),
+  invitations: () =>
+    req<{ invitations: IInvitation[]; emails_left_today: number }>(
+      '/invitations',
+    ),
+  revokeInvitation: (id: string) =>
+    req<{ ok: boolean }>(`/invitations/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+  /** The invitee's side: public, addressed by the secret in the link. */
+  invitationPreview: (token: string) =>
+    req<{
+      workspace: string
+      inviter: string
+      email: string
+      role: 'admin' | 'member'
+      status: 'pending' | 'accepted' | 'expired' | 'revoked'
+      expires_at: number
+      proof: 'provider' | 'link'
+    }>(`/auth/invitations/${encodeURIComponent(token)}`),
+  acceptInvitation: (token: string) =>
+    req<{ next: string }>(
+      `/auth/invitations/${encodeURIComponent(token)}/accept`,
+      { method: 'POST' },
+    ),
   updateMember: (
     id: string,
     patch: { role?: 'admin' | 'member'; disabled?: boolean; name?: string },

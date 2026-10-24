@@ -4,6 +4,8 @@ import { dailyReportTick } from './services/dailyReport'
 import { ssoConfigFromEnv } from './core/sso'
 import { oidcConfigFromEnv } from './core/oidc'
 import { openDb } from './db'
+import { emailSenderFromEnv } from './core/email'
+import { pruneOauthClients } from './core/oauth'
 import { bunLive, bunWebsocket } from './live-bun'
 import {
   channelsFromEnv,
@@ -32,6 +34,7 @@ const app = await createApp(db, {
   // published constant whenever NODE_ENV was simply not set.
   aiDevSecret: process.env.ACTA_AI_DEV_SECRET === 'true',
   live: bunLive,
+  emailSender: emailSenderFromEnv(process.env),
   bootstrap: {
     workspaceName: process.env.ACTA_WORKSPACE ?? 'Nubisco',
     adminEmail: process.env.ACTA_ADMIN_EMAIL,
@@ -68,6 +71,9 @@ setInterval(() => {
       baseUrl: process.env.ACTA_BASE_URL,
     }),
   ).catch((err) => console.error('daily report tick failed', err))
+  void pruneOauthClients(db).catch((err) =>
+    console.error('oauth client prune failed', err),
+  )
 }, SWEEP_INTERVAL_MS)
 
 export default {
