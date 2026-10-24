@@ -1269,7 +1269,8 @@ export async function dailyReportTick(
 ): Promise<void> {
   const at = opts.now ?? Date.now()
   const workspaces = await db.query<{ workspace_id: string }>(
-    'SELECT workspace_id FROM daily_report WHERE enabled = 1',
+    `SELECT r.workspace_id FROM daily_report r JOIN workspace w ON w.id = r.workspace_id
+      WHERE r.enabled = 1 AND w.suspended_at IS NULL AND w.deleted_at IS NULL`,
   )
   for (const { workspace_id: workspaceId } of workspaces) {
     const row = await reportRow(db, workspaceId)

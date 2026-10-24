@@ -37,6 +37,11 @@ export interface IOverview {
   goals?: IGoalRef[]
   /** Workspace-wide policy, as Settings shows it and the server enforces it. */
   policy?: { comment_delete: TCommentDeletePolicy }
+  /**
+   * Set while an admin has deleted the workspace and it waits to be purged:
+   * read-only until then (LA-401).
+   */
+  deletion?: { purge_at: number }
 }
 
 /** Who may delete a comment: its author, or only an admin. */

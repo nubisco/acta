@@ -109,6 +109,18 @@
       >
         Live updates are interrupted; changes still save.
       </NbBanner>
+      <NbBanner
+        v-if="ws.overview.value?.deletion"
+        status="error"
+        variant="callout"
+        flush
+        title="This workspace is being deleted"
+      >
+        It is read-only and will be removed for good on
+        {{
+          new Date(ws.overview.value.deletion.purge_at).toLocaleDateString()
+        }}. An admin can cancel this in Settings, Workspace.
+      </NbBanner>
     </template>
 
     <template #topbar-left>

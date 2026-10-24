@@ -39,6 +39,7 @@ import { startWebhookDispatcher } from './services/webhooks'
 import { onEvent } from './core/events'
 import { liveFrame, type ILiveTransport } from './core/live'
 import type { IRunOptions } from './services/dailyReport'
+import { exportByToken } from './services/workspaceExport'
 
 export interface IAppEnv {
   Variables: {
@@ -343,6 +344,26 @@ export async function createApp(
   // Provider webhooks authenticate by signature, not by session, so they
   // mount before requireAuth.
   app.route('/api/v1/hooks', hookRoutes())
+  // An emailed export link (LA-401). The token in it is the credential, so it
+  // mounts before requireAuth, and anything not exactly right is a 404.
+  app.get('/api/v1/exports/:id', async (c) => {
+    const found = await exportByToken(
+      db,
+      store,
+      c.req.param('id'),
+      c.req.query('token') ?? '',
+    )
+    if (!found) return c.json({ error: 'not found' }, 404)
+    return new Response(new Uint8Array(found.bytes), {
+      headers: {
+        'content-type': 'application/zip',
+        'content-disposition': `attachment; filename="${found.filename}"`,
+        'x-content-type-options': 'nosniff',
+        'cache-control': 'no-store',
+        'referrer-policy': 'no-referrer',
+      },
+    })
+  })
   // Identity-provider events (avatar changes, membership). Signature
   // authenticated for the same reason, and 404 when no secret is set.
   app.route(
@@ -507,7 +528,7 @@ export async function createApp(
 }
 
 /** Bun-only filesystem blob store; the Workers entrypoint supplies R2. */
-async function fsBlobStore(dir: string): Promise<IBlobStore> {
+export async function fsBlobStore(dir: string): Promise<IBlobStore> {
   const { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } =
     await import('node:fs')
   const { join } = await import('node:path')

@@ -764,6 +764,36 @@ CREATE TABLE IF NOT EXISTS daily_report_run (
 );
 CREATE INDEX IF NOT EXISTS idx_daily_report_run_ws ON daily_report_run(workspace_id, until_ts);
 
+-- A per-workspace export an admin asked for (LA-401): every table as JSONL,
+-- the pages as Markdown and the uploaded files, in one zip kept in the blob
+-- store under this row's id. The link that downloads it is a token whose hash
+-- is kept here, valid until expires_at, after which the cron removes both.
+CREATE TABLE IF NOT EXISTS workspace_export (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  requested_by TEXT NOT NULL REFERENCES actor(id),
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'running', 'ready', 'failed')),
+  token_hash TEXT,
+  size INTEGER,
+  -- Files left out because the zip would have passed its size cap. Named in
+  -- the zip's README, so nothing is missing without saying so.
+  skipped_files INTEGER NOT NULL DEFAULT 0,
+  error TEXT,
+  claimed_at INTEGER,
+  ready_at INTEGER,
+  expires_at INTEGER,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_workspace_export_ws ON workspace_export(workspace_id, created_at);
+
+-- When an instance-wide cron job last finished, for the ones that run daily
+-- rather than on every five-minute tick (retention, the size check).
+CREATE TABLE IF NOT EXISTS instance_job (
+  name TEXT PRIMARY KEY,
+  done_at INTEGER NOT NULL
+);
+
 -- Full-text search over items, comments, docs (mvp F7).
 CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
   kind, ref, title, body, space_key, tokenize = 'unicode61'
@@ -1128,4 +1158,17 @@ export const ADDITIVE_COLUMNS = [
     WHERE used_at IS NULL
       AND (EXISTS (SELECT 1 FROM oauth_code c WHERE c.client_id = oauth_client.id)
            OR EXISTS (SELECT 1 FROM oauth_token t WHERE t.client_id = oauth_client.id))`,
+  // LA-401. A workspace an admin asked to delete: when, by whom, and when the
+  // cron purges it. Reads keep working until then and writes are refused, so
+  // the 30 days are for changing your mind or exporting, not for working.
+  'ALTER TABLE workspace ADD COLUMN deleted_at INTEGER',
+  'ALTER TABLE workspace ADD COLUMN deleted_by TEXT',
+  'ALTER TABLE workspace ADD COLUMN purge_at INTEGER',
+  // What the retention sweep deletes by. Each sweep is a range on time, and
+  // without these every one of them scanned its whole table. Activity needs
+  // none: its ids are time-ordered, so idx_event_ws already is one.
+  'CREATE INDEX IF NOT EXISTS idx_op_log_created ON op_log(created_at)',
+  'CREATE INDEX IF NOT EXISTS idx_webhook_delivery_created ON webhook_delivery(created_at)',
+  'CREATE INDEX IF NOT EXISTS idx_notification_read ON notification(read_at) WHERE read_at IS NOT NULL',
+  'CREATE INDEX IF NOT EXISTS idx_workspace_purge ON workspace(purge_at) WHERE purge_at IS NOT NULL',
 ]

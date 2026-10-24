@@ -28,6 +28,18 @@ import {
   needsAttention,
 } from '../services/home'
 import { liveFrame, sameOriginSocket, type ILiveTransport } from '../core/live'
+import { defer } from '../core/defer'
+import {
+  exportForAdmin,
+  exportList,
+  exportRequest,
+  runPendingExport,
+} from '../services/workspaceExport'
+import {
+  cancelDeletion,
+  deletionStatus,
+  scheduleDeletion,
+} from '../services/workspaceDeletion'
 import { spaceWrite } from '../services/spaces'
 import { docWrite } from '../services/docs'
 import {
@@ -751,6 +763,74 @@ export function apiRoutes(
       ctx.workspaceId,
     ])
     return c.json({ comment_delete: body.comment_delete })
+  })
+
+  /**
+   * Exports (LA-401). Asking starts the work off the request, and the cron
+   * finishes any it did not. Admin only, like everything that copies the whole
+   * workspace somewhere else.
+   */
+  app.get('/workspace/exports', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    return c.json({ exports: await exportList(ctx) })
+  })
+
+  app.post('/workspace/exports', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    const created = await exportRequest(ctx)
+    defer(
+      runPendingExport(ctx.db, {
+        store,
+        send: options.invites?.send,
+        baseUrl: options.invites?.baseUrl,
+      }).catch((err) => console.error('workspace export failed', err)),
+    )
+    return c.json({ export: created }, 202)
+  })
+
+  app.get('/workspace/exports/:id/download', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    const { bytes, filename } = await exportForAdmin(
+      ctx,
+      store,
+      c.req.param('id'),
+    )
+    return new Response(new Uint8Array(bytes), {
+      headers: {
+        'content-type': 'application/zip',
+        'content-disposition': `attachment; filename="${filename}"`,
+        'x-content-type-options': 'nosniff',
+      },
+    })
+  })
+
+  /**
+   * Deleting the workspace (LA-401). Typed confirmation, thirty days to change
+   * your mind, and read-only in between. Admin only.
+   */
+  app.get('/workspace/deletion', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    return c.json({ deletion: await deletionStatus(ctx.db, ctx.workspaceId) })
+  })
+
+  app.post('/workspace/deletion', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    const body = z
+      .object({ confirm: z.string().min(1).max(200) })
+      .parse(await c.req.json())
+    return c.json({ deletion: await scheduleDeletion(ctx, body.confirm) })
+  })
+
+  app.delete('/workspace/deletion', async (c) => {
+    const ctx = ctxOf(c)
+    requireScope(ctx, 'admin')
+    await cancelDeletion(ctx)
+    return c.json({ deletion: null })
   })
 
   /**

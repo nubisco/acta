@@ -75,6 +75,10 @@ const NOTIFIABLE = new Set([
   // A page coming out of private: the people named in it can see it now.
   'doc.shared',
   'member.updated',
+  // The instance's database nearing D1's cap, to the operators (LA-401).
+  'instance.storage_high',
+  // A workspace export ready to download, to the admin who asked for it.
+  'workspace.export_ready',
   // Goals. Being handed one, a check-in on one you own or follow, and it
   // being put away or brought back. An edit is here for the names it adds
   // and nothing else, the same way a document save is: it is in neither
