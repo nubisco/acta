@@ -626,7 +626,9 @@ export function authRoutes(
     // signing people in would be a password that never expires.
     if (inv.status === 'accepted')
       return c.json(
-        { error: 'this invitation was already accepted; sign in with a code' },
+        {
+          error: 'this invitation was already accepted, so sign in with a code',
+        },
         409,
       )
     const accepted = await acceptInvitation(db, token, inv.row.email)

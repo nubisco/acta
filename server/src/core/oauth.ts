@@ -204,7 +204,7 @@ export async function registerClient(
     return {
       ok: false,
       error: 'temporarily_unavailable',
-      description: 'Registration is paused; try again later',
+      description: 'Registration is paused. Try again later.',
     }
   }
   const id = newId('oac')

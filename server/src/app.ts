@@ -117,7 +117,7 @@ export interface IAppOptions {
   aiDevSecret?: boolean
   /**
    * Request rate limits (core/rateLimit.ts). On Workers, the native
-   * `[[ratelimits]]` bindings; everywhere else, in-process counters, which is
+   * `[[ratelimits]]` bindings. Everywhere else, in-process counters, which is
    * also the default.
    */
   rateLimiters?: TRateLimiters

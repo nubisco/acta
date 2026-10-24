@@ -138,7 +138,7 @@ type THeader = (name: string) => string | undefined
 
 /**
  * The caller's address, as well as we can tell. `cf-connecting-ip` is set by
- * Cloudflare and is the one to trust; the rest is for a self-hosted instance
+ * Cloudflare and is the one to trust. The rest is for a self-hosted instance
  * behind its own proxy, and for tests.
  */
 export function clientIp(header: THeader): string {

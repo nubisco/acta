@@ -147,7 +147,7 @@ export async function createInvitation(
   if ((pending[0]?.n ?? 0) >= MAX_PENDING_INVITES)
     throw new ApiError(
       429,
-      `this workspace already has ${MAX_PENDING_INVITES} open invitations; revoke some first`,
+      `this workspace already has ${MAX_PENDING_INVITES} open invitations, so revoke some first`,
     )
 
   // The daily cap is taken before anything is written, so a refused
@@ -165,7 +165,7 @@ export async function createInvitation(
     if (!room)
       throw new ApiError(
         429,
-        `this workspace has sent its ${INVITE_EMAILS_PER_DAY} invitations for today; try again tomorrow`,
+        `this workspace has sent its ${INVITE_EMAILS_PER_DAY} invitations for today. Try again tomorrow.`,
       )
   }
 

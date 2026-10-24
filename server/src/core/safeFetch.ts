@@ -448,7 +448,7 @@ export async function safeFetchBytes(
  * rules apply: http and https only, no credentials in the URL, the hostname
  * resolved and every address checked, and a wall-time cap.
  *
- * Redirects are NOT followed. A webhook receiver answers; it does not send us
+ * Redirects are NOT followed. A webhook receiver answers, it does not send us
  * somewhere else, and re-POSTing a payload to wherever a 307 points is exactly
  * the hop the address check exists to stop. A 3xx is reported as the status it
  * is, which the caller records as a failed delivery.

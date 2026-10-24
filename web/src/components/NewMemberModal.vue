@@ -176,7 +176,7 @@ async function copyLink(): Promise<void> {
     await navigator.clipboard.writeText(link.value)
     toast.success('Link copied')
   } catch {
-    toast.error('Could not copy; select the link and copy it instead')
+    toast.error('Could not copy. Select the link and copy it instead.')
   }
 }
 </script>
