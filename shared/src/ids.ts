@@ -35,6 +35,8 @@ export const ID_PREFIXES = [
   'drr',
   // An invitation into a workspace (LA-397).
   'inv',
+  // A workspace export (LA-401).
+  'exp',
 ] as const
 
 export type TIdPrefix = (typeof ID_PREFIXES)[number]
