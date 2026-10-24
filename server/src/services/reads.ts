@@ -1114,8 +1114,8 @@ export async function search(ctx: ICtx, params: TSearch) {
   const match = ftsMatchExpr(params.query)
   if (!match) return { results: [] }
   const types = params.types ?? ['item', 'doc', 'comment']
-  const args: unknown[] = [match]
-  let filter = `kind IN (${types.map(() => '?').join(',')})`
+  const args: unknown[] = [match, ctx.workspaceId]
+  let filter = `workspace_id = ? AND kind IN (${types.map(() => '?').join(',')})`
   args.push(...types)
   if (params.space) {
     filter += ' AND space_key = ?'
@@ -1125,7 +1125,7 @@ export async function search(ctx: ICtx, params: TSearch) {
   const hidden = await hiddenDocIds(ctx)
   if (hidden.length > 0) {
     // Comments on a page are indexed under the page's slug as their title.
-    filter += ` AND NOT (kind IN ('doc', 'comment') AND (CASE kind WHEN 'doc' THEN ref ELSE title END) IN (SELECT slug FROM document WHERE id IN (SELECT value FROM json_each(?))))`
+    filter += ` AND NOT (kind IN ('doc', 'comment') AND (CASE kind WHEN 'doc' THEN ref ELSE title END) IN (SELECT slug FROM document WHERE workspace_id = fts.workspace_id AND id IN (SELECT value FROM json_each(?))))`
     args.push(JSON.stringify(hidden))
   }
   const rows = await ctx.db.query<{

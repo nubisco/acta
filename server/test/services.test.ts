@@ -177,6 +177,60 @@ describe('items', () => {
     expect(prefix.results.some((r) => r.ref === 'SW-1')).toBe(true)
   })
 
+  it('search stays inside the workspace, even where keys repeat', async () => {
+    await db.run(
+      "INSERT INTO workspace (id, name, slug, created_at) VALUES ('ws_other', 'Other', 'other', 1)",
+    )
+    await db.run(
+      `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
+       VALUES ('act_ana', 'ws_other', 'human', 'ana', 'Ana', 'ana@example.com', 'admin', 1)`,
+    )
+    const other: ICtx = {
+      db,
+      workspaceId: 'ws_other',
+      actor: { ...ctx.actor, id: 'act_ana', handle: 'ana' },
+    }
+    await spaceWrite(other, [
+      {
+        op: 'create',
+        op_id: 'o1',
+        key: 'SW',
+        name: 'Other',
+        template: 'kanban6',
+      },
+    ])
+    await itemWrite(
+      other,
+      [
+        {
+          op: 'create',
+          op_id: 'o2',
+          list: 'To Do',
+          title: 'Secret merger plan',
+        },
+      ],
+      'SW',
+    )
+    await itemWrite(
+      ctx,
+      [{ op: 'create', op_id: 'i1', list: 'To Do', title: 'Tune the amp' }],
+      'SW',
+    )
+    // Both workspaces now hold an SW-1. Neither sees the other's.
+    const mine = (await search(ctx, { query: 'merger', limit: 20 })) as {
+      results: unknown[]
+    }
+    expect(mine.results).toHaveLength(0)
+    const theirs = (await search(other, { query: 'merger', limit: 20 })) as {
+      results: { ref: string }[]
+    }
+    expect(theirs.results.map((r) => r.ref)).toEqual(['SW-1'])
+    const own = (await search(other, { query: 'tune', limit: 20 })) as {
+      results: unknown[]
+    }
+    expect(own.results).toHaveLength(0)
+  })
+
   it('enforces if_rev and reports current rev on conflict', async () => {
     await itemWrite(
       ctx,

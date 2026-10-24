@@ -765,8 +765,10 @@ CREATE TABLE IF NOT EXISTS daily_report_run (
 CREATE INDEX IF NOT EXISTS idx_daily_report_run_ws ON daily_report_run(workspace_id, until_ts);
 
 -- Full-text search over items, comments, docs (mvp F7).
+-- workspace_id is UNINDEXED: it is never matched as text, only filtered on, so
+-- one tenant's search never returns another's rows (refs repeat across workspaces).
 CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
-  kind, ref, title, body, space_key, tokenize = 'unicode61'
+  kind, ref, title, body, space_key, workspace_id UNINDEXED, tokenize = 'unicode61'
 );
 `
 
@@ -904,22 +906,23 @@ export const TOKEN_REBUILD = {
 }
 
 export const FTS_COLUMN_RENAME = {
-  detect: 'SELECT space_key FROM fts LIMIT 1',
+  // The newest column decides: an index without workspace_id is rebuilt.
+  detect: 'SELECT workspace_id FROM fts LIMIT 1',
   drop: 'DROP TABLE IF EXISTS fts',
   create: `CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
-  kind, ref, title, body, space_key, tokenize = 'unicode61'
+  kind, ref, title, body, space_key, workspace_id UNINDEXED, tokenize = 'unicode61'
 )`,
 }
 
 /** Repopulates a freshly rebuilt FTS index from the rows it covers. */
 export const REINDEX_FTS = [
-  `INSERT INTO fts (kind, ref, title, body, space_key)
-     SELECT 'item', i.key, i.title, i.description, s.key
+  `INSERT INTO fts (kind, ref, title, body, space_key, workspace_id)
+     SELECT 'item', i.key, i.title, i.description, s.key, i.workspace_id
        FROM item i JOIN space s ON s.id = i.space_id`,
-  `INSERT INTO fts (kind, ref, title, body, space_key)
-     SELECT 'doc', d.slug, d.title, d.body, '' FROM document d`,
-  `INSERT INTO fts (kind, ref, title, body, space_key)
-     SELECT 'comment', c.id, '', c.body, s.key
+  `INSERT INTO fts (kind, ref, title, body, space_key, workspace_id)
+     SELECT 'doc', d.slug, d.title, d.body, '', d.workspace_id FROM document d`,
+  `INSERT INTO fts (kind, ref, title, body, space_key, workspace_id)
+     SELECT 'comment', c.id, '', c.body, s.key, c.workspace_id
        FROM comment c JOIN item i ON i.id = c.item_id
        JOIN space s ON s.id = i.space_id`,
 ]
