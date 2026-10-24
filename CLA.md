@@ -35,6 +35,14 @@ You represent that:
 
 Nubisco is not obligated to use or include any Contribution. Except for the representations above, Contributions are provided "AS IS" without warranties of any kind.
 
-## 7. Agreement
+## 7. Open-core context
 
-By opening a pull request and confirming the CLA statement in the pull request template, you accept this Agreement for that Contribution and future Contributions to the Project.
+Acta is open core. Everything outside `packages/ee/` is licensed under the GNU Affero General Public License, version 3 or later. `packages/ee/` is proprietary to Nubisco. By accepting this Agreement you understand that:
+
+- Contributions to the open-source core may also be used in the Enterprise Edition and in Nubisco's hosted service.
+- Contributions to `packages/ee/` are not accepted from outside Nubisco at this time.
+- Nothing in this Agreement reduces the rights you have under the AGPL as a user of the core.
+
+## 8. Agreement
+
+By opening a pull request and confirming the CLA statement in the pull request template, you accept this Agreement for that Contribution and future Contributions to the Project. A CI check refuses a pull request whose CLA confirmation is not ticked.
