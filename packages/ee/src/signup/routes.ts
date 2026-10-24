@@ -38,6 +38,17 @@ import { finishIntent, pendingSignup } from './intent'
 /** Decided by Jose, 2026-10-24: one workspace per account. Above it, sales. */
 export const WORKSPACES_PER_ACCOUNT = 1
 
+/**
+ * Whether strangers may create workspaces here. Off unless ACTA_SIGNUP_OPEN is
+ * "true", so deploying the signup code never opens signup by itself: on the
+ * hosted instance it stays closed until the terms exist (LA-402).
+ */
+export function signupOpen(
+  env: Record<string, string | undefined> = {},
+): boolean {
+  return env.ACTA_SIGNUP_OPEN?.trim() === 'true'
+}
+
 /** The legal documents a creator accepts, when the deployment names them. */
 export interface ITermsConfig {
   version: string
@@ -135,17 +146,21 @@ export function mountSignupRoutes(
   app.get('/api/v1/auth/signup/state', async (c) => {
     const who = await identityOf(c, db)
     const terms = termsConfig(deps.env)
+    const open = signupOpen(deps.env)
     if (!who)
-      return c.json({ identity: null, terms, sales_url: salesUrl() }, 200, {
-        'cache-control': 'no-store',
-      })
+      return c.json(
+        { identity: null, open, terms, sales_url: salesUrl() },
+        200,
+        { 'cache-control': 'no-store' },
+      )
     const owned = await ownedBy(db, who)
     return c.json(
       {
         identity: { email: who.email, name: who.name, source: who.source },
+        open,
         owned,
         cap: WORKSPACES_PER_ACCOUNT,
-        can_create: owned < WORKSPACES_PER_ACCOUNT,
+        can_create: open && owned < WORKSPACES_PER_ACCOUNT,
         terms,
         sales_url: salesUrl(),
       },
@@ -176,6 +191,11 @@ export function mountSignupRoutes(
   })
 
   app.post('/api/v1/auth/signup/workspaces', async (c) => {
+    if (!signupOpen(deps.env))
+      return c.json(
+        { error: 'signup_closed', message: 'Signup is not open yet.' },
+        403,
+      )
     const who = await identityOf(c, db)
     if (!who) return c.json({ error: 'unauthorized' }, 401)
     const parsed = zCreate.safeParse(await c.req.json().catch(() => null))

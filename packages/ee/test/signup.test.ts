@@ -95,7 +95,9 @@ async function instance(
     fetchImpl: idpFetch,
     baseUrl: 'https://acta.test',
     sso,
-    editionEnv: env,
+    // Signup is closed unless a deployment opens it. These tests open it,
+    // except where they say otherwise.
+    editionEnv: { ACTA_SIGNUP_OPEN: 'true', ...env },
   })) as never
 }
 
@@ -449,6 +451,27 @@ describe('signup with the Enterprise Edition', () => {
     )[0]
     expect(row.terms_version).toBe('2026-11')
     expect(row.terms_accepted_at).toBeGreaterThan(0)
+  })
+
+  it('stays closed until ACTA_SIGNUP_OPEN is "true"', async () => {
+    registerEnterpriseEdition(EE_MODULES)
+    const db = await openDb(':memory:')
+    const app = await instance(db, { ACTA_SIGNUP_OPEN: '' })
+    // A stranger is refused at sign-in exactly as without the EE.
+    const res = await signIn(app, 'ana@example.com')
+    expect(res.headers.get('location')).toBe('/login?error=not_a_member')
+    const created = await app.fetch(
+      await post('/api/v1/auth/signup/workspaces', { name: 'One' }, ''),
+    )
+    expect(created.status).toBe(403)
+    expect(await created.json()).toMatchObject({ error: 'signup_closed' })
+    const state = (await (
+      await app.request('https://acta.test/api/v1/auth/signup/state')
+    ).json()) as { open: boolean }
+    expect(state.open).toBe(false)
+    expect(
+      await db.query("SELECT id FROM workspace WHERE slug != 'nubisco'"),
+    ).toHaveLength(0)
   })
 
   it('never takes over a sign-in that has somewhere to go', async () => {

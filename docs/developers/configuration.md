@@ -240,12 +240,13 @@ Read only by the Enterprise Edition's signup (see
 [Authentication](/developers/authentication#hosted-signup-enterprise-edition)).
 A self-hosted build ignores them.
 
-| Variable             | Default | What it does                                                                                 |
-| -------------------- | ------- | -------------------------------------------------------------------------------------------- |
-| `ACTA_TERMS_VERSION` | _unset_ | The terms and privacy version a creator must accept. Unset, signup asks for no acceptance.   |
-| `ACTA_TERMS_URL`     | _unset_ | Where the terms of service are, linked from the signup page.                                 |
-| `ACTA_PRIVACY_URL`   | _unset_ | Where the privacy notice is, linked from the signup page.                                    |
-| `ACTA_SALES_URL`     | _unset_ | Where "Contact sales" points once an account has its one workspace. Unset, no link is shown. |
+| Variable             | Default | What it does                                                                                                                                                   |
+| -------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ACTA_TERMS_VERSION` | _unset_ | The terms and privacy version a creator must accept. Unset, signup asks for no acceptance.                                                                     |
+| `ACTA_TERMS_URL`     | _unset_ | Where the terms of service are, linked from the signup page.                                                                                                   |
+| `ACTA_PRIVACY_URL`   | _unset_ | Where the privacy notice is, linked from the signup page.                                                                                                      |
+| `ACTA_SIGNUP_OPEN`   | _unset_ | `true` lets a person with no workspace create one (Enterprise Edition). Anything else keeps signup closed: strangers are refused at sign-in as without the EE. |
+| `ACTA_SALES_URL`     | _unset_ | Where "Contact sales" points once an account has its one workspace. Unset, no link is shown.                                                                   |
 
 ## Analytics
 

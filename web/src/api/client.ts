@@ -88,6 +88,8 @@ export interface ISignupState {
     name: string
     source: 'session' | 'pending'
   } | null
+  /** Whether strangers may create workspaces here (ACTA_SIGNUP_OPEN). */
+  open?: boolean
   owned?: number
   cap?: number
   can_create?: boolean

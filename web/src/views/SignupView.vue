@@ -22,6 +22,15 @@
         <NbButton variant="secondary" @click="goToSignIn">Sign in</NbButton>
       </template>
 
+      <template v-else-if="phase === 'closed'">
+        <h1 class="type-heading-03">Signup is not open yet</h1>
+        <p class="signup__note">
+          New workspaces cannot be created here yet. If someone invited you,
+          open the link in their invitation.
+        </p>
+        <NbButton variant="secondary" @click="goToSignIn">Sign in</NbButton>
+      </template>
+
       <template v-else-if="phase === 'signed-out'">
         <h1 class="type-heading-03">Create your workspace</h1>
         <p class="signup__note">
@@ -302,7 +311,8 @@ const TEMPLATE_OPTIONS = [
   { value: 'none', label: 'Empty: add your own lists' },
 ]
 
-type TPhase = 'loading' | 'unavailable' | 'signed-out' | 'cap' | 'wizard'
+type TPhase =
+  'loading' | 'unavailable' | 'closed' | 'signed-out' | 'cap' | 'wizard'
 
 const phase = ref<TPhase>('loading')
 const state = ref<ISignupState | null>(null)
@@ -540,6 +550,10 @@ onMounted(async () => {
   } catch (err) {
     error.value = humanise(err)
     phase.value = 'signed-out'
+    return
+  }
+  if (state.value.open === false) {
+    phase.value = 'closed'
     return
   }
   if (!state.value.identity) {

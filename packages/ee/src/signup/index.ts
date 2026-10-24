@@ -13,13 +13,15 @@
 import type { IEeModule } from '../modules'
 import { inactivitySweep } from './inactivity'
 import { startIntent } from './intent'
-import { mountSignupRoutes } from './routes'
+import { mountSignupRoutes, signupOpen } from './routes'
 
 export const signupModule: IEeModule = {
   name: 'signup',
   features: ['signup'],
   mountRoutes: mountSignupRoutes,
   onUnknownSignIn: async (c, identity, deps) => {
+    // Closed: decline, so the core refuses the sign-in exactly as before.
+    if (!signupOpen(deps.env)) return null
     await startIntent(c, deps.db, identity)
     console.log(
       'signup: a vouched-for person with no workspace was sent to /signup',
