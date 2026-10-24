@@ -27,6 +27,12 @@ export interface ISqlDriver {
   transaction<T>(fn: () => Promise<T>): Promise<T>
   /** False when FTS5 is unavailable (search falls back to LIKE). */
   readonly supportsFts: boolean
+  /**
+   * How big the database is, in bytes, or null when the driver cannot say.
+   * D1 has a hard size cap shared by every workspace on it (LA-401), so the
+   * cron watches this.
+   */
+  sizeBytes?(): Promise<number | null>
 }
 
 /**
@@ -247,6 +253,17 @@ export class BunSqliteDriver implements ISqlDriver {
     }
   }
 
+  sizeBytes(): Promise<number | null> {
+    const pages = this.db.query('PRAGMA page_count').get() as {
+      page_count: number
+    } | null
+    const size = this.db.query('PRAGMA page_size').get() as {
+      page_size: number
+    } | null
+    if (!pages || !size) return Promise.resolve(null)
+    return Promise.resolve(pages.page_count * size.page_size)
+  }
+
   close(): void {
     this.db.close()
   }
@@ -409,5 +426,18 @@ export class D1Driver implements ISqlDriver {
 
   transaction<T>(fn: () => Promise<T>): Promise<T> {
     return fn()
+  }
+
+  /**
+   * D1 reports the database size on every result's meta as `size_after`, so
+   * the cheapest statement there is answers it. PRAGMA page_count is not
+   * something D1 promises to allow.
+   */
+  async sizeBytes(): Promise<number | null> {
+    const res = (await this.db.prepare('SELECT 1').run()) as {
+      meta?: { size_after?: number }
+    } | null
+    const size = res?.meta?.size_after
+    return typeof size === 'number' ? size : null
   }
 }
