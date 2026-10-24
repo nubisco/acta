@@ -102,7 +102,11 @@ is theirs, so on its own it never creates a member. Sign-in lands a person:
 1. in the workspace an invitation they are accepting is for, when the address
    they signed in as is the one invited;
 2. otherwise in a workspace they are already a member of;
-3. otherwise nowhere, with `not_a_member`.
+3. otherwise nowhere, with `not_a_member`. On Nubisco's hosted service, which
+   runs the Enterprise Edition, step 3 is signup instead: the person is sent to
+   `/signup` to create a workspace of their own (see
+   [Hosted signup](#hosted-signup-enterprise-edition)). A self-hosted build has
+   no signup and refuses them.
 
 `ACTA_OIDC_AUTO_PROVISION=true` changes step 3: anyone your provider vouches
 for becomes a member of this instance's workspace on first sign-in. It is off by
@@ -165,6 +169,32 @@ and does the same), `GET /api/v1/invitations` and
 `DELETE /api/v1/invitations/:id`, all admin only. The invitee's side is
 `GET /api/v1/auth/invitations/:token` and
 `POST /api/v1/auth/invitations/:token/accept`.
+
+## Hosted signup (Enterprise Edition)
+
+Nubisco's hosted service lets anyone its provider vouches for create a
+workspace. This is Enterprise Edition code (`packages/ee/src/signup`), and a
+self-hosted build has none of it: no `/signup`, no "Create a workspace".
+
+- **Who.** A sign-in that lands nowhere (step 3 above) gets a half-hour signup
+  cookie and goes to `/signup`. The workspace is created for the address the
+  provider proved, never one typed into a form. Someone already signed in can
+  create one from the workspaces page.
+- **How many.** One workspace created per account, counted by the creator's
+  address and provider id, including a workspace scheduled for deletion until
+  it is purged. Above that, the page points at sales (`ACTA_SALES_URL`).
+- **Addresses.** 3 to 40 lowercase letters, digits and hyphens. Every
+  top-level path the app answers on, and names that would pass for Nubisco,
+  are reserved.
+- **Terms.** When `ACTA_TERMS_VERSION` is set, creating a workspace requires
+  accepting that version, and the workspace records it with the time.
+- **Joining.** Signup only ever creates a new workspace. Joining one that
+  exists is still by invitation.
+- **Idle Free workspaces.** Not opened in a browser for 180 days: the admins
+  are emailed. 30 days later: read-only (tokens and agents cannot write, and a
+  person opening it lifts it). 30 days after that: scheduled for deletion, with
+  the usual 30 days to export or cancel. Never applied to paid workspaces or to
+  the instance's own workspace.
 
 ## Removing someone: the provider's webhook is account-wide
 
