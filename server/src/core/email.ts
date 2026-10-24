@@ -243,3 +243,79 @@ export function digestEmail(
 
   return { subject, html, text }
 }
+
+/**
+ * A sender from the environment, or none.
+ *
+ * The same rule as the notification channel (see `channelsFromEnv`): the key
+ * and the From address are required together, with no default address, and
+ * an instance with neither simply sends nothing.
+ */
+export function emailSenderFromEnv(
+  env: Record<string, string | undefined>,
+): TEmailSender | undefined {
+  if (!env.ACTA_RESEND_API_KEY || !env.ACTA_EMAIL_FROM) return undefined
+  return resendSender(env.ACTA_RESEND_API_KEY, env.ACTA_EMAIL_FROM)
+}
+
+/**
+ * The invitation email.
+ *
+ * The one email Acta sends to an address nobody has confirmed, which is why
+ * it says plainly who asked, and that ignoring it is the whole of opting out.
+ * Everything interpolated is escaped: the workspace name and the inviter's
+ * name are both typed by a person.
+ */
+export function invitationEmail(opts: {
+  workspace: string
+  inviter: string
+  acceptUrl: string
+  expiresInDays: number
+}): { subject: string; html: string; text: string } {
+  const subject = `${opts.inviter} invited you to ${opts.workspace} on Acta`
+  const html = `<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /></head>
+  <body style="margin:0;padding:32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;">
+      <tr>
+        <td style="background:#1a1a1a;padding:24px 32px;border-radius:8px 8px 0 0;">
+          <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.3px;">${escapeHtml(opts.workspace)}</span>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#fff;padding:24px 32px 0;">
+          <p style="margin:0;font-size:15px;color:#555;line-height:1.6;">
+            <strong style="color:#111;">${escapeHtml(opts.inviter)}</strong> invited you to join
+            <strong style="color:#111;">${escapeHtml(opts.workspace)}</strong> on Acta.
+          </p>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#fff;padding:24px 32px 32px;">
+          <a href="${escapeHtml(opts.acceptUrl)}"
+             style="display:inline-block;background:#5b4fe0;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-size:14px;font-weight:600;">
+            Accept the invitation
+          </a>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#f7f6f5;padding:16px 32px;border-radius:0 0 8px 8px;border-top:1px solid #e8e7e6;">
+          <p style="margin:0;font-size:12px;color:#999;">
+            The link works for ${opts.expiresInDays} days. If you were not expecting this, ignore it:
+            nothing else will be sent to this address unless you accept.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`
+  const text = [
+    `${opts.inviter} invited you to join ${opts.workspace} on Acta.`,
+    '',
+    `Accept the invitation: ${opts.acceptUrl}`,
+    '',
+    `The link works for ${opts.expiresInDays} days. If you were not expecting this, ignore it: nothing else will be sent to this address unless you accept.`,
+  ].join('\n')
+  return { subject, html, text }
+}

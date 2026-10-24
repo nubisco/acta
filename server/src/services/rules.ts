@@ -10,6 +10,7 @@ import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
 import { emitEvent, onEvent, type IEvent } from '../core/events'
 import { withOp } from '../core/ops'
+import { outboundFetchDeps, safePost, type IFetchDeps } from '../core/safeFetch'
 import type { ISqlDriver } from '../db'
 import { itemWrite } from './items'
 import { matchesPattern } from './webhooks'
@@ -228,7 +229,8 @@ async function itemMatches(
 }
 
 export interface IRulesEngineOptions {
-  fetchImpl?: typeof fetch
+  /** Fetch and resolver behind the SSRF guard, for `call_webhook`. */
+  fetchDeps?: IFetchDeps
 }
 
 /** Subscribe the rules engine to the event stream. Returns an unsubscribe fn. */
@@ -236,7 +238,7 @@ export function startRulesEngine(
   db: ISqlDriver,
   opts: IRulesEngineOptions = {},
 ): () => void {
-  const fetchImpl = opts.fetchImpl ?? fetch
+  const fetchDeps = opts.fetchDeps ?? outboundFetchDeps()
 
   return onEvent(async (event) => {
     // Loop guard (design-spec §6): actions caused by a rule never re-trigger.
@@ -268,7 +270,7 @@ export function startRulesEngine(
         )
           continue
       }
-      await executeRule(db, rule, event, fetchImpl)
+      await executeRule(db, rule, event, fetchDeps)
     }
   })
 }
@@ -277,7 +279,7 @@ async function executeRule(
   db: ISqlDriver,
   rule: { id: string; name: string; action: string },
   event: IEvent,
-  fetchImpl: typeof fetch,
+  fetchDeps: IFetchDeps,
 ): Promise<void> {
   const system = (
     await db.query<{ id: string; handle: string }>(
@@ -337,8 +339,10 @@ async function executeRule(
       await itemWrite(ctx, [{ op: 'complete', op_id: opId, key }])
       break
     case 'call_webhook':
-      void fetchImpl(action.url, {
-        method: 'POST',
+      // Through the SSRF guard, like every outbound webhook: the URL is typed
+      // in by a workspace admin, and on a shared instance that is a stranger
+      // asking our server to POST somewhere inside our network.
+      void safePost(action.url, fetchDeps, {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           rule: rule.name,

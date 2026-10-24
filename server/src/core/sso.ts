@@ -16,7 +16,10 @@ export interface ISsoConfig {
   issuer: string
   authorizeUrl: string
   appId: string
-  /** Create members on first login (the IdP gates who gets a token). */
+  /**
+   * Create members on first login. Off unless the instance opts in, because
+   * the provider only says who someone is, never which workspace is theirs.
+   */
   autoProvision: boolean
   /** Shown on the sign-in button. */
   label: string
@@ -32,7 +35,11 @@ export function ssoConfigFromEnv(
     issuer,
     appId,
     authorizeUrl: env.ACTA_SSO_AUTHORIZE_URL ?? `${issuer}/api/auth/sso`,
-    autoProvision: env.ACTA_SSO_AUTO_PROVISION !== 'false',
+    // Opt-in (LA-397). A valid token says who someone is, not which
+    // workspace they belong to, and on an instance whose provider lets
+    // anyone sign up, "on" puts every stranger inside this instance's own
+    // workspace. Off, people join by invitation.
+    autoProvision: env.ACTA_SSO_AUTO_PROVISION === 'true',
     label: env.ACTA_SSO_LABEL ?? 'single sign-on',
   }
 }

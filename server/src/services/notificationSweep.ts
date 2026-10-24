@@ -21,6 +21,7 @@ import { withOp } from '../core/ops'
 import { now, type ICtx } from '../core/ctx'
 import type { ISqlDriver } from '../db'
 import { digestEmail, resendSender, type TEmailSender } from '../core/email'
+import { DIGEST_EMAILS_PER_DAY, takeEmailQuota } from '../core/emailQuota'
 
 /** How far ahead a due date starts being worth mentioning. */
 const DUE_SOON_MS = 24 * 60 * 60 * 1000
@@ -94,6 +95,11 @@ export interface ISweepOptions {
   baseUrl?: string
   /** Overridable in tests, so a sweep can be run at a chosen instant. */
   nowMs?: number
+  /**
+   * Digests one workspace may send per UTC day. Past it, reminders are
+   * stamped without being sent: the bell still has every one of them.
+   */
+  dailyEmailCap?: number
 }
 
 function systemCtx(
@@ -252,15 +258,32 @@ export async function reminderSweep(
       await db.query<{
         name: string
         email: string | null
+        email_confirmed_at: number | null
+        workspace_id: string
         workspace: string
         workspace_slug: string | null
       }>(
-        `SELECT a.name, a.email, w.name AS workspace, w.slug AS workspace_slug
+        `SELECT a.name, a.email, a.email_confirmed_at, w.id AS workspace_id,
+                w.name AS workspace, w.slug AS workspace_slug
            FROM actor a JOIN workspace w ON w.id = a.workspace_id
-          WHERE a.id = ? AND a.disabled = 0`,
+          WHERE a.id = ? AND a.disabled = 0 AND w.suspended_at IS NULL`,
         [actorId],
       )
     )[0]
+    // Mail goes only to an address its owner has proved (LA-397), and only
+    // while the workspace is inside its daily cap. Either way the channel
+    // sees no address and declines, and the bell keeps the notification.
+    const mayEmail =
+      person !== undefined &&
+      person.email !== null &&
+      person.email_confirmed_at !== null &&
+      (await takeEmailQuota(
+        db,
+        person.workspace_id,
+        'digest',
+        opts.dailyEmailCap ?? DIGEST_EMAILS_PER_DAY,
+        ts,
+      ))
     // Disabled since the notification was written, or never reachable.
     // Stamping them anyway is deliberate: leaving the rows pending would
     // have every sweep from now until they come back re-select the same
@@ -269,7 +292,7 @@ export async function reminderSweep(
       ? {
           id: actorId,
           name: person.name,
-          email: person.email,
+          email: mayEmail ? person.email : null,
           workspace: person.workspace,
           workspaceSlug: person.workspace_slug,
           baseUrl: opts.baseUrl ?? '',

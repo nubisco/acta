@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS workspace (
   -- cards are per space, and a counter rather than MAX()+1 so a deleted
   -- goal's number is never handed to a different goal. See ADDITIVE_COLUMNS.
   next_goal_seq INTEGER NOT NULL DEFAULT 1,
+  -- Set by an operator to shut a workspace (abuse, an acceptable-use breach).
+  -- Every authenticated request into it is refused while it is set, and
+  -- nothing is deleted. See ADDITIVE_COLUMNS for existing databases.
+  suspended_at INTEGER,
   created_at INTEGER NOT NULL
 );
 
@@ -57,6 +61,11 @@ CREATE TABLE IF NOT EXISTS actor (
   -- failure people actually report is missing the thing, not being told
   -- twice. See ADDITIVE_COLUMNS for existing databases.
   notify_after_seconds INTEGER NOT NULL DEFAULT 600,
+  -- When this person proved they own their email address: a provider vouched
+  -- for it at sign-in, a one-time code sent to it was entered, or an
+  -- invitation sent to it was accepted. Null means nobody has, and nothing is
+  -- emailed to an address in that state. See ADDITIVE_COLUMNS.
+  email_confirmed_at INTEGER,
   created_at INTEGER NOT NULL,
   UNIQUE (workspace_id, handle)
 );
@@ -90,6 +99,9 @@ CREATE TABLE IF NOT EXISTS oauth_client (
   -- JSON array. Matched exactly at authorize time; a prefix match is how open
   -- redirects are born.
   redirect_uris TEXT NOT NULL,
+  -- When a code was first issued to it. Registration is open to anyone, so a
+  -- client never used within a few days is pruned. See ADDITIVE_COLUMNS.
+  used_at INTEGER,
   created_at INTEGER NOT NULL
 );
 
@@ -122,6 +134,43 @@ CREATE TABLE IF NOT EXISTS oauth_token (
   rotated_at INTEGER,
   last_used_at INTEGER,
   revoked_at INTEGER
+);
+
+-- Invitations into a workspace. A person is only a member once they accept,
+-- which proves the address is theirs: by signing in through the provider as
+-- that address, or by following a link that was only ever sent to it. Until
+-- then they are not an actor, cannot be mentioned or assigned, and are sent
+-- nothing but the invitation itself.
+CREATE TABLE IF NOT EXISTS invitation (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  email TEXT NOT NULL,
+  handle TEXT NOT NULL,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
+  -- The secret in the link, hashed like every other credential here.
+  token_hash TEXT NOT NULL UNIQUE,
+  invited_by TEXT NOT NULL REFERENCES actor(id),
+  -- Whether the invitation email went out. False when the instance has no
+  -- email configured or the workspace hit its daily cap.
+  emailed INTEGER NOT NULL DEFAULT 0,
+  expires_at INTEGER NOT NULL,
+  accepted_at INTEGER,
+  accepted_actor_id TEXT REFERENCES actor(id),
+  revoked_at INTEGER,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_invitation_ws ON invitation(workspace_id, created_at);
+
+-- How many emails of a kind one workspace has sent on one UTC day. The cap is
+-- what keeps a workspace on a shared instance from becoming a way to send
+-- mail from our domain to addresses of its choosing.
+CREATE TABLE IF NOT EXISTS email_quota (
+  workspace_id TEXT NOT NULL REFERENCES workspace(id),
+  day TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (workspace_id, day, kind)
 );
 
 CREATE TABLE IF NOT EXISTS otp_challenge (
@@ -1058,4 +1107,25 @@ export const ADDITIVE_COLUMNS = [
   // every card in a space, and a card's activity tail and reopening a card
   // read it for one. Until this, each of those scanned the whole event table.
   'CREATE INDEX IF NOT EXISTS idx_event_entity ON event(entity_id)',
+  // LA-397, the isolation gate. An operator's switch to shut a workspace.
+  'ALTER TABLE workspace ADD COLUMN suspended_at INTEGER',
+  // Whether the address on an actor has been proved. Existing people who have
+  // ever signed in have proved it (through the provider, which binds
+  // platform_user_id, or with a code, which mints a session), so they are
+  // backfilled. Anyone an admin typed in who never came is left unconfirmed
+  // and gets no email until they sign in. Safe to re-run: every sign-in path
+  // now stamps the column itself.
+  'ALTER TABLE actor ADD COLUMN email_confirmed_at INTEGER',
+  `UPDATE actor SET email_confirmed_at = created_at
+    WHERE email_confirmed_at IS NULL AND kind = 'human'
+      AND (platform_user_id IS NOT NULL
+           OR EXISTS (SELECT 1 FROM auth_token t
+                       WHERE t.actor_id = actor.id AND t.kind = 'session'))`,
+  // When an OAuth client was first used. Clients that already have a code or a
+  // token count as used, so pruning never removes a working connector.
+  'ALTER TABLE oauth_client ADD COLUMN used_at INTEGER',
+  `UPDATE oauth_client SET used_at = created_at
+    WHERE used_at IS NULL
+      AND (EXISTS (SELECT 1 FROM oauth_code c WHERE c.client_id = oauth_client.id)
+           OR EXISTS (SELECT 1 FROM oauth_token t WHERE t.client_id = oauth_client.id))`,
 ]

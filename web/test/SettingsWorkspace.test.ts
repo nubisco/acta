@@ -15,9 +15,15 @@ const setWorkspacePolicy = vi.fn(async () => ({ comment_delete: 'admin' }))
 const me = vi.fn()
 
 vi.mock('@/api/client', () => ({
-  api: { overview, setWorkspacePolicy },
+  api: {
+    overview,
+    setWorkspacePolicy,
+    // People lists pending invitations for an admin.
+    invitations: async () => ({ invitations: [], emails_left_today: 20 }),
+  },
   auth: { me },
   getWorkspaceSlug: () => 'nubisco',
+  ApiHttpError: class extends Error {},
 }))
 
 // The tab is read from and written to the URL.

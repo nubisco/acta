@@ -10,6 +10,7 @@ import {
   resolveToken,
   sha256Hex,
   workspaceBySlug,
+  workspaceSuspended,
   workspacesForEmail,
   type TOtpSender,
 } from '../core/auth'
@@ -20,6 +21,11 @@ import { acceptedPicture, isNubiscoPlatform } from '../core/avatar'
 import { OidcClient, type IOidcConfig } from '../core/oidc'
 import { resolveOauthToken } from '../core/oauth'
 import type { ISqlDriver } from '../db'
+import {
+  acceptInvitation,
+  invitationByToken,
+  publicView,
+} from '../services/invitations'
 
 const SESSION_COOKIE = 'acta_session'
 const SESSION_TTL = 30 * 24 * 3600 * 1000
@@ -78,13 +84,34 @@ export function safeReturnPath(raw: string | undefined): string | null {
 const OIDC_HANDSHAKE_COOKIE = 'acta_oidc_handshake'
 
 /**
+ * Set when someone presses Accept on an invitation and is sent to the
+ * provider to prove who they are. The callback reads it to know which
+ * invitation the sign-in is for. Only the token, never anything the callback
+ * trusts on its own: the invitation is looked up and the provider's email
+ * must match it.
+ */
+const INVITE_COOKIE = 'acta_invite'
+
+/**
  * Everything after "who is this": map the claims to a workspace member,
- * provision one if the instance allows it, and mint the session.
+ * accept an invitation if this sign-in carries one, and mint the session.
  *
  * Shared by both provider modes deliberately. The difference between a JWT
  * handed over in the query and one fetched through a code exchange ends at
  * the claims; if provisioning drifted between the two, an instance would get
  * different roles depending on how its provider happened to be wired.
+ *
+ * Who gets in (LA-397). A valid token from the provider says who someone is,
+ * not which workspace they belong to, so it is never enough on its own to
+ * create a member:
+ *
+ *  1. An invitation carried by this sign-in, for this email, is accepted.
+ *  2. Otherwise an existing member with this email signs in, preferring the
+ *     instance's own workspace, then the oldest they belong to.
+ *  3. Otherwise nobody is created, unless the instance opted in with
+ *     ACTA_OIDC_AUTO_PROVISION / ACTA_SSO_AUTO_PROVISION=true (off by
+ *     default), or the instance's workspace has no administrator at all yet,
+ *     which is a fresh install's first sign-in and nothing else.
  */
 async function signInWithClaims(
   c: Context<IAuthEnv>,
@@ -93,16 +120,62 @@ async function signInWithClaims(
   issuer?: string,
 ): Promise<Response> {
   const db = c.get('db')
-  const workspaceId = c.get('workspaceId')
-  let member = (
-    await db.query<{ id: string; disabled: number }>(
-      "SELECT id, disabled FROM actor WHERE workspace_id = ? AND email = ? AND kind = 'human'",
-      [workspaceId, claims.email],
-    )
-  )[0]
-  if (member?.disabled === 1) return c.redirect('/login?error=disabled')
+  const bootWorkspaceId = c.get('workspaceId')
+  let workspaceId = bootWorkspaceId
+  let member: { id: string; disabled: number } | undefined
+  // Where to land: the workspace just joined, when this sign-in accepted an
+  // invitation, otherwise wherever the person was going.
+  let landing: string | null = null
+
+  const inviteToken = getCookie(c, INVITE_COOKIE)
+  if (inviteToken) {
+    deleteCookie(c, INVITE_COOKIE, { path: '/' })
+    const accepted = await acceptInvitation(db, inviteToken, claims.email)
+    if (!accepted.ok) {
+      return c.redirect(`/login?error=invite_${accepted.reason}`)
+    }
+    workspaceId = accepted.workspace.id
+    member = { id: accepted.actorId, disabled: 0 }
+    landing = `/${accepted.workspace.slug}`
+  }
+
   if (!member) {
-    if (!autoProvision) return c.redirect('/login?error=not_a_member')
+    // Enabled rows first, the instance's own workspace before any other, then
+    // the oldest. A person disabled here but a member elsewhere still gets in
+    // elsewhere, and only someone disabled everywhere is told so.
+    const found = (
+      await db.query<{ id: string; disabled: number; workspace_id: string }>(
+        `SELECT id, disabled, workspace_id FROM actor
+          WHERE lower(email) = lower(?) AND kind = 'human'
+          ORDER BY disabled ASC, (workspace_id = ?) DESC, created_at ASC
+          LIMIT 1`,
+        [claims.email, bootWorkspaceId],
+      )
+    )[0]
+    if (found?.disabled === 1) return c.redirect('/login?error=disabled')
+    if (found) {
+      member = found
+      workspaceId = found.workspace_id
+    }
+  }
+
+  if (!member) {
+    // An instance that delegates identity to a provider seeds no admin of its
+    // own (see bootstrap), so without this the first person to sign in to a
+    // fresh install could never get in, and nothing could ever be
+    // administered. Only ever promotes into a vacuum: the moment one admin
+    // exists this is inert, so it cannot be used to join, let alone escalate
+    // on, an established workspace. Operators of a shared instance close even
+    // that window by setting ACTA_ADMIN_EMAIL.
+    const admins = await db.query(
+      `SELECT id FROM actor
+        WHERE workspace_id = ? AND kind = 'human' AND role = 'admin'
+              AND disabled = 0 LIMIT 1`,
+      [workspaceId],
+    )
+    const firstAdmin = admins.length === 0
+    if (!autoProvision && !firstAdmin)
+      return c.redirect('/login?error=not_a_member')
     const id = newId('act')
     const base = claims.email
       .split('@')[0]
@@ -114,19 +187,6 @@ async function signInWithClaims(
       [workspaceId, base],
     )
     const handle = clash.length > 0 ? `${base}-${id.slice(-4)}` : base
-    // An instance that delegates identity to a provider seeds no admin of its
-    // own (see bootstrap), so without this the first person to sign in to a
-    // fresh install becomes a member of a workspace that has no
-    // administrator, and nothing can ever be administered. Only ever promotes
-    // into a vacuum: the moment one admin exists this is inert, so it cannot
-    // be used to escalate on an established workspace.
-    const admins = await db.query(
-      `SELECT id FROM actor
-        WHERE workspace_id = ? AND kind = 'human' AND role = 'admin'
-              AND disabled = 0 LIMIT 1`,
-      [workspaceId],
-    )
-    const firstAdmin = admins.length === 0
     await db.run(
       `INSERT INTO actor (id, workspace_id, kind, handle, name, email, role, created_at)
        VALUES (?, ?, 'human', ?, ?, ?, ?, ?)`,
@@ -169,6 +229,13 @@ async function signInWithClaims(
     flushPendingEvents()
     member = { id, disabled: 0 }
   }
+  // The provider vouched for this address just now, so it is confirmed and
+  // may be emailed. Kept on first confirmation, never moved.
+  await db.run(
+    `UPDATE actor SET email_confirmed_at = ?
+      WHERE id = ? AND email_confirmed_at IS NULL`,
+    [now(), member.id],
+  )
   // Bind the provider's own id for this person. Email is how the member was
   // found above and is a poor key afterwards: the platform's webhooks name a
   // user by id, and an email address can change.
@@ -216,7 +283,7 @@ async function signInWithClaims(
     path: '/',
     maxAge: SESSION_TTL / 1000,
   })
-  const ret = safeReturnPath(getCookie(c, SSO_RETURN_COOKIE))
+  const ret = landing ?? safeReturnPath(getCookie(c, SSO_RETURN_COOKIE))
   deleteCookie(c, SSO_RETURN_COOKIE, { path: '/' })
   return c.redirect(ret ?? '/', 302)
 }
@@ -489,6 +556,12 @@ export function authRoutes(
         [workspaceId, body.email],
       )
     )[0]
+    // A code sent to this address was just entered, which proves it.
+    await db.run(
+      `UPDATE actor SET email_confirmed_at = ?
+        WHERE id = ? AND email_confirmed_at IS NULL`,
+      [now(), actor.id],
+    )
     const token = await createToken(
       db,
       workspaceId,
@@ -505,6 +578,77 @@ export function authRoutes(
       maxAge: SESSION_TTL / 1000,
     })
     return c.json({ ok: true })
+  })
+
+  /**
+   * Invitations, from the invitee's side. Public: the person holding the link
+   * is not a member of anything yet. The token is the only key, and it says
+   * no more than the email already did.
+   */
+  app.get('/invitations/:token', async (c) => {
+    const inv = await invitationByToken(c.get('db'), c.req.param('token'))
+    if (!inv) return c.json({ error: 'invitation not found' }, 404)
+    return c.json({
+      ...publicView(inv),
+      // How accepting proves who you are, so the page can say so.
+      proof: sso ? 'provider' : 'link',
+    })
+  })
+
+  /**
+   * Accept. A POST behind a button, never the GET of the link: mail scanners
+   * fetch every link in a message, and an invitation that accepted itself
+   * when a scanner looked at it would prove nothing.
+   */
+  app.post('/invitations/:token/accept', async (c) => {
+    const db = c.get('db')
+    const token = c.req.param('token')
+    const inv = await invitationByToken(db, token)
+    if (!inv) return c.json({ error: 'invitation not found' }, 404)
+    if (inv.status === 'revoked' || inv.status === 'expired')
+      return c.json({ error: `this invitation has ${inv.status}` }, 410)
+
+    if (sso) {
+      // The provider proves the address: remember which invitation this is
+      // and send them through it. The callback does the rest.
+      setCookie(c, INVITE_COOKIE, token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'Lax',
+        path: '/',
+        maxAge: 600,
+      })
+      return c.json({ next: '/api/v1/auth/sso/start' })
+    }
+
+    // No provider: the link was only ever sent to the invited address, so
+    // holding it is the proof. Once only, though. An accepted link that kept
+    // signing people in would be a password that never expires.
+    if (inv.status === 'accepted')
+      return c.json(
+        { error: 'this invitation was already accepted; sign in with a code' },
+        409,
+      )
+    const accepted = await acceptInvitation(db, token, inv.row.email)
+    if (!accepted.ok) return c.json({ error: accepted.reason }, 409)
+    const session = await createToken(
+      db,
+      accepted.workspace.id,
+      accepted.actorId,
+      'session',
+      accepted.role === 'admin'
+        ? ['read', 'write', 'admin']
+        : ['read', 'write'],
+      SESSION_TTL,
+    )
+    setCookie(c, SESSION_COOKIE, session, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: SESSION_TTL / 1000,
+    })
+    return c.json({ next: `/${accepted.workspace.slug}` })
   })
 
   app.post('/logout', async (c) => {
@@ -815,11 +959,12 @@ export function requireAuth(
       }
       return c.json({ error: 'unauthorized' }, 401)
     }
+    if (await workspaceSuspended(db, authed.workspaceId))
+      return c.json({ error: 'workspace suspended' }, 403)
     c.set('actor', authed)
     // Without a workspace segment the request means "the one the token was
     // minted in", which keeps the unprefixed endpoints working.
     c.set('workspaceId', authed.workspaceId)
-    void db
     await next()
   }
 }
@@ -894,6 +1039,10 @@ export function requireWorkspace(): MiddlewareHandler<IAuthEnv> {
 
     const actor = await actorInWorkspace(db, authed, workspace.id)
     if (!actor) return c.json({ error: 'workspace not found' }, 404)
+    // After the membership check, so a stranger cannot learn that a
+    // workspace exists by being told it is suspended.
+    if (workspace.suspended_at !== null)
+      return c.json({ error: 'workspace suspended' }, 403)
 
     c.set('actor', actor)
     c.set('workspaceId', workspace.id)

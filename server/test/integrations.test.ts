@@ -44,6 +44,9 @@ beforeEach(async () => {
     bootstrap: { adminEmail: 'jose@nubisco.io', adminHandle: 'jose' },
     dataDir: `/tmp/acta-test-${Math.random().toString(36).slice(2)}`,
     fetchImpl: fakeFetch(),
+    // Every hook URL in these tests is a public name that resolves nowhere,
+    // so the SSRF guard is given a public address to find.
+    outboundResolve: async () => ['93.184.216.34'],
     webhookBackoffMs: 1,
     baseUrl: 'https://acta.example',
   })) as never

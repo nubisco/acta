@@ -5,6 +5,12 @@ import { ApiError, now } from '../core/ctx'
 import { defer } from '../core/defer'
 import { emitEvent, onEvent, type IEvent } from '../core/events'
 import { withOp } from '../core/ops'
+import {
+  outboundFetchDeps,
+  safePost,
+  UrlRefused,
+  type IFetchDeps,
+} from '../core/safeFetch'
 import type { ISqlDriver } from '../db'
 import { slackPayload, type ISlackContext } from './slack'
 
@@ -165,7 +171,12 @@ const MAX_ATTEMPTS = 3
 const DISABLE_AFTER = 10
 
 export interface IDispatcherOptions {
-  fetchImpl?: typeof fetch
+  /**
+   * Fetch and resolver behind the SSRF guard. Every delivery goes through
+   * `safePost`, so a hook pointed at 127.0.0.1, the metadata address or a name
+   * that resolves into a private range is refused before a socket is opened.
+   */
+  fetchDeps?: IFetchDeps
   /** Backoff between attempts, ms. Overridable for tests. */
   backoffMs?: number
   /** Acta's public address, so Slack messages can link back to a card. */
@@ -224,7 +235,7 @@ export function startWebhookDispatcher(
   db: ISqlDriver,
   opts: IDispatcherOptions = {},
 ): () => void {
-  const fetchImpl = opts.fetchImpl ?? fetch
+  const fetchDeps = opts.fetchDeps ?? outboundFetchDeps()
   const backoffMs = opts.backoffMs ?? 2000
 
   return onEvent(async (event) => {
@@ -257,7 +268,7 @@ export function startWebhookDispatcher(
       ? await slackContextFor(db, event, opts.baseUrl)
       : {}
     for (const hook of matching) {
-      defer(deliver(db, hook, event, fetchImpl, backoffMs, context))
+      defer(deliver(db, hook, event, fetchDeps, backoffMs, context))
     }
   })
 }
@@ -266,7 +277,7 @@ async function deliver(
   db: ISqlDriver,
   hook: { id: string; url: string; secret: string | null; format?: string },
   event: IEvent,
-  fetchImpl: typeof fetch,
+  fetchDeps: IFetchDeps,
   backoffMs: number,
   slack: ISlackContext = {},
 ): Promise<void> {
@@ -299,12 +310,15 @@ async function deliver(
   let attempts = 0
   for (attempts = 1; attempts <= MAX_ATTEMPTS; attempts++) {
     try {
-      const res = await fetchImpl(hook.url, { method: 'POST', headers, body })
+      const res = await safePost(hook.url, fetchDeps, { headers, body })
       status = res.status
       if (res.ok) break
       lastError = `http ${res.status}`
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err)
+      // A refused address is refused every time. Retrying it only spends
+      // the backoff, so the delivery fails now and says why.
+      if (err instanceof UrlRefused) break
     }
     if (attempts < MAX_ATTEMPTS)
       await new Promise((r) => setTimeout(r, backoffMs * attempts))

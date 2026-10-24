@@ -439,6 +439,54 @@ export async function safeFetchBytes(
 }
 
 /**
+ * POST a body to a user-supplied URL, or throw `UrlRefused`.
+ *
+ * For outbound webhooks and the rule action that calls one. Those URLs are
+ * typed in by a workspace admin, which on a shared hosted instance means a
+ * stranger, and a POST from inside our network to an address of their choosing
+ * is the same SSRF sink as a link preview with a body attached. So the same
+ * rules apply: http and https only, no credentials in the URL, the hostname
+ * resolved and every address checked, and a wall-time cap.
+ *
+ * Redirects are NOT followed. A webhook receiver answers; it does not send us
+ * somewhere else, and re-POSTing a payload to wherever a 307 points is exactly
+ * the hop the address check exists to stop. A 3xx is reported as the status it
+ * is, which the caller records as a failed delivery.
+ *
+ * The response body is never read: a receiver's reply is not ours to buffer,
+ * and the status is all a delivery log needs.
+ */
+export async function safePost(
+  raw: string,
+  deps: IFetchDeps,
+  init: { headers: Record<string, string>; body: string },
+): Promise<{ status: number; ok: boolean }> {
+  const url = await assertPublicUrl(raw, deps)
+  const controller = new AbortController()
+  const timer = setTimeout(
+    () => controller.abort(),
+    deps.timeoutMs ?? WEBHOOK_TIMEOUT_MS,
+  )
+  try {
+    const res = await deps.fetch(url.toString(), {
+      method: 'POST',
+      redirect: 'manual',
+      signal: controller.signal,
+      headers: init.headers,
+      body: init.body,
+    })
+    // Release the connection without reading what came back.
+    await res.body?.cancel().catch(() => {})
+    return { status: res.status, ok: res.status >= 200 && res.status < 300 }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** Wall time for one webhook delivery attempt. Receivers should answer fast. */
+export const WEBHOOK_TIMEOUT_MS = 10_000
+
+/**
  * The body, up to `maxBytes`, then stop reading.
  *
  * Reading the stream rather than calling `res.arrayBuffer()`, because that has
@@ -541,4 +589,19 @@ async function resolveOverHttps(hostname: string): Promise<string[]> {
 /** The deps a real request uses. Tests pass their own. */
 export function realFetchDeps(): IFetchDeps {
   return { fetch, resolve: defaultResolve }
+}
+
+/**
+ * The deps for outbound deliveries (webhooks, rule actions).
+ *
+ * `fetch` is bound to globalThis because these deps are called as
+ * `deps.fetch(...)`, and workerd refuses to run its global fetch with any
+ * `this` but globalThis ("Illegal invocation"). See JwksVerifier in sso.ts for
+ * the evening that cost.
+ */
+export function outboundFetchDeps(
+  fetchImpl: typeof fetch = globalThis.fetch,
+  resolve: (hostname: string) => Promise<string[]> = defaultResolve,
+): IFetchDeps {
+  return { fetch: fetchImpl.bind(globalThis), resolve }
 }

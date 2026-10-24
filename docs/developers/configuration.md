@@ -28,20 +28,35 @@ no admin is seeded, and the first person the provider vouches for becomes the
 administrator of the empty workspace. That promotion only ever happens into a
 vacuum, so it cannot be used to escalate later.
 
+On an instance whose provider lets anyone sign up, set `ACTA_ADMIN_EMAIL`
+anyway. It closes even that first-run window, so the first stranger through the
+door cannot become the administrator of the instance's own workspace.
+
 ## Identity
 
 See [Authentication](/developers/authentication) for the whole picture.
 
 ### OpenID Connect (recommended)
 
-| Variable                   | Default                | What it does                                                                             |
-| -------------------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
-| `ACTA_OIDC_ISSUER`         | _unset_                | Your provider's issuer URL. Setting this and a client id turns OIDC on.                  |
-| `ACTA_OIDC_CLIENT_ID`      | _unset_                | The client you registered for Acta.                                                      |
-| `ACTA_OIDC_CLIENT_SECRET`  | _unset_                | Omit for a public client; PKCE still protects the exchange.                              |
-| `ACTA_OIDC_SCOPES`         | `openid email profile` | `email` is not optional: the email is how a token becomes a member.                      |
-| `ACTA_OIDC_AUTO_PROVISION` | `true`                 | Create a member on first sign-in. Set `false` to require that members are invited first. |
-| `ACTA_OIDC_LABEL`          | `single sign-on`       | What the sign-in button calls your provider, e.g. `Okta`.                                |
+| Variable                   | Default                | What it does                                                                    |
+| -------------------------- | ---------------------- | ------------------------------------------------------------------------------- |
+| `ACTA_OIDC_ISSUER`         | _unset_                | Your provider's issuer URL. Setting this and a client id turns OIDC on.         |
+| `ACTA_OIDC_CLIENT_ID`      | _unset_                | The client you registered for Acta.                                             |
+| `ACTA_OIDC_CLIENT_SECRET`  | _unset_                | Omit for a public client; PKCE still protects the exchange.                     |
+| `ACTA_OIDC_SCOPES`         | `openid email profile` | `email` is not optional: the email is how a token becomes a member.             |
+| `ACTA_OIDC_AUTO_PROVISION` | `false`                | Set `true` to create a member on first sign-in. Off, people join by invitation. |
+| `ACTA_OIDC_LABEL`          | `single sign-on`       | What the sign-in button calls your provider, e.g. `Okta`.                       |
+
+::: warning Auto-provisioning is off by default
+Until release 1.57 it was on. A provider token says who someone is, never which
+workspace is theirs, so "on" adds everyone the provider will sign in to this
+instance's own workspace, as a member, with access to every space. Turn it on
+only when your provider already restricts who can sign in to Acta, and never on
+an instance whose provider lets anyone sign up. An instance that relied on the
+old default must now set `ACTA_OIDC_AUTO_PROVISION=true` (or
+`ACTA_SSO_AUTO_PROVISION=true`) to keep behaving as it did, or invite people
+instead.
+:::
 
 ### One-time codes
 
@@ -68,7 +83,7 @@ have; prefer OIDC for anything new, and note that OIDC wins if both are set.
 | `ACTA_SSO_ISSUER`         | _unset_                  | Issuer, also where the JWKS is fetched from.       |
 | `ACTA_SSO_APP_ID`         | _unset_                  | The app identifier sent to the authorize endpoint. |
 | `ACTA_SSO_AUTHORIZE_URL`  | `${issuer}/api/auth/sso` | Where to send the browser.                         |
-| `ACTA_SSO_AUTO_PROVISION` | `true`                   | As above.                                          |
+| `ACTA_SSO_AUTO_PROVISION` | `false`                  | As above.                                          |
 | `ACTA_SSO_LABEL`          | `single sign-on`         | As above.                                          |
 
 ### Provider webhooks
@@ -102,6 +117,35 @@ On Cloudflare Workers this is a secret, not a var:
 wrangler secret put PLATFORM_WEBHOOK_SECRET
 ```
 
+## Rate limits
+
+Acta limits requests per caller on the routes that can be flooded. The numbers
+live in `RATE_LIMITS` in `server/src/core/rateLimit.ts`.
+
+| Surface                                                   | Counted by               | Limit        |
+| --------------------------------------------------------- | ------------------------ | ------------ |
+| `POST /mcp`                                               | credential               | 240 a minute |
+| Writes under `/api/v1` (`POST`, `PUT`, `PATCH`, `DELETE`) | credential, else address | 300 a minute |
+| `POST /api/v1/ingest/:token`                              | address                  | 30 a minute  |
+| `POST /oauth/register`                                    | address                  | 5 a minute   |
+| Sign-in codes and invitation acceptance                   | address                  | 20 a minute  |
+
+Over the limit, the answer is `429` with `Retry-After`. An MCP tool call gets a
+normal result with `isError: true` and a sentence the agent can act on instead,
+because most MCP clients treat a bare 429 as a dead connection. Provider
+webhooks (`/api/v1/hooks`, `/api/v1/platform`) are not limited: they are
+signature-authenticated and arrive in bursts.
+
+- **On Cloudflare** each limit is a native `[[ratelimits]]` binding in
+  `server/wrangler.toml` (`ACTA_MCP_LIMITER`, `ACTA_WRITE_LIMITER`,
+  `ACTA_INGEST_LIMITER`, `ACTA_OAUTH_REGISTER_LIMITER`, `ACTA_AUTH_LIMITER`),
+  counted at the edge per location with no storage cost. The numbers there
+  must match `RATE_LIMITS`, and a test compares the two. A missing binding
+  falls back to a counter inside the isolate rather than to no limit.
+- **On Bun or Docker** the same numbers are counted in the process. Nothing
+  to configure. Behind a reverse proxy, make sure it sets `X-Forwarded-For`,
+  or every caller shares one address.
+
 ## Notification email
 
 Acta tells people about work they are part of in the bell. If a notification
@@ -133,6 +177,20 @@ On Cloudflare Workers the key is a secret, not a var:
 ```sh
 wrangler secret put ACTA_RESEND_API_KEY
 ```
+
+### Who is emailed, and how much
+
+Email goes only to people who have proved their address: by signing in through
+the provider, by entering a one-time code sent to it, or by accepting an
+invitation sent to it. Somebody who exists only because an admin typed their
+address in never gets a digest. The one email an unproved address ever receives
+is the invitation itself.
+
+Each workspace also has a daily allowance per UTC day: 20 invitation emails and
+300 digests (`server/src/core/emailQuota.ts`). Past it, an invitation is
+refused with a message saying so, and a digest is skipped while the
+notifications stay in the bell. On a shared instance this is what stops one
+workspace from spending every other workspace's sender reputation.
 
 ### The sweep
 
