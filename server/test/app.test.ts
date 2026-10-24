@@ -55,6 +55,7 @@ describe('server skeleton', () => {
       nubisco_platform: false,
       // Self-serve signup is an EE feature, and no EE is registered.
       signup: false,
+      plans: false,
     })
 
     const otp = await app.request('/api/v1/auth/otp', {

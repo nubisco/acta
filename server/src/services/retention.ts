@@ -27,6 +27,7 @@
  * so the next tick carries on where it stopped.
  */
 
+import { currentEdition } from '../core/edition'
 import { ulid } from '@nubisco/acta-shared'
 import type { ISqlDriver } from '../db'
 import { now } from '../core/ctx'
@@ -53,15 +54,16 @@ export const DEFAULT_HISTORY_DAYS = 90
 /**
  * How many days of activity a workspace keeps.
  *
- * One function so the plans card (LA-399) has one place to answer from: Free
- * keeps 90 days and Team a year. Until plans exist every workspace gets the
- * default, which is the Free window.
+ * The plans module (LA-399) answers through the edition: Free keeps 90 days
+ * and Team a year. The core edition, and a workspace the edition has no
+ * answer for, keep the default, which is the Free window.
  */
-export function retentionDaysFor(
-  _db: ISqlDriver,
-  _workspaceId: string,
+export async function retentionDaysFor(
+  db: ISqlDriver,
+  workspaceId: string,
 ): Promise<number> {
-  return Promise.resolve(DEFAULT_HISTORY_DAYS)
+  const days = await currentEdition().historyDays?.(db, workspaceId)
+  return days ?? DEFAULT_HISTORY_DAYS
 }
 
 /** Statements a tick may still spend, shared by everything the cron runs. */

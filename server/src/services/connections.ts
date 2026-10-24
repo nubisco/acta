@@ -14,6 +14,8 @@
  * hold an admin session.
  */
 
+import { assertWithinLimit } from '../core/edition'
+import { usageOf } from '../core/usage'
 import { newId } from '@nubisco/acta-shared'
 import { z } from 'zod'
 import { ApiError, now, type ICtx } from '../core/ctx'
@@ -138,6 +140,11 @@ export async function connectionWrite(ctx: ICtx, ops: TConnectionOp[]) {
             // The connection's own actor. Named after the connection so the
             // activity feed reads "opened by GitHub" rather than naming a
             // person who was not involved.
+            await assertWithinLimit(
+              ctx,
+              'agents',
+              await usageOf(ctx.db, ctx.workspaceId, 'agents'),
+            )
             const actorId = newId('act')
             const handle = `${op.name
               .toLowerCase()

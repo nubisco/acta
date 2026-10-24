@@ -1,4 +1,5 @@
 import { Hono, type Context, type MiddlewareHandler } from 'hono'
+import { usageOf } from '../core/usage'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { z } from 'zod'
 import { newId } from '@nubisco/acta-shared'
@@ -23,7 +24,13 @@ import { JwksVerifier, type ISsoClaims, type ISsoConfig } from '../core/sso'
 import { acceptedPicture, isNubiscoPlatform } from '../core/avatar'
 import { OidcClient, type IOidcConfig } from '../core/oidc'
 import { resolveOauthToken } from '../core/oauth'
-import { currentEdition, editionHas, type IEditionDeps } from '../core/edition'
+import {
+  PlanLimitError,
+  assertWithinLimit,
+  currentEdition,
+  editionHas,
+  type IEditionDeps,
+} from '../core/edition'
 import type { ISqlDriver } from '../db'
 import {
   acceptInvitation,
@@ -199,6 +206,18 @@ async function signInWithClaims(
           : null
       return taken ?? c.redirect('/login?error=not_a_member')
     }
+    // Provisioning adds a member, so it counts against the plan (LA-399).
+    try {
+      await assertWithinLimit(
+        { db, workspaceId },
+        'members',
+        await usageOf(db, workspaceId, 'members'),
+      )
+    } catch (err) {
+      if (err instanceof PlanLimitError)
+        return c.redirect('/login?error=plan_limit')
+      throw err
+    }
     const id = newId('act')
     const base = claims.email
       .split('@')[0]
@@ -367,6 +386,9 @@ export function authRoutes(
       // the edition offers it, so a self-hosted instance never shows a
       // "Create a workspace" that leads nowhere.
       signup: editionHas('signup'),
+      // Whether workspaces have plans and billing here (LA-399). A core build,
+      // or a hosted one without billing set up, shows no plan or upgrade UI.
+      plans: editionHas('plans'),
       // The tracker, where this instance has one (ACTA_ANALYTICS_URL).
       analytics_url: opts.analyticsUrl,
     }),
@@ -668,7 +690,11 @@ export function authRoutes(
         409,
       )
     const accepted = await acceptInvitation(db, token, inv.row.email)
-    if (!accepted.ok) return c.json({ error: accepted.reason }, 409)
+    if (!accepted.ok)
+      return c.json(
+        { error: accepted.reason, message: accepted.message },
+        accepted.reason === 'plan_limit' ? 402 : 409,
+      )
     const session = await createToken(
       db,
       accepted.workspace.id,

@@ -157,6 +157,7 @@ const authConfig = ref<{
   nubisco_platform?: boolean
   platform_url?: string
   signup?: boolean
+  plans?: boolean
   analytics_url?: string
 } | null>(null)
 
@@ -460,6 +461,8 @@ export function useWorkspace() {
     platformUrl: computed(() => authConfig.value?.platform_url ?? null),
     /** Whether people can create workspaces here (the hosted service). */
     signupEnabled: computed(() => authConfig.value?.signup === true),
+    /** Whether this instance has plans and billing (EE, LA-399). */
+    plansEnabled: computed(() => authConfig.value?.plans === true),
     loadAuthConfig,
     forgetWorkspaces,
     connectionDown: computed(() => connectionDown.value),

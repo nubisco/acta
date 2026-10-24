@@ -390,6 +390,35 @@ CREATE TABLE IF NOT EXISTS attachment (
   created_at INTEGER NOT NULL
 );
 
+-- Plans (LA-399, Enterprise Edition). The workspace's entitlement as the
+-- licenses service last sent it: pushed by a signed webhook, fetched on a miss
+-- or when a day old. No row means Free. Unused by a core build.
+CREATE TABLE IF NOT EXISTS workspace_plan (
+  workspace_id TEXT PRIMARY KEY REFERENCES workspace(id),
+  plan TEXT NOT NULL,
+  state TEXT NOT NULL,
+  source TEXT NOT NULL,
+  -- JSON: the billed limits (spaces, members, storage_gb). null is unlimited.
+  limits TEXT NOT NULL,
+  -- JSON: the subscription summary, or null.
+  subscription TEXT,
+  version INTEGER NOT NULL,
+  grace_until TEXT,
+  ends_at TEXT,
+  fetched_at INTEGER NOT NULL
+);
+
+-- The limits Paddle does not bill for, per plan, so they change without a
+-- catalogue edit. The plans module seeds the adopted values with INSERT OR
+-- IGNORE, so a value an operator changed here is kept.
+CREATE TABLE IF NOT EXISTS plan_limit (
+  plan TEXT NOT NULL,
+  resource TEXT NOT NULL,
+  -- null is unlimited.
+  value INTEGER,
+  PRIMARY KEY (plan, resource)
+);
+
 CREATE TABLE IF NOT EXISTS webhook (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL REFERENCES workspace(id),
@@ -1214,4 +1243,9 @@ export const ADDITIVE_COLUMNS = [
     WHERE last_seen_at IS NULL`,
   'CREATE INDEX IF NOT EXISTS idx_workspace_owner_email ON workspace(owner_email) WHERE owner_email IS NOT NULL',
   'CREATE INDEX IF NOT EXISTS idx_workspace_owner_sub ON workspace(owner_platform_user_id) WHERE owner_platform_user_id IS NOT NULL',
+  // Plans (LA-399). Over the member cap after a downgrade, the people an admin
+  // marked keep write access first (then admins, then the earliest to join).
+  'ALTER TABLE actor ADD COLUMN keeps_write INTEGER NOT NULL DEFAULT 0',
+  // Storage is SUM(size) per workspace on every upload.
+  'CREATE INDEX IF NOT EXISTS idx_attachment_ws ON attachment(workspace_id)',
 ]

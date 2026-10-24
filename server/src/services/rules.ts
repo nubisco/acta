@@ -4,6 +4,8 @@
  * caused_by chaining, and a depth-1 loop guard.
  */
 
+import { assertWithinLimit } from '../core/edition'
+import { usageOf } from '../core/usage'
 import { newId, parseEmbedQuery, type IEmbedQuery } from '@nubisco/acta-shared'
 import { z } from 'zod'
 import type { ICtx } from '../core/ctx'
@@ -77,6 +79,11 @@ export async function ruleWrite(ctx: ICtx, ops: TRuleOp[]) {
           case 'create': {
             if (op.condition && parseEmbedQuery(op.condition) === null)
               throw new ApiError(400, `invalid condition: ${op.condition}`)
+            await assertWithinLimit(
+              ctx,
+              'rules',
+              await usageOf(ctx.db, ctx.workspaceId, 'rules'),
+            )
             const id = newId('rul')
             await ctx.db.run(
               'INSERT INTO rule (id, workspace_id, name, trigger, condition, action, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',

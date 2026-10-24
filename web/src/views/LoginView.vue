@@ -168,6 +168,10 @@ onMounted(async () => {
       invite_revoked: 'That invitation was withdrawn.',
       invite_invalid: 'That invitation does not exist.',
       invite_accepted: 'That invitation was already used.',
+      invite_plan_limit:
+        'That workspace has no room for another member on its plan. Ask whoever invited you to make room.',
+      plan_limit:
+        'That workspace has no room for another member on its plan. Ask an admin to make room.',
       disabled: 'This account is disabled',
       sso_state: 'The sign-in attempt expired; try again',
       sso_token: 'Single sign-on failed; try again',

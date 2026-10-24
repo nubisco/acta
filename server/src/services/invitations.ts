@@ -20,6 +20,8 @@
  * and it is capped per workspace per day.
  */
 
+import { assertWithinLimit } from '../core/edition'
+import { usageOf } from '../core/usage'
 import { newId } from '@nubisco/acta-shared'
 import { z } from 'zod'
 import { randomToken, sha256Hex } from '../core/auth'
@@ -136,6 +138,23 @@ export async function createInvitation(
   )
   if (handleTaken.length > 0)
     throw new ApiError(409, `the handle @${handle} is taken in this workspace`)
+
+  // Every open invitation is a seat it may take. Refused here when the plan
+  // could not make room even by buying a member, so nobody is invited into a
+  // workspace they cannot join. Nothing is bought until someone accepts.
+  const open = await db.query<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM invitation
+      WHERE workspace_id = ? AND accepted_at IS NULL AND revoked_at IS NULL
+        AND expires_at > ?`,
+    [ctx.workspaceId, ts],
+  )
+  await assertWithinLimit(
+    ctx,
+    'members',
+    (await usageOf(db, ctx.workspaceId, 'members')) + (open[0]?.n ?? 0),
+    1,
+    { dryRun: true },
+  )
 
   const token = `acta_inv_${randomToken(24)}`
   const pending = await db.query<{ n: number }>(
@@ -376,7 +395,15 @@ export type TAcceptResult =
     }
   | {
       ok: false
-      reason: 'invalid' | 'expired' | 'revoked' | 'accepted' | 'email_mismatch'
+      reason:
+        | 'invalid'
+        | 'expired'
+        | 'revoked'
+        | 'accepted'
+        | 'email_mismatch'
+        | 'plan_limit'
+      /** Set for plan_limit: why no seat could be added, in plain words. */
+      message?: string
     }
 
 /**
@@ -435,6 +462,19 @@ export async function acceptInvitation(
     actorId = existing.id
     role = existing.role
   } else {
+    // A new member counts against the plan. On Acta Team this is where one
+    // more member is bought, billed at the next renewal (LA-399).
+    try {
+      await assertWithinLimit(
+        { db, workspaceId },
+        'members',
+        await usageOf(db, workspaceId, 'members'),
+      )
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 402 || err.status === 409))
+        return { ok: false, reason: 'plan_limit', message: err.message }
+      throw err
+    }
     actorId = newId('act')
     role = inv.row.role
     const clash = await db.query(

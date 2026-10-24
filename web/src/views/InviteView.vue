@@ -103,9 +103,15 @@ async function accept(): Promise<void> {
     error.value =
       err instanceof ApiHttpError && err.status === 429
         ? 'Too many attempts. Wait a minute and try again.'
-        : err instanceof ApiHttpError
-          ? err.message
-          : 'Could not reach the server'
+        : err instanceof ApiHttpError && err.status === 402
+          ? // The workspace's plan has no room (LA-399), in the server's words.
+            String(
+              (err.body as { message?: string } | null)?.message ??
+                'This workspace has no room for another member. Ask whoever invited you to make room.',
+            )
+          : err instanceof ApiHttpError
+            ? err.message
+            : 'Could not reach the server'
     accepting.value = false
   }
 }

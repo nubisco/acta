@@ -16,6 +16,9 @@
     <SettingsAiBriefings
       v-else-if="tab === 'ai-briefings' && ws.isAdmin.value"
     />
+    <SettingsBilling
+      v-else-if="tab === 'billing' && ws.isAdmin.value && ws.plansEnabled.value"
+    />
     <SettingsLabels v-else-if="tab === 'labels'" />
     <SettingsAutomation v-else-if="tab === 'automation'" />
   </div>
@@ -58,6 +61,7 @@ import SettingsWorkspace from '@/components/settings/SettingsWorkspace.vue'
 import SettingsLabels from '@/components/settings/SettingsLabels.vue'
 import SettingsAutomation from '@/components/settings/SettingsAutomation.vue'
 import SettingsAiBriefings from '@/components/settings/SettingsAiBriefings.vue'
+import SettingsBilling from '@/components/settings/SettingsBilling.vue'
 
 const filterBar = useShellSlot('fixedbar')
 const ws = useWorkspace()
@@ -71,6 +75,10 @@ const tabs = computed(() => [
     ? [
         { id: 'workspace', label: 'Workspace' },
         { id: 'ai-briefings', label: 'AI briefings' },
+        // Only where workspaces have plans (the hosted service, LA-399).
+        ...(ws.plansEnabled.value
+          ? [{ id: 'billing', label: 'Plan and billing' }]
+          : []),
       ]
     : []),
   { id: 'labels', label: 'Labels' },
@@ -93,10 +101,9 @@ function tabFrom(raw: unknown): string {
 }
 
 const tab = ref(tabFrom(route.query.tab))
-watch(
-  () => route.query.tab,
-  (raw) => (tab.value = tabFrom(raw)),
-)
+// Tabs that depend on the instance (Plan and billing) arrive with its config,
+// which may land after this view: a link to one of them waits for it.
+watch([() => route.query.tab, tabs], ([raw]) => (tab.value = tabFrom(raw)))
 watch(tab, (id) => {
   if (route.query.tab === id) return
   void router.replace({ query: { ...route.query, tab: id } })

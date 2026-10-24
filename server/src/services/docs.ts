@@ -27,6 +27,7 @@ import {
 } from '../core/docAccess'
 import { anchorForComment, anchorStatus } from './anchors'
 import type { AttachmentStore } from './attachments'
+import { assertCanWrite } from '../core/edition'
 
 export async function docWrite(
   ctx: ICtx,
@@ -35,7 +36,13 @@ export async function docWrite(
 ): Promise<TOpResult[]> {
   const results: TOpResult[] = []
   for (const op of ops) {
-    results.push(await withOp(ctx, op.op_id, () => applyDocOp(ctx, op, store)))
+    results.push(
+      await withOp(ctx, op.op_id, async () => {
+        // A person over the plan's member cap after a downgrade reads only.
+        await assertCanWrite(ctx)
+        return applyDocOp(ctx, op, store)
+      }),
+    )
   }
   return results
 }

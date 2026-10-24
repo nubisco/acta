@@ -122,8 +122,9 @@ export async function workspaceOverview(ctx: ICtx) {
     name: string
     role: string
     avatar_url: string | null
+    keeps_write: number
   }>(
-    'SELECT id, handle, kind, name, role, avatar_url FROM actor WHERE workspace_id = ? AND disabled = 0 ORDER BY handle',
+    'SELECT id, handle, kind, name, role, avatar_url, keeps_write FROM actor WHERE workspace_id = ? AND disabled = 0 ORDER BY handle',
     [ctx.workspaceId],
   )
   const visibleRoots = visibleDocSql('d.id', await hiddenDocIds(ctx))

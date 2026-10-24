@@ -120,6 +120,12 @@ export async function cancelDeletion(ctx: ICtx): Promise<void> {
  * added later cannot be forgotten or deleted out of order.
  */
 export const PURGE_ORDER: [string, string][] = [
+  // The cached plan (LA-399). The subscription itself lives in licenses and
+  // is cancelled there, not here.
+  [
+    'workspace_plan',
+    'SELECT rowid AS id FROM workspace_plan WHERE workspace_id = ?',
+  ],
   [
     'notification',
     'SELECT rowid AS id FROM notification WHERE workspace_id = ?',
@@ -223,6 +229,8 @@ export const INSTANCE_TABLES = new Set([
   'workspace',
   // A signup in progress belongs to a person, not yet to any workspace.
   'signup_intent',
+  // What each plan allows (LA-399): the same for every workspace.
+  'plan_limit',
 ])
 
 /**

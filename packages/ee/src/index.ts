@@ -13,7 +13,10 @@ import {
 } from '../../../server/src/core/edition'
 import { EE_MODULES, type IEeModule } from './modules'
 
-function onlyOne<K extends 'getLimits' | 'isFreePlan'>(
+type TSingleHook =
+  'getLimits' | 'isFreePlan' | 'raiseLimit' | 'writeBlock' | 'historyDays'
+
+function onlyOne<K extends TSingleHook>(
   modules: IEeModule[],
   hook: K,
 ): IEeModule[K] | undefined {
@@ -33,11 +36,21 @@ export function enterpriseEdition(modules: IEeModule[] = EE_MODULES): IEdition {
   const isFreePlan = onlyOne(modules, 'isFreePlan') ?? (async () => false)
   return {
     name: 'enterprise',
-    // Until plans exist (LA-399), the EE limits nothing either.
+    // Without a plans module, the EE limits nothing either.
     getLimits: limits ?? (async () => ({ ...UNLIMITED })),
-    features: modules.flatMap((m) => m.features ?? []),
+    raiseLimit: onlyOne(modules, 'raiseLimit'),
+    writeBlock: onlyOne(modules, 'writeBlock'),
+    historyDays: onlyOne(modules, 'historyDays'),
+    // Read when asked, not when registered: a module may only know whether
+    // it is on once its routes have mounted and read the deployment's config.
+    get features() {
+      return modules.flatMap((m) => m.features ?? [])
+    },
     mountRoutes: (app, deps) => {
       for (const m of modules) m.mountRoutes?.(app, deps)
+    },
+    mountWorkspaceRoutes: (app, deps) => {
+      for (const m of modules) m.mountWorkspaceRoutes?.(app, deps)
     },
     onUnknownSignIn: async (c, identity, deps) => {
       for (const m of modules) {

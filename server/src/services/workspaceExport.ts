@@ -218,6 +218,9 @@ export const NOT_EXPORTED: Record<string, string> = {
   email_quota: 'bookkeeping',
   notification: 'one person inbox',
   workspace_export: 'the exports themselves',
+  workspace_plan:
+    'billing cache, the subscription lives with the payment provider',
+  plan_limit: 'instance, what each plan allows',
 }
 
 function jsonl(rows: Record<string, unknown>[], drop: string[] = []): string {

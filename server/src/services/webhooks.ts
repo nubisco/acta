@@ -1,3 +1,5 @@
+import { assertWithinLimit } from '../core/edition'
+import { usageOf } from '../core/usage'
 import { newId } from '@nubisco/acta-shared'
 import { z } from 'zod'
 import type { ICtx } from '../core/ctx'
@@ -64,6 +66,11 @@ export async function webhookWrite(ctx: ICtx, ops: TWebhookOp[]) {
       await withOp(ctx, op.op_id, async () => {
         switch (op.op) {
           case 'create': {
+            await assertWithinLimit(
+              ctx,
+              'webhooks',
+              await usageOf(ctx.db, ctx.workspaceId, 'webhooks'),
+            )
             const id = newId('whk')
             await ctx.db.run(
               'INSERT INTO webhook (id, workspace_id, url, events, secret, format, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',

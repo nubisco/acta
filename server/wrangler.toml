@@ -50,6 +50,17 @@ ACTA_BASE_URL = "https://acta.nubisco.io"
 # "Contact sales" once an account has its one workspace (LA-398): the
 # corporate contact form, opened on Acta and pre-sales.
 ACTA_SALES_URL = "https://nubisco.io/contact?product=acta&need=pre-sales"
+# Plans and billing (LA-399, EE). Plans switch on only once the secret
+# ACTA_LICENSES_SERVICE_TOKEN is also set, so this file alone changes nothing.
+# Secrets, set with wrangler secret put, never here:
+#   ACTA_LICENSES_SERVICE_TOKEN     licenses' SERVICE_TOKEN_ACTA
+#   ACTA_ENTITLEMENT_WEBHOOK_SECRET licenses' ENTITLEMENT_WEBHOOK_SECRET_ACTA
+#   ACTA_ANALYTICS_TOKEN            optional, server-side billing events
+ACTA_LICENSES_URL = "https://licenses.nubisco.io"
+ACTA_PADDLE_ENV = "production"
+# Paddle.js client-side token: public by design, the same one the corporate
+# site's checkout uses.
+ACTA_PADDLE_CLIENT_TOKEN = "live_8694f44333d844a6177d3279321"
 # ACTA_SSO_AUTO_PROVISION is left unset (off), so nobody joins on sign-in
 # alone: new colleagues are invited from Settings, People (LA-397).
 # No ACTA_ADMIN_* here: identity comes from platform.nubisco.io via SSO, and

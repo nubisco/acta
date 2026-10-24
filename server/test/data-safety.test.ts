@@ -233,6 +233,7 @@ async function populate(ctx: ICtx, space: string): Promise<void> {
       [ws],
     )
   )[0]
+  await insertRow('workspace_plan', { workspace_id: ws })
   await insertRow('goal_update', {
     id: newId('gup'),
     workspace_id: ws,
