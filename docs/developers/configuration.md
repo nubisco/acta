@@ -247,6 +247,25 @@ A self-hosted build ignores them.
 | `ACTA_PRIVACY_URL`   | _unset_ | Where the privacy notice is, linked from the signup page.                                    |
 | `ACTA_SALES_URL`     | _unset_ | Where "Contact sales" points once an account has its one workspace. Unset, no link is shown. |
 
+## Plans and billing (Enterprise Edition)
+
+Read only by the Enterprise Edition's plans module (see
+[Plans and billing](/developers/plans)). Plans switch on when both
+`ACTA_LICENSES_URL` and `ACTA_LICENSES_SERVICE_TOKEN` are set. Until then every
+workspace is unlimited and no billing is shown. A self-hosted build ignores
+them all.
+
+| Variable                          | Default      | What it does                                                                                                    |
+| --------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------- |
+| `ACTA_LICENSES_URL`               | _unset_      | The licenses service that holds each workspace's entitlement and talks to Paddle.                               |
+| `ACTA_LICENSES_SERVICE_TOKEN`     | _unset_      | Secret. The bearer token licenses issued for Acta.                                                              |
+| `ACTA_ENTITLEMENT_WEBHOOK_SECRET` | _unset_      | Secret. HMAC key of the `entitlement.updated` webhook at `/api/v1/billing/entitlement`. Unset, that route 404s. |
+| `ACTA_PADDLE_ENV`                 | `production` | `sandbox` for a test deployment.                                                                                |
+| `ACTA_PADDLE_CLIENT_TOKEN`        | _unset_      | Paddle.js client-side token. Public. Unset, the Upgrade button is disabled.                                     |
+| `ACTA_ANALYTICS_API`              | _unset_      | Nubisco Analytics base URL, for billing events sent from the server.                                            |
+| `ACTA_ANALYTICS_TOKEN`            | _unset_      | Secret. Ingestion token for those events.                                                                       |
+| `ACTA_ANALYTICS_DOMAIN`           | _unset_      | The analytics property the events are recorded under.                                                           |
+
 ## Analytics
 
 | Variable             | Default | What it does                                                                                                                 |
