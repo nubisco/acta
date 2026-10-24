@@ -1206,6 +1206,12 @@ export const ADDITIVE_COLUMNS = [
   // (stamped at most once a day). What the inactivity job measures idleness
   // by: an agent writing on its own is not someone using the workspace.
   'ALTER TABLE workspace ADD COLUMN last_seen_at INTEGER',
+  // Workspaces that predate the column count as seen when it arrived, never
+  // as idle since their creation, which would put a years-old workspace at
+  // the end of the inactivity ladder on its first run. New ones are stamped
+  // when created, so after the first migrate this matches nothing.
+  `UPDATE workspace SET last_seen_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+    WHERE last_seen_at IS NULL`,
   'CREATE INDEX IF NOT EXISTS idx_workspace_owner_email ON workspace(owner_email) WHERE owner_email IS NOT NULL',
   'CREATE INDEX IF NOT EXISTS idx_workspace_owner_sub ON workspace(owner_platform_user_id) WHERE owner_platform_user_id IS NOT NULL',
 ]

@@ -13,20 +13,48 @@ import {
 } from '../../../server/src/core/edition'
 import { EE_MODULES, type IEeModule } from './modules'
 
-export function enterpriseEdition(modules: IEeModule[] = EE_MODULES): IEdition {
-  const limiters = modules.filter((m) => m.getLimits)
-  if (limiters.length > 1) {
+function onlyOne<K extends 'getLimits' | 'isFreePlan'>(
+  modules: IEeModule[],
+  hook: K,
+): IEeModule[K] | undefined {
+  const supplying = modules.filter((m) => m[hook])
+  if (supplying.length > 1) {
     throw new Error(
-      `Two EE modules supply plan limits (${limiters.map((m) => m.name).join(', ')}). Exactly one may.`,
+      `Two EE modules supply ${hook} (${supplying.map((m) => m.name).join(', ')}). Exactly one may.`,
     )
   }
-  const limits = limiters[0]?.getLimits
+  return supplying[0]?.[hook]
+}
+
+export function enterpriseEdition(modules: IEeModule[] = EE_MODULES): IEdition {
+  const limits = onlyOne(modules, 'getLimits')
+  // Until plans exist (LA-399) every workspace counts as paid, so a job that
+  // only touches Free workspaces touches none rather than all of them.
+  const isFreePlan = onlyOne(modules, 'isFreePlan') ?? (async () => false)
   return {
     name: 'enterprise',
     // Until plans exist (LA-399), the EE limits nothing either.
     getLimits: limits ?? (async () => ({ ...UNLIMITED })),
+    features: modules.flatMap((m) => m.features ?? []),
     mountRoutes: (app, deps) => {
       for (const m of modules) m.mountRoutes?.(app, deps)
+    },
+    onUnknownSignIn: async (c, identity, deps) => {
+      for (const m of modules) {
+        const taken = await m.onUnknownSignIn?.(c, identity, deps)
+        if (taken) return taken
+      }
+      return null
+    },
+    scheduled: async (deps) => {
+      // One module failing never stops the next.
+      for (const m of modules) {
+        try {
+          await m.scheduled?.({ ...deps, isFreePlan })
+        } catch (err) {
+          console.error(`ee ${m.name} tick failed`, err)
+        }
+      }
     },
   }
 }

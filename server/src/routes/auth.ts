@@ -1145,4 +1145,33 @@ export async function mintBootstrapToken(
   )
 }
 
+/**
+ * Sign someone in on this response: a session for the actor, in the cookie the
+ * app reads. The one shape every sign-in path issues, so a session started by
+ * the EE's signup is indistinguishable from one started here.
+ */
+export async function startSession(
+  c: Context,
+  db: ISqlDriver,
+  workspaceId: string,
+  actorId: string,
+  role: 'admin' | 'member',
+): Promise<void> {
+  const token = await createToken(
+    db,
+    workspaceId,
+    actorId,
+    'session',
+    role === 'admin' ? ['read', 'write', 'admin'] : ['read', 'write'],
+    SESSION_TTL,
+  )
+  setCookie(c, SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: SESSION_TTL / 1000,
+  })
+}
+
 export { SESSION_COOKIE, randomToken }

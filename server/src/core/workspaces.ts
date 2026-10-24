@@ -196,8 +196,9 @@ export async function createWorkspace(
   await db.transaction(async () => {
     await db.run(
       `INSERT INTO workspace (id, name, slug, owner_email, owner_platform_user_id,
-                              terms_version, terms_accepted_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                              terms_version, terms_accepted_at, last_seen_at,
+                              created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         workspaceId,
         name,
@@ -206,6 +207,8 @@ export async function createWorkspace(
         opts.owner?.platformUserId ?? null,
         opts.terms?.version ?? null,
         opts.terms?.acceptedAt ?? null,
+        // Its creator is looking at it right now.
+        ts,
         ts,
       ],
     )
