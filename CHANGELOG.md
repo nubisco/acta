@@ -1,3 +1,18 @@
+# [1.62.0](https://github.com/nubisco/acta/compare/v1.61.0...v1.62.0) (2026-10-24)
+
+
+### Bug Fixes
+
+* **data:** purge a workspace's search rows by workspace_id ([a866221](https://github.com/nubisco/acta/commit/a866221c8b26ff68d39d8fc3abdfe51ae2af4a72))
+* **web:** hold the welcome dialog until signup is done (LA-398) ([ccbe7e0](https://github.com/nubisco/acta/commit/ccbe7e01751462a154267bd150d643319f4e21cf))
+
+
+### Features
+
+* **edition:** signup hooks in the seam, and the inactivity freeze (LA-398) ([458f348](https://github.com/nubisco/acta/commit/458f348ab306a6c629061c0b2a6e06260f71dac5))
+* **ee:** self-serve signup, one workspace per account (LA-398) ([98bcbce](https://github.com/nubisco/acta/commit/98bcbce5a9edbe5410dbb2c71a7739a235d73e83))
+* **web:** signup and onboarding, and Create a workspace (LA-398) ([3fffc94](https://github.com/nubisco/acta/commit/3fffc94fd50bc937055f61f787d6a3953738a9dc))
+
 # [1.61.0](https://github.com/nubisco/acta/compare/v1.60.0...v1.61.0) (2026-10-24)
 
 
