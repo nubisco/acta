@@ -1,3 +1,11 @@
+## [1.56.1](https://github.com/nubisco/acta/compare/v1.56.0...v1.56.1) (2026-10-24)
+
+
+### Bug Fixes
+
+* **editor:** add the details and maths markdown rules once per parser ([4232708](https://github.com/nubisco/acta/commit/4232708675857cc2e984d4f83acc389b346dddf1))
+* **editor:** move the document editor to Tiptap 3 ([a544993](https://github.com/nubisco/acta/commit/a54499352c15b42711c518bbf8c5fd649df897ef))
+
 # [1.56.0](https://github.com/nubisco/acta/compare/v1.55.0...v1.56.0) (2026-10-23)
 
 
