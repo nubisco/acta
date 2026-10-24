@@ -1,3 +1,10 @@
+# [1.58.0](https://github.com/nubisco/acta/compare/v1.57.0...v1.58.0) (2026-10-24)
+
+
+### Features
+
+* **shell:** the rail takes the fleet anatomy ([f9225c5](https://github.com/nubisco/acta/commit/f9225c5597d45dff4844ccd1e342d3d4269fc196))
+
 # [1.57.0](https://github.com/nubisco/acta/compare/v1.56.1...v1.57.0) (2026-10-24)
 
 
