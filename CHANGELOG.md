@@ -1,3 +1,10 @@
+# [1.60.0](https://github.com/nubisco/acta/compare/v1.59.0...v1.60.0) (2026-10-24)
+
+
+### Features
+
+* **spaces:** the chosen space as its own rail group, with space Settings last ([9b749d0](https://github.com/nubisco/acta/commit/9b749d0f9cd7de2c972e7cd9985a4898be9dbef8))
+
 # [1.59.0](https://github.com/nubisco/acta/compare/v1.58.0...v1.59.0) (2026-10-24)
 
 
