@@ -81,6 +81,25 @@ export interface IInvitation {
   created_at: number
 }
 
+/** An export of the whole workspace, as an admin sees it (LA-401). */
+export interface IWorkspaceExport {
+  id: string
+  status: 'pending' | 'running' | 'ready' | 'failed'
+  size: number | null
+  skipped_files: number
+  error: string | null
+  ready_at: number | null
+  expires_at: number | null
+  created_at: number
+}
+
+/** A deletion an admin asked for, waiting out its thirty days. */
+export interface IWorkspaceDeletion {
+  deleted_at: number
+  purge_at: number
+  deleted_by: string | null
+}
+
 export function newOpId(): string {
   return `web:${crypto.randomUUID()}`
 }
@@ -424,6 +443,27 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(policy),
     }),
+
+  /** Exports of the whole workspace (LA-401). Admin only. */
+  exports: () => req<{ exports: IWorkspaceExport[] }>('/workspace/exports'),
+  requestExport: () =>
+    req<{ export: IWorkspaceExport }>('/workspace/exports', {
+      method: 'POST',
+    }),
+  /** Where a ready export downloads from, through the signed-in session. */
+  exportDownloadUrl: (id: string) =>
+    `${BASE}/w/${encodeURIComponent(workspaceSlug)}/workspace/exports/${encodeURIComponent(id)}/download`,
+
+  /** Deleting the workspace: thirty days, read-only in between. Admin only. */
+  deletion: () =>
+    req<{ deletion: IWorkspaceDeletion | null }>('/workspace/deletion'),
+  scheduleDeletion: (confirm: string) =>
+    req<{ deletion: IWorkspaceDeletion }>('/workspace/deletion', {
+      method: 'POST',
+      body: JSON.stringify({ confirm }),
+    }),
+  cancelDeletion: () =>
+    req<{ deletion: null }>('/workspace/deletion', { method: 'DELETE' }),
 
   /** The workspace's AI provider. Admin only, and the key is write-only. */
   aiSettings: () =>
