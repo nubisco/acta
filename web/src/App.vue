@@ -177,6 +177,7 @@
     @close="inspector.dismiss()"
   />
   <DocPreviewModal />
+  <PlanLimitModal />
   <!-- One overlay for both questions: what can I do, and where is that
        thing. The suggester is asked as you type, debounced and race-guarded
        by the component itself. -->
@@ -239,6 +240,7 @@ import HomeCustomizer from '@/components/home/HomeCustomizer.vue'
 import { useHomeLayout } from '@/composables/useHomeLayout'
 import ItemModal from '@/components/ItemModal.vue'
 import DocPreviewModal from '@/components/DocPreviewModal.vue'
+import PlanLimitModal from '@/components/PlanLimitModal.vue'
 import GlobalSearch from '@/components/GlobalSearch.vue'
 import NewSpaceModal from '@/components/NewSpaceModal.vue'
 import GoalFormModal from '@/components/goals/GoalFormModal.vue'

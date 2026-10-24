@@ -31,6 +31,8 @@ export interface IOverview {
     name: string
     role: string
     avatar_url?: string | null
+    /** Over the member cap after a downgrade, keeps write access (LA-399). */
+    keeps_write?: number
   }[]
   doc_roots: { slug: string; title: string; children: number }[]
   /** Every goal, compact, for chips and pickers. */

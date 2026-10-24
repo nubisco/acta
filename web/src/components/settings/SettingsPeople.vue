@@ -20,6 +20,17 @@
       </NbButton>
     </header>
 
+    <NbBanner
+      v-if="overCap"
+      status="warning"
+      variant="callout"
+      :title="`${overCap.used} people, and the plan allows ${overCap.cap}`"
+    >
+      After the change of plan nobody was removed. {{ overCap.cap }} of them can
+      still edit and the rest can read. Choose who keeps write access below, or
+      upgrade under Plan and billing.
+    </NbBanner>
+
     <NbDataTable
       stack-on-phone
       :columns="columns"
@@ -51,6 +62,18 @@
         <NbBadge size="sm" :variant="row.role === 'admin' ? 'purple' : 'blue'">
           {{ row.role === 'admin' ? 'Admin' : 'Member' }}
         </NbBadge>
+      </template>
+      <template #cell-write="{ row }">
+        <NbSwitch
+          :name="`keeps-write-${row.id}`"
+          :model-value="Boolean(row.keepsWrite)"
+          :label="`${row.name} keeps write access`"
+          hide-label
+          :disabled="savingWrite === row.id"
+          @update:model-value="
+            (v?: boolean) => setKeepsWrite(String(row.id), !!v)
+          "
+        />
       </template>
       <template #empty>
         <NbEmptyState
@@ -158,10 +181,44 @@ const toast = useToast()
 const inviting = ref(false)
 const avatarTarget = ref<{ id: string; hasAvatar: boolean } | null>(null)
 
-const columns = [
+const columns = computed(() => [
   { key: 'person', header: 'Person' },
   { key: 'role', header: 'Role' },
-]
+  ...(overCap.value ? [{ key: 'write', header: 'Keeps write access' }] : []),
+])
+
+/**
+ * Over the plan's member cap after a downgrade (LA-399): nobody is removed,
+ * and an admin chooses who keeps write access. Only admins, only where the
+ * instance has plans, and only while the workspace is over the cap.
+ */
+const overCap = ref<{ used: number; cap: number } | null>(null)
+const savingWrite = ref<string | null>(null)
+
+async function loadCap(): Promise<void> {
+  if (!ws.isAdmin.value || !ws.plansEnabled.value) return
+  try {
+    const b = await api.billing()
+    const cap = b.limits.members
+    const used = b.usage.members ?? 0
+    overCap.value =
+      cap !== null && cap !== undefined && used > cap ? { used, cap } : null
+  } catch {
+    overCap.value = null
+  }
+}
+
+async function setKeepsWrite(id: string, keeps: boolean): Promise<void> {
+  savingWrite.value = id
+  try {
+    await api.updateMember(id, { keeps_write: keeps })
+    await ws.refresh()
+  } catch {
+    toast.error('Write access could not be changed.')
+  } finally {
+    savingWrite.value = null
+  }
+}
 
 const rows = computed(() =>
   (ws.overview.value?.actors ?? [])
@@ -175,6 +232,7 @@ const rows = computed(() =>
       hasAvatar: Boolean(a.avatar_url),
       // Your own picture is yours to change, anyone else's needs admin.
       canEditAvatar: a.id === ws.me.value?.id || ws.isAdmin.value,
+      keepsWrite: a.keeps_write === 1,
     })),
 )
 
@@ -224,7 +282,10 @@ async function loadInvitations(): Promise<void> {
     toast.error(humanise(err), { title: 'Could not load invitations' })
   }
 }
-onMounted(loadInvitations)
+onMounted(() => {
+  void loadInvitations()
+  void loadCap()
+})
 
 async function revoke(id: string): Promise<void> {
   revoking.value = id

@@ -64,8 +64,72 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   })
   const body = res.status === 204 ? null : await res.json().catch(() => null)
+  const limit = planLimitIn(body)
+  if (limit) notifyPlanLimit(limit)
   if (!res.ok) throw new ApiHttpError(res.status, body)
   return body as T
+}
+
+/** A refusal because the workspace's plan caps something (LA-399). */
+export interface IPlanLimit {
+  error: 'plan_limit'
+  resource: string
+  limit: number
+  current: number
+  message: string
+}
+
+/**
+ * The plan_limit in a response, if any: a 402 carries it in `current`, and a
+ * batch write carries it in the `current` of the op that was refused.
+ */
+function planLimitIn(body: unknown): IPlanLimit | null {
+  const b = body as {
+    error?: unknown
+    current?: { error?: string }
+    results?: { ok?: boolean; error?: string; current?: { error?: string } }[]
+  } | null
+  if (b?.current?.error === 'plan_limit')
+    return { ...(b.current as IPlanLimit), message: String(b.error ?? '') }
+  const op = b?.results?.find(
+    (r) => r?.ok === false && r.current?.error === 'plan_limit',
+  )
+  return op
+    ? { ...(op.current as IPlanLimit), message: String(op.error ?? '') }
+    : null
+}
+
+type TPlanLimitListener = (limit: IPlanLimit) => void
+const planLimitListeners = new Set<TPlanLimitListener>()
+
+/** Called whenever any request is refused by the plan, for the upgrade prompt. */
+export function onPlanLimit(listener: TPlanLimitListener): () => void {
+  planLimitListeners.add(listener)
+  return () => planLimitListeners.delete(listener)
+}
+
+function notifyPlanLimit(limit: IPlanLimit): void {
+  for (const l of planLimitListeners) l(limit)
+}
+
+/** A workspace's plan, usage and checkout settings (LA-399). Admin only. */
+export interface IBillingState {
+  plan: string
+  state: 'trialing' | 'active' | 'grace' | 'restricted' | 'free'
+  source: 'subscription' | 'override' | 'free'
+  subscription: {
+    status: string
+    billing: 'monthly' | 'yearly' | null
+    extra_members: number
+    current_period_end: string | null
+    ends_at: string | null
+    grace_until: string | null
+  } | null
+  limits: Record<string, number | null>
+  usage: Record<string, number>
+  team: { members_included: number; members_max: number }
+  paddle: { env: 'production' | 'sandbox'; client_token: string | null }
+  sales_url: string | null
 }
 
 /** An invitation as an admin sees it. */
@@ -203,6 +267,8 @@ export const auth = {
       platform_url?: string
       /** Whether a person with no workspace can create one here (EE). */
       signup?: boolean
+      /** Whether workspaces have plans and billing here (EE, LA-399). */
+      plans?: boolean
       /** Where the Nubisco Analytics tracker is served from, if anywhere. */
       analytics_url?: string
     }>('/auth/config'),
@@ -496,6 +562,24 @@ export const api = {
       body: JSON.stringify(policy),
     }),
 
+  /** Plan and billing (LA-399). Admin only, and only where plans exist. */
+  billing: () => req<IBillingState>('/billing'),
+  billingCheckout: (body: {
+    billing: 'monthly' | 'yearly'
+    extra_members: number
+  }) =>
+    req<{
+      transaction_id: string
+      paddle: IBillingState['paddle']
+    }>('/billing/checkout', { method: 'POST', body: JSON.stringify(body) }),
+  billingPortal: () =>
+    req<{ url: string }>('/billing/portal', { method: 'POST' }),
+  billingSeats: (extraMembers: number) =>
+    req<{ ok: true; extra_members: number }>('/billing/seats', {
+      method: 'POST',
+      body: JSON.stringify({ extra_members: extraMembers }),
+    }),
+
   /** Exports of the whole workspace (LA-401). Admin only. */
   exports: () => req<{ exports: IWorkspaceExport[] }>('/workspace/exports'),
   requestExport: () =>
@@ -737,7 +821,13 @@ export const api = {
     ),
   updateMember: (
     id: string,
-    patch: { role?: 'admin' | 'member'; disabled?: boolean; name?: string },
+    patch: {
+      role?: 'admin' | 'member'
+      disabled?: boolean
+      name?: string
+      /** Over the member cap after a downgrade, keeps write access first. */
+      keeps_write?: boolean
+    },
   ) =>
     req<{ ok: boolean }>(`/members/${id}`, {
       method: 'PATCH',
