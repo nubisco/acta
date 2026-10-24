@@ -1,5 +1,5 @@
 import { mkdirSync } from 'node:fs'
-import { bunAssetReader, createApp, reportRunOptions } from './app'
+import { bunAssetReader, createApp, fsBlobStore, reportRunOptions } from './app'
 import { dailyReportTick } from './services/dailyReport'
 import { ssoConfigFromEnv } from './core/sso'
 import { oidcConfigFromEnv } from './core/oidc'
@@ -7,6 +7,8 @@ import { openDb } from './db'
 import { emailSenderFromEnv } from './core/email'
 import { pruneOauthClients } from './core/oauth'
 import { bunLive, bunWebsocket } from './live-bun'
+import { AttachmentStore } from './services/attachments'
+import { maintenanceTick } from './services/maintenance'
 import {
   channelsFromEnv,
   notificationSweep,
@@ -58,6 +60,11 @@ const app = await createApp(db, {
  */
 const SWEEP_INTERVAL_MS = 60_000
 const channels = channelsFromEnv(process.env)
+const maintenanceStore = new AttachmentStore(
+  await fsBlobStore(`${DATA_DIR}/attachments`),
+)
+const maintenanceSender = emailSenderFromEnv(process.env)
+let maintaining = false
 setInterval(() => {
   void notificationSweep(db, {
     channels,
@@ -74,6 +81,17 @@ setInterval(() => {
   void pruneOauthClients(db).catch((err) =>
     console.error('oauth client prune failed', err),
   )
+  // Retention, exports, purges and the size alert (LA-401). Each part logs
+  // its own failures. Skipped while the last one is still going, because a
+  // big export can take longer than the interval.
+  if (!maintaining) {
+    maintaining = true
+    void maintenanceTick(db, {
+      store: maintenanceStore,
+      send: maintenanceSender,
+      baseUrl: process.env.ACTA_BASE_URL,
+    }).finally(() => (maintaining = false))
+  }
 }, SWEEP_INTERVAL_MS)
 
 export default {

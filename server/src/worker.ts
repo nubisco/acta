@@ -15,7 +15,8 @@ import { emailSenderFromEnv } from './core/email'
 import { pruneOauthClients } from './core/oauth'
 import { rateLimitersFromBindings } from './core/rateLimit'
 import { hubLive, type IHubNamespace } from './live-hub'
-import type { IBlobStore } from './services/attachments'
+import { AttachmentStore, type IBlobStore } from './services/attachments'
+import { maintenanceTick } from './services/maintenance'
 import {
   channelsFromEnv,
   notificationSweep,
@@ -225,5 +226,14 @@ export default {
     await pruneOauthClients(driver).catch((err) =>
       console.error('oauth client prune failed', err),
     )
+    // Retention, workspace exports and purges, and the database size alert
+    // (LA-401). Last, so a slow purge never delays a reminder.
+    await maintenanceTick(driver, {
+      store: new AttachmentStore(r2BlobStore(env.ATTACHMENTS)),
+      send: emailSenderFromEnv(
+        env as unknown as Record<string, string | undefined>,
+      ),
+      baseUrl: env.ACTA_BASE_URL,
+    })
   },
 }
