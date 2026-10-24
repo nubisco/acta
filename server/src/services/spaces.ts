@@ -3,6 +3,8 @@ import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
 import { emitEvent } from '../core/events'
 import { withOp } from '../core/ops'
+import { assertCanWrite, assertWithinLimit } from '../core/edition'
+import { usageOf } from '../core/usage'
 import { spaceByKey, listByRef, tailPos, type IItemRow } from '../core/store'
 import { purgeItem } from './items'
 import type { AttachmentStore } from './attachments'
@@ -24,7 +26,19 @@ export async function spaceWrite(
   const results: TOpResult[] = []
   for (const op of ops) {
     results.push(
-      await withOp(ctx, op.op_id, () => applySpaceOp(ctx, op, store)),
+      await withOp(ctx, op.op_id, async () => {
+        // A space over the plan's cap after a downgrade is read-only
+        // (LA-399), except for archiving, restoring or deleting it, which is
+        // how an admin chooses what stays. Create and restore check the cap.
+        if (!['create', 'archive', 'restore', 'delete'].includes(op.op)) {
+          const rows = await ctx.db.query<{ id: string }>(
+            'SELECT id FROM space WHERE workspace_id = ? AND key = ?',
+            [ctx.workspaceId, 'key' in op ? op.key : op.space],
+          )
+          await assertCanWrite(ctx, rows[0]?.id)
+        }
+        return applySpaceOp(ctx, op, store)
+      }),
     )
   }
   return results
@@ -44,6 +58,12 @@ async function applySpaceOp(
       )
       if (existing.length > 0)
         throw new ApiError(409, `space ${op.key} already exists`)
+      // Archived spaces do not count, so archiving one makes room.
+      await assertWithinLimit(
+        ctx,
+        'spaces',
+        await usageOf(ctx.db, ctx.workspaceId, 'spaces'),
+      )
       const id = newId('brd')
       await ctx.db.run(
         `INSERT INTO space (id, workspace_id, key, name, description, created_at, updated_at)
@@ -105,6 +125,17 @@ async function applySpaceOp(
     }
     case 'restore': {
       const space = await spaceByKey(ctx, op.key)
+      const archived = await ctx.db.query<{ archived: number }>(
+        'SELECT archived FROM space WHERE id = ?',
+        [space.id],
+      )
+      // Restoring brings a space back into the count, so it is checked too.
+      if (archived[0]?.archived === 1)
+        await assertWithinLimit(
+          ctx,
+          'spaces',
+          await usageOf(ctx.db, ctx.workspaceId, 'spaces'),
+        )
       await ctx.db.run(
         'UPDATE space SET archived = 0, updated_at = ? WHERE id = ?',
         [ts, space.id],

@@ -17,6 +17,8 @@ import {
 } from './comments'
 import { ftsDelete, ftsUpsert } from '../core/fts'
 import { withOp } from '../core/ops'
+import { assertCanWrite, assertWithinLimit } from '../core/edition'
+import { usageOf } from '../core/usage'
 import type { AttachmentStore } from './attachments'
 import {
   actorByRef,
@@ -67,12 +69,38 @@ export async function itemWrite(
   const results: TOpResult[] = []
   for (const op of ops) {
     results.push(
-      await withOp(ctx, op.op_id, () =>
-        applyItemOp(ctx, op, defaultSpace, store),
-      ),
+      await withOp(ctx, op.op_id, async () => {
+        // A space or a person over the plan's caps after a downgrade is
+        // read-only (LA-399). The core edition never refuses.
+        await assertCanWrite(ctx, await spaceIdOfOp(ctx, op, defaultSpace))
+        return applyItemOp(ctx, op, defaultSpace, store)
+      }),
     )
   }
   return results
+}
+
+/** The space an op writes into, when it can be told before running it. */
+async function spaceIdOfOp(
+  ctx: ICtx,
+  op: TItemOp,
+  defaultSpace?: string,
+): Promise<string | undefined> {
+  if (op.op === 'create') {
+    const key = op.space ?? defaultSpace
+    if (!key) return undefined
+    const rows = await ctx.db.query<{ id: string }>(
+      'SELECT id FROM space WHERE workspace_id = ? AND key = ?',
+      [ctx.workspaceId, key],
+    )
+    return rows[0]?.id
+  }
+  if (!('key' in op) || typeof op.key !== 'string') return undefined
+  const rows = await ctx.db.query<{ space_id: string }>(
+    'SELECT space_id FROM item WHERE workspace_id = ? AND key = ?',
+    [ctx.workspaceId, op.key],
+  )
+  return rows[0]?.space_id
 }
 
 /** The space's first done list, or null when it has none. */
@@ -312,6 +340,11 @@ async function applyItemOp(
         throw new ApiError(400, 'create requires space (or default_space)')
       const space = await spaceByKey(ctx, spaceKey)
       const list = await listByRef(ctx, space.id, op.list)
+      await assertWithinLimit(
+        ctx,
+        'items',
+        await usageOf(ctx.db, ctx.workspaceId, 'items'),
+      )
       const id = newId('itm')
       const seq = space.next_seq
       const key = itemKey(space.key, seq)

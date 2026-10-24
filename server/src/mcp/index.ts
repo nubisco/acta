@@ -88,6 +88,9 @@ async function handleRequest(
         const result = await tool.handler(ctx, parsed.data)
         return rpcResult(id, {
           content: [{ type: 'text', text: JSON.stringify(result) }],
+          // A batch whose ops hit the plan's caps is an error the model must
+          // notice, not a success with a failure buried in it (LA-399).
+          ...(hitPlanLimit(result) ? { isError: true } : {}),
         })
       } catch (err) {
         if (err instanceof ApiError) {
@@ -108,6 +111,17 @@ async function handleRequest(
       if (req.method.startsWith('notifications/')) return undefined
       return rpcError(id, -32601, `method not found: ${req.method}`)
   }
+}
+
+/** Whether a batch write's results include a plan_limit refusal. */
+function hitPlanLimit(result: unknown): boolean {
+  const results = (result as { results?: unknown })?.results
+  if (!Array.isArray(results)) return false
+  return results.some(
+    (r) =>
+      (r as { ok?: boolean })?.ok === false &&
+      (r as { current?: { error?: string } })?.current?.error === 'plan_limit',
+  )
 }
 
 function toolError(text: string) {

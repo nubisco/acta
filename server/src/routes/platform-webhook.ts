@@ -23,6 +23,8 @@ import type { ISqlDriver } from '../db'
 import { now } from '../core/ctx'
 import { acceptedPicture } from '../core/avatar'
 import { anonymiseAccount } from '../services/workspaceDeletion'
+import { PlanLimitError, assertWithinLimit } from '../core/edition'
+import { usageOf } from '../core/usage'
 
 interface IPlatformHookEnv {
   Variables: { db: ISqlDriver }
@@ -200,18 +202,31 @@ export function platformWebhookRoutes(
         // on the platform would otherwise stay locked out for good, because
         // sign-in refuses a disabled actor. Their old credentials stay
         // revoked: they sign in again and mint new ones.
-        const rows = await db.query<{ id: string }>(
-          `SELECT id FROM actor
+        const rows = await db.query<{ id: string; workspace_id: string }>(
+          `SELECT id, workspace_id FROM actor
             WHERE platform_user_id = ? AND kind = 'human'
               AND disabled = 1 AND disabled_source = 'platform'`,
           [user_id],
         )
-        await db.run(
-          `UPDATE actor SET disabled = 0, disabled_source = NULL
-            WHERE platform_user_id = ? AND kind = 'human'
-              AND disabled = 1 AND disabled_source = 'platform'`,
-          [user_id],
-        )
+        for (const row of rows) {
+          // Coming back counts against the workspace's member cap (LA-399).
+          // A workspace with no room keeps them disabled, and an admin can
+          // enable them once there is.
+          try {
+            await assertWithinLimit(
+              { db, workspaceId: row.workspace_id },
+              'members',
+              await usageOf(db, row.workspace_id, 'members'),
+            )
+          } catch (err) {
+            if (err instanceof PlanLimitError) continue
+            throw err
+          }
+          await db.run(
+            'UPDATE actor SET disabled = 0, disabled_source = NULL WHERE id = ?',
+            [row.id],
+          )
+        }
         // Someone who has never signed in has no actor yet, and needs none:
         // sign-in provisions them.
         return c.json({ ok: true, handled: rows.length > 0 })

@@ -1,4 +1,6 @@
 import { Hono } from 'hono'
+import { assertWithinLimit } from '../core/edition'
+import { usageOf } from '../core/usage'
 import { z } from 'zod'
 import { newId, zIngest } from '@nubisco/acta-shared'
 import { sha256Hex, workspaceGate } from '../core/auth'
@@ -233,6 +235,11 @@ export async function createIngestToken(
       throw new ApiError(404, `list ${input.list} not found`)
     listId = list[0].id
   }
+  await assertWithinLimit(
+    ctx,
+    'agents',
+    await usageOf(ctx.db, ctx.workspaceId, 'agents'),
+  )
   const actorId = newId('act')
   const handle = `${input.name
     .toLowerCase()

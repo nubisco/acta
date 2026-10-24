@@ -1,4 +1,6 @@
 import { Hono, type Context } from 'hono'
+import { assertWithinLimit } from '../core/edition'
+import { usageOf } from '../core/usage'
 import { z } from 'zod'
 import {
   zActivityQuery,
@@ -929,10 +931,33 @@ export function apiRoutes(
         /** Core identity field; SSO providers and self-hosted uploads both
          * write it here. null clears back to the initials fallback. */
         avatar_url: z.string().url().max(2000).nullable().optional(),
+        /**
+         * Over the plan's member cap after a downgrade (LA-399), the people an
+         * admin marks here keep write access first.
+         */
+        keeps_write: z.boolean().optional(),
       })
       .parse(await c.req.json())
     if (c.req.param('id') === ctx.actor.id && body.disabled)
       throw new ApiError(400, 'you cannot disable yourself')
+    if (body.disabled === false) {
+      // Enabling someone again brings them back into the member count.
+      const was = await ctx.db.query<{ disabled: number }>(
+        "SELECT disabled FROM actor WHERE workspace_id = ? AND id = ? AND kind = 'human'",
+        [ctx.workspaceId, c.req.param('id')],
+      )
+      if (was[0]?.disabled === 1)
+        await assertWithinLimit(
+          ctx,
+          'members',
+          await usageOf(ctx.db, ctx.workspaceId, 'members'),
+        )
+    }
+    if (body.keeps_write !== undefined)
+      await ctx.db.run(
+        "UPDATE actor SET keeps_write = ? WHERE workspace_id = ? AND id = ? AND kind = 'human'",
+        [body.keeps_write ? 1 : 0, ctx.workspaceId, c.req.param('id')],
+      )
     // An identity provider seeds an avatar so a new member arrives with a
     // face, but it must not overwrite one the person chose themselves: an
     // upload that silently reverts on the next sign-in reads as a bug.
@@ -1000,6 +1025,11 @@ export function apiRoutes(
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '')
+    await assertWithinLimit(
+      ctx,
+      'agents',
+      await usageOf(ctx.db, ctx.workspaceId, 'agents'),
+    )
     const actorId = newId('act')
     await ctx.db.run(
       `INSERT INTO actor (id, workspace_id, kind, handle, name, role, on_behalf_of, created_at)

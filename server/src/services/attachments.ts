@@ -1,4 +1,6 @@
 import { newId } from '@nubisco/acta-shared'
+import { assertCanWrite, assertWithinLimit } from '../core/edition'
+import { usageOf } from '../core/usage'
 import { z } from 'zod'
 import type { ICtx } from '../core/ctx'
 import { ApiError, now } from '../core/ctx'
@@ -58,6 +60,21 @@ export interface IBlobStore {
 
 /** Raw uploads bypass base64 and its 1 MB inline cap. */
 export const UPLOAD_MAX_BYTES = 26_214_400 // 25 MB
+
+/**
+ * The plan's file size and storage caps (LA-399), before a file is stored.
+ * Under the core edition only UPLOAD_MAX_BYTES applies.
+ */
+async function assertRoomFor(ctx: ICtx, bytes: number): Promise<void> {
+  await assertCanWrite(ctx)
+  await assertWithinLimit(ctx, 'file_bytes', 0, bytes)
+  await assertWithinLimit(
+    ctx,
+    'storage_bytes',
+    await usageOf(ctx.db, ctx.workspaceId, 'storage_bytes'),
+    bytes,
+  )
+}
 
 export class AttachmentStore {
   constructor(private blobs: IBlobStore) {}
@@ -158,6 +175,7 @@ export async function attachmentAdd(
         413,
         'inline attachments are capped at 1 MB; use the REST upload endpoint',
       )
+    await assertRoomFor(ctx, bytes.byteLength)
     await store.write(id, bytes)
     size = bytes.byteLength
   }
@@ -255,6 +273,7 @@ export async function attachmentUpload(
   const owner = input.item
     ? { kind: 'item' as const, row: await itemByKey(ctx, input.item) }
     : { kind: 'doc' as const, row: await docBySlug(ctx, input.doc!) }
+  await assertRoomFor(ctx, bytes.byteLength)
   const id = newId('att')
   await store.write(id, bytes)
   await ctx.db.run(
