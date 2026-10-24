@@ -10,10 +10,15 @@ export async function ftsUpsert(
   spaceKey = '',
 ): Promise<void> {
   if (!ctx.db.supportsFts) return
-  await ctx.db.run('DELETE FROM fts WHERE kind = ? AND ref = ?', [kind, ref])
+  // Refs (item keys, doc slugs) repeat across workspaces, so every statement
+  // is scoped to this one.
   await ctx.db.run(
-    'INSERT INTO fts (kind, ref, title, body, space_key) VALUES (?, ?, ?, ?, ?)',
-    [kind, ref, title, body, spaceKey],
+    'DELETE FROM fts WHERE kind = ? AND ref = ? AND workspace_id = ?',
+    [kind, ref, ctx.workspaceId],
+  )
+  await ctx.db.run(
+    'INSERT INTO fts (kind, ref, title, body, space_key, workspace_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [kind, ref, title, body, spaceKey, ctx.workspaceId],
   )
 }
 
@@ -23,5 +28,8 @@ export async function ftsDelete(
   ref: string,
 ): Promise<void> {
   if (!ctx.db.supportsFts) return
-  await ctx.db.run('DELETE FROM fts WHERE kind = ? AND ref = ?', [kind, ref])
+  await ctx.db.run(
+    'DELETE FROM fts WHERE kind = ? AND ref = ? AND workspace_id = ?',
+    [kind, ref, ctx.workspaceId],
+  )
 }

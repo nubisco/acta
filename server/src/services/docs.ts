@@ -668,9 +668,10 @@ async function applyDocOp(
       )
       await syncDocDerived(ctx, doc.id, newSlug, title, doc.body)
       if (newSlug !== doc.slug) {
-        await ctx.db.run("DELETE FROM fts WHERE kind = 'doc' AND ref = ?", [
-          doc.slug,
-        ])
+        await ctx.db.run(
+          "DELETE FROM fts WHERE kind = 'doc' AND ref = ? AND workspace_id = ?",
+          [doc.slug, ctx.workspaceId],
+        )
       }
       await emitEvent(
         ctx,
