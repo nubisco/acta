@@ -22,7 +22,11 @@
           <div>
             <h2 class="type-heading-01 billing__plan">
               {{ planName }}
-              <NbBadge size="sm" :variant="stateBadge.variant">
+              <NbBadge
+                v-if="state.state !== 'free'"
+                size="sm"
+                :variant="stateBadge.variant"
+              >
                 {{ stateBadge.label }}
               </NbBadge>
             </h2>
@@ -299,7 +303,8 @@ const METERS: { key: string; label: string; bytes?: boolean }[] = [
 
 function size(bytes: number): string {
   const gb = bytes / 1024 ** 3
-  if (gb >= 1) return `${gb.toFixed(gb >= 10 ? 0 : 1)} GB`
+  if (gb >= 1)
+    return `${Number.isInteger(gb) || gb >= 10 ? Math.round(gb) : gb.toFixed(1)} GB`
   return `${Math.max(0, Math.round(bytes / 1024 ** 2))} MB`
 }
 
