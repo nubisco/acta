@@ -123,7 +123,7 @@ Acta is open core, and the split is by directory ([LICENSE](./LICENSE)):
 
 What the hosted service at acta.nubisco.io sells is operations, scale and those business controls, not features withheld from the code. [OPEN_CORE_MODEL.md](./OPEN_CORE_MODEL.md) explains the split and [COMMERCIAL.md](./COMMERCIAL.md) covers commercial use.
 
-Every release up to and including v1.59.0 was MIT licensed and stays so. See [NOTICE.md](./NOTICE.md).
+Every release up to and including v1.60.0 was MIT licensed and stays so. See [NOTICE.md](./NOTICE.md).
 
 "Acta", "Nubisco", and the Nubisco logo are trademarks of Nubisco, Lda. No license here grants permission to use them. Forks and derived products must use their own names and branding.
 

@@ -2,12 +2,12 @@
 
 ## License change
 
-Acta was published under the MIT License up to and including **v1.59.0**.
+Acta was published under the MIT License up to and including **v1.60.0**.
 Those releases, and copies of the source taken from them, stay under the MIT
 License for good. Nothing about this change withdraws a right anyone already
 has.
 
-Releases after v1.59.0 are licensed as described in [LICENSE](./LICENSE): the
+Releases after v1.60.0 are licensed as described in [LICENSE](./LICENSE): the
 core under AGPL-3.0-or-later, and `packages/ee/` under the proprietary Acta
 Enterprise Edition License.
 
