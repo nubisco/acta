@@ -88,12 +88,14 @@ For anything security-related, do not open an issue. See
 To keep Acta sustainable and legally consistent, contributions are made under
 the Individual CLA:
 
-- See [docs/CLA-INDIVIDUAL.md](./docs/CLA-INDIVIDUAL.md)
+- See [CLA.md](./CLA.md)
 - You keep ownership of your contributions
 - You grant Nubisco a broad licence to use them in the project and related works
 
 By opening a pull request you confirm you agree to the CLA in the pull request
-template, and you agree to licence your contribution under the MIT licence.
+template, and you licence your contribution to the core under AGPL-3.0-or-later.
+A CI check refuses a pull request whose CLA boxes are not ticked. Changes to
+`packages/ee/` are not accepted from outside Nubisco.
 
 ## Code of Conduct
 

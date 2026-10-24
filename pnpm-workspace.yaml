@@ -3,6 +3,7 @@ packages:
   - web
   - shared
   - importers
+  - packages/ee
 
 # The only dependencies whose install scripts run. This lived under "pnpm" in
 # package.json, which pnpm 10 no longer reads.

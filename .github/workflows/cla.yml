@@ -1,0 +1,36 @@
+name: CLA
+
+# Refuses a pull request whose CLA confirmation in the template is not ticked
+# (CLA.md, section 8). Nubisco's own people and bots are covered already and
+# skip it. The body is read from the event through an environment variable,
+# never interpolated into the script, so a crafted description cannot run.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the CLA confirmation
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          ASSOCIATION: ${{ github.event.pull_request.author_association }}
+          AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+        run: |
+          case "$ASSOCIATION" in
+            OWNER|MEMBER) echo "Nubisco member, covered."; exit 0 ;;
+          esac
+          if [ "$AUTHOR_TYPE" = "Bot" ]; then echo "Bot, skipped."; exit 0; fi
+          missing=0
+          printf '%s' "$BODY" | grep -qiF -- '- [x] I have read `CLA.md` and I agree to its terms' || missing=1
+          printf '%s' "$BODY" | grep -qiF -- '- [x] I confirm I am legally entitled to submit this contribution under the CLA' || missing=1
+          if [ "$missing" = 1 ]; then
+            echo "::error::Tick both CLA boxes in the pull request description (see CLA.md)."
+            exit 1
+          fi
+          echo "CLA confirmed."
