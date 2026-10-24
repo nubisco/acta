@@ -314,10 +314,17 @@ watch(welcomeOpen, (open) => (tours.held.value = open), { immediate: true })
  * is version-gated: bumping the tour shows it once to everyone, which is how
  * an existing workspace hears about a shell that has changed under them.
  */
+const onSignup = computed(() => route.name === 'signup')
 watch(
-  () => ws.me.value,
-  (me) => {
+  () => [ws.me.value, onSignup.value] as const,
+  ([me, signingUp], previous) => {
     if (!me) return
+    // Signup has its own steps (LA-398). The welcome waits until they are
+    // done and the person lands in their workspace, rather than covering them.
+    if (signingUp) return
+    // Only a new person, or someone just leaving signup. Any other move
+    // between pages leaves the welcome and the tour alone.
+    if (previous && previous[0] === me && !previous[1]) return
     if (me.onboarded === false) welcomeOpen.value = true
     else void tour.maybeAutoStart()
   },

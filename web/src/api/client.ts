@@ -81,6 +81,24 @@ export interface IInvitation {
   created_at: number
 }
 
+/** What the signup page draws itself from (EE, LA-398). */
+export interface ISignupState {
+  identity: {
+    email: string
+    name: string
+    source: 'session' | 'pending'
+  } | null
+  owned?: number
+  cap?: number
+  can_create?: boolean
+  terms: {
+    version: string
+    terms_url: string | null
+    privacy_url: string | null
+  } | null
+  sales_url: string | null
+}
+
 /** An export of the whole workspace, as an admin sees it (LA-401). */
 export interface IWorkspaceExport {
   id: string
@@ -183,7 +201,34 @@ export const auth = {
       sso_label?: string
       nubisco_platform?: boolean
       platform_url?: string
+      /** Whether a person with no workspace can create one here (EE). */
+      signup?: boolean
+      /** Where the Nubisco Analytics tracker is served from, if anywhere. */
+      analytics_url?: string
     }>('/auth/config'),
+
+  /**
+   * Signup (EE, LA-398): who is signing up, how many workspaces they may still
+   * create, and the terms they accept. Public: a person signing up for the
+   * first time has a signup cookie, not a session.
+   */
+  signupState: () => req<ISignupState>('/auth/signup/state'),
+
+  /** The address a name would get, or whether a chosen one is free. */
+  signupSlug: (q: { name?: string; slug?: string }) =>
+    req<{ slug: string; available: boolean; problem: string | null }>(
+      `/auth/signup/slug?${new URLSearchParams(q as Record<string, string>)}`,
+    ),
+
+  createWorkspace: (body: {
+    name: string
+    slug?: string
+    terms_version?: string
+  }) =>
+    req<{ workspace_id: string; slug: string }>('/auth/signup/workspaces', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   /**
    * A fresh sign-in through Acta's own SSO start. Switching accounts is

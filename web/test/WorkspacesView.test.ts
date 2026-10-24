@@ -21,13 +21,21 @@ vi.mock('vue-router', () => ({
 
 const slug = ref('')
 let list = [{ id: 'w1', name: 'Acme', slug: 'acme' }]
+const signupEnabled = ref(false)
 vi.mock('@/stores/workspace', () => ({
   useWorkspace: () => ({
     me: computed(() => ({ id: 'a1' })),
     loadMe: vi.fn(async () => true),
     workspaceSlug: computed(() => slug.value),
     listWorkspaces: vi.fn(async () => list),
+    loadAuthConfig: vi.fn(async () => undefined),
+    signupEnabled: computed(() => signupEnabled.value),
   }),
+}))
+
+const signupState = vi.fn()
+vi.mock('@/api/client', () => ({
+  auth: { signupState: () => signupState() },
 }))
 
 import WorkspacesView from '@/views/WorkspacesView.vue'
@@ -38,6 +46,8 @@ beforeEach(() => {
   query.value = {}
   slug.value = ''
   list = [{ id: 'w1', name: 'Acme', slug: 'acme' }]
+  signupEnabled.value = false
+  signupState.mockReset()
 })
 
 describe('the workspace list', () => {
@@ -83,5 +93,40 @@ describe('the workspace list', () => {
       key: 'Enter',
     })
     expect(push).toHaveBeenCalledWith('/globex/s/ST?item=ST-4')
+  })
+
+  it('offers no workspace creation where the instance has no signup', async () => {
+    slug.value = 'acme'
+    const wrapper = mount(WorkspacesView)
+    await flushPromises()
+    expect(signupState).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Create a workspace')
+  })
+
+  it('offers to create one within the cap, and sales above it', async () => {
+    slug.value = 'acme'
+    signupEnabled.value = true
+    signupState.mockResolvedValue({
+      identity: { email: 'a@b.c', name: 'A', source: 'session' },
+      can_create: true,
+      terms: null,
+      sales_url: 'https://nubisco.io/contact',
+    })
+    const open = mount(WorkspacesView)
+    await flushPromises()
+    expect(open.text()).toContain('Create a workspace')
+
+    signupState.mockResolvedValue({
+      identity: { email: 'a@b.c', name: 'A', source: 'session' },
+      can_create: false,
+      terms: null,
+      sales_url: 'https://nubisco.io/contact',
+    })
+    const full = mount(WorkspacesView)
+    await flushPromises()
+    expect(full.text()).not.toContain('Create a workspace')
+    expect(full.find('a[href="https://nubisco.io/contact"]').exists()).toBe(
+      true,
+    )
   })
 })

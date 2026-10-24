@@ -36,6 +36,15 @@ export const routes: RouteRecordRaw[] = [
     meta: { public: true, frameless: true, title: 'Invitation' },
   },
   {
+    // Signup and onboarding (EE, LA-398). Public: someone signing up for the
+    // first time has a signup cookie, not a session, and the page works out
+    // which it is from the server.
+    path: '/signup',
+    name: 'signup',
+    component: () => import('./views/SignupView.vue'),
+    meta: { public: true, frameless: true, title: 'Create a workspace' },
+  },
+  {
     // The entry point, the way CMS and Verba have one. Skips straight
     // through when there is only one workspace to choose.
     path: '/',

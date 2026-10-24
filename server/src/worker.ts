@@ -17,6 +17,7 @@ import { rateLimitersFromBindings } from './core/rateLimit'
 import { hubLive, type IHubNamespace } from './live-hub'
 import { AttachmentStore, type IBlobStore } from './services/attachments'
 import { maintenanceTick } from './services/maintenance'
+import { currentEdition } from './core/edition'
 import {
   channelsFromEnv,
   notificationSweep,
@@ -81,6 +82,8 @@ interface IWorkerEnv {
   ACTA_RESEND_API_KEY?: string
   /** The From address on those emails. Must be a verified Resend sender. */
   ACTA_EMAIL_FROM?: string
+  /** Where the Nubisco Analytics tracker is served from. Unset, none loads. */
+  ACTA_ANALYTICS_URL?: string
 }
 
 /** What a cron trigger hands the scheduled handler. */
@@ -165,6 +168,10 @@ function getApp(env: IWorkerEnv, origin: string): Promise<Hono<IAppEnv>> {
       emailSender: emailSenderFromEnv(
         env as unknown as Record<string, string | undefined>,
       ),
+      // An Enterprise Edition reads its own settings from here (signup's
+      // terms version, for one). The core reads none of it.
+      editionEnv: env as unknown as Record<string, string | undefined>,
+      analyticsUrl: env.ACTA_ANALYTICS_URL,
       bootstrap: {
         workspaceName: env.ACTA_WORKSPACE ?? 'Workspace',
         adminEmail: env.ACTA_ADMIN_EMAIL,
@@ -235,5 +242,17 @@ export default {
       ),
       baseUrl: env.ACTA_BASE_URL,
     })
+    // The edition's own cron work (signup's Free inactivity job). After the
+    // core's, and its failure is the edition's to log, never the core's.
+    await currentEdition()
+      .scheduled?.({
+        db: driver,
+        send: emailSenderFromEnv(
+          env as unknown as Record<string, string | undefined>,
+        ),
+        baseUrl: env.ACTA_BASE_URL,
+        env: env as unknown as Record<string, string | undefined>,
+      })
+      .catch((err) => console.error('edition tick failed', err))
   },
 }

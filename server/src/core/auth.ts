@@ -98,13 +98,23 @@ export async function workspaceBySlug(
   db: ISqlDriver,
   slug: string,
 ): Promise<
-  | (IWorkspaceRow & { suspended_at: number | null; purge_at: number | null })
+  | (IWorkspaceRow & {
+      suspended_at: number | null
+      purge_at: number | null
+      frozen_at: number | null
+      last_seen_at: number | null
+    })
   | null
 > {
   const rows = await db.query<
-    IWorkspaceRow & { suspended_at: number | null; purge_at: number | null }
+    IWorkspaceRow & {
+      suspended_at: number | null
+      purge_at: number | null
+      frozen_at: number | null
+      last_seen_at: number | null
+    }
   >(
-    'SELECT id, name, slug, suspended_at, purge_at FROM workspace WHERE slug = ?',
+    'SELECT id, name, slug, suspended_at, purge_at, frozen_at, last_seen_at FROM workspace WHERE slug = ?',
     [slug],
   )
   return rows[0] ?? null
@@ -120,16 +130,68 @@ export async function workspaceBySlug(
 export async function workspaceGate(
   db: ISqlDriver,
   workspaceId: string,
-): Promise<{ suspended: boolean; purgeAt: number | null }> {
+): Promise<{
+  suspended: boolean
+  purgeAt: number | null
+  frozenAt: number | null
+  lastSeenAt: number | null
+}> {
   const rows = await db.query<{
     suspended_at: number | null
     purge_at: number | null
-  }>('SELECT suspended_at, purge_at FROM workspace WHERE id = ?', [workspaceId])
+    frozen_at: number | null
+    last_seen_at: number | null
+  }>(
+    'SELECT suspended_at, purge_at, frozen_at, last_seen_at FROM workspace WHERE id = ?',
+    [workspaceId],
+  )
   const row = rows[0]
   return {
     suspended: row?.suspended_at !== null && row?.suspended_at !== undefined,
     purgeAt: row?.purge_at ?? null,
+    frozenAt: row?.frozen_at ?? null,
+    lastSeenAt: row?.last_seen_at ?? null,
   }
+}
+
+const SEEN_PRECISION_MS = 24 * 60 * 60 * 1000
+
+/**
+ * A person opened this workspace in a browser (a session, not a token).
+ *
+ * Records it at day precision, which is all the inactivity job (signup,
+ * LA-398) measures by, so it costs one write a day per workspace rather than
+ * one per request. It also lifts an inactivity freeze and its warning: a
+ * person coming back is the activity the job was waiting for. Tokens and
+ * agents count for neither, because a bot writing on its own into a
+ * workspace nobody opens is what the freeze is for.
+ */
+export async function notePersonSeen(
+  db: ISqlDriver,
+  workspaceId: string,
+  gate: { frozenAt: number | null; lastSeenAt: number | null },
+  at = now(),
+): Promise<void> {
+  if (gate.frozenAt !== null) {
+    await db.run(
+      `UPDATE workspace SET frozen_at = NULL, inactivity_warned_at = NULL,
+              last_seen_at = ? WHERE id = ?`,
+      [at, workspaceId],
+    )
+    return
+  }
+  if (gate.lastSeenAt === null || at - gate.lastSeenAt >= SEEN_PRECISION_MS) {
+    await db.run(
+      `UPDATE workspace SET last_seen_at = ?, inactivity_warned_at = NULL
+        WHERE id = ?`,
+      [at, workspaceId],
+    )
+  }
+}
+
+/** What a frozen workspace still allows anyone who is not a person in a browser. */
+export function allowedWhileFrozen(method: string): boolean {
+  return method === 'GET' || method === 'HEAD'
 }
 
 /**

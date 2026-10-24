@@ -221,6 +221,8 @@ export const INSTANCE_TABLES = new Set([
   'link_preview',
   'oauth_client',
   'workspace',
+  // A signup in progress belongs to a person, not yet to any workspace.
+  'signup_intent',
 ])
 
 /**
@@ -246,27 +248,10 @@ export async function purgeWorkspace(
   budget: IBudget,
 ): Promise<boolean> {
   if (db.supportsFts) {
-    // Comments are indexed by id. Cards and pages by key and slug, which are
-    // only unique inside a workspace, so a key another workspace also uses is
-    // left alone rather than taking its row out of that workspace's search.
+    // Every index row carries its workspace, so the purge takes exactly this
+    // workspace's rows and never another's that shares a key or slug.
     const fts: [string, unknown[]][] = [
-      [
-        `SELECT rowid AS id FROM fts WHERE kind = 'comment'
-           AND ref IN (SELECT id FROM comment WHERE workspace_id = ?)`,
-        [workspaceId],
-      ],
-      [
-        `SELECT rowid AS id FROM fts WHERE kind = 'item'
-           AND ref IN (SELECT key FROM item WHERE workspace_id = ?
-                        AND key NOT IN (SELECT key FROM item WHERE workspace_id != ?))`,
-        [workspaceId, workspaceId],
-      ],
-      [
-        `SELECT rowid AS id FROM fts WHERE kind = 'doc'
-           AND ref IN (SELECT slug FROM document WHERE workspace_id = ?
-                        AND slug NOT IN (SELECT slug FROM document WHERE workspace_id != ?))`,
-        [workspaceId, workspaceId],
-      ],
+      ['SELECT rowid AS id FROM fts WHERE workspace_id = ?', [workspaceId]],
     ]
     for (const [select, params] of fts)
       if (!(await deleteInBatches(db, budget, 'fts', select, params)))

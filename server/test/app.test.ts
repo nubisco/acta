@@ -53,6 +53,8 @@ describe('server skeleton', () => {
       sso_label: 'single sign-on',
       // No provider at all, so nothing platform-specific is offered.
       nubisco_platform: false,
+      // Self-serve signup is an EE feature, and no EE is registered.
+      signup: false,
     })
 
     const otp = await app.request('/api/v1/auth/otp', {

@@ -13,6 +13,7 @@ import {
   subscribeEvents,
 } from '@/api/client'
 import type { ILiveEvent, IOverview } from '@/types/api'
+import { initAnalytics } from '@/composables/useAnalytics'
 
 export interface IWorkspaceSummary {
   id: string
@@ -155,12 +156,17 @@ let inboxLoaded = false
 const authConfig = ref<{
   nubisco_platform?: boolean
   platform_url?: string
+  signup?: boolean
+  analytics_url?: string
 } | null>(null)
 
 async function loadAuthConfig(): Promise<void> {
   if (authConfig.value) return
   try {
     authConfig.value = await auth.config()
+    // The tracker loads only where the instance names one (the hosted
+    // service). Self-hosted instances load nothing.
+    void initAnalytics(authConfig.value.analytics_url)
   } catch {
     // Left null, which reads as "not the platform" everywhere below, so a
     // failed read hides the platform parts rather than showing broken ones.
@@ -424,6 +430,14 @@ export function useWorkspace() {
     await api.notificationRead(id).catch(() => undefined)
   }
 
+  /**
+   * After a workspace is created: the list is cached for the session, and the
+   * new one has to be in it.
+   */
+  function forgetWorkspaces(): void {
+    workspaces.value = []
+  }
+
   async function logout(): Promise<void> {
     await auth.logout()
     me.value = null
@@ -444,6 +458,10 @@ export function useWorkspace() {
     ),
     /** Nubisco Platform's address, or null when sign-in goes elsewhere. */
     platformUrl: computed(() => authConfig.value?.platform_url ?? null),
+    /** Whether people can create workspaces here (the hosted service). */
+    signupEnabled: computed(() => authConfig.value?.signup === true),
+    loadAuthConfig,
+    forgetWorkspaces,
     connectionDown: computed(() => connectionDown.value),
     workspaceSlug: computed(() => workspaceSlug.value),
     workspaces: computed(() => workspaces.value),

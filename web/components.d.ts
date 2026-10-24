@@ -68,6 +68,8 @@ declare module 'vue' {
     NbSidebarMenuItem: typeof import('@nubisco/ui/components/SidebarMenuItem')['NbSidebarMenuItem']
     NbSkeleton: typeof import('@nubisco/ui/components/Skeleton')['NbSkeleton']
     NbSpinner: typeof import('@nubisco/ui/components/Spinner')['NbSpinner']
+    NbStepper: typeof import('@nubisco/ui/components/Stepper')['NbStepper']
+    NbStepperStep: typeof import('@nubisco/ui/components/StepperStep')['NbStepperStep']
     NbSubmenu: typeof import('@nubisco/ui/components/Submenu')['NbSubmenu']
     NbSwitch: typeof import('@nubisco/ui/components/Switch')['NbSwitch']
     NbTableOfContents: typeof import('@nubisco/ui/components/TableOfContents')['NbTableOfContents']

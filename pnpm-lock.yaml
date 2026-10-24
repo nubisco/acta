@@ -79,13 +79,17 @@ importers:
         version: 5.9.3
 
   packages/ee:
+    dependencies:
+      hono:
+        specifier: ^4.13.13
+        version: 4.13.13
+      zod:
+        specifier: ^4.3.5
+        version: 4.5.4
     devDependencies:
       '@types/bun':
         specifier: ^1.3.4
         version: 1.4.1
-      hono:
-        specifier: ^4.13.13
-        version: 4.13.13
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

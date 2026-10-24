@@ -234,6 +234,25 @@ Changing it makes every stored provider key unreadable, and an admin has to
 enter the key again. The report rides the same cron as the sweep above, and
 claims each local date once, so a retried cron never posts twice.
 
+## Hosted signup (Enterprise Edition)
+
+Read only by the Enterprise Edition's signup (see
+[Authentication](/developers/authentication#hosted-signup-enterprise-edition)).
+A self-hosted build ignores them.
+
+| Variable             | Default | What it does                                                                                 |
+| -------------------- | ------- | -------------------------------------------------------------------------------------------- |
+| `ACTA_TERMS_VERSION` | _unset_ | The terms and privacy version a creator must accept. Unset, signup asks for no acceptance.   |
+| `ACTA_TERMS_URL`     | _unset_ | Where the terms of service are, linked from the signup page.                                 |
+| `ACTA_PRIVACY_URL`   | _unset_ | Where the privacy notice is, linked from the signup page.                                    |
+| `ACTA_SALES_URL`     | _unset_ | Where "Contact sales" points once an account has its one workspace. Unset, no link is shown. |
+
+## Analytics
+
+| Variable             | Default | What it does                                                                                                                 |
+| -------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `ACTA_ANALYTICS_URL` | _unset_ | Where a Nubisco Analytics tracker is served from. Set, the app loads it and records the signup funnel. Unset, nothing loads. |
+
 ## Importer variables
 
 Used by the [migration CLIs](/developers/migrate-trello), not by the server.

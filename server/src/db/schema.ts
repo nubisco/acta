@@ -787,6 +787,20 @@ CREATE TABLE IF NOT EXISTS workspace_export (
 );
 CREATE INDEX IF NOT EXISTS idx_workspace_export_ws ON workspace_export(workspace_id, created_at);
 
+-- A person the identity provider vouched for who belongs to no workspace yet,
+-- waiting to create one (LA-398, signup). The cookie holds the token, this
+-- holds its hash and what the provider said, for half an hour. Instance-wide:
+-- there is no workspace to belong to until the signup finishes.
+CREATE TABLE IF NOT EXISTS signup_intent (
+  token_hash TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  name TEXT,
+  platform_user_id TEXT,
+  picture TEXT,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+
 -- When an instance-wide cron job last finished, for the ones that run daily
 -- rather than on every five-minute tick (retention, the size check).
 CREATE TABLE IF NOT EXISTS instance_job (
@@ -1174,4 +1188,30 @@ export const ADDITIVE_COLUMNS = [
   'CREATE INDEX IF NOT EXISTS idx_webhook_delivery_created ON webhook_delivery(created_at)',
   'CREATE INDEX IF NOT EXISTS idx_notification_read ON notification(read_at) WHERE read_at IS NOT NULL',
   'CREATE INDEX IF NOT EXISTS idx_workspace_purge ON workspace(purge_at) WHERE purge_at IS NOT NULL',
+  // LA-398, signup. Who created a workspace through signup, which is what the
+  // one-per-account cap counts. Stored lowercased. Workspaces made before
+  // signup existed have no owner and count against nobody.
+  'ALTER TABLE workspace ADD COLUMN owner_email TEXT',
+  'ALTER TABLE workspace ADD COLUMN owner_platform_user_id TEXT',
+  // The terms the creator accepted, and when. Null where no terms were
+  // configured at the time (self-hosted, or before the documents existed).
+  'ALTER TABLE workspace ADD COLUMN terms_version TEXT',
+  'ALTER TABLE workspace ADD COLUMN terms_accepted_at INTEGER',
+  // The Free inactivity ladder: when the admins were warned, and when the
+  // workspace was made read-only for being idle. A person opening it again
+  // clears both.
+  'ALTER TABLE workspace ADD COLUMN inactivity_warned_at INTEGER',
+  'ALTER TABLE workspace ADD COLUMN frozen_at INTEGER',
+  // When a person last opened the workspace in a browser, at day precision
+  // (stamped at most once a day). What the inactivity job measures idleness
+  // by: an agent writing on its own is not someone using the workspace.
+  'ALTER TABLE workspace ADD COLUMN last_seen_at INTEGER',
+  // Workspaces that predate the column count as seen when it arrived, never
+  // as idle since their creation, which would put a years-old workspace at
+  // the end of the inactivity ladder on its first run. New ones are stamped
+  // when created, so after the first migrate this matches nothing.
+  `UPDATE workspace SET last_seen_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+    WHERE last_seen_at IS NULL`,
+  'CREATE INDEX IF NOT EXISTS idx_workspace_owner_email ON workspace(owner_email) WHERE owner_email IS NOT NULL',
+  'CREATE INDEX IF NOT EXISTS idx_workspace_owner_sub ON workspace(owner_platform_user_id) WHERE owner_platform_user_id IS NOT NULL',
 ]
