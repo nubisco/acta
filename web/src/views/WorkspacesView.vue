@@ -24,8 +24,18 @@
       v-else-if="workspaces.length === 0"
       size="sm"
       title="No workspaces yet"
-      description="This account is not a member of any workspace. Ask an admin to add you."
-    />
+      :description="
+        canCreate
+          ? 'Create one of your own, or ask an admin to invite you to theirs.'
+          : 'This account is not a member of any workspace. Ask an admin to invite you.'
+      "
+    >
+      <template v-if="canCreate" #actions>
+        <NbButton variant="primary" icon="plus" :to="{ name: 'signup' }">
+          Create a workspace
+        </NbButton>
+      </template>
+    </NbEmptyState>
 
     <NbCardGrid v-else min="16rem" class="workspaces__grid">
       <NbCard
@@ -46,6 +56,28 @@
         </template>
       </NbCard>
     </NbCardGrid>
+
+    <!-- Signup (EE): only where the instance offers it, and within the
+         per-account cap. Above it, the way to more is sales. -->
+    <footer
+      v-if="!loading && workspaces.length > 0 && signup"
+      class="workspaces__more"
+    >
+      <NbButton
+        v-if="signup.can_create"
+        variant="secondary"
+        icon="plus"
+        :to="{ name: 'signup' }"
+      >
+        Create a workspace
+      </NbButton>
+      <p v-else-if="signup.sales_url" class="workspaces__note">
+        Need another workspace?
+        <a :href="signup.sales_url" target="_blank" rel="noopener"
+          >Contact sales</a
+        >.
+      </p>
+    </footer>
   </div>
 </template>
 
@@ -63,6 +95,7 @@
  */
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { auth, type ISignupState } from '@/api/client'
 import { humanise } from '@/lib/state'
 import { useWorkspace, type IWorkspaceSummary } from '@/stores/workspace'
 
@@ -95,6 +128,20 @@ function choose(workspace: IWorkspaceSummary): void {
 const workspaces = ref<IWorkspaceSummary[]>([])
 const loading = ref(true)
 const error = ref('')
+/** Null where the instance has no signup, or before it is known. */
+const signup = ref<ISignupState | null>(null)
+const canCreate = computed(() => signup.value?.can_create === true)
+
+async function loadSignup(): Promise<void> {
+  await ws.loadAuthConfig()
+  if (!ws.signupEnabled.value) return
+  try {
+    signup.value = await auth.signupState()
+  } catch {
+    // No button rather than a broken one.
+    signup.value = null
+  }
+}
 
 async function load(): Promise<void> {
   try {
@@ -107,6 +154,7 @@ async function load(): Promise<void> {
       void router.replace(destinationIn(workspaces.value[0]))
       return
     }
+    await loadSignup()
   } catch (err) {
     error.value = humanise(err)
   } finally {
@@ -143,8 +191,14 @@ void load()
 
   &__banner,
   &__loading,
-  &__grid {
+  &__grid,
+  &__more {
     inline-size: min(40rem, 100%);
+  }
+
+  &__note {
+    margin: 0;
+    color: var(--nb-c-text-subtle);
   }
 
   &__loading {
@@ -167,7 +221,8 @@ void load()
 
     .workspaces__banner,
     .workspaces__loading,
-    .workspaces__grid {
+    .workspaces__grid,
+    .workspaces__more {
       inline-size: 100%;
     }
   }
