@@ -96,6 +96,7 @@ describe('external sso', () => {
       nubisco_platform: false,
       // Self-serve signup is an EE feature, and no EE is registered.
       signup: false,
+      plans: false,
     })
   })
 
@@ -139,6 +140,7 @@ describe('external sso', () => {
       nubisco_platform: false,
       // Self-serve signup is an EE feature, and no EE is registered.
       signup: false,
+      plans: false,
     })
   })
 

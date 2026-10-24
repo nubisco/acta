@@ -402,31 +402,27 @@ export async function createApp(
 
   // Workspace-scoped API: the segment names the workspace, and the middleware
   // resolves who you are inside it. This is the path the app uses.
-  app.use('/api/v1/w/:workspace/*', requireWorkspace())
-  app.route(
-    '/api/v1/w/:workspace',
-    apiRoutes(store, {
+  // The workspace API, with the edition's own workspace routes on it (plans
+  // and billing, LA-399). The core edition adds nothing.
+  const workspaceApi = () => {
+    const api = apiRoutes(store, {
       remoteFetchDeps: opts.remoteFetchDeps,
       liveSocket: opts.live?.socket,
       report: reportOpts,
       invites: { send: opts.emailSender, baseUrl: opts.baseUrl },
-    }),
-  )
+    })
+    currentEdition().mountWorkspaceRoutes?.(api, editionDeps)
+    return api
+  }
+  app.use('/api/v1/w/:workspace/*', requireWorkspace())
+  app.route('/api/v1/w/:workspace', workspaceApi())
 
   // The same API without a workspace segment, meaning "the workspace this
   // token was minted in". Agent tokens, the MCP server and the importers all
   // address Acta this way, and a token is a grant on one workspace, so there
   // is nothing for them to choose.
   app.use('/api/v1/*', requireAuth())
-  app.route(
-    '/api/v1',
-    apiRoutes(store, {
-      remoteFetchDeps: opts.remoteFetchDeps,
-      liveSocket: opts.live?.socket,
-      report: reportOpts,
-      invites: { send: opts.emailSender, baseUrl: opts.baseUrl },
-    }),
-  )
+  app.route('/api/v1', workspaceApi())
 
   /**
    * CORS for the MCP endpoint.

@@ -21,12 +21,16 @@
  *   to no workspace. The core refuses them (not_a_member). Signup instead
  *   sends them on to create one.
  * - scheduled: work for the cron tick (signup's Free inactivity job).
+ * - raiseLimit, writeBlock, historyDays: plans (LA-399). A cap the edition can
+ *   lift by billing for it, what a downgrade makes read-only, and how long
+ *   history is kept.
  * - features: named capabilities the SPA reads from /auth/config, so it shows
  *   signup only where signup exists.
  */
 
 import type { Context, Hono } from 'hono'
 import type { IAppEnv } from '../app'
+import type { IAuthEnv } from '../routes/auth'
 import type { ISqlDriver } from '../db'
 import { ApiError, type ICtx } from './ctx'
 import type { TEmailSender } from './email'
@@ -93,6 +97,12 @@ export interface IEdition {
   name: string
   getLimits(db: ISqlDriver, workspaceId: string): Promise<TPlanLimits>
   mountRoutes?(app: Hono<IAppEnv>, deps: IEditionDeps): void
+  /**
+   * Routes inside the workspace API, after its auth middleware: the handler
+   * reads db, workspaceId and actor from the context like any API route.
+   * Mounted on both the /api/v1/w/:workspace and the bare /api/v1 router.
+   */
+  mountWorkspaceRoutes?(app: Hono<IAuthEnv>, deps: IEditionDeps): void
   /** Named capabilities, reported by /auth/config. */
   features?: string[]
   /**
@@ -106,6 +116,39 @@ export interface IEdition {
   ): Promise<Response | null>
   /** Runs on the cron tick, after the core's own work. */
   scheduled?(deps: IEditionTickDeps): Promise<void>
+  /**
+   * Called when a creation would pass a cap, before it is refused. Answer true
+   * when the edition raised the cap to `needed` (Acta Team buys one more
+   * member, LA-399), so the creation goes ahead. With `dryRun` it only says
+   * whether it could, and changes nothing.
+   */
+  raiseLimit?(
+    db: ISqlDriver,
+    workspaceId: string,
+    resource: TLimitedResource,
+    needed: number,
+    opts: { dryRun: boolean },
+  ): Promise<boolean>
+  /**
+   * Whether this write may go ahead on a workspace over its plan's caps after
+   * a downgrade. Nothing is deleted on a downgrade: what is over the cap
+   * becomes read-only instead. Answer the refusal, or null.
+   */
+  writeBlock?(
+    db: ISqlDriver,
+    workspaceId: string,
+    target: IWriteTarget,
+  ): Promise<PlanLimitError | null>
+  /** Days of history the workspace keeps. null keeps the core default. */
+  historyDays?(db: ISqlDriver, workspaceId: string): Promise<number | null>
+}
+
+/** Who is writing, and where, for writeBlock. */
+export interface IWriteTarget {
+  actorId: string
+  actorKind: 'human' | 'agent' | 'system'
+  /** The space the write lands in, when it lands in one. */
+  spaceId?: string
 }
 
 export const CORE_EDITION: IEdition = {
@@ -149,6 +192,18 @@ export interface IPlanLimitDetail {
   current: number
 }
 
+function describe(resource: TLimitedResource, n: number): string {
+  if (resource === 'storage_bytes' || resource === 'file_bytes') {
+    const mb = n / (1024 * 1024)
+    const size =
+      mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.ceil(mb)} MB`
+    return resource === 'file_bytes'
+      ? `files up to ${size}`
+      : `${size} of storage`
+  }
+  return `${n} ${resource}`
+}
+
 /**
  * 402 when a plan caps this resource. The message is a sentence a person, or
  * a model reading an MCP result, can act on. `current` carries the detail.
@@ -157,7 +212,9 @@ export class PlanLimitError extends ApiError {
   constructor(resource: TLimitedResource, limit: number, current: number) {
     super(
       402,
-      `This workspace's plan allows ${limit} ${resource.replace('_', ' ')}, and it has ${current}. Upgrade the plan to add more.`,
+      resource === 'file_bytes'
+        ? `This workspace's plan allows ${describe(resource, limit)}. Upgrade the plan for larger files.`
+        : `This workspace's plan allows ${describe(resource, limit)}, and it has ${describe(resource, current)}. Upgrade the plan to add more.`,
       {
         error: 'plan_limit',
         resource,
@@ -177,13 +234,38 @@ export class PlanLimitError extends ApiError {
  * never refuses anything.
  */
 export async function assertWithinLimit(
-  ctx: ICtx,
+  ctx: Pick<ICtx, 'db' | 'workspaceId'>,
   resource: TLimitedResource,
   current: number,
   adding = 1,
+  opts: { dryRun?: boolean } = {},
 ): Promise<void> {
   const limit = (await getLimits(ctx.db, ctx.workspaceId))[resource]
-  if (limit !== null && current + adding > limit) {
-    throw new PlanLimitError(resource, limit, current)
-  }
+  if (limit === null || current + adding <= limit) return
+  const raised = await edition.raiseLimit?.(
+    ctx.db,
+    ctx.workspaceId,
+    resource,
+    current + adding,
+    { dryRun: opts.dryRun ?? false },
+  )
+  if (raised) return
+  throw new PlanLimitError(resource, limit, current)
+}
+
+/**
+ * Refuses a write the plan has made read-only: a space or a member over the
+ * caps after a downgrade. The core edition never refuses.
+ */
+export async function assertCanWrite(
+  ctx: ICtx,
+  spaceId?: string,
+): Promise<void> {
+  if (!edition.writeBlock) return
+  const block = await edition.writeBlock(ctx.db, ctx.workspaceId, {
+    actorId: ctx.actor.id,
+    actorKind: ctx.actor.kind,
+    spaceId,
+  })
+  if (block) throw block
 }
