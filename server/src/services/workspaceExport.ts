@@ -207,6 +207,7 @@ export const NOT_EXPORTED: Record<string, string> = {
   ai_price_list: 'instance',
   link_preview: 'instance cache',
   oauth_client: 'instance',
+  signup_intent: 'instance, a signup in progress',
   fts: 'search index, rebuilt from the rows',
   auth_token: 'credentials',
   oauth_code: 'credentials',

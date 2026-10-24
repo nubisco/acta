@@ -221,6 +221,8 @@ export const INSTANCE_TABLES = new Set([
   'link_preview',
   'oauth_client',
   'workspace',
+  // A signup in progress belongs to a person, not yet to any workspace.
+  'signup_intent',
 ])
 
 /**
