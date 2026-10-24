@@ -97,7 +97,10 @@ with the optional ones left blank and a note on what each one turns on.
 
 Acta also runs on Workers with D1 for the database and R2 for attachments.
 This is how the hosted instance runs. `server/wrangler.toml` in the repository
-is a working example; the parts that matter are:
+is a working example, with one difference: Nubisco's file starts from the
+Enterprise Edition entry (`../packages/ee/src/worker.ts`), which is proprietary.
+Point yours at `src/worker.ts`, the open-source core. The parts that matter
+are:
 
 ```toml
 name = "acta"

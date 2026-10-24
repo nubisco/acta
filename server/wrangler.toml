@@ -1,7 +1,10 @@
 # Nubisco's hosted Acta instance (Workers + D1 + R2). Self-hosters use the
 # Docker image instead; this file is for the Cloudflare deployment.
 name = "acta"
-main = "src/worker.ts"
+# Nubisco's hosted service runs the Enterprise Edition entry, which registers
+# packages/ee and then serves src/worker.ts unchanged. A self-hosted Workers
+# deployment points this at "src/worker.ts" instead and gets the core edition.
+main = "../packages/ee/src/worker.ts"
 compatibility_date = "2026-08-01"
 
 routes = [{ pattern = "acta.nubisco.io", custom_domain = true }]
