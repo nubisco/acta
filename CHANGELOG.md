@@ -1,3 +1,10 @@
+## [1.63.1](https://github.com/nubisco/acta/compare/v1.63.0...v1.63.1) (2026-10-25)
+
+
+### Bug Fixes
+
+* **web:** docs blocks, comments and the sequence view read against the page again ([ed28bcc](https://github.com/nubisco/acta/commit/ed28bcce783cc67dd139ee8253884cf59da7d937))
+
 # [1.63.0](https://github.com/nubisco/acta/compare/v1.62.0...v1.63.0) (2026-10-25)
 
 
