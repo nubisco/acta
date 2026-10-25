@@ -183,3 +183,28 @@ export function rowLabels(row: {
 export function labelText(entry: ILabelEntry): string {
   return entry.exclusive ? `${entry.group}: ${entry.name}` : entry.name
 }
+
+/**
+ * The groups that belong at one level of Settings: one space's (`space` a
+ * key), or the workspace's own (`space` null). Unlike `labelGroups`, which
+ * serves the pickers and so only knows groups that hold a label, this
+ * includes empty groups, because Settings is where an empty group gets its
+ * first label.
+ */
+export function groupsAt(
+  overview: IOverview | null,
+  space: string | null,
+): ILabelGroup[] {
+  const filled = labelGroups(overview).filter((g) => g.space === space)
+  const known = new Set(filled.map((g) => g.id))
+  const empty: ILabelGroup[] = (overview?.label_groups ?? [])
+    .filter((g) => g.space_key === space && !known.has(g.id))
+    .map((g) => ({
+      id: g.id,
+      name: g.name,
+      space: g.space_key,
+      exclusive: g.exclusive === true,
+      labels: [],
+    }))
+  return [...filled, ...empty].sort((a, b) => a.name.localeCompare(b.name))
+}

@@ -116,3 +116,23 @@ export function describeAction(action: IRuleAction): string {
 export function describeTrigger(trigger: string): string {
   return RULE_TRIGGERS.find((t) => t.value === trigger)?.label ?? trigger
 }
+
+/**
+ * The space a rule belongs to, or null when it is workspace-wide.
+ *
+ * A rule row has no space of its own (the `rule` table holds the workspace
+ * and nothing narrower), so where it belongs is read from what it says. A
+ * condition of `space=KEY` means it only ever fires for that space's cards,
+ * which makes it that space's rule. Without one, a move into another space
+ * files cards into that space, so it is the target's. Anything else runs on
+ * every space and stays in workspace Settings.
+ */
+export function ruleSpace(
+  rule: Pick<IRuleView, 'condition' | 'action'>,
+): string | null {
+  const scoped = parseCondition(rule.condition).space
+  if (scoped) return scoped
+  if (rule.action.kind === 'move_item' && rule.action.space)
+    return rule.action.space
+  return null
+}

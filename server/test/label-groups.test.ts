@@ -502,3 +502,43 @@ describe('two boards each wanting their own version group', () => {
     expect(seen.labels.length >= 0).toBe(true)
   })
 })
+
+/**
+ * Settings shows groups at two levels (2026-10-24): a space's own in its
+ * Settings, the shared ones in workspace Settings. A group made a moment ago
+ * has no labels yet, and the labels are the only way the catalogue used to
+ * reach a group, so it would have been invisible to the page that fills it.
+ */
+describe('every group, at its level, even before it has a label', () => {
+  it('lists empty groups with the space they belong to, or none', async () => {
+    await labelWrite(jose, [
+      { op: 'group_create', op_id: 'e1', name: 'Platform', space: 'ST' },
+      { op: 'group_create', op_id: 'e2', name: 'Customer' },
+    ])
+    const overview = await workspaceOverview(jose)
+    const groups = overview.label_groups.filter((g) =>
+      ['Platform', 'Customer'].includes(g.name),
+    )
+    expect(groups).toEqual([
+      expect.objectContaining({ name: 'Customer', space_key: null }),
+      expect.objectContaining({ name: 'Platform', space_key: 'ST' }),
+    ])
+    expect(overview.labels.some((l) => l.group_name === 'Platform')).toBe(false)
+  })
+
+  it('says which of them name a single answer', async () => {
+    await labelWrite(jose, [
+      {
+        op: 'group_create',
+        op_id: 'e3',
+        name: 'Release',
+        space: 'ST',
+        exclusive: true,
+      },
+    ])
+    const overview = await workspaceOverview(jose)
+    expect(overview.label_groups.find((g) => g.name === 'Release')).toEqual(
+      expect.objectContaining({ exclusive: true, space_key: 'ST' }),
+    )
+  })
+})

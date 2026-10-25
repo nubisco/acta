@@ -92,6 +92,8 @@ const props = defineProps<{
   mode: 'create' | 'edit' | 'merge'
   /** The label being edited or merged. Null when creating. */
   label: ILabelView | null
+  /** The group's id, which names it exactly where its name may not. */
+  groupId?: string
   groupName: string
   /** Other labels in the same group, which are the merge targets. */
   siblings: ILabelView[]
@@ -184,7 +186,9 @@ async function submit(): Promise<void> {
         {
           op: 'label_create',
           op_id: opId(),
-          group: props.groupName,
+          // By id: two spaces can each have a group with this name, and the
+          // server refuses a name it cannot tell apart.
+          group: props.groupId || props.groupName,
           name: name.value.trim(),
           color: color.value,
         },

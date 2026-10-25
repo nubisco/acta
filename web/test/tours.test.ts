@@ -103,7 +103,7 @@ describe('playing a walkthrough', () => {
 
 describe('the walkthroughs in Settings', () => {
   it('lists each one with its state, and resets one', async () => {
-    remote['acta-intro'] = record('finish', 2)
+    remote['acta-intro'] = record('finish', 3)
     remote['acta-goals'] = record('skip')
     const Settings = (
       await import('@/components/settings/SettingsWalkthroughs.vue')

@@ -1,6 +1,7 @@
 /**
  * The views of a space, in one list for the two places that offer them: the
- * tabs above the board and the space's group in the rail. Each is the same
+ * space's group in the rail, and on a phone, where the rail is a drawer, the
+ * tabs above the board. Each is the same
  * board read a different way, addressed by `?view=` on the space's URL, with
  * the board itself carrying no query at all.
  */

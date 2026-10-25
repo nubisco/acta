@@ -99,6 +99,18 @@
         :options="actionOptions"
       />
 
+      <!-- Optional, as in rule_write: left empty the card moves within its
+           own space, and naming one files it into that space instead. -->
+      <NbSelect
+        v-if="actionKind === 'move_item'"
+        :id="`${formId}-action-space`"
+        v-model="action.space"
+        label="Move to space"
+        placeholder="Its own space"
+        clearable
+        :options="spaceOptions"
+        @change="action.list = undefined"
+      />
       <NbSelect
         v-if="actionKind === 'move_item'"
         :id="`${formId}-action-list`"
@@ -207,7 +219,15 @@ import {
   type TRuleActionKind,
 } from '@/components/settings/rules'
 
-const props = defineProps<{ open: boolean; rule: IRuleView | null }>()
+const props = defineProps<{
+  open: boolean
+  rule: IRuleView | null
+  /**
+   * The space whose Settings opened the editor. A new rule starts narrowed
+   * to it, so a rule made there belongs there.
+   */
+  space?: string | null
+}>()
 const emit = defineEmits<{ close: []; saved: [] }>()
 
 const ws = useWorkspace()
@@ -270,11 +290,15 @@ const listOptions = computed(() => {
 })
 
 /**
- * A move needs a list that exists on the item's own space, and the engine
- * resolves it by name. Offering the same set as the condition keeps the two
- * consistent.
+ * A move needs a list that exists where the card lands, and the engine
+ * resolves it by name. That is the target space when one is named, and
+ * otherwise the card's own, which is the same set the condition offers.
  */
-const targetListOptions = listOptions
+const targetListOptions = computed(() => {
+  if (!action.space) return listOptions.value
+  const target = spaces.value.find((b) => b.key === action.space)
+  return (target?.lists ?? []).map((l) => ({ label: l.name, value: l.name }))
+})
 
 const labelOptions = computed(() => {
   const names = new Set(
@@ -317,6 +341,7 @@ watch(
     for (const key of Object.keys(condition) as (keyof typeof condition)[])
       delete condition[key]
     Object.assign(condition, parseCondition(r?.condition))
+    if (!r && props.space) condition.space = props.space
 
     serverError.value = ''
     errors.name = undefined
@@ -357,6 +382,15 @@ function validateAction(): void {
     : 'Fill this in, or the rule does nothing'
 }
 
+/** The action as sent, without the fields a picker left empty. */
+function actionPayload(): IRuleAction {
+  const out = { ...action }
+  for (const key of Object.keys(out) as (keyof IRuleAction)[])
+    if (out[key] === undefined || out[key] === null || out[key] === '')
+      delete out[key]
+  return out
+}
+
 async function submit(): Promise<void> {
   validateName()
   validateAction()
@@ -377,7 +411,7 @@ async function submit(): Promise<void> {
             // Null, not an empty string: clearing a condition has to be
             // distinguishable from leaving it untouched.
             condition: conditionText || null,
-            action: { ...action },
+            action: actionPayload(),
             enabled: enabled.value,
           }
         : {
@@ -386,7 +420,7 @@ async function submit(): Promise<void> {
             name: name.value.trim(),
             trigger: trigger.value,
             condition: conditionText || undefined,
-            action: { ...action },
+            action: actionPayload(),
             enabled: enabled.value,
           },
     ])

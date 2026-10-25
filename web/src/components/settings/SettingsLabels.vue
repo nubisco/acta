@@ -1,13 +1,33 @@
 <template>
   <div class="labels-settings">
-    <p class="labels-settings__lede">
-      Labels are grouped, and a group is a field: "Fixes version" names one
-      release, "Affects version" names several. Drag a label to set where it
-      sits in its group, which is the order every picker shows: 1.9.0 belongs
-      before 1.11.0 and sorting by name says otherwise. Turning on "One value
-      per card" applies from then on. Cards that already carry several keep
-      them, because a setting should not quietly delete work somebody did.
-    </p>
+    <div class="labels-settings__intro">
+      <p class="labels-settings__lede">
+        <template v-if="space">
+          The label groups made for this space. Their labels are offered on this
+          space only, beside the workspace's own groups, which are in workspace
+          Settings.
+        </template>
+        <template v-else>
+          The label groups every space shares. A group made for one space is in
+          that space's Settings, under Labels.
+        </template>
+        A group is a field: "Fixes version" names one release, "Affects version"
+        names several. Drag a label to set where it sits in its group, which is
+        the order every picker shows: 1.9.0 belongs before 1.11.0 and sorting by
+        name says otherwise. Turning on "One value per card" applies from then
+        on. Cards that already carry several keep them, because a setting should
+        not quietly delete work somebody did.
+      </p>
+      <NbButton
+        v-if="ws.isAdmin.value"
+        size="sm"
+        variant="secondary"
+        icon="plus"
+        @click="groupEditing = { group: null }"
+      >
+        New group
+      </NbButton>
+    </div>
 
     <NbPanel
       v-for="group in groups"
@@ -17,9 +37,17 @@
       <header class="labels-settings__head">
         <div class="labels-settings__title">
           <h2 class="type-heading-01">{{ group.name }}</h2>
-          <NbBadge size="sm" variant="grey">
-            {{ group.space ? spaceName(group.space) : 'Workspace' }}
-          </NbBadge>
+          <NbButton
+            v-if="ws.isAdmin.value"
+            v-nb-tooltip="{ body: `Rename group ${group.name}` }"
+            size="sm"
+            variant="ghost"
+            icon="pencil-simple"
+            :aria-label="`Rename group ${group.name}`"
+            @click="
+              groupEditing = { group: { id: group.id, name: group.name } }
+            "
+          />
           <span class="labels-settings__count">
             {{ group.labels.length }}
             {{ group.labels.length === 1 ? 'label' : 'labels' }}
@@ -116,13 +144,61 @@
     <NbEmptyState
       v-if="groups.length === 0"
       size="sm"
-      title="No labels yet"
-      description="Labels are created on spaces or through imports and can be managed here."
+      :title="
+        space ? 'No label groups for this space' : 'No shared label groups'
+      "
+      :description="
+        space
+          ? 'Make a group here for labels only this space uses.'
+          : 'Make a group here for labels every space uses.'
+      "
+    />
+
+    <!-- Where the per-space groups went (2026-10-24). An old link to this
+         tab lands here, so it says where they are and goes there. -->
+    <NbPanel
+      v-if="!space && elsewhere.length > 0"
+      class="labels-settings__group"
+    >
+      <header>
+        <h2 class="type-heading-01">For one space</h2>
+        <p class="labels-settings__lede">
+          These spaces have label groups of their own, in their Settings.
+        </p>
+      </header>
+      <NbDataTable
+        stack-on-phone
+        :columns="elsewhereColumns"
+        :rows="elsewhere"
+        row-key="key"
+        size="sm"
+        aria-label="Label groups by space"
+      >
+        <template #cell-actions="{ row }">
+          <NbButton
+            size="sm"
+            variant="ghost"
+            icon="sliders-horizontal"
+            :to="wpath(`/s/${row.key}/settings?tab=labels`)"
+          >
+            Open
+          </NbButton>
+        </template>
+      </NbDataTable>
+    </NbPanel>
+
+    <LabelGroupModal
+      :open="groupEditing !== null"
+      :group="groupEditing?.group ?? null"
+      :space="space ?? null"
+      @close="groupEditing = null"
+      @saved="groupEditing = null"
     />
 
     <LabelEditModal
       :open="editing !== null"
       :label="editing?.label ?? null"
+      :group-id="editing?.group.id ?? ''"
       :group-name="editing?.group.name ?? ''"
       :siblings="editing?.siblings ?? []"
       :mode="editing?.mode ?? 'edit'"
@@ -152,12 +228,23 @@ import { computed, ref } from 'vue'
 import { useConfirm, useToast } from '@nubisco/ui'
 import { api, newOpId as opId } from '@/api/client'
 import { humanise } from '@/lib/state'
-import { labelGroups } from '@/lib/labels'
+import { groupsAt } from '@/lib/labels'
+import { wpath } from '@/lib/paths'
 import type { ILabelEntry, ILabelGroup } from '@/lib/labels'
 import { useWorkspace } from '@/stores/workspace'
 import LabelBadge from '@/components/LabelBadge.vue'
 import LabelEditModal from '@/components/settings/LabelEditModal.vue'
+import LabelGroupModal from '@/components/settings/LabelGroupModal.vue'
 import type { ILabelView } from '@/components/settings/labels'
+
+const props = defineProps<{
+  /**
+   * A space's key: that space's own groups (its Settings). Absent: the groups
+   * every space shares (workspace Settings). The data says which is which, a
+   * group's `space_id` being set or null.
+   */
+  space?: string
+}>()
 
 const ws = useWorkspace()
 const toast = useToast()
@@ -168,11 +255,32 @@ const confirm = useConfirm()
  * then by each group's own arrangement. Sorting it here would undo the
  * ordering this pane exists to let people set.
  */
-const groups = computed<ILabelGroup[]>(() => labelGroups(ws.overview.value))
+const groups = computed<ILabelGroup[]>(() =>
+  groupsAt(ws.overview.value, props.space ?? null),
+)
 
-function spaceName(key: string): string {
-  return ws.overview.value?.spaces.find((b) => b.key === key)?.name ?? key
-}
+const groupEditing = ref<{ group: { id: string; name: string } | null } | null>(
+  null,
+)
+
+const elsewhereColumns = [
+  { key: 'name', header: 'Space', primary: true },
+  { key: 'groups', header: 'Groups' },
+  { key: 'actions', header: '' },
+]
+
+/** Spaces with groups of their own, for the pointer in workspace Settings. */
+const elsewhere = computed(() =>
+  (ws.overview.value?.spaces ?? [])
+    .map((s) => ({
+      key: s.key,
+      name: s.name,
+      groups: groupsAt(ws.overview.value, s.key)
+        .map((g) => g.name)
+        .join(', '),
+    }))
+    .filter((r) => r.groups !== ''),
+)
 
 /** The dot beside the colour name, so the word is not the only cue. */
 function swatch(color: string): string {
@@ -285,6 +393,13 @@ function remove(label: ILabelEntry): void {
   flex-direction: column;
   gap: var(--nb-spacing-24);
 
+  &__intro {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: var(--nb-spacing-16);
+  }
+
   &__lede {
     max-width: 68ch;
     margin: 0;
@@ -356,7 +471,8 @@ function remove(label: ILabelEntry): void {
 /* A phone: the action goes under the heading and its description, rather
    than beside them squeezing the text to half the width. */
 @include variables.phone {
-  .labels-settings__head {
+  .labels-settings__head,
+  .labels-settings__intro {
     flex-wrap: wrap;
   }
 }

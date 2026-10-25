@@ -47,7 +47,11 @@
 
     <component :is="filterBar.Outlet">
       <div class="space__bar">
+        <!-- The views are in the space's group in the rail, so the desktop
+             has no tabs here (Jose, 2026-10-24). A phone keeps them, because
+             there the rail is a drawer, out of sight. -->
         <NbTabs
+          v-if="phone"
           v-model="view"
           v-nb-tour-step="'space-views'"
           variant="line"

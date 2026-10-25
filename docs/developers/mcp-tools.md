@@ -20,7 +20,7 @@ store configured (it does in every standard deployment). Those marked
 | `search`             |           | Full-text across item titles and descriptions, comments and documents. Returns type, key or slug, title, snippet.                                                                                                                                                                                                  |
 | `activity_query`     |           | The audit trail. Filter by entity, actor, `actor_kind`, verb pattern (`item.*`), and `since` for a cheap delta.                                                                                                                                                                                                    |
 | `response_times`     |           | Time to first response and time to resolution, per space and per label, as count, median and P90, plus cards received and still waiting. See [Response times](#response-times).                                                                                                                                    |
-| `label_write`        | **write** | `group_create`, `label_create`, `label_update`, `label_merge` (folds one label into another and reassigns every item), `label_delete`.                                                                                                                                                                             |
+| `label_write`        | **write** | `group_create` (with `space` for one space, without for every space), `group_update`, `label_create`, `label_update`, `label_reorder`, `label_merge` (folds one label into another and reassigns every item), `label_delete`.                                                                                      |
 | `webhook_write`      | **write** | Outbound webhooks: `create` (url plus event patterns, optional HMAC secret), `update`, `delete`.                                                                                                                                                                                                                   |
 | `rule_write`         | **write** | Automation rules from a fixed catalogue. See below.                                                                                                                                                                                                                                                                |
 | `attachment_add`     | **write** | Attach a URL, or inline base64 up to 1 MB, to an item or document.                                                                                                                                                                                                                                                 |
@@ -235,6 +235,11 @@ omitting the field.
 
 Rule actions are attributed to the system actor with `caused_by` chaining, and
 never re-trigger rules, so a pair of rules cannot loop.
+
+A rule has no space column. Where it is shown is read from what it says: a
+condition naming `space=X` makes it space X's, and so does a `move_item` into
+space X when the condition names no space. Those are in that space's
+Settings, under Automation. Every other rule is in workspace Settings.
 
 ## Response times
 

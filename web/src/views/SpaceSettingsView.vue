@@ -10,240 +10,227 @@
     />
 
     <template v-else>
+      <component :is="filterBar.Outlet">
+        <NbTabs
+          v-model="tab"
+          :items="TABS"
+          aria-label="Space settings sections"
+          variant="line"
+        />
+      </component>
+
       <NbBanner
         v-if="archived"
         status="warning"
         variant="callout"
-        title="This space is archived. It is out of the rail and Home, with everything in it kept. Restore it at the foot of this page."
+        title="This space is archived. It is out of the rail and Home, with everything in it kept. Restore it at the foot of General."
       />
 
-      <!-- What the space is called and what it is for. -->
-      <NbPanel class="space-settings__section">
-        <header>
-          <h2 class="type-heading-01">Space</h2>
-        </header>
-        <form class="space-settings__form" @submit.prevent="saveDetails">
-          <NbTextInput
-            id="space-settings-name"
-            v-model="name"
-            label="Name"
-            :maxlength="200"
-            required
-          />
-          <NbTextInput
-            id="space-settings-key"
-            :model-value="space.key"
-            label="Key"
-            readonly
-            :helper="`Every card here is numbered from it (${space.key}-1, ${space.key}-2), and links to cards carry it, so it does not change.`"
-          />
-          <NbTextInput
-            id="space-settings-description"
-            v-model="description"
-            label="Description"
-            multiline
-            :rows="4"
-            :maxlength="10000"
-            helper="What this space is for. Agents read it before they file cards here."
-          />
-          <div class="space-settings__actions">
+      <!-- The space's own labels and automation (2026-10-24), moved here
+           from workspace Settings, which keeps what every space shares. -->
+      <SettingsLabels v-if="tab === 'labels'" :space="space.key" />
+      <SettingsAutomation v-else-if="tab === 'automation'" :space="space.key" />
+
+      <template v-else>
+        <!-- What the space is called and what it is for. -->
+        <NbPanel class="space-settings__section">
+          <header>
+            <h2 class="type-heading-01">Space</h2>
+          </header>
+          <form class="space-settings__form" @submit.prevent="saveDetails">
+            <NbTextInput
+              id="space-settings-name"
+              v-model="name"
+              label="Name"
+              :maxlength="200"
+              required
+            />
+            <NbTextInput
+              id="space-settings-key"
+              :model-value="space.key"
+              label="Key"
+              readonly
+              :helper="`Every card here is numbered from it (${space.key}-1, ${space.key}-2), and links to cards carry it, so it does not change.`"
+            />
+            <NbTextInput
+              id="space-settings-description"
+              v-model="description"
+              label="Description"
+              multiline
+              :rows="4"
+              :maxlength="10000"
+              helper="What this space is for. Agents read it before they file cards here."
+            />
+            <div class="space-settings__actions">
+              <NbButton
+                type="submit"
+                variant="primary"
+                :disabled="!detailsDirty || !name.trim()"
+                :loading="savingDetails"
+              >
+                Save
+              </NbButton>
+            </div>
+          </form>
+        </NbPanel>
+
+        <!-- The columns of the board. -->
+        <NbPanel class="space-settings__section">
+          <header class="space-settings__head">
+            <div>
+              <h2 class="type-heading-01">Lists</h2>
+              <p class="space-settings__lede">
+                The columns of the board, in order. Drag one to move it. A
+                list's role says what being in it means: open counts, the
+                progress bar on Home and the done window all read it.
+              </p>
+            </div>
+          </header>
+
+          <NbReorderList
+            :model-value="lists"
+            item-key="id"
+            label="Lists in this space"
+            class="space-settings__lists"
+            @update:model-value="reorder"
+          >
+            <template #default="{ item }">
+              <div class="space-settings__list">
+                <NbTextInput
+                  :id="`list-name-${item.id}`"
+                  :model-value="item.name"
+                  size="sm"
+                  :aria-label="`Name of ${item.name}`"
+                  :maxlength="200"
+                  @change="
+                    (event: Event) =>
+                      renameList(item, (event.target as HTMLInputElement).value)
+                  "
+                />
+                <NbSelect
+                  :id="`list-role-${item.id}`"
+                  size="sm"
+                  :model-value="item.role ?? 'none'"
+                  :options="ROLE_OPTIONS"
+                  :aria-label="`Role of ${item.name}`"
+                  @update:model-value="(role) => setRole(item, String(role))"
+                />
+                <span class="space-settings__count">
+                  {{ item.items }} {{ item.items === 1 ? 'card' : 'cards' }}
+                </span>
+                <NbButton
+                  v-nb-tooltip="{
+                    body:
+                      item.items > 0
+                        ? 'Move or archive its cards first'
+                        : `Archive ${item.name}`,
+                  }"
+                  size="sm"
+                  variant="ghost"
+                  icon="archive"
+                  :aria-label="`Archive list ${item.name}`"
+                  :disabled="item.items > 0"
+                  @click="archiveList(item)"
+                />
+              </div>
+            </template>
+          </NbReorderList>
+
+          <form class="space-settings__add" @submit.prevent="addList">
+            <NbTextInput
+              id="space-settings-new-list"
+              v-model="newListName"
+              size="sm"
+              label="New list"
+              placeholder="Name"
+              :maxlength="200"
+            />
+            <NbSelect
+              id="space-settings-new-list-role"
+              v-model="newListRole"
+              size="sm"
+              label="Role"
+              :options="ROLE_OPTIONS"
+            />
             <NbButton
               type="submit"
-              variant="primary"
-              :disabled="!detailsDirty || !name.trim()"
-              :loading="savingDetails"
+              size="sm"
+              variant="secondary"
+              icon="plus"
+              :disabled="!newListName.trim()"
             >
-              Save
+              Add list
+            </NbButton>
+          </form>
+        </NbPanel>
+
+        <!-- How long done cards stay on the board. The Done column's own menu
+           keeps the same controls where the cards are. -->
+        <NbPanel class="space-settings__section">
+          <header>
+            <h2 class="type-heading-01">Done cards</h2>
+            <p class="space-settings__lede">
+              A card leaves the board a set number of days after it became done.
+              Nothing is archived: it stays in search, in the Table view under
+              "Done cards" and in its goals' progress.
+            </p>
+          </header>
+          <div class="space-settings__done">
+            <NbSelect
+              id="space-settings-done-window"
+              label="Keep done cards on the board"
+              :model-value="doneWindowValue"
+              :options="WINDOW_OPTIONS"
+              @update:model-value="(v) => setDoneWindow(v)"
+            />
+            <NbButton variant="secondary" icon="broom" @click="clearDone">
+              Clear done now
             </NbButton>
           </div>
-        </form>
-      </NbPanel>
+        </NbPanel>
 
-      <!-- The columns of the board. -->
-      <NbPanel class="space-settings__section">
-        <header class="space-settings__head">
-          <div>
-            <h2 class="type-heading-01">Lists</h2>
+        <!-- Archive is the reversible step, delete is for good. -->
+        <NbPanel class="space-settings__section">
+          <header>
+            <h2 class="type-heading-01">Archive or delete</h2>
             <p class="space-settings__lede">
-              The columns of the board, in order. Drag one to move it. A list's
-              role says what being in it means: open counts, the progress bar on
-              Home and the done window all read it.
+              Archiving takes the space out of the rail and Home and keeps
+              everything in it. Deleting is for good, and only an admin can do
+              it: an empty space goes at once, one with cards is archived first
+              and deleted from Archived spaces on Home, where its contents are
+              spelled out.
             </p>
+          </header>
+          <div class="space-settings__actions">
+            <NbButton
+              v-if="archived"
+              variant="secondary"
+              icon="arrow-counter-clockwise"
+              @click="restore"
+            >
+              Restore space
+            </NbButton>
+            <NbButton
+              v-else
+              variant="secondary"
+              icon="archive"
+              @click="actions.archive()"
+            >
+              Archive space
+            </NbButton>
+            <NbButton
+              v-if="ws.isAdmin.value"
+              variant="danger"
+              outlined
+              icon="trash"
+              :disabled="cardCount > 0"
+              @click="actions.remove()"
+            >
+              Delete space
+            </NbButton>
           </div>
-        </header>
-
-        <NbReorderList
-          :model-value="lists"
-          item-key="id"
-          label="Lists in this space"
-          class="space-settings__lists"
-          @update:model-value="reorder"
-        >
-          <template #default="{ item }">
-            <div class="space-settings__list">
-              <NbTextInput
-                :id="`list-name-${item.id}`"
-                :model-value="item.name"
-                size="sm"
-                :aria-label="`Name of ${item.name}`"
-                :maxlength="200"
-                @change="
-                  (event: Event) =>
-                    renameList(item, (event.target as HTMLInputElement).value)
-                "
-              />
-              <NbSelect
-                :id="`list-role-${item.id}`"
-                size="sm"
-                :model-value="item.role ?? 'none'"
-                :options="ROLE_OPTIONS"
-                :aria-label="`Role of ${item.name}`"
-                @update:model-value="(role) => setRole(item, String(role))"
-              />
-              <span class="space-settings__count">
-                {{ item.items }} {{ item.items === 1 ? 'card' : 'cards' }}
-              </span>
-              <NbButton
-                v-nb-tooltip="{
-                  body:
-                    item.items > 0
-                      ? 'Move or archive its cards first'
-                      : `Archive ${item.name}`,
-                }"
-                size="sm"
-                variant="ghost"
-                icon="archive"
-                :aria-label="`Archive list ${item.name}`"
-                :disabled="item.items > 0"
-                @click="archiveList(item)"
-              />
-            </div>
-          </template>
-        </NbReorderList>
-
-        <form class="space-settings__add" @submit.prevent="addList">
-          <NbTextInput
-            id="space-settings-new-list"
-            v-model="newListName"
-            size="sm"
-            label="New list"
-            placeholder="Name"
-            :maxlength="200"
-          />
-          <NbSelect
-            id="space-settings-new-list-role"
-            v-model="newListRole"
-            size="sm"
-            label="Role"
-            :options="ROLE_OPTIONS"
-          />
-          <NbButton
-            type="submit"
-            size="sm"
-            variant="secondary"
-            icon="plus"
-            :disabled="!newListName.trim()"
-          >
-            Add list
-          </NbButton>
-        </form>
-      </NbPanel>
-
-      <!-- How long done cards stay on the board. The Done column's own menu
-           keeps the same controls where the cards are. -->
-      <NbPanel class="space-settings__section">
-        <header>
-          <h2 class="type-heading-01">Done cards</h2>
-          <p class="space-settings__lede">
-            A card leaves the board a set number of days after it became done.
-            Nothing is archived: it stays in search, in the Table view under
-            "Done cards" and in its goals' progress.
-          </p>
-        </header>
-        <div class="space-settings__done">
-          <NbSelect
-            id="space-settings-done-window"
-            label="Keep done cards on the board"
-            :model-value="doneWindowValue"
-            :options="WINDOW_OPTIONS"
-            @update:model-value="(v) => setDoneWindow(v)"
-          />
-          <NbButton variant="secondary" icon="broom" @click="clearDone">
-            Clear done now
-          </NbButton>
-        </div>
-      </NbPanel>
-
-      <!-- Space settings kept with the rest of their kind, so this says
-           where they are rather than splitting them. -->
-      <NbPanel class="space-settings__section">
-        <header>
-          <h2 class="type-heading-01">Labels and automation</h2>
-          <p class="space-settings__lede">
-            Labels made for this space, and the forms, tokens and connections
-            that file cards into it, are managed with the rest of the
-            workspace's, so they can be compared side by side.
-          </p>
-        </header>
-        <div class="space-settings__actions">
-          <NbButton
-            variant="ghost"
-            icon="tag"
-            :to="wpath('/settings?tab=labels')"
-          >
-            Labels
-          </NbButton>
-          <NbButton
-            variant="ghost"
-            icon="lightning"
-            :to="wpath('/settings?tab=automation')"
-          >
-            Automation
-          </NbButton>
-        </div>
-      </NbPanel>
-
-      <!-- Archive is the reversible step, delete is for good. -->
-      <NbPanel class="space-settings__section">
-        <header>
-          <h2 class="type-heading-01">Archive or delete</h2>
-          <p class="space-settings__lede">
-            Archiving takes the space out of the rail and Home and keeps
-            everything in it. Deleting is for good, and only an admin can do it:
-            an empty space goes at once, one with cards is archived first and
-            deleted from Archived spaces on Home, where its contents are spelled
-            out.
-          </p>
-        </header>
-        <div class="space-settings__actions">
-          <NbButton
-            v-if="archived"
-            variant="secondary"
-            icon="arrow-counter-clockwise"
-            @click="restore"
-          >
-            Restore space
-          </NbButton>
-          <NbButton
-            v-else
-            variant="secondary"
-            icon="archive"
-            @click="actions.archive()"
-          >
-            Archive space
-          </NbButton>
-          <NbButton
-            v-if="ws.isAdmin.value"
-            variant="danger"
-            outlined
-            icon="trash"
-            :disabled="cardCount > 0"
-            @click="actions.remove()"
-          >
-            Delete space
-          </NbButton>
-        </div>
-      </NbPanel>
+        </NbPanel>
+      </template>
     </template>
   </div>
 </template>
@@ -261,15 +248,52 @@
  * the done window in the Done column's menu, as shortcuts where the work is.
  */
 import { computed, ref, watch } from 'vue'
-import { useConfirm, useToast } from '@nubisco/ui'
+import { useRoute, useRouter } from 'vue-router'
+import { useConfirm, useShellSlot, useToast } from '@nubisco/ui'
 import { api, newOpId } from '@/api/client'
 import type { TSpaceOp } from '@nubisco/acta-shared'
 import { useSpaceActions } from '@/composables/useSpaceActions'
-import { wpath } from '@/lib/paths'
 import { humanise } from '@/lib/state'
 import { useWorkspace } from '@/stores/workspace'
+import SettingsLabels from '@/components/settings/SettingsLabels.vue'
+import SettingsAutomation from '@/components/settings/SettingsAutomation.vue'
 
 const props = defineProps<{ spaceKey: string }>()
+
+const filterBar = useShellSlot('fixedbar')
+const route = useRoute()
+const router = useRouter()
+
+/**
+ * Sections, as in workspace Settings, with the tab in the URL so a pointer
+ * from there (and a reload) lands on the right one. Labels and Automation
+ * hold what used to be filed under the workspace (2026-10-24).
+ */
+const TABS = [
+  { id: 'general', label: 'General' },
+  { id: 'labels', label: 'Labels' },
+  { id: 'automation', label: 'Automation' },
+]
+
+function tabFrom(raw: unknown): string {
+  return typeof raw === 'string' && TABS.some((t) => t.id === raw)
+    ? raw
+    : 'general'
+}
+
+const tab = ref(tabFrom(route.query.tab))
+watch(
+  () => route.query.tab,
+  (raw) => (tab.value = tabFrom(raw)),
+)
+watch(tab, (id) => {
+  const current = route.query.tab ?? 'general'
+  if (current === id) return
+  const query = { ...route.query }
+  if (id === 'general') delete query.tab
+  else query.tab = id
+  void router.replace({ query })
+})
 
 const ws = useWorkspace()
 const toast = useToast()

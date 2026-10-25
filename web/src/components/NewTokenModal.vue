@@ -51,6 +51,7 @@
         v-model="space"
         label="Space"
         :options="spaceOptions"
+        :disabled="Boolean(props.lockedSpace)"
         :error="errors.space"
         @change="errors.space = undefined"
       />
@@ -81,6 +82,8 @@ import { useWorkspace } from '@/stores/workspace'
 const props = defineProps<{
   open: boolean
   kind: 'agent' | 'ingest' | 'personal'
+  /** Opened from a space's Settings: the endpoint files into that space. */
+  lockedSpace?: string
 }>()
 const emit = defineEmits<{ close: []; created: [token: string] }>()
 
@@ -134,7 +137,7 @@ watch(
       name.value = ''
       scopes.value = ['read', 'write']
       personalScope.value = 'write'
-      space.value = ''
+      space.value = props.lockedSpace ?? ''
       serverError.value = ''
       errors.name = undefined
       errors.space = undefined

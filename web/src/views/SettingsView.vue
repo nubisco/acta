@@ -45,6 +45,12 @@
  * workspace under the gear. The router sends an old link to one of those
  * tabs to its new page.
  *
+ * Labels and Automation hold what every space shares. A space's own label
+ * groups, and the ingest endpoints, connections and rules that file cards
+ * into one space, are in that space's Settings (2026-10-24). Both tabs stay,
+ * so an old link still lands, and each lists the spaces that have their own,
+ * with a link to each.
+ *
  * Each section owns its own data and dialogs. This view is only the switch,
  * which is why it is short: the old one had grown past a thousand lines with
  * every section's state interleaved in a single script block.

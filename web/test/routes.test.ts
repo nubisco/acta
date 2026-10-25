@@ -45,4 +45,20 @@ describe('the routes', () => {
     expect(moved.name).toBe('personal-settings')
     expect(moved.query.tab).toBe('notifications')
   })
+
+  // Labels and automation for one space moved to its Settings (2026-10-24).
+  // The workspace tabs stay, with what every space shares and a pointer to
+  // the rest, so an old link still lands on a page that says where to go.
+  it('keeps the old Labels and Automation links, and opens a space on either tab', async () => {
+    expect((await land('/acme/settings?tab=labels')).query.tab).toBe('labels')
+    const automation = await land('/acme/settings?tab=automation')
+    expect(automation.name).toBe('settings')
+    expect(automation.query.tab).toBe('automation')
+    const space = await land('/acme/s/ST/settings?tab=labels')
+    expect(space.name).toBe('space-settings')
+    expect(space.query.tab).toBe('labels')
+    const old = await land('/acme/b/ST/settings?tab=automation')
+    expect(old.name).toBe('space-settings')
+    expect(old.query.tab).toBe('automation')
+  })
 })

@@ -57,14 +57,14 @@
     </NbModal>
 
     <!-- Inbound, unauthenticated senders ------------------------------- -->
-    <NbPanel class="automation__section">
+    <NbPanel v-if="space" class="automation__section">
       <header class="automation__head">
         <div>
           <h2 class="type-heading-01">Ingest endpoints</h2>
           <p class="automation__lede">
             A URL you paste into a website form or another tool. Anything posted
-            to it becomes a card on the space you choose. The URL is the
-            credential, so treat it as a secret.
+            to it becomes a card on this space. The URL is the credential, so
+            treat it as a secret.
           </p>
         </div>
         <NbButton
@@ -115,14 +115,14 @@
     </NbPanel>
 
     <!-- Inbound, signed providers -------------------------------------- -->
-    <NbPanel class="automation__section">
+    <NbPanel v-if="space" class="automation__section">
       <header class="automation__head">
         <div>
           <h2 class="type-heading-01">Connections</h2>
           <p class="automation__lede">
             A provider pushes signed events to Acta. GitHub issues become
-            tracking cards on the space you pick, and every delivery is verified
-            against a shared secret.
+            tracking cards on this space, and every delivery is verified against
+            a shared secret.
           </p>
         </div>
         <NbButton
@@ -162,7 +162,7 @@
     </NbPanel>
 
     <!-- Outbound ------------------------------------------------------- -->
-    <NbPanel class="automation__section">
+    <NbPanel v-if="!space" class="automation__section">
       <header class="automation__head">
         <div>
           <h2 class="type-heading-01">Webhooks</h2>
@@ -212,9 +212,15 @@
       <header class="automation__head">
         <div>
           <h2 class="type-heading-01">Rules</h2>
-          <p class="automation__lede">
-            Acta reacting to itself. When something happens to an item, and the
-            item matches, do one thing to it.
+          <p v-if="space" class="automation__lede">
+            Acta reacting to itself. When something happens to a card on this
+            space, and the card matches, do one thing to it. A rule that moves
+            cards here from anywhere is listed here too.
+          </p>
+          <p v-else class="automation__lede">
+            Acta reacting to itself. When something happens to an item in any
+            space, and the item matches, do one thing to it. A rule narrowed to
+            one space is in that space's Settings.
           </p>
         </div>
         <NbButton
@@ -281,7 +287,7 @@
     </NbPanel>
 
     <!-- Identities ----------------------------------------------------- -->
-    <NbPanel class="automation__section">
+    <NbPanel v-if="!space" class="automation__section">
       <header class="automation__head">
         <div>
           <h2 class="type-heading-01">Agent tokens</h2>
@@ -327,9 +333,51 @@
       </NbDataTable>
     </NbPanel>
 
+    <!-- Where the per-space pieces went (2026-10-24). An old link to this
+         tab lands here, so it says where to look and goes there. -->
+    <NbPanel v-if="!space" class="automation__section">
+      <header class="automation__head">
+        <div>
+          <h2 class="type-heading-01">For one space</h2>
+          <p class="automation__lede">
+            Ingest endpoints, connections and rules that file cards into one
+            space are in that space's Settings, under Automation.
+          </p>
+        </div>
+      </header>
+      <NbDataTable
+        stack-on-phone
+        :columns="spaceColumns"
+        :rows="spaceRows"
+        row-key="key"
+        size="sm"
+        aria-label="Automation by space"
+        :loading="loading"
+      >
+        <template #cell-actions="{ row }">
+          <NbButton
+            size="sm"
+            variant="ghost"
+            icon="sliders-horizontal"
+            :to="wpath(`/s/${row.key}/settings?tab=automation`)"
+          >
+            Open
+          </NbButton>
+        </template>
+        <template #empty>
+          <NbEmptyState
+            size="sm"
+            title="Nothing set up for one space"
+            description="Open a space's Settings to add an ingest endpoint, a connection or a rule for it."
+          />
+        </template>
+      </NbDataTable>
+    </NbPanel>
+
     <NewTokenModal
       :open="creatingIngest"
       kind="ingest"
+      :locked-space="space ?? undefined"
       @close="creatingIngest = false"
       @created="onIngestCreated"
     />
@@ -346,12 +394,14 @@
     />
     <NewConnectionModal
       :open="creatingConnection"
+      :locked-space="space ?? undefined"
       @close="creatingConnection = false"
       @created="onConnectionCreated"
     />
     <RuleEditModal
       :open="editingRule !== null"
       :rule="editingRule?.rule ?? null"
+      :space="space"
       @close="editingRule = null"
       @saved="onRuleSaved"
     />
@@ -359,6 +409,14 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * Automation at two levels (2026-10-24). In workspace Settings it is what
+ * runs across every space: webhooks, agent tokens and the rules that are not
+ * narrowed to a space. In a space's Settings, with `space` set, it is what
+ * files cards into that space: its ingest endpoints, its connections and its
+ * rules. Each of those rows names exactly one space, so it is shown in that
+ * space's Settings and nowhere else.
+ */
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useConfirm, useToast } from '@nubisco/ui'
 import { api, newOpId as opId } from '@/api/client'
@@ -372,8 +430,28 @@ import RuleEditModal from '@/components/settings/RuleEditModal.vue'
 import {
   describeAction,
   describeTrigger,
+  ruleSpace,
   type IRuleView,
 } from '@/components/settings/rules'
+import { wpath } from '@/lib/paths'
+
+const props = defineProps<{
+  /** A space's key: show what files cards into it, and nothing else. */
+  space?: string
+}>()
+const space = computed(() => props.space ?? null)
+
+/**
+ * Where a rule is listed. A rule naming a space that no longer exists stays
+ * in workspace Settings, or it would be listed nowhere and could never be
+ * edited or deleted from the interface again.
+ */
+function homeOf(rule: IRuleView): string | null {
+  const key = ruleSpace(rule)
+  return key && ws.overview.value?.spaces.some((s) => s.key === key)
+    ? key
+    : null
+}
 
 const ws = useWorkspace()
 const toast = useToast()
@@ -440,41 +518,66 @@ const agentColumns = [
   { key: 'handle', header: 'Handle' },
 ]
 
+const spaceColumns = [
+  { key: 'name', header: 'Space', primary: true },
+  { key: 'ingest', header: 'Ingest endpoints' },
+  { key: 'connections', header: 'Connections' },
+  { key: 'rules', header: 'Rules' },
+  { key: 'actions', header: '' },
+]
+
+/** Every space with something of its own, for the pointer above. */
+const spaceRows = computed(() =>
+  (ws.overview.value?.spaces ?? [])
+    .map((s) => ({
+      key: s.key,
+      name: s.name,
+      ingest: ingestTokens.value.filter((t) => t.space === s.key).length,
+      connections: connections.value.filter((c) => c.space === s.key).length,
+      rules: rules.value.filter((r) => homeOf(r) === s.key).length,
+    }))
+    .filter((r) => r.ingest + r.connections + r.rules > 0),
+)
+
 const ingestRows = computed(() =>
-  ingestTokens.value.map((t) => ({
-    id: t.id,
-    name: t.name,
-    target: t.list ? `${t.space} · ${t.list}` : t.space,
-    items: t.items,
-    // Never used is what makes an old endpoint safe to revoke.
-    used: t.last_used_at
-      ? new Date(t.last_used_at).toLocaleDateString()
-      : 'Never',
-  })),
+  ingestTokens.value
+    .filter((t) => t.space === space.value)
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      target: t.list ? `${t.space} · ${t.list}` : t.space,
+      items: t.items,
+      // Never used is what makes an old endpoint safe to revoke.
+      used: t.last_used_at
+        ? new Date(t.last_used_at).toLocaleDateString()
+        : 'Never',
+    })),
 )
 
 type TStatusVariant = 'green' | 'grey' | 'orange'
 
 const connectionRows = computed(() =>
-  connections.value.map((c) => ({
-    id: c.id,
-    name: c.name,
-    provider: c.provider,
-    target: c.list ? `${c.space} · ${c.list}` : c.space,
-    status: !c.enabled
-      ? 'Inactive'
-      : c.last_error
-        ? 'Attention'
-        : c.last_event_at
-          ? 'Active'
-          : 'Waiting',
-    statusVariant: (!c.enabled
-      ? 'grey'
-      : c.last_error
-        ? 'orange'
-        : 'green') as TStatusVariant,
-    statusDot: c.enabled,
-  })),
+  connections.value
+    .filter((c) => c.space === space.value)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      provider: c.provider,
+      target: c.list ? `${c.space} · ${c.list}` : c.space,
+      status: !c.enabled
+        ? 'Inactive'
+        : c.last_error
+          ? 'Attention'
+          : c.last_event_at
+            ? 'Active'
+            : 'Waiting',
+      statusVariant: (!c.enabled
+        ? 'grey'
+        : c.last_error
+          ? 'orange'
+          : 'green') as TStatusVariant,
+      statusDot: c.enabled,
+    })),
 )
 
 const webhookRows = computed(() =>
@@ -495,14 +598,16 @@ const webhookRows = computed(() =>
 )
 
 const ruleRows = computed(() =>
-  rules.value.map((r) => ({
-    id: r.id,
-    name: r.name,
-    when: describeTrigger(r.trigger),
-    match: r.condition ?? 'Everything',
-    does: describeAction(r.action),
-    enabled: r.enabled,
-  })),
+  rules.value
+    .filter((r) => homeOf(r) === space.value)
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      when: describeTrigger(r.trigger),
+      match: r.condition ?? 'Everything',
+      does: describeAction(r.action),
+      enabled: r.enabled,
+    })),
 )
 
 const agentRows = computed(() =>

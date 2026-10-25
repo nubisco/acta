@@ -137,8 +137,9 @@ happen first. A card can be part of something it does not wait on, and wait
 on something it is not part of.
 
 **`label_group`, `label`** The classification vocabulary. A group is scoped to
-a space or is workspace-wide, so a version group on one board never appears on
-another.
+a space (`space_id` set) or is workspace-wide (`space_id` null), so a version
+group on one board never appears on another. The first kind is managed in that
+space's Settings, the second in workspace Settings.
 
 Two columns turn a group from a bag of tags into something closer to a field.
 `label_group.exclusive` means at most one label from that group on a card,
@@ -160,7 +161,11 @@ reason a card read returns `label_ids` alongside `labels`: the bare name
 `1.12.0` cannot say which group it came from.
 
 **`webhook`, `webhook_delivery`, `rule`** Outbound delivery with a failure
-count, and the automation catalogue.
+count, and the automation catalogue. `rule` belongs to the workspace and has no
+space column. Its space, for where Settings shows it, is read from its
+condition (`space=X`) or, failing that, from a `move_item` action into another
+space. `ingest_token` and `connection` each name one space, so they are shown
+in that space's Settings.
 
 ## Conventions
 

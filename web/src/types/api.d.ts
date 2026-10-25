@@ -24,6 +24,16 @@ export interface IOverview {
      */
     exclusive?: true
   }[]
+  /**
+   * Every label group, empty ones included, which `labels` cannot show
+   * because it reaches a group only through its labels.
+   */
+  label_groups?: {
+    id: string
+    name: string
+    space_key: string | null
+    exclusive?: true
+  }[]
   actors: {
     id: string
     handle: string

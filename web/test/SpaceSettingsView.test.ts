@@ -8,6 +8,7 @@
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import type { Component } from 'vue'
 import { NbSelect as Select } from '@nubisco/ui'
 
 const overview = vi.fn()
@@ -26,8 +27,10 @@ vi.mock('@/api/client', () => ({
   ApiHttpError: class extends Error {},
 }))
 
+const routeQuery = vi.hoisted(() => ({ value: {} as Record<string, string> }))
+
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: {}, params: {} }),
+  useRoute: () => ({ query: routeQuery.value, params: {} }),
   useRouter: () => ({ push, replace: vi.fn() }),
   RouterLink: { template: '<a><slot /></a>' },
 }))
@@ -51,6 +54,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  routeQuery.value = {}
   overview.mockResolvedValue(OVERVIEW)
   me.mockResolvedValue({ id: 'a1', handle: 'ivan', role: 'admin' })
   spaceGet.mockResolvedValue({
@@ -64,14 +68,21 @@ beforeEach(() => {
   })
 })
 
-async function mountPage(spaceKey = 'ST') {
+async function mountPage(
+  spaceKey = 'ST',
+  stubs: Record<string, Component | boolean> = {},
+) {
   vi.resetModules()
   const View = (await import('@/views/SpaceSettingsView.vue')).default
   const { useWorkspace } = await import('@/stores/workspace')
   const ws = useWorkspace()
   await ws.refresh()
   await ws.loadMe()
-  const wrapper = mount(View, { props: { spaceKey }, attachTo: document.body })
+  const wrapper = mount(View, {
+    props: { spaceKey },
+    attachTo: document.body,
+    global: { stubs },
+  })
   await flushPromises()
   return wrapper
 }
@@ -208,5 +219,49 @@ describe('the space settings page', () => {
     const wrapper = await mountPage('NOPE')
     expect(wrapper.text()).toContain('No such space')
     wrapper.unmount()
+  })
+})
+
+/**
+ * Labels and automation for one space moved here from workspace Settings
+ * (Jose, 2026-10-24), as tabs beside General, with the tab in the URL so the
+ * pointers left in workspace Settings land on the right one.
+ */
+describe('the labels and automation of the space', () => {
+  const sections = {
+    SettingsLabels: {
+      props: ['space'],
+      template: '<div class="stub-labels">labels of {{ space }}</div>',
+    },
+    SettingsAutomation: {
+      props: ['space'],
+      template: '<div class="stub-automation">automation of {{ space }}</div>',
+    },
+  }
+
+  it('opens on General, with neither section showing', async () => {
+    const wrapper = await mountPage('ST', sections)
+    expect(wrapper.find('#space-settings-name').exists()).toBe(true)
+    expect(wrapper.find('.stub-labels').exists()).toBe(false)
+    expect(wrapper.find('.stub-automation').exists()).toBe(false)
+  })
+
+  it("lands on the space's labels from ?tab=labels", async () => {
+    routeQuery.value = { tab: 'labels' }
+    const wrapper = await mountPage('ST', sections)
+    expect(wrapper.find('.stub-labels').text()).toBe('labels of ST')
+    expect(wrapper.find('#space-settings-name').exists()).toBe(false)
+  })
+
+  it("lands on the space's automation from ?tab=automation", async () => {
+    routeQuery.value = { tab: 'automation' }
+    const wrapper = await mountPage('ST', sections)
+    expect(wrapper.find('.stub-automation').text()).toBe('automation of ST')
+  })
+
+  it('no longer sends people to workspace Settings for them', async () => {
+    const wrapper = await mountPage('ST', sections)
+    const hrefs = wrapper.findAll('a').map((a) => a.attributes('href') ?? '')
+    expect(hrefs.some((h) => h.includes('/settings?tab='))).toBe(false)
   })
 })

@@ -26,6 +26,21 @@ vi.mock('vue-router', () => ({
     new Proxy({}, { get: (_t, key: string) => (route.value as never)[key] }),
 }))
 
+const phone = vi.hoisted(() => ({ value: false }))
+vi.mock('@nubisco/ui', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>
+  const { ref: vueRef } = await import('vue')
+  const signal = vueRef(false)
+  Object.defineProperty(phone, 'value', {
+    get: () => signal.value,
+    set: (on: boolean) => (signal.value = on),
+  })
+  return {
+    ...actual,
+    usePhoneLayout: () => ({ phone: signal, phoneTouch: signal }),
+  }
+})
+
 vi.mock('@/api/client', () => ({
   getWorkspaceSlug: () => 'acme',
 }))
@@ -231,6 +246,29 @@ describe('the rail', () => {
       'Settings',
     ])
     wrapper.unmount()
+    route.value = { name: 'home', params: { workspace: 'acme' } }
+  })
+
+  // The desktop has no view tabs above the board any more (2026-10-24), so
+  // the walkthrough's views step points at this group instead. A phone keeps
+  // the tabs, and the step with them, so the rail does not claim it there.
+  it('carries the views walkthrough step on a desktop, and not on a phone', async () => {
+    route.value = {
+      name: 'space',
+      params: { workspace: 'acme', spaceKey: 'ST' },
+    }
+    const desktop = mountRail('verbose')
+    const groups = desktop.findAll('.nb-sidebar-menu-group')
+    expect(groups[1].attributes('data-nb-tour-step')).toBe('space-views')
+    desktop.unmount()
+
+    phone.value = true
+    const onPhone = mountRail('verbose')
+    expect(onPhone.find('[data-nb-tour-step="space-views"]').exists()).toBe(
+      false,
+    )
+    onPhone.unmount()
+    phone.value = false
     route.value = { name: 'home', params: { workspace: 'acme' } }
   })
 })

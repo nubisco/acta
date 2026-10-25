@@ -198,7 +198,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'label_write',
     description:
-      'Batch label management, idempotent via op_id. Ops: group_create (workspace-wide or space-scoped; exclusive:true means at most one label from the group per card, which is how a group becomes a field like "Fixes version"), group_update, label_create (pos orders it within its group), label_update, label_reorder (the whole group in the order you want, positions assigned for you), label_merge (folds one label into another and reassigns all items), label_delete. A label is referenced by id, by bare name, or by "Group/Name", which is what to use when two groups hold the same values.',
+      'Batch label management, idempotent via op_id. Ops: group_create (with space: a group for that space alone, shown in its Settings; without: a group every space shares, shown in workspace Settings; exclusive:true means at most one label from the group per card, which is how a group becomes a field like "Fixes version"), group_update (name, exclusive), label_create (pos orders it within its group), label_update, label_reorder (the whole group in the order you want, positions assigned for you), label_merge (folds one label into another and reassigns all items), label_delete. A label is referenced by id, by bare name, or by "Group/Name", which is what to use when two groups hold the same values.',
     schema: zLabelWrite,
     write: true,
     handler: async (ctx, args) => {
@@ -223,7 +223,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'rule_write',
     description:
-      'Manage automation rules (fixed catalog), idempotent via op_id. Ops: create {trigger: event pattern, condition?: embed-query grammar (space=X list=Y label=Z assignee=H state=open|done|archived), action: move_item|apply_label|assign|comment|complete|call_webhook}, update (name/enabled), delete. Rule actions are attributed to the system actor with caused_by chaining and never re-trigger rules. Every op response includes the current rule list.',
+      "Manage automation rules (fixed catalog), idempotent via op_id. Ops: create {trigger: event pattern, condition?: embed-query grammar (space=X list=Y label=Z assignee=H state=open|done|archived), action: move_item {list, space?: file it into another space}|apply_label|assign|comment|complete|call_webhook}, update (name, trigger, condition (null clears it), action, enabled), delete. A rule whose condition names space=X belongs to space X, and so does a move_item into space X without one: those are shown in that space's Settings, every other rule in workspace Settings. Rule actions are attributed to the system actor with caused_by chaining and never re-trigger rules. Every op response includes the current rule list.",
     schema: zRuleWrite,
     write: true,
     handler: async (ctx, args) => {

@@ -65,15 +65,25 @@ show on the card on a board, the Table view has a sortable Priority column, and
 
 The space you are in has its own group in the sidebar, headed with its name:
 its views (Board, Table, Calendar, Timeline, Sequence, Response times), then
-**Settings**, always last. **Spaces**, under the workspace's own entries,
-opens the list of every space to switch to another, and Home lists them too.
+**Settings**, always last. That group is how you move between the views. On a
+phone, where the sidebar is a drawer, the views are also tabs above the board.
+**Spaces**, under the workspace's own entries, opens the list of every space
+to switch to another, and Home lists them too.
 
-A space's **Settings** hold everything that is configured per space: its name
-and description, its lists (rename, reorder by dragging, change what a list
-means, add one, archive an empty one), how long done cards stay on the board,
-and archiving or deleting it. The key is shown there but does not change,
-because every card key and every link to a card is made from it. These are the
-same things an agent can change with the `space_write` tool.
+A space's **Settings** hold everything that is configured per space, in three
+tabs:
+
+- **General**: its name and description, its lists (rename, reorder by
+  dragging, change what a list means, add one, archive an empty one), how long
+  done cards stay on the board, and archiving or deleting it. The key is shown
+  there but does not change, because every card key and every link to a card
+  is made from it. These are the same things an agent can change with the
+  `space_write` tool.
+- **Labels**: the label groups made for this space alone, with their labels.
+  Groups every space shares are in workspace Settings.
+- **Automation**: what files cards into this space. Its ingest endpoints, its
+  GitHub connections, and its rules: a rule whose condition names this space,
+  or one that moves cards into it from anywhere.
 
 Archiving takes a space out of the sidebar and Home with everything in it
 kept, and **Archived spaces** at the foot of Home's Spaces panel brings it
@@ -560,13 +570,18 @@ Six sections, grouped by what you are trying to do.
 **Labels** is the vocabulary your cards are filed under. A label lives in a
 group, and a group belongs either to one space or to the whole workspace, so a
 board can have its own vocabulary without imposing it on every other board.
+Here are the groups every space shares. A space's own groups are in that
+space's Settings, and this tab lists the spaces that have some, with a link to
+each.
 
-**Automation** is everything that happens without a person, arranged by which
-way the work flows: **ingest endpoints** take a URL you paste into a website
-form, **connections** let a provider like GitHub push signed events in,
-**webhooks** post events back out to your systems, **rules** are Acta reacting
-to itself, and **agent tokens** are credentials for a script that acts under
-its own name.
+**Automation** is everything that happens without a person. Here is what runs
+across every space: **webhooks** post events out to your systems, **rules**
+not narrowed to one space are Acta reacting to itself, and **agent tokens**
+are credentials for a script that acts under its own name. What files cards
+into one space (its **ingest endpoints**, which take a URL you paste into a
+website form, its **connections**, which let a provider like GitHub push
+signed events in, and its rules) is in that space's Settings, and this tab
+lists the spaces that have any.
 
 **Workspace** is policy that applies to everybody, and only an admin sees it.
 Today that is whether people may delete their own comments, or whether

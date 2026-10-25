@@ -27,6 +27,7 @@
         v-model="space"
         label="Space"
         :options="spaceOptions"
+        :disabled="Boolean(props.lockedSpace)"
       />
       <NbSelect
         id="field-connection-list"
@@ -113,7 +114,11 @@ import { humanise } from '@/lib/state'
 import { useWorkspace } from '@/stores/workspace'
 import LabelBadge from '@/components/LabelBadge.vue'
 
-const props = defineProps<{ open: boolean }>()
+const props = defineProps<{
+  open: boolean
+  /** Opened from a space's Settings: issues file into that space. */
+  lockedSpace?: string
+}>()
 const emit = defineEmits<{
   close: []
   /** The signing secret is shown once, so the parent has to receive it. */
@@ -178,7 +183,7 @@ watch(
   (open) => {
     if (open) {
       name.value = 'GitHub'
-      space.value = ws.overview.value?.spaces[0]?.key ?? ''
+      space.value = props.lockedSpace ?? ws.overview.value?.spaces[0]?.key ?? ''
       list.value = ''
       labels.value = []
       repos.value = []

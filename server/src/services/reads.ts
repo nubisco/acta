@@ -115,6 +115,21 @@ export async function workspaceOverview(ctx: ICtx) {
       ORDER BY g.name, l.pos IS NULL, l.pos, l.name`,
     [ctx.workspaceId],
   )
+  // Every group, the empty ones too. The labels above only reach a group
+  // through a label, so a group made a moment ago, with nothing in it yet,
+  // would be invisible to the Settings that has to fill it.
+  const groups = await ctx.db.query<{
+    id: string
+    name: string
+    space_key: string | null
+    exclusive: number
+  }>(
+    `SELECT g.id, g.name, b.key AS space_key, g.exclusive
+       FROM label_group g LEFT JOIN space b ON b.id = g.space_id
+      WHERE g.workspace_id = ?
+      ORDER BY g.name`,
+    [ctx.workspaceId],
+  )
   const actors = await ctx.db.query<{
     id: string
     handle: string
@@ -176,6 +191,12 @@ export async function workspaceOverview(ctx: ICtx) {
       // Absent rather than false, the way every other flag in this payload
       // reads, so a group that behaves as it always did says nothing.
       exclusive: l.exclusive === 1 || undefined,
+    })),
+    label_groups: groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      space_key: g.space_key,
+      exclusive: g.exclusive === 1 || undefined,
     })),
     actors,
     doc_roots: docRoots,

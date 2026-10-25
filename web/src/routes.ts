@@ -94,7 +94,11 @@ export const routes: RouteRecordRaw[] = [
       },
       {
         path: 'b/:spaceKey/settings',
-        redirect: (to) => ({ name: 'space-settings', params: to.params }),
+        redirect: (to) => ({
+          name: 'space-settings',
+          params: to.params,
+          query: to.query,
+        }),
       },
       {
         path: 'docs/:slug(.*)?',
@@ -139,7 +143,9 @@ export const routes: RouteRecordRaw[] = [
         // The workspace's settings are the gear at the foot of the rail.
         // What is yours alone moved to the user menu (the fleet's three
         // settings levels), so a bookmark or an old link to one of those
-        // tabs still lands on it.
+        // tabs still lands on it. Labels and Automation stay, holding what
+        // every space shares, and each points at the spaces whose own
+        // labels and automation moved to their Settings (2026-10-24).
         beforeEnter: (to) => {
           const tab = to.query.tab
           if (typeof tab !== 'string' || !PERSONAL_TABS.includes(tab))

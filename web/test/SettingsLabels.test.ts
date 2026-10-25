@@ -52,12 +52,27 @@ const LABELS = [
     name: '1.11.0',
     color: 'orange',
   },
+  {
+    group_id: 'lgr_need',
+    group_name: 'Need',
+    space_key: null,
+    id: 'need-bug',
+    name: 'Bug report',
+    color: 'red',
+  },
 ]
 
 const overview = {
   workspace: { id: 'w1', name: 'Nubisco' },
   spaces: [{ key: 'ST', name: 'Stagewright', lists: [] }],
   labels: LABELS,
+  // An empty group reaches Settings only through label_groups.
+  label_groups: [
+    { id: 'lgr_need', name: 'Need', space_key: null },
+    { id: 'lgr_fixes_version', name: 'Fixes version', space_key: 'ST' },
+    { id: 'lgr_affects_version', name: 'Affects version', space_key: 'ST' },
+    { id: 'lgr_platform', name: 'Platform', space_key: 'ST' },
+  ],
   actors: [],
   doc_roots: [],
 }
@@ -80,12 +95,21 @@ vi.mock('@/api/client', () => ({
     labelWrite: (...a: unknown[]) => labelWrite(...(a as [])),
   },
   newOpId: () => 'op',
+  getWorkspaceSlug: () => 'nubisco',
 }))
 
 import SettingsLabels from '@/components/settings/SettingsLabels.vue'
 
-function render() {
-  return mount(SettingsLabels, { global: { stubs: { teleport: true } } })
+/** A space's Settings by default, where the version groups live. */
+function render(props: { space?: string } = { space: 'ST' }) {
+  return mount(SettingsLabels, {
+    props,
+    global: { stubs: { teleport: true } },
+  })
+}
+
+function headings(view: ReturnType<typeof render>): string[] {
+  return view.findAll('.labels-settings__group h2').map((h) => h.text())
 }
 
 /** The panel for a group, found by its heading rather than by position. */
@@ -169,6 +193,90 @@ describe('Settings, Labels', () => {
         op_id: 'op',
         group: 'lgr_fixes_version',
         labels: ['fix-1110', 'fix-190', 'fix-1120'],
+      },
+    ])
+  })
+})
+
+/**
+ * Two levels (Jose, 2026-10-24). A group with a space belongs to that space's
+ * Settings, a group without one to workspace Settings, and the workspace page
+ * says where the others went, because old links to it still land there.
+ */
+describe('Labels at the space and workspace levels', () => {
+  beforeEach(() => {
+    labelWrite.mockReset()
+    labelWrite.mockResolvedValue({ results: [{ ok: true }] })
+  })
+
+  it("shows a space's own groups in its Settings, empty ones too", () => {
+    expect(headings(render({ space: 'ST' }))).toEqual([
+      'Affects version',
+      'Fixes version',
+      'Platform',
+    ])
+  })
+
+  it('shows only the shared groups in workspace Settings, and points at the space', () => {
+    const view = render({})
+    expect(headings(view)).toEqual(['Need', 'For one space'])
+    const pointer = view
+      .findAll('.labels-settings__group')
+      .find((p) => p.find('h2').text() === 'For one space')!
+    expect(pointer.text()).toContain('Stagewright')
+    expect(pointer.text()).toContain('Affects version, Fixes version, Platform')
+    expect(pointer.find('a').attributes('href')).toBe(
+      '/nubisco/s/ST/settings?tab=labels',
+    )
+  })
+
+  it('creates a group scoped to the space it was made in', async () => {
+    const view = render({ space: 'ST' })
+    const add = view
+      .findAll('button')
+      .find((b) => b.text().includes('New group'))!
+    await add.trigger('click')
+    const name = view.find('#label-group-form-name')
+    await name.setValue('Component')
+    await view.find('form#label-group-form').trigger('submit')
+    await new Promise((r) => setTimeout(r))
+    expect(labelWrite.mock.calls[0][0]).toEqual([
+      {
+        op: 'group_create',
+        op_id: 'op',
+        name: 'Component',
+        space: 'ST',
+        exclusive: false,
+      },
+    ])
+  })
+
+  it('creates a workspace-wide group from workspace Settings', async () => {
+    const view = render({})
+    await view
+      .findAll('button')
+      .find((b) => b.text().includes('New group'))!
+      .trigger('click')
+    await view.find('#label-group-form-name').setValue('Customer')
+    await view.find('form#label-group-form').trigger('submit')
+    await new Promise((r) => setTimeout(r))
+    expect(labelWrite.mock.calls[0][0]).toEqual([
+      { op: 'group_create', op_id: 'op', name: 'Customer', exclusive: false },
+    ])
+  })
+
+  it('renames a group by its id', async () => {
+    const view = render({ space: 'ST' })
+    await view.find('[aria-label="Rename group Platform"]').trigger('click')
+    await view.find('#label-group-form-name').setValue('Platforms')
+    await view.find('form#label-group-form').trigger('submit')
+    await new Promise((r) => setTimeout(r))
+    expect(labelWrite.mock.calls[0][0]).toEqual([
+      {
+        op: 'group_update',
+        op_id: 'op',
+        group: 'lgr_platform',
+        name: 'Platforms',
       },
     ])
   })

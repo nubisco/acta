@@ -1,8 +1,8 @@
 import type { IWalkthrough, IWalkthroughLabels } from '@nubisco/ui'
 
 /**
- * First-run walkthrough. Targets are `v-nb-tour-step` ids stamped in App.vue
- * and SpaceView.vue; a step whose target is not on screen is dropped, which
+ * First-run walkthrough. Targets are `v-nb-tour-step` ids stamped in App.vue,
+ * RailNav.vue and SpaceView.vue; a step whose target is not on screen is dropped, which
  * is why App starts the tour from a space rather than wherever the person
  * happened to be.
  *
@@ -17,7 +17,7 @@ import type { IWalkthrough, IWalkthroughLabels } from '@nubisco/ui'
  */
 export const introTour: IWalkthrough = {
   id: 'acta-intro',
-  version: 2,
+  version: 3,
   steps: [
     {
       title: 'A quick tour',
@@ -25,9 +25,9 @@ export const introTour: IWalkthrough = {
     },
     {
       target: 'space-views',
-      title: 'One space, four ways to look at it',
-      body: 'Columns, a sortable table, a calendar of due dates, or a timeline. Same cards and same filters throughout, so switching never means rebuilding your view.',
-      placement: 'bottom',
+      title: 'One space, several ways to look at it',
+      body: 'Columns, a sortable table, a calendar of due dates, a timeline or the order work has to happen in, plus how long people wait for an answer. Same cards and same filters throughout, so switching never means rebuilding your view. Settings, last in the list, holds the lists, labels and automation of this space.',
+      placement: 'right',
     },
     {
       target: 'space-card',

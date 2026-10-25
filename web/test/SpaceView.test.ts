@@ -17,6 +17,11 @@ import {
   rememberBoardFilters,
 } from '@/lib/boardFilters'
 
+// The library's phone signal, switchable per test. Off is the desktop.
+const phoneSignal = vi.hoisted(() => ({
+  ref: null as null | { value: boolean },
+}))
+
 const reveal = vi.hoisted(() => ({
   value: null as { key: string; at: number } | null,
 }))
@@ -47,7 +52,14 @@ vi.mock('@nubisco/ui', async (importOriginal) => {
       () =>
         slots.default?.(),
   })
-  return { ...actual, useShellSlot: () => ({ Outlet }) }
+  const { ref: vueRef } = await import('vue')
+  const phone = vueRef(false)
+  phoneSignal.ref = phone
+  return {
+    ...actual,
+    useShellSlot: () => ({ Outlet }),
+    usePhoneLayout: () => ({ phone, phoneTouch: phone }),
+  }
 })
 
 const overview = {
@@ -744,5 +756,34 @@ describe('a board keeps its filters', () => {
     expect(lastParams().label).toBe('lbl_urgent')
     expect(recallBoardFilters('SU').labels).toEqual(['lbl_urgent'])
     view.unmount()
+  })
+})
+
+/**
+ * The views live in the space's group in the rail, so the desktop has no
+ * tabs above the board (Jose, 2026-10-24). A phone keeps them, because its
+ * rail is a drawer. The filters stay in the bar either way.
+ */
+describe('the view tabs', () => {
+  beforeEach(() => forgetBoardFilters())
+
+  it('are gone on a desktop, and the filters keep their place', async () => {
+    phoneSignal.ref!.value = false
+    const view = await render()
+    expect(view.find('[aria-label="Space views"]').exists()).toBe(false)
+    expect(view.find('.space__bar .space__filters').exists()).toBe(true)
+    expect(view.find('#field-filter-text').exists()).toBe(true)
+    expect(view.find('#field-board-sort').exists()).toBe(true)
+    expect(view.find('#field-swimlane').exists()).toBe(true)
+  })
+
+  it('stay on a phone, as the walkthrough target', async () => {
+    phoneSignal.ref!.value = true
+    const view = await render()
+    const tabs = view.find('[aria-label="Space views"]')
+    expect(tabs.exists()).toBe(true)
+    expect(tabs.text()).toContain('Response times')
+    expect(view.find('[data-nb-tour-step="space-views"]').exists()).toBe(true)
+    phoneSignal.ref!.value = false
   })
 })

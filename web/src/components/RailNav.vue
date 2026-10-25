@@ -49,7 +49,14 @@
 
     <!-- The space you are in, as its own group headed with its name (the
          fleet rail anatomy): its views, then its Settings, always last. -->
-    <NbSidebarMenuGroup v-if="chosen" :label="chosen.name">
+    <!-- On a desktop this group is the only way between the views, so the
+         walkthrough points at it. A phone keeps tabs above the board for
+         that, and the tour points there instead. -->
+    <NbSidebarMenuGroup
+      v-if="chosen"
+      v-nb-tour-step="phone ? undefined : 'space-views'"
+      :label="chosen.name"
+    >
       <NbSidebarMenuItem
         v-for="entry in spaceEntries"
         :key="entry.id"
@@ -71,6 +78,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { usePhoneLayout } from '@nubisco/ui'
 import { useWorkspace } from '@/stores/workspace'
 import { wpath } from '@/lib/paths'
 import { SPACE_VIEWS, spaceViewOf, spaceViewPath } from '@/lib/spaceViews'
@@ -82,6 +90,7 @@ defineProps<{
 
 const route = useRoute()
 const ws = useWorkspace()
+const { phone } = usePhoneLayout()
 
 const workspaceName = computed(() => ws.overview.value?.workspace.name ?? '')
 
