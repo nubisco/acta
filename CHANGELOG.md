@@ -1,3 +1,10 @@
+# [1.64.0](https://github.com/nubisco/acta/compare/v1.63.1...v1.64.0) (2026-10-25)
+
+
+### Features
+
+* **web:** card references are link buttons, and the card trail is a real breadcrumb ([616c425](https://github.com/nubisco/acta/commit/616c425fdd2948b2a713895282311cdf0b3568a7))
+
 ## [1.63.1](https://github.com/nubisco/acta/compare/v1.63.0...v1.63.1) (2026-10-25)
 
 
