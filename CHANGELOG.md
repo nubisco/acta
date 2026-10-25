@@ -1,3 +1,10 @@
+# [1.63.0](https://github.com/nubisco/acta/compare/v1.62.0...v1.63.0) (2026-10-25)
+
+
+### Features
+
+* **web:** space views live in the rail, and a space's own labels and automation in its Settings ([7366f9c](https://github.com/nubisco/acta/commit/7366f9c1ceba306bbe8166599a286725c44d5921))
+
 # [1.62.0](https://github.com/nubisco/acta/compare/v1.61.0...v1.62.0) (2026-10-24)
 
 
