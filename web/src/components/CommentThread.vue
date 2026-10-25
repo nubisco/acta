@@ -141,11 +141,12 @@
             </NbButton>
           </div>
         </div>
-        <MarkdownView
-          v-else
-          :source="comment.body"
-          class="thread__body nb-layer-2"
-        />
+        <!-- A panel rather than a pinned layer: it lands one level deeper
+             than whatever holds the thread, so a comment reads as a surface
+             on a document page (layer 0) and inside the inspector alike. -->
+        <NbPanel v-else class="thread__body">
+          <MarkdownView :source="comment.body" />
+        </NbPanel>
       </li>
     </ul>
     <NbForm class="thread__composer" @submit.prevent="emit('submit')">
@@ -507,10 +508,9 @@ function askDelete(comment: ICommentView | null): void {
     }
   }
 
-  &__body {
+  /* Doubled so the thread's denser padding wins over NbPanel's own. */
+  &__body#{&}__body {
     padding: var(--nb-spacing-8) var(--nb-spacing-12);
-    border-radius: var(--nb-radius-sm);
-    background: var(--nb-c-surface);
   }
 
   &__head {

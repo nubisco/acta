@@ -25,7 +25,7 @@
     <template v-else-if="plan">
       <!-- The headline is the only number anyone asks for: how long is the
            road. Said once, at the top, rather than implied by the layout. -->
-      <header class="sequence__summary nb-layer-2">
+      <NbPanel class="sequence__summary">
         <span class="sequence__stat">
           <strong>{{ plan.layers }}</strong>
           {{ plan.layers === 1 ? 'step' : 'steps' }}
@@ -44,7 +44,7 @@
         >
           Critical path only
         </NbButton>
-      </header>
+      </NbPanel>
 
       <!-- One band per step. Everything in a band can be worked at the same
            time, which is the question a plan is actually asked: not "when is
@@ -56,7 +56,7 @@
         :class="{ 'sequence__step--now': step.layer === 0 }"
       >
         <div class="sequence__rail">
-          <span class="sequence__badge">{{ step.layer + 1 }}</span>
+          <span class="sequence__badge nb-layer-1">{{ step.layer + 1 }}</span>
           <span v-if="step.layer === 0" class="sequence__now"
             >Can start now</span
           >
@@ -66,7 +66,7 @@
           <li v-for="node in step.nodes" :key="node.key">
             <button
               type="button"
-              class="sequence__card"
+              class="sequence__card nb-layer-1"
               :class="{
                 'sequence__card--critical': node.critical,
                 'sequence__card--milestone': node.is_milestone,
@@ -202,15 +202,13 @@ const steps = computed(() => {
     gap: var(--nb-spacing-12);
   }
 
-  &__summary {
+  /* Doubled so the summary's denser padding wins over NbPanel's own. */
+  &__summary#{&}__summary {
     display: flex;
     align-items: center;
     gap: var(--nb-spacing-16);
     flex-wrap: wrap;
     padding: var(--nb-spacing-8) var(--nb-spacing-12);
-    border: 1px solid var(--nb-c-border);
-    border-radius: var(--nb-radius-sm);
-    background: var(--nb-c-surface);
   }
 
   &__stat {
@@ -244,19 +242,25 @@ const steps = computed(() => {
     top: 0;
   }
 
+  /* The view is drawn straight on the page ground, layer 0. The step badges
+     and the cards are surfaces painted here rather than library components,
+     so they carry .nb-layer-1 in the markup, the theming docs' recipe for a
+     hand-painted card. The size pill inside a card sits one deeper, on 2. */
   &__badge {
     display: grid;
     place-items: center;
     inline-size: 1.75rem;
     block-size: 1.75rem;
+    border: 1px solid var(--nb-c-border);
     border-radius: var(--nb-radius-pill);
-    background: var(--nb-c-layer-2);
+    background: var(--nb-c-surface);
     color: var(--nb-c-text-subtle);
     font-size: var(--nb-type-body-sm-size);
     font-weight: 600;
   }
 
   &__step--now &__badge {
+    border-color: var(--nb-c-primary);
     background: var(--nb-c-primary);
     color: var(--nb-c-white);
   }

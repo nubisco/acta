@@ -141,8 +141,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@nubisco/ui':
-        specifier: ^5.29.0
-        version: 5.29.0(pixi.js@8.20.1)(vue-i18n@11.4.10(vue@3.5.44(typescript@5.9.3)))(vue@3.5.44(typescript@5.9.3))
+        specifier: ^5.32.0
+        version: 5.32.0(pixi.js@8.20.1)(vue-i18n@11.4.10(vue@3.5.44(typescript@5.9.3)))(vue@3.5.44(typescript@5.9.3))
       '@tiptap/core':
         specifier: ^3.32.0
         version: 3.32.0(@tiptap/pm@3.32.0)
@@ -1133,8 +1133,8 @@ packages:
     os: [linux]
     libc: [glibc]
 
-  '@nubisco/ui@5.29.0':
-    resolution: {integrity: sha512-HHT/TUy3eBJSeHjd8nReYiJLLE1MOB4cFU4sNX0k1iDOYcuNUemYc++4MISf6/arnjdK1aglV6szb/85y0x8cQ==}
+  '@nubisco/ui@5.32.0':
+    resolution: {integrity: sha512-4tW+p5VhoXthgTSEe4z8EYFqcxvHEyEeHSA3KzCcCItj3wUV+ct6s135Wbx7w2HJYEOb8uRYScPKMvJxPpoI/w==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       pixi.js: ^8.0.0
@@ -5762,7 +5762,7 @@ snapshots:
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
 
-  '@nubisco/ui@5.29.0(pixi.js@8.20.1)(vue-i18n@11.4.10(vue@3.5.44(typescript@5.9.3)))(vue@3.5.44(typescript@5.9.3))':
+  '@nubisco/ui@5.32.0(pixi.js@8.20.1)(vue-i18n@11.4.10(vue@3.5.44(typescript@5.9.3)))(vue@3.5.44(typescript@5.9.3))':
     dependencies:
       pixi.js: 8.20.1
       vue: 3.5.44(typescript@5.9.3)

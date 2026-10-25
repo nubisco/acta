@@ -139,7 +139,12 @@
         </template>
       </NbEmptyState>
 
-      <article v-else class="docs__doc">
+      <!-- The page is the shell's ground (layer 0), and the blocks a document
+           paints by hand (link cards, code bars, attachments, the comment box)
+           are surfaces on it. Naming layer 1 here is what gives their
+           var(--nb-c-surface) the panel value: the markup is rendered from
+           Markdown, so no library surface is there to count the depth. -->
+      <NbLayer v-else as="article" :level="1" class="docs__doc">
         <h1 class="type-heading-04">{{ doc.title }}</h1>
         <ProvenanceNote v-if="doc.imported" :imported="doc.imported" />
         <DocChromeBar
@@ -265,7 +270,7 @@
             @clear-quote="pendingAnchor = null"
           />
         </section>
-      </article>
+      </NbLayer>
     </div>
 
     <div v-if="tocShown" class="docs__toc">
