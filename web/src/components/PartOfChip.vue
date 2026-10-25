@@ -1,21 +1,23 @@
 <template>
   <div class="part-of">
-    <button
-      type="button"
-      class="part-of__ref"
-      :aria-label="`Open ${parent.key}: ${parent.title}, which this card is part of`"
-      @click="emit('open', parent.key)"
-    >
+    <div class="part-of__ref">
       <NbIcon name="arrow-bend-left-up" :size="13" aria-hidden="true" />
       <span class="part-of__lead">Part of</span>
       <span class="part-of__key">{{ parent.key }}</span>
-      <span class="part-of__title">{{ parent.title }}</span>
+      <CardKeyLink
+        :card-key="parent.key"
+        class="part-of__title"
+        :aria-label="`Open ${parent.key}: ${parent.title}, which this card is part of`"
+        @open="emit('open', $event)"
+      >
+        <span class="part-of__title-text">{{ parent.title }}</span>
+      </CardKeyLink>
       <!-- Only when the parent is somewhere else. A board name on every chip
            is noise; on the ones that leave this board it is the whole point. -->
       <NbBadge v-if="parent.space !== space" size="sm" variant="grey">
         {{ parent.space }}
       </NbBadge>
-    </button>
+    </div>
     <NbButton
       v-nb-tooltip="{ body: `Detach from ${parent.key}. Both cards stay.` }"
       size="sm"
@@ -37,6 +39,7 @@
  * over a single fact is heavier than the fact.
  */
 import { api, newOpId } from '@/api/client'
+import CardKeyLink from '@/components/CardKeyLink.vue'
 import type { IPartRef } from '@/types/api'
 
 const props = defineProps<{
@@ -79,26 +82,9 @@ async function detach(): Promise<void> {
        close button, which is the one click nobody meant to make. */
     flex: 0 1 auto;
     min-inline-size: 0;
-    padding: var(--nb-spacing-2) var(--nb-spacing-4);
-    margin-inline-start: calc(var(--nb-spacing-4) * -1);
-    background: none;
-    border: 0;
-    border-radius: var(--nb-radius-sm);
-    text-align: start;
-    font: inherit;
+    padding-block: var(--nb-spacing-2);
     font-size: var(--nb-type-body-sm-size);
     color: var(--nb-c-text-subtle);
-    cursor: pointer;
-
-    &:hover {
-      background: var(--nb-c-surface-hover);
-      color: var(--nb-c-text);
-    }
-
-    &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring);
-      outline-offset: 1px;
-    }
   }
 
   &__lead {
@@ -112,7 +98,12 @@ async function detach(): Promise<void> {
     font-size: var(--nb-type-code-sm-size);
   }
 
+  /* The title is the link. It gives way before anything else in the line. */
   &__title {
+    min-inline-size: 0;
+  }
+
+  &__title-text {
     min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;

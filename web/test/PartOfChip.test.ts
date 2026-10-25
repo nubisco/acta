@@ -13,6 +13,7 @@ const itemWrite = vi.fn()
 vi.mock('@/api/client', () => ({
   api: { itemWrite: (...a: unknown[]) => itemWrite(...(a as [])) },
   newOpId: () => 'op',
+  getWorkspaceSlug: () => 'acme',
   ApiHttpError: class extends Error {},
 }))
 
@@ -51,7 +52,7 @@ describe('PartOfChip', () => {
 
   it('opens the parent when the chip itself is clicked', async () => {
     const view = render()
-    await view.find('.part-of__ref').trigger('click')
+    await view.find('.part-of__title').trigger('click')
     expect(view.emitted('open')).toEqual([['ST-4']])
     expect(itemWrite).not.toHaveBeenCalled()
   })
@@ -60,7 +61,7 @@ describe('PartOfChip', () => {
   // parent would cut the parent's own link to its parent instead.
   it('detaches this card from its parent in one click', async () => {
     const view = render()
-    await view.find('.nb-button').trigger('click')
+    await view.find('[aria-label^="Detach"]').trigger('click')
     await flushPromises()
     expect(itemWrite.mock.calls[0][0][0]).toMatchObject({
       op: 'set_parent',

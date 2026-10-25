@@ -33,12 +33,7 @@
               :key="dep.key"
               class="deps__row nb-layer-3"
             >
-              <button
-                type="button"
-                class="deps__ref"
-                :aria-label="`Open ${dep.key}: ${dep.title}`"
-                @click="emit('open', dep.key)"
-              >
+              <div class="deps__ref">
                 <span
                   class="deps__key"
                   :class="{ 'deps__key--done': dep.done }"
@@ -47,7 +42,14 @@
                 </span>
                 <!-- The title leads. The key is the address, but nobody reads
                      a plan by its addresses. -->
-                <span class="deps__title">{{ dep.title }}</span>
+                <CardKeyLink
+                  :card-key="dep.key"
+                  class="deps__title"
+                  :aria-label="`Open ${dep.key}: ${dep.title}`"
+                  @open="emit('open', $event)"
+                >
+                  <span class="deps__title-text">{{ dep.title }}</span>
+                </CardKeyLink>
                 <NbIcon
                   v-if="dep.done"
                   v-nb-tooltip="{ body: 'Done' }"
@@ -55,7 +57,7 @@
                   :size="14"
                   class="deps__done"
                 />
-              </button>
+              </div>
               <NbButton
                 v-nb-tooltip="{ body: `Unlink ${dep.key}` }"
                 size="sm"
@@ -151,6 +153,7 @@
 import { computed, ref, watch } from 'vue'
 import { api, newOpId } from '@/api/client'
 import { humanise } from '@/lib/state'
+import CardKeyLink from '@/components/CardKeyLink.vue'
 import type { IDependencyRef } from '@/types/api'
 
 const props = defineProps<{
@@ -391,20 +394,6 @@ async function commitSize(): Promise<void> {
     background: var(--nb-c-surface);
     border: 1px solid var(--nb-c-border);
     border-radius: var(--nb-radius-sm);
-    text-align: start;
-    font: inherit;
-    color: inherit;
-    cursor: pointer;
-
-    &:hover {
-      background: var(--nb-c-surface-hover);
-      border-color: var(--nb-c-primary);
-    }
-
-    &:focus-visible {
-      outline: 1px solid var(--nb-c-focus-ring);
-      outline-offset: 1px;
-    }
   }
 
   /* Never wraps. A two-character-wide column that broke "ST-41" across two
@@ -424,11 +413,17 @@ async function commitSize(): Promise<void> {
   /* The prominent half: full text colour and weight, the key beside it muted.
      Reversing those made every row look like an id with a footnote. */
   &__title {
-    flex: 1;
+    /* Only as wide as its text, so the link is the words and not the row.
+       The margin keeps the badge and the done mark at the row's end. */
+    flex: 0 1 auto;
+    margin-inline-end: auto;
     min-inline-size: 0;
     font-size: var(--nb-type-body-sm-size);
     font-weight: var(--nb-type-label-lg-weight);
-    color: var(--nb-c-text);
+  }
+
+  &__title-text {
+    min-inline-size: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

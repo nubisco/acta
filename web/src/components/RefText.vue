@@ -1,16 +1,12 @@
 <template>
   <span class="ref-text">
     <template v-for="(part, i) in parts" :key="i">
-      <button
+      <CardKeyLink
         v-if="'key' in part"
-        type="button"
-        class="md__ref md__ref--bare"
+        :card-key="part.key"
         :title="titleOf(part.key)"
-        @click.stop.prevent="open($event, part.key)"
-        @auxclick.stop.prevent="open($event, part.key)"
-      >
-        {{ part.key }}</button
-      ><template v-else>{{ part.text }}</template>
+        @open="inspector.open"
+      /><template v-else>{{ part.text }}</template>
     </template>
   </span>
 </template>
@@ -20,21 +16,15 @@ import { computed, watchEffect } from 'vue'
 import { useInspector, useWorkspace } from '@/stores/workspace'
 import { useRefCards } from '@/stores/refs'
 import { splitCardKeys } from '@/lib/cardKeys'
-import { cardPath, wantsNewTab } from '@/lib/paths'
+import CardKeyLink from '@/components/CardKeyLink.vue'
 
 /**
  * Plain text with every card key in it made openable: a checklist entry, a
  * history line, anything that is not markdown. The markdown surfaces do the
  * same through lib/cardKeys.ts, so a key reads and behaves alike in both.
- * `.stop.prevent` because the text often sits in a label or a row that has
- * a click of its own, and opening a card must not also tick a checkbox.
+ * CardKeyLink keeps the click from reaching a label or row around the text.
  */
 const props = defineProps<{ text: string }>()
-
-function open(event: MouseEvent, key: string): void {
-  if (wantsNewTab(event)) window.open(cardPath(key), '_blank', 'noopener')
-  else if (event.button === 0) inspector.open(key)
-}
 
 const ws = useWorkspace()
 const inspector = useInspector()

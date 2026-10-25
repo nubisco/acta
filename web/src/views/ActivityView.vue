@@ -104,28 +104,25 @@
               v-for="(part, i) in (row as IRow).parts"
               :key="`${(row as IRow).id}-${i}`"
             >
-              <button
+              <CardKeyLink
                 v-if="part.kind === 'item'"
-                type="button"
-                class="md__ref md__ref--bare"
-                @click="inspector.open(part.text)"
-              >
-                {{ part.text }}
-              </button>
-              <RouterLink
+                :card-key="part.text"
+                @open="inspector.open"
+              />
+              <NbButton
                 v-else-if="part.kind === 'doc'"
-                class="md__ref"
+                variant="link"
                 :to="wpath(`/docs/${part.slug}`)"
               >
                 {{ part.text }}
-              </RouterLink>
-              <RouterLink
+              </NbButton>
+              <NbButton
                 v-else-if="part.kind === 'goal'"
-                class="md__ref"
+                variant="link"
                 :to="wpath(`/goals/${part.number}`)"
               >
                 {{ part.text }}
-              </RouterLink>
+              </NbButton>
               <template v-else>{{ part.text }}</template>
             </template>
           </span>
@@ -158,9 +155,9 @@ import { api } from '@/api/client'
 import type { IEventRow } from '@/types/api'
 import { absoluteTime, relativeTime, useLoadState } from '@/lib/state'
 import { useWorkspace } from '@/stores/workspace'
-import { RouterLink } from 'vue-router'
 import ActorAvatar from '@/components/ActorAvatar.vue'
 import ActorFilter from '@/components/ActorFilter.vue'
+import CardKeyLink from '@/components/CardKeyLink.vue'
 import { activitySegments, type TActivitySegment } from '@/lib/activity'
 import { wpath } from '@/lib/paths'
 import { useInspector } from '@/stores/workspace'

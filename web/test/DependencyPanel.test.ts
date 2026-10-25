@@ -18,6 +18,7 @@ vi.mock('@/api/client', () => ({
     spaceGet: (...a: unknown[]) => spaceGet(...(a as [])),
   },
   newOpId: () => 'op',
+  getWorkspaceSlug: () => 'acme',
   ApiHttpError: class extends Error {},
 }))
 

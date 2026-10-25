@@ -13,18 +13,9 @@
         :aria-label="`Back to ${previousKey}`"
         @click="inspector.back()"
       />
-      <NbBreadcrumbs class="card-trail__crumbs">
-        <NbButton
-          v-nb-tooltip="{ body: `Back to ${previousLabel}` }"
-          size="xs"
-          variant="ghost"
-          class="card-trail__crumb"
-          @click="inspector.back()"
-        >
-          {{ previousKey }}
-        </NbButton>
-        <span class="card-trail__key" aria-current="page">{{ cardKey }}</span>
-      </NbBreadcrumbs>
+      <!-- The card you came from is a link in the trail, muted like any
+           parent crumb, and this card is the current one. -->
+      <NbBreadcrumbs class="card-trail__crumbs" :items="crumbs" />
     </template>
     <span v-else class="card-trail__key">{{ cardKey }}</span>
     <!-- The card's address, for pasting into a chat. Next to the key because
@@ -40,7 +31,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { useToast } from '@nubisco/ui'
+import { useToast, type IBreadcrumbItem } from '@nubisco/ui'
 import { useInspector } from '@/stores/workspace'
 import { useRefCards } from '@/stores/refs'
 import { cardUrl } from '@/lib/paths'
@@ -66,6 +57,11 @@ const previousLabel = computed(() => {
   return card ? `${key} ${card.title}` : key
 })
 watch(previousKey, (key) => key && refCards.request(key), { immediate: true })
+
+const crumbs = computed<IBreadcrumbItem[]>(() => [
+  { label: previousKey.value ?? '', onClick: () => inspector.back() },
+  { label: props.cardKey },
+])
 </script>
 
 <style scoped lang="scss">
@@ -76,12 +72,11 @@ watch(previousKey, (key) => key && refCards.request(key), { immediate: true })
   min-inline-size: 0;
 }
 
+/* Keys are addresses, so the trail is mono at the key's size. */
 .card-trail__crumbs {
   min-inline-size: 0;
-}
-
-.card-trail__crumb {
   font-family: var(--nb-font-family-mono);
+  font-size: var(--nb-type-code-sm-size);
 }
 
 .card-trail__key {

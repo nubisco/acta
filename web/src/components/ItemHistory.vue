@@ -34,21 +34,18 @@
             >
               {{ part.name.split('/').pop() }}
             </NbBadge>
-            <button
+            <CardKeyLink
               v-else-if="part.kind === 'item'"
-              type="button"
-              class="md__ref md__ref--bare"
-              @click="emit('open', part.key)"
-            >
-              {{ part.key }}
-            </button>
-            <RouterLink
+              :card-key="part.key"
+              @open="emit('open', $event)"
+            />
+            <NbButton
               v-else-if="part.kind === 'goal'"
-              class="md__ref"
+              variant="link"
               :to="wpath(`/goals/${part.number}`)"
             >
               G-{{ part.number }}
-            </RouterLink>
+            </NbButton>
             <RefText v-else :text="part.text" />
           </template>
           <span v-if="event.automated" class="history__muted">
@@ -89,7 +86,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import RefText from '@/components/RefText.vue'
-import { RouterLink } from 'vue-router'
+import CardKeyLink from '@/components/CardKeyLink.vue'
 import type { IItemEvent } from '@/types/api'
 import { describe, shownInHistory } from '@/lib/history'
 import { absoluteTime, relativeTime } from '@/lib/state'

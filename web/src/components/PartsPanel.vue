@@ -7,18 +7,20 @@
 
       <ul v-if="parts.length > 0" class="parts__list">
         <li v-for="part in parts" :key="part.key" class="parts__row nb-layer-3">
-          <button
-            type="button"
-            class="parts__ref"
-            :aria-label="`Open ${part.key}: ${part.title}`"
-            @click="emit('open', part.key)"
-          >
+          <div class="parts__ref">
             <span class="parts__key" :class="{ 'parts__key--done': part.done }">
               {{ part.key }}
             </span>
             <!-- The title leads, as it does on a dependency row: nobody reads
-                 a plan by its addresses. -->
-            <span class="parts__title">{{ part.title }}</span>
+                 a plan by its addresses. It is also the link. -->
+            <CardKeyLink
+              :card-key="part.key"
+              class="parts__title"
+              :aria-label="`Open ${part.key}: ${part.title}`"
+              @open="emit('open', $event)"
+            >
+              <span class="parts__title-text">{{ part.title }}</span>
+            </CardKeyLink>
             <!-- Only when it is somewhere else. Stamping every row with the
                  board you are already looking at says nothing, and it is the
                  rows that leave this board that need the warning. -->
@@ -37,7 +39,7 @@
               :size="14"
               class="parts__done"
             />
-          </button>
+          </div>
           <!-- Detach, not delete, and the label says so. The card carries on
                existing on its own board: the only thing this removes is the
                link, which is why there is no confirm in front of it. -->
@@ -92,7 +94,9 @@
               @click="attach(hit.ref)"
             >
               <span class="parts__key">{{ hit.ref }}</span>
-              <span class="parts__title">{{ hit.title }}</span>
+              <span class="parts__title parts__title-text">{{
+                hit.title
+              }}</span>
               <NbBadge
                 v-if="hit.space && hit.space !== space"
                 size="sm"
@@ -124,6 +128,7 @@
 import { computed, ref, watch } from 'vue'
 import { api, newOpId } from '@/api/client'
 import { humanise } from '@/lib/state'
+import CardKeyLink from '@/components/CardKeyLink.vue'
 import type { IPartRef, ISearchResult } from '@/types/api'
 
 const props = defineProps<{
@@ -272,6 +277,11 @@ async function detach(key: string): Promise<void> {
     background: var(--nb-c-surface);
     border: 1px solid var(--nb-c-border);
     border-radius: var(--nb-radius-sm);
+  }
+
+  /* A search hit is still a whole-row button: the row is the one thing to
+     pick. A part row is not, its title is the link. */
+  &__hit {
     text-align: start;
     font: inherit;
     color: inherit;
@@ -307,11 +317,17 @@ async function detach(key: string): Promise<void> {
   }
 
   &__title {
-    flex: 1;
+    /* Only as wide as its text, so the link is the words and not the row.
+       The margin keeps the badge and the done mark at the row's end. */
+    flex: 0 1 auto;
+    margin-inline-end: auto;
     min-inline-size: 0;
     font-size: var(--nb-type-body-sm-size);
     font-weight: var(--nb-type-label-lg-weight);
-    color: var(--nb-c-text);
+  }
+
+  &__title-text {
+    min-inline-size: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

@@ -18,6 +18,8 @@ vi.mock('vue-router', () => ({
 
 vi.mock('@/lib/paths', () => ({
   wpath: (p: string) => `/nubisco${p}`,
+  cardPath: (key: string) => `/nubisco/s/${key.split('-')[0]}?item=${key}`,
+  wantsNewTab: (e: MouseEvent) => e.metaKey || e.ctrlKey || e.shiftKey,
   cardUrl: (key: string) =>
     `https://acta.test/nubisco/s/${key.split('-')[0]}?item=${key}`,
 }))
@@ -212,7 +214,7 @@ describe('ItemInspector', () => {
     // Back asks the router for a step through history (App.vue answers it),
     // so the next browser Back does not land on a duplicate.
     const asked = useInspector().backRequest.value
-    await crumbs.find('.card-trail__crumb').trigger('click')
+    await crumbs.find('.nb-breadcrumbs__link').trigger('click')
     expect(useInspector().backRequest.value).toBe(asked + 1)
   })
 

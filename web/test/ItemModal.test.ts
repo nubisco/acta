@@ -16,6 +16,8 @@ vi.mock('vue-router', () => ({
 }))
 vi.mock('@/lib/paths', () => ({
   wpath: (p: string) => `/nubisco${p}`,
+  cardPath: (key: string) => `/nubisco/s/${key.split('-')[0]}?item=${key}`,
+  wantsNewTab: (e: MouseEvent) => e.metaKey || e.ctrlKey || e.shiftKey,
   cardUrl: (key: string) =>
     `https://acta.test/nubisco/s/${key.split('-')[0]}?item=${key}`,
 }))
