@@ -1,33 +1,24 @@
 <template>
-  <NbPanel class="people-settings">
-    <header class="people-settings__head">
-      <div>
-        <h2 class="type-heading-01">People</h2>
-        <p class="people-settings__lede">
-          Everyone who can sign in to this workspace. Only people can be
-          assigned work or mentioned. Automations that create items on your
-          behalf live under Automation.
-        </p>
-      </div>
-      <NbButton
-        v-if="ws.isAdmin.value"
-        size="sm"
-        variant="primary"
-        icon="plus"
-        @click="inviting = true"
-      >
-        Invite member
-      </NbButton>
-    </header>
-
+  <div class="people-settings">
     <NbDataTable
       stack-on-phone
       :columns="columns"
       :rows="rows"
       row-key="id"
       size="sm"
-      aria-label="People"
+      title="People"
+      description="Everyone who can sign in to this workspace. Only people can be assigned work or mentioned. Automations that create items on your behalf live under Automation."
     >
+      <template #toolbar-actions>
+        <NbButton
+          v-if="ws.isAdmin.value"
+          variant="primary"
+          icon="plus"
+          @click="inviting = true"
+        >
+          Invite member
+        </NbButton>
+      </template>
       <template #cell-person="{ row }">
         <span class="people-settings__person">
           <button
@@ -61,61 +52,43 @@
       </template>
     </NbDataTable>
 
-    <section
+    <NbDataTable
       v-if="ws.isAdmin.value && invitations.length > 0"
-      class="people-settings__invites"
-      aria-labelledby="pending-invitations"
+      stack-on-phone
+      :columns="inviteColumns"
+      :rows="inviteRows"
+      row-key="id"
+      size="sm"
+      title="Pending invitations"
+      :description="invitesDescription"
     >
-      <h3 id="pending-invitations" class="type-heading-02">
-        Pending invitations
-      </h3>
-      <p class="people-settings__lede">
-        Not members yet. They join when they accept, and nothing else is sent to
-        them until then.
-        <template v-if="emailsLeft !== null">
-          {{ emailsLeft }} invitation
-          {{ emailsLeft === 1 ? 'email' : 'emails' }} left today.
-        </template>
-      </p>
-      <NbDataTable
-        stack-on-phone
-        :columns="inviteColumns"
-        :rows="inviteRows"
-        row-key="id"
-        size="sm"
-        aria-label="Pending invitations"
-      >
-        <template #cell-person="{ row }">
-          <span class="people-settings__names">
-            <span class="people-settings__name">{{ row.name }}</span>
-            <span class="people-settings__handle">{{ row.email }}</span>
-          </span>
-        </template>
-        <template #cell-role="{ row }">
-          <NbBadge
-            size="sm"
-            :variant="row.role === 'admin' ? 'purple' : 'blue'"
-          >
-            {{ row.role === 'admin' ? 'Admin' : 'Member' }}
-          </NbBadge>
-        </template>
-        <template #cell-status="{ row }">
-          <NbBadge size="sm" :variant="row.expired ? 'grey' : 'green'">
-            {{ row.status }}
-          </NbBadge>
-        </template>
-        <template #cell-actions="{ row }">
-          <NbButton
-            size="sm"
-            variant="ghost"
-            :loading="revoking === row.id"
-            @click="revoke(String(row.id))"
-          >
-            Revoke
-          </NbButton>
-        </template>
-      </NbDataTable>
-    </section>
+      <template #cell-person="{ row }">
+        <span class="people-settings__names">
+          <span class="people-settings__name">{{ row.name }}</span>
+          <span class="people-settings__handle">{{ row.email }}</span>
+        </span>
+      </template>
+      <template #cell-role="{ row }">
+        <NbBadge size="sm" :variant="row.role === 'admin' ? 'purple' : 'blue'">
+          {{ row.role === 'admin' ? 'Admin' : 'Member' }}
+        </NbBadge>
+      </template>
+      <template #cell-status="{ row }">
+        <NbBadge size="sm" :variant="row.expired ? 'grey' : 'green'">
+          {{ row.status }}
+        </NbBadge>
+      </template>
+      <template #cell-actions="{ row }">
+        <NbButton
+          size="sm"
+          variant="ghost"
+          :loading="revoking === row.id"
+          @click="revoke(String(row.id))"
+        >
+          Revoke
+        </NbButton>
+      </template>
+    </NbDataTable>
 
     <NewMemberModal
       :open="inviting"
@@ -130,7 +103,7 @@
       @close="avatarTarget = null"
       @saved="avatarTarget = null"
     />
-  </NbPanel>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -189,6 +162,16 @@ function openAvatar(row: unknown): void {
  */
 const invitations = ref<IInvitation[]>([])
 const emailsLeft = ref<number | null>(null)
+
+// The table's description, with today's remaining invitation emails when the
+// server reports them.
+const invitesDescription = computed(() => {
+  const base =
+    'Not members yet. They join when they accept, and nothing else is sent to them until then.'
+  if (emailsLeft.value === null) return base
+  const noun = emailsLeft.value === 1 ? 'email' : 'emails'
+  return `${base} ${emailsLeft.value} invitation ${noun} left today.`
+})
 const revoking = ref<string | null>(null)
 
 const inviteColumns = [
@@ -249,27 +232,7 @@ function onCreated(emailed: boolean): void {
 .people-settings {
   display: flex;
   flex-direction: column;
-  gap: var(--nb-spacing-16);
-
-  &__head {
-    display: flex;
-    align-items: start;
-    justify-content: space-between;
-    gap: var(--nb-spacing-16);
-  }
-
-  &__invites {
-    display: flex;
-    flex-direction: column;
-    gap: var(--nb-spacing-8);
-  }
-
-  &__lede {
-    max-width: 68ch;
-    margin-block-start: var(--nb-spacing-4);
-    color: var(--nb-c-text-subtle);
-    font-size: var(--nb-type-body-sm-size);
-  }
+  gap: var(--nb-spacing-24);
 
   &__person {
     display: flex;
@@ -310,14 +273,6 @@ function onCreated(emailed: boolean): void {
       outline: 1px solid var(--nb-c-focus-ring);
       outline-offset: 2px;
     }
-  }
-}
-
-/* A phone: the action goes under the heading and its description, rather
-   than beside them squeezing the text to half the width. */
-@include variables.phone {
-  .people-settings__head {
-    flex-wrap: wrap;
   }
 }
 </style>

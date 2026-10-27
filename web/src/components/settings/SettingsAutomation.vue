@@ -57,322 +57,257 @@
     </NbModal>
 
     <!-- Inbound, unauthenticated senders ------------------------------- -->
-    <NbPanel v-if="space" class="automation__section">
-      <header class="automation__head">
-        <div>
-          <h2 class="type-heading-01">Ingest endpoints</h2>
-          <p class="automation__lede">
-            A URL you paste into a website form or another tool. Anything posted
-            to it becomes a card on this space. The URL is the credential, so
-            treat it as a secret.
-          </p>
-        </div>
+    <NbDataTable
+      v-if="space"
+      stack-on-phone
+      :columns="ingestColumns"
+      :rows="ingestRows"
+      row-key="id"
+      size="sm"
+      :loading="loading"
+      :error="error"
+      title="Ingest endpoints"
+      description="A URL you paste into a website form or another tool. Anything posted to it becomes a card on this space. The URL is the credential, so treat it as a secret."
+    >
+      <template #toolbar-actions>
         <NbButton
           v-if="ws.isAdmin.value"
-          size="sm"
           variant="primary"
           icon="plus"
           @click="creatingIngest = true"
         >
           New endpoint
         </NbButton>
-      </header>
-
-      <NbDataTable
-        stack-on-phone
-        :columns="ingestColumns"
-        :rows="ingestRows"
-        row-key="id"
-        size="sm"
-        aria-label="Ingest endpoints"
-        :loading="loading"
-        :error="error"
-      >
-        <template #cell-used="{ row }">
-          <span :class="{ automation__never: row.used === 'Never' }">
-            {{ row.used }}
-          </span>
-        </template>
-        <template #cell-actions="{ row }">
-          <NbButton
-            v-if="ws.isAdmin.value"
-            size="sm"
-            variant="ghost"
-            :aria-label="`Revoke ${row.name}`"
-            @click="revokeIngest(String(row.id), String(row.name))"
-          >
-            Revoke
-          </NbButton>
-        </template>
-        <template #empty>
-          <NbEmptyState
-            size="sm"
-            title="No ingest endpoints"
-            description="Create one to turn a contact form or an external tool into cards."
-          />
-        </template>
-      </NbDataTable>
-    </NbPanel>
-
-    <!-- Inbound, signed providers -------------------------------------- -->
-    <NbPanel v-if="space" class="automation__section">
-      <header class="automation__head">
-        <div>
-          <h2 class="type-heading-01">Connections</h2>
-          <p class="automation__lede">
-            A provider pushes signed events to Acta. GitHub issues become
-            tracking cards on this space, and every delivery is verified against
-            a shared secret.
-          </p>
-        </div>
+      </template>
+      <template #cell-used="{ row }">
+        <span :class="{ automation__never: row.used === 'Never' }">
+          {{ row.used }}
+        </span>
+      </template>
+      <template #cell-actions="{ row }">
         <NbButton
           v-if="ws.isAdmin.value"
           size="sm"
+          variant="ghost"
+          :aria-label="`Revoke ${row.name}`"
+          @click="revokeIngest(String(row.id), String(row.name))"
+        >
+          Revoke
+        </NbButton>
+      </template>
+      <template #empty>
+        <NbEmptyState
+          size="sm"
+          title="No ingest endpoints"
+          description="Create one to turn a contact form or an external tool into cards."
+        />
+      </template>
+    </NbDataTable>
+
+    <!-- Inbound, signed providers -------------------------------------- -->
+    <NbDataTable
+      v-if="space"
+      stack-on-phone
+      :columns="connectionColumns"
+      :rows="connectionRows"
+      row-key="id"
+      size="sm"
+      :loading="loading"
+      :error="error"
+      title="Connections"
+      description="A provider pushes signed events to Acta. GitHub issues become tracking cards on this space, and every delivery is verified against a shared secret."
+    >
+      <template #toolbar-actions>
+        <NbButton
+          v-if="ws.isAdmin.value"
           variant="primary"
           icon="plus"
           @click="creatingConnection = true"
         >
           Connect GitHub
         </NbButton>
-      </header>
-
-      <NbDataTable
-        stack-on-phone
-        :columns="connectionColumns"
-        :rows="connectionRows"
-        row-key="id"
-        size="sm"
-        aria-label="Connections"
-        :loading="loading"
-        :error="error"
-      >
-        <template #cell-status="{ row }">
-          <NbBadge size="sm" :variant="row.statusVariant" :dot="row.statusDot">
-            {{ row.status }}
-          </NbBadge>
-        </template>
-        <template #empty>
-          <NbEmptyState
-            size="sm"
-            title="No connections yet"
-            description="Connect a GitHub repository and its issues become tracking cards."
-          />
-        </template>
-      </NbDataTable>
-    </NbPanel>
+      </template>
+      <template #cell-status="{ row }">
+        <NbBadge size="sm" :variant="row.statusVariant" :dot="row.statusDot">
+          {{ row.status }}
+        </NbBadge>
+      </template>
+      <template #empty>
+        <NbEmptyState
+          size="sm"
+          title="No connections yet"
+          description="Connect a GitHub repository and its issues become tracking cards."
+        />
+      </template>
+    </NbDataTable>
 
     <!-- Outbound ------------------------------------------------------- -->
-    <NbPanel v-if="!space" class="automation__section">
-      <header class="automation__head">
-        <div>
-          <h2 class="type-heading-01">Webhooks</h2>
-          <p class="automation__lede">
-            The other direction. Acta posts signed events to your systems as
-            work changes, or to a Slack channel.
-          </p>
-        </div>
+    <NbDataTable
+      v-if="!space"
+      stack-on-phone
+      :columns="webhookColumns"
+      :rows="webhookRows"
+      row-key="id"
+      size="sm"
+      :loading="loading"
+      :error="error"
+      title="Webhooks"
+      description="The other direction. Acta posts signed events to your systems as work changes, or to a Slack channel."
+    >
+      <template #toolbar-actions>
         <NbButton
           v-if="ws.isAdmin.value"
-          size="sm"
           variant="primary"
           icon="plus"
           @click="creatingWebhook = true"
         >
           New webhook
         </NbButton>
-      </header>
-
-      <NbDataTable
-        stack-on-phone
-        :columns="webhookColumns"
-        :rows="webhookRows"
-        row-key="id"
-        size="sm"
-        aria-label="Webhooks"
-        :loading="loading"
-        :error="error"
-      >
-        <template #cell-status="{ row }">
-          <NbBadge size="sm" :variant="row.statusVariant" :dot="row.statusDot">
-            {{ row.status }}
-          </NbBadge>
-        </template>
-        <template #empty>
-          <NbEmptyState
-            size="sm"
-            title="No webhooks yet"
-            description="Webhooks POST signed events to your systems as work changes."
-          />
-        </template>
-      </NbDataTable>
-    </NbPanel>
+      </template>
+      <template #cell-status="{ row }">
+        <NbBadge size="sm" :variant="row.statusVariant" :dot="row.statusDot">
+          {{ row.status }}
+        </NbBadge>
+      </template>
+      <template #empty>
+        <NbEmptyState
+          size="sm"
+          title="No webhooks yet"
+          description="Webhooks POST signed events to your systems as work changes."
+        />
+      </template>
+    </NbDataTable>
 
     <!-- Internal ------------------------------------------------------- -->
-    <NbPanel class="automation__section">
-      <header class="automation__head">
-        <div>
-          <h2 class="type-heading-01">Rules</h2>
-          <p v-if="space" class="automation__lede">
-            Acta reacting to itself. When something happens to a card on this
-            space, and the card matches, do one thing to it. A rule that moves
-            cards here from anywhere is listed here too.
-          </p>
-          <p v-else class="automation__lede">
-            Acta reacting to itself. When something happens to an item in any
-            space, and the item matches, do one thing to it. A rule narrowed to
-            one space is in that space's Settings.
-          </p>
-        </div>
+    <NbDataTable
+      stack-on-phone
+      :columns="ruleColumns"
+      :rows="ruleRows"
+      row-key="id"
+      size="sm"
+      :loading="loading"
+      :error="error"
+      title="Rules"
+      :description="rulesDescription"
+    >
+      <template #toolbar-actions>
         <NbButton
           v-if="ws.isAdmin.value"
-          size="sm"
           variant="primary"
           icon="plus"
           @click="editingRule = { rule: null }"
         >
           New rule
         </NbButton>
-      </header>
-
-      <NbDataTable
-        stack-on-phone
-        :columns="ruleColumns"
-        :rows="ruleRows"
-        row-key="id"
-        size="sm"
-        aria-label="Rules"
-        :loading="loading"
-        :error="error"
-      >
-        <template #cell-status="{ row }">
-          <NbBadge
+      </template>
+      <template #cell-status="{ row }">
+        <NbBadge
+          size="sm"
+          :variant="row.enabled ? 'green' : 'grey'"
+          :dot="Boolean(row.enabled)"
+        >
+          {{ row.enabled ? 'Active' : 'Inactive' }}
+        </NbBadge>
+      </template>
+      <template #cell-actions="{ row }">
+        <div class="automation__actions">
+          <NbButton
+            v-if="ws.isAdmin.value"
+            v-nb-tooltip="{ body: `Edit rule ${row.name}` }"
             size="sm"
-            :variant="row.enabled ? 'green' : 'grey'"
-            :dot="Boolean(row.enabled)"
-          >
-            {{ row.enabled ? 'Active' : 'Inactive' }}
-          </NbBadge>
-        </template>
-        <template #cell-actions="{ row }">
-          <div class="automation__actions">
-            <NbButton
-              v-if="ws.isAdmin.value"
-              v-nb-tooltip="{ body: `Edit rule ${row.name}` }"
-              size="sm"
-              variant="ghost"
-              icon="pencil-simple"
-              :aria-label="`Edit rule ${row.name}`"
-              @click="openRule(String(row.id))"
-            />
-            <NbButton
-              v-if="ws.isAdmin.value"
-              v-nb-tooltip="{ body: `Delete rule ${row.name}` }"
-              size="sm"
-              variant="danger"
-              outlined
-              icon="trash-simple"
-              :aria-label="`Delete rule ${row.name}`"
-              @click="deleteRule(String(row.id), String(row.name))"
-            />
-          </div>
-        </template>
-        <template #empty>
-          <NbEmptyState
-            size="sm"
-            title="No rules yet"
-            description="A rule reacts to a change: move an item, apply a label, post a comment."
+            variant="ghost"
+            icon="pencil-simple"
+            :aria-label="`Edit rule ${row.name}`"
+            @click="openRule(String(row.id))"
           />
-        </template>
-      </NbDataTable>
-    </NbPanel>
+          <NbButton
+            v-if="ws.isAdmin.value"
+            v-nb-tooltip="{ body: `Delete rule ${row.name}` }"
+            size="sm"
+            variant="danger"
+            outlined
+            icon="trash-simple"
+            :aria-label="`Delete rule ${row.name}`"
+            @click="deleteRule(String(row.id), String(row.name))"
+          />
+        </div>
+      </template>
+      <template #empty>
+        <NbEmptyState
+          size="sm"
+          title="No rules yet"
+          description="A rule reacts to a change: move an item, apply a label, post a comment."
+        />
+      </template>
+    </NbDataTable>
 
     <!-- Identities ----------------------------------------------------- -->
-    <NbPanel v-if="!space" class="automation__section">
-      <header class="automation__head">
-        <div>
-          <h2 class="type-heading-01">Agent tokens</h2>
-          <p class="automation__lede">
-            A credential for a script or a bot that acts as
-            <strong>itself</strong>, with its own name in the activity feed. To
-            let a tool act as <strong>you</strong> instead, use an access token
-            under Your account.
-          </p>
-        </div>
+    <NbDataTable
+      v-if="!space"
+      stack-on-phone
+      :columns="agentColumns"
+      :rows="agentRows"
+      row-key="id"
+      size="sm"
+      title="Agent tokens"
+      description="A credential for a script or a bot that acts as itself, with its own name in the activity feed. To let a tool act as you instead, use an access token under Your account."
+    >
+      <template #toolbar-actions>
         <NbButton
           v-if="ws.isAdmin.value"
-          size="sm"
           variant="primary"
           icon="plus"
           @click="creatingAgent = true"
         >
           New agent token
         </NbButton>
-      </header>
-
-      <NbDataTable
-        stack-on-phone
-        :columns="agentColumns"
-        :rows="agentRows"
-        row-key="id"
-        size="sm"
-        aria-label="Agent identities"
-      >
-        <template #cell-agent="{ row }">
-          <span class="automation__agent">
-            <ActorAvatar :handle="String(row.handle)" :size="22" />
-            <span>{{ row.name }}</span>
-          </span>
-        </template>
-        <template #empty>
-          <NbEmptyState
-            size="sm"
-            title="No agents"
-            description="Agent tokens let a script post as its own identity rather than as a person."
-          />
-        </template>
-      </NbDataTable>
-    </NbPanel>
+      </template>
+      <template #cell-agent="{ row }">
+        <span class="automation__agent">
+          <ActorAvatar :handle="String(row.handle)" :size="22" />
+          <span>{{ row.name }}</span>
+        </span>
+      </template>
+      <template #empty>
+        <NbEmptyState
+          size="sm"
+          title="No agents"
+          description="Agent tokens let a script post as its own identity rather than as a person."
+        />
+      </template>
+    </NbDataTable>
 
     <!-- Where the per-space pieces went (2026-10-24). An old link to this
          tab lands here, so it says where to look and goes there. -->
-    <NbPanel v-if="!space" class="automation__section">
-      <header class="automation__head">
-        <div>
-          <h2 class="type-heading-01">For one space</h2>
-          <p class="automation__lede">
-            Ingest endpoints, connections and rules that file cards into one
-            space are in that space's Settings, under Automation.
-          </p>
-        </div>
-      </header>
-      <NbDataTable
-        stack-on-phone
-        :columns="spaceColumns"
-        :rows="spaceRows"
-        row-key="key"
-        size="sm"
-        aria-label="Automation by space"
-        :loading="loading"
-      >
-        <template #cell-actions="{ row }">
-          <NbButton
-            size="sm"
-            variant="ghost"
-            icon="sliders-horizontal"
-            :to="wpath(`/s/${row.key}/settings?tab=automation`)"
-          >
-            Open
-          </NbButton>
-        </template>
-        <template #empty>
-          <NbEmptyState
-            size="sm"
-            title="Nothing set up for one space"
-            description="Open a space's Settings to add an ingest endpoint, a connection or a rule for it."
-          />
-        </template>
-      </NbDataTable>
-    </NbPanel>
+    <NbDataTable
+      v-if="!space"
+      stack-on-phone
+      :columns="spaceColumns"
+      :rows="spaceRows"
+      row-key="key"
+      size="sm"
+      :loading="loading"
+      title="For one space"
+      description="Ingest endpoints, connections and rules that file cards into one space are in that space's Settings, under Automation."
+    >
+      <template #cell-actions="{ row }">
+        <NbButton
+          size="sm"
+          variant="ghost"
+          icon="sliders-horizontal"
+          :to="wpath(`/s/${row.key}/settings?tab=automation`)"
+        >
+          Open
+        </NbButton>
+      </template>
+      <template #empty>
+        <NbEmptyState
+          size="sm"
+          title="Nothing set up for one space"
+          description="Open a space's Settings to add an ingest endpoint, a connection or a rule for it."
+        />
+      </template>
+    </NbDataTable>
 
     <NewTokenModal
       :open="creatingIngest"
@@ -440,6 +375,14 @@ const props = defineProps<{
   space?: string
 }>()
 const space = computed(() => props.space ?? null)
+
+// The Rules table on a space lists what files cards into it, and the
+// workspace one lists the rest, so each says which it is.
+const rulesDescription = computed(() =>
+  space.value
+    ? 'Acta reacting to itself. When something happens to a card on this space, and the card matches, do one thing to it. A rule that moves cards here from anywhere is listed here too.'
+    : "Acta reacting to itself. When something happens to an item in any space, and the item matches, do one thing to it. A rule narrowed to one space is in that space's Settings.",
+)
 
 /**
  * Where a rule is listed. A rule naming a space that no longer exists stays
@@ -786,26 +729,6 @@ function deleteRule(id: string, name: string): void {
   flex-direction: column;
   gap: var(--nb-spacing-24);
 
-  &__section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--nb-spacing-16);
-  }
-
-  &__head {
-    display: flex;
-    align-items: start;
-    justify-content: space-between;
-    gap: var(--nb-spacing-16);
-  }
-
-  &__lede {
-    max-width: 68ch;
-    margin-block-start: var(--nb-spacing-4);
-    color: var(--nb-c-text-subtle);
-    font-size: var(--nb-type-body-sm-size);
-  }
-
   &__reveal {
     display: flex;
     gap: var(--nb-spacing-8);
@@ -834,14 +757,6 @@ function deleteRule(id: string, name: string): void {
      word carries a little less weight than a date rather than more. */
   &__never {
     color: var(--nb-c-text-subtle);
-  }
-}
-
-/* A phone: the action goes under the heading and its description, rather
-   than beside them squeezing the text to half the width. */
-@include variables.phone {
-  .automation__head {
-    flex-wrap: wrap;
   }
 }
 </style>

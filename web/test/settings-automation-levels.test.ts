@@ -208,7 +208,7 @@ describe('workspace Settings, Automation', () => {
 
   it('lists each space with something of its own, with a link to its Settings', async () => {
     const wrapper = await mountAt()
-    const pointer = table(wrapper, 'Automation by space')
+    const pointer = table(wrapper, 'For one space')
     expect(pointer.text()).toContain('Design')
     expect(pointer.text()).toContain('Stagewright')
     const hrefs = pointer.findAll('a').map((a) => a.attributes('href'))

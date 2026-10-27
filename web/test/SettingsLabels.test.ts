@@ -219,10 +219,9 @@ describe('Labels at the space and workspace levels', () => {
 
   it('shows only the shared groups in workspace Settings, and points at the space', () => {
     const view = render({})
-    expect(headings(view)).toEqual(['Need', 'For one space'])
-    const pointer = view
-      .findAll('.labels-settings__group')
-      .find((p) => p.find('h2').text() === 'For one space')!
+    expect(headings(view)).toEqual(['Need'])
+    // The pointer is a table titled for what it lists, and the title names it.
+    const pointer = view.find('[aria-label="For one space"]')
     expect(pointer.text()).toContain('Stagewright')
     expect(pointer.text()).toContain('Affects version, Fixes version, Platform')
     expect(pointer.find('a').attributes('href')).toBe(

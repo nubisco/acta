@@ -18,55 +18,39 @@
       </NbField>
     </NbBanner>
 
-    <NbPanel class="account__section">
-      <header class="account__head">
-        <div>
-          <h2 class="type-heading-01">Access tokens</h2>
-          <p class="account__lede">
-            A token lets an editor, a script or an MCP client act as
-            <strong>you</strong>, with your role. Work done through one is
-            attributed to you, not to a bot. Tokens never carry admin rights, so
-            administration still takes a signed-in session.
-          </p>
-        </div>
-        <NbButton
-          size="sm"
-          variant="primary"
-          icon="plus"
-          @click="creating = true"
-        >
+    <NbDataTable
+      stack-on-phone
+      :columns="tokenColumns"
+      :rows="tokenRows"
+      row-key="id"
+      size="sm"
+      title="Access tokens"
+      description="A token lets an editor, a script or an MCP client act as you, with your role. Work done through one is attributed to you, not to a bot. Tokens never carry admin rights, so administration still takes a signed-in session."
+      :loading="tokensLoading"
+    >
+      <template #toolbar-actions>
+        <NbButton variant="primary" icon="plus" @click="creating = true">
           New token
         </NbButton>
-      </header>
-
-      <NbDataTable
-        stack-on-phone
-        :columns="tokenColumns"
-        :rows="tokenRows"
-        row-key="id"
-        size="sm"
-        aria-label="Access tokens"
-        :loading="tokensLoading"
-      >
-        <template #cell-actions="{ row }">
-          <NbButton
-            size="sm"
-            variant="ghost"
-            :aria-label="`Revoke ${row.label}`"
-            @click="revokeToken(String(row.id), String(row.label))"
-          >
-            Revoke
-          </NbButton>
-        </template>
-        <template #empty>
-          <NbEmptyState
-            size="sm"
-            title="No access tokens"
-            description="Create one to use Acta from an editor, a script or an MCP client."
-          />
-        </template>
-      </NbDataTable>
-    </NbPanel>
+      </template>
+      <template #cell-actions="{ row }">
+        <NbButton
+          size="sm"
+          variant="ghost"
+          :aria-label="`Revoke ${row.label}`"
+          @click="revokeToken(String(row.id), String(row.label))"
+        >
+          Revoke
+        </NbButton>
+      </template>
+      <template #empty>
+        <NbEmptyState
+          size="sm"
+          title="No access tokens"
+          description="Create one to use Acta from an editor, a script or an MCP client."
+        />
+      </template>
+    </NbDataTable>
 
     <!--
       Connected applications. An OAuth grant was previously a one-way door:
@@ -74,46 +58,34 @@
       and nothing listed a grant, so authorising Claude could not be undone
       from the interface at all.
     -->
-    <NbPanel class="account__section">
-      <header class="account__head">
-        <div>
-          <h2 class="type-heading-01">Connected applications</h2>
-          <p class="account__lede">
-            Applications you have signed in to Acta from, such as the Claude or
-            ChatGPT connectors. They act as you, and they can be cut off here at
-            any time.
-          </p>
-        </div>
-      </header>
-
-      <NbDataTable
-        stack-on-phone
-        :columns="appColumns"
-        :rows="appRows"
-        row-key="client_id"
-        size="sm"
-        aria-label="Connected applications"
-        :loading="appsLoading"
-      >
-        <template #cell-actions="{ row }">
-          <NbButton
-            size="sm"
-            variant="ghost"
-            :aria-label="`Revoke access for ${row.name}`"
-            @click="revokeApp(String(row.client_id), String(row.name))"
-          >
-            Revoke
-          </NbButton>
-        </template>
-        <template #empty>
-          <NbEmptyState
-            size="sm"
-            title="Nothing connected"
-            description="Connect Acta from Claude or another MCP client and it appears here."
-          />
-        </template>
-      </NbDataTable>
-    </NbPanel>
+    <NbDataTable
+      stack-on-phone
+      :columns="appColumns"
+      :rows="appRows"
+      row-key="client_id"
+      size="sm"
+      title="Connected applications"
+      description="Applications you have signed in to Acta from, such as the Claude or ChatGPT connectors. They act as you, and they can be cut off here at any time."
+      :loading="appsLoading"
+    >
+      <template #cell-actions="{ row }">
+        <NbButton
+          size="sm"
+          variant="ghost"
+          :aria-label="`Revoke access for ${row.name}`"
+          @click="revokeApp(String(row.client_id), String(row.name))"
+        >
+          Revoke
+        </NbButton>
+      </template>
+      <template #empty>
+        <NbEmptyState
+          size="sm"
+          title="Nothing connected"
+          description="Connect Acta from Claude or another MCP client and it appears here."
+        />
+      </template>
+    </NbDataTable>
 
     <NewTokenModal
       :open="creating"
@@ -277,41 +249,10 @@ function revokeApp(clientId: string, name: string): void {
   flex-direction: column;
   gap: var(--nb-spacing-24);
 
-  &__section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--nb-spacing-16);
-  }
-
-  /* The action sits with the heading it belongs to, not below the table it
-     acts on. A primary button stranded under a list reads as a footer for
-     the page rather than the control for that section. */
-  &__head {
-    display: flex;
-    align-items: start;
-    justify-content: space-between;
-    gap: var(--nb-spacing-16);
-  }
-
-  &__lede {
-    max-width: 68ch;
-    margin-block-start: var(--nb-spacing-4);
-    color: var(--nb-c-text-subtle);
-    font-size: var(--nb-type-body-sm-size);
-  }
-
   &__reveal {
     display: flex;
     gap: var(--nb-spacing-8);
     align-items: end;
-  }
-}
-
-/* A phone: the action goes under the heading and its description, rather
-   than beside them squeezing the text to half the width. */
-@include variables.phone {
-  .account__head {
-    flex-wrap: wrap;
   }
 }
 </style>

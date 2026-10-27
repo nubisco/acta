@@ -156,36 +156,27 @@
 
     <!-- Where the per-space groups went (2026-10-24). An old link to this
          tab lands here, so it says where they are and goes there. -->
-    <NbPanel
+    <NbDataTable
       v-if="!space && elsewhere.length > 0"
-      class="labels-settings__group"
+      stack-on-phone
+      :columns="elsewhereColumns"
+      :rows="elsewhere"
+      row-key="key"
+      size="sm"
+      title="For one space"
+      description="These spaces have label groups of their own, in their Settings."
     >
-      <header>
-        <h2 class="type-heading-01">For one space</h2>
-        <p class="labels-settings__lede">
-          These spaces have label groups of their own, in their Settings.
-        </p>
-      </header>
-      <NbDataTable
-        stack-on-phone
-        :columns="elsewhereColumns"
-        :rows="elsewhere"
-        row-key="key"
-        size="sm"
-        aria-label="Label groups by space"
-      >
-        <template #cell-actions="{ row }">
-          <NbButton
-            size="sm"
-            variant="ghost"
-            icon="sliders-horizontal"
-            :to="wpath(`/s/${row.key}/settings?tab=labels`)"
-          >
-            Open
-          </NbButton>
-        </template>
-      </NbDataTable>
-    </NbPanel>
+      <template #cell-actions="{ row }">
+        <NbButton
+          size="sm"
+          variant="ghost"
+          icon="sliders-horizontal"
+          :to="wpath(`/s/${row.key}/settings?tab=labels`)"
+        >
+          Open
+        </NbButton>
+      </template>
+    </NbDataTable>
 
     <LabelGroupModal
       :open="groupEditing !== null"

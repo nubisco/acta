@@ -1,17 +1,15 @@
 <template>
   <div class="workspace-data">
-    <NbPanel class="workspace-data__section">
-      <header class="workspace-data__head">
-        <div>
-          <h2 class="type-heading-01">Export everything</h2>
-          <p class="workspace-data__lede">
-            One zip with every space, card, page, goal and uploaded file in this
-            workspace, as JSON Lines and Markdown, so it can be read without
-            Acta. Private pages are included only if they are yours. It takes a
-            minute or two, and the download link is emailed to you and listed
-            here for {{ LINK_DAYS }} days.
-          </p>
-        </div>
+    <NbDataTable
+      stack-on-phone
+      :columns="exportColumns"
+      :rows="exportRows"
+      row-key="id"
+      size="sm"
+      title="Export everything"
+      :description="exportDescription"
+    >
+      <template #toolbar-actions>
         <NbButton
           variant="secondary"
           :loading="requesting"
@@ -20,30 +18,26 @@
         >
           {{ inProgress ? 'Export in progress' : 'Export everything' }}
         </NbButton>
-      </header>
-
-      <NbDataTable
-        v-if="exports.length > 0"
-        stack-on-phone
-        :columns="exportColumns"
-        :rows="exportRows"
-        row-key="id"
-        size="sm"
-        aria-label="Exports"
-      >
-        <template #cell-action="{ row }">
-          <NbButton
-            v-if="row.downloadUrl"
-            variant="ghost"
-            size="sm"
-            :href="row.downloadUrl"
-            download
-          >
-            Download
-          </NbButton>
-        </template>
-      </NbDataTable>
-    </NbPanel>
+      </template>
+      <template #cell-action="{ row }">
+        <NbButton
+          v-if="row.downloadUrl"
+          variant="ghost"
+          size="sm"
+          :href="row.downloadUrl"
+          download
+        >
+          Download
+        </NbButton>
+      </template>
+      <template #empty>
+        <NbEmptyState
+          size="sm"
+          title="No exports yet"
+          description="Export the workspace and the download is listed here."
+        />
+      </template>
+    </NbDataTable>
 
     <NbPanel class="workspace-data__section">
       <header class="workspace-data__head">
@@ -138,6 +132,9 @@ import { humanise } from '@/lib/state'
 
 const LINK_DAYS = 7
 const GRACE_DAYS = 30
+
+// The export table's description, which names how long a download link lasts.
+const exportDescription = `One zip with every space, card, page, goal and uploaded file in this workspace, as JSON Lines and Markdown, so it can be read without Acta. Private pages are included only if they are yours. It takes a minute or two, and the download link is emailed to you and listed here for ${LINK_DAYS} days.`
 
 const ws = useWorkspace()
 const toast = useToast()
