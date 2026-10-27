@@ -1,3 +1,10 @@
+# [1.65.0](https://github.com/nubisco/acta/compare/v1.64.0...v1.65.0) (2026-10-27)
+
+
+### Features
+
+* **web:** settings tables carry their own title, description and action ([6d734bf](https://github.com/nubisco/acta/commit/6d734bfd6231c391b1a5a01be71d2409bb4f5506))
+
 # [1.64.0](https://github.com/nubisco/acta/compare/v1.63.1...v1.64.0) (2026-10-25)
 
 
