@@ -8,6 +8,7 @@ import type { Hono } from 'hono'
 import { createApp, reportRunOptions, type IAppEnv } from './app'
 import { dailyReportTick } from './services/dailyReport'
 import { setDeferrer } from './core/defer'
+import { sharedStartup } from './core/startup'
 import { ssoConfigFromEnv } from './core/sso'
 import { oidcConfigFromEnv } from './core/oidc'
 import { D1Driver, type ID1Database } from './db'
@@ -115,26 +116,32 @@ function r2BlobStore(bucket: IR2Bucket): IBlobStore {
 /** Durable Object classes have to be exported by the worker's main module. */
 export { LiveHub } from './live-hub'
 
-let appPromise: Promise<Hono<IAppEnv>> | null = null
+/**
+ * How long the first request may spend migrating and building the app. Long
+ * enough for a real migration, short enough that a D1 call hung by a provider
+ * incident turns into an error and the next request tries again, rather than
+ * every request waiting on it for the life of the isolate (see core/startup).
+ */
+const STARTUP_TIMEOUT_MS = 20_000
+
 /**
  * The migrated driver the app is built on. Held separately so the cron
  * handler can use the same one rather than opening a second: not because two
  * are expensive, but because only this one is known to have migrated, and a
  * sweep is the wrong place to discover that.
  */
-let driverPromise: Promise<D1Driver> | null = null
-
-function getDriver(env: IWorkerEnv): Promise<D1Driver> {
-  driverPromise ??= (async () => {
+const getDriver = sharedStartup(
+  async (env: IWorkerEnv): Promise<D1Driver> => {
     const driver = new D1Driver(env.DB)
     await driver.migrate()
     return driver
-  })()
-  return driverPromise
-}
+  },
+  STARTUP_TIMEOUT_MS,
+  'database migration',
+)
 
-function getApp(env: IWorkerEnv, origin: string): Promise<Hono<IAppEnv>> {
-  appPromise ??= (async () => {
+const getApp = sharedStartup(
+  async (env: IWorkerEnv, origin: string): Promise<Hono<IAppEnv>> => {
     const driver = await getDriver(env)
     return createApp(driver, {
       blobStore: r2BlobStore(env.ATTACHMENTS),
@@ -179,9 +186,10 @@ function getApp(env: IWorkerEnv, origin: string): Promise<Hono<IAppEnv>> {
         adminName: env.ACTA_ADMIN_NAME,
       },
     })
-  })()
-  return appPromise
-}
+  },
+  STARTUP_TIMEOUT_MS,
+  'app startup',
+)
 
 export default {
   async fetch(
