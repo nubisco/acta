@@ -15,7 +15,7 @@
     "@floating-ui/dom": "^1.8.0",
     "@nubisco/acta-importers": "workspace:*",
     "@nubisco/acta-shared": "workspace:*",
-    "@nubisco/ui": "^5.37.0",
+    "@nubisco/ui": "^5.41.1",
     "@tiptap/core": "^3.32.0",
     "@tiptap/extension-code-block": "^3.32.0",
     "@tiptap/extension-italic": "^3.32.0",
