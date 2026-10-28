@@ -1,6 +1,8 @@
-# Architecture
-
-A monorepo of four packages plus the docs you are reading.
+---
+layout: nubisco
+title: 'Architecture'
+intro: 'A monorepo of four packages plus the docs you are reading.'
+---
 
 | Package      | What it is                                                                              |
 | ------------ | --------------------------------------------------------------------------------------- |

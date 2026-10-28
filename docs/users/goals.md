@@ -1,9 +1,8 @@
-# Goals
-
-A goal names an outcome and groups the cards that get you there, from any
-space. It is the answer to "what is all this work for", and it is the first
-thing on Home and right under Activity in the sidebar, because that is the
-question worth asking before any single card.
+---
+layout: nubisco
+title: 'Goals'
+intro: 'A goal names an outcome and groups the cards that get you there, from any space. It is the answer to "what is all this work for", and it is the first thing on Home and right under Activity in the sidebar, because that is the question worth asking before any single card.'
+---
 
 ## Two signals, kept apart
 

@@ -1,7 +1,8 @@
-# The data model
-
-Thirty-odd tables in `server/src/db/schema.ts`. These are the ones that carry
-the ideas; the rest are joins and logs.
+---
+layout: nubisco
+title: 'The data model'
+intro: 'Thirty-odd tables in `server/src/db/schema.ts`. These are the ones that carry the ideas; the rest are joins and logs.'
+---
 
 ## Identity
 

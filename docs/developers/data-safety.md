@@ -1,11 +1,8 @@
-# Data safety
-
-What Acta deletes on its own, how a workspace is exported and deleted, and what
-happens when a person's account is erased. All of it runs from the same
-scheduled tick as notifications: the cron trigger on Cloudflare, a one-minute
-interval on Bun. The code is in `server/src/services/` (`retention.ts`,
-`storageAlert.ts`, `workspaceExport.ts`, `workspaceDeletion.ts`,
-`maintenance.ts`).
+---
+layout: nubisco
+title: 'Data safety'
+intro: "What Acta deletes on its own, how a workspace is exported and deleted, and what happens when a person's account is erased. All of it runs from the same scheduled tick as notifications: the cron trigger on Cloudflare, a one-minute interval on Bun. The code is in `server/src/services/` (`retention.ts`, `storageAlert.ts`, `workspaceExport.ts`, `workspaceDeletion.ts`, `maintenance.ts`)."
+---
 
 ## Retention
 

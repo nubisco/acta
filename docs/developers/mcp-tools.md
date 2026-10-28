@@ -1,8 +1,8 @@
-# Tools
-
-Seventeen tools, plus `attachment_add` when the instance has an attachment
-store configured (it does in every standard deployment). Those marked
-**write** require a token with the write scope.
+---
+layout: nubisco
+title: 'Tools'
+intro: 'Seventeen tools, plus `attachment_add` when the instance has an attachment store configured (it does in every standard deployment). Those marked **write** require a token with the write scope.'
+---
 
 | Tool                 |           | Does                                                                                                                                                                                                                                                                                                               |
 | -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

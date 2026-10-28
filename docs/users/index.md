@@ -1,7 +1,8 @@
-# What Acta is
-
-_This half of the documentation is for using Acta. If you are the one running
-it, see [the developers' half](/developers/)._
+---
+layout: nubisco
+title: 'What Acta is'
+intro: "_This half of the documentation is for using Acta. If you are the one running it, see [the developers' half](/developers/)._"
+---
 
 Acta (Latin: _things done_) is a project management and documentation server.
 It holds two things that usually live in two products:

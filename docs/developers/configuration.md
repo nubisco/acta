@@ -1,8 +1,8 @@
-# Configuration
-
-Everything is an environment variable. Nothing is required to boot, but an
-instance with no `ACTA_ADMIN_EMAIL` and no identity provider has no way for
-anyone to sign in.
+---
+layout: nubisco
+title: 'Configuration'
+intro: 'Everything is an environment variable. Nothing is required to boot, but an instance with no `ACTA_ADMIN_EMAIL` and no identity provider has no way for anyone to sign in.'
+---
 
 ## Core
 

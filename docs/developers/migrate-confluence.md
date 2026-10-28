@@ -1,8 +1,8 @@
-# Migrating from Confluence
-
-The importer reads Confluence pages (from a directory of JSON, or fetched
-live) and writes them to Acta as documents, converting storage-format XHTML to
-Markdown and preserving the page tree, versions and authorship.
+---
+layout: nubisco
+title: 'Migrating from Confluence'
+intro: 'The importer reads Confluence pages (from a directory of JSON, or fetched live) and writes them to Acta as documents, converting storage-format XHTML to Markdown and preserving the page tree, versions and authorship.'
+---
 
 Like the Trello importer it is **idempotent**, so running it again after fixing
 something cannot duplicate pages.

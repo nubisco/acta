@@ -1,7 +1,8 @@
-# Authentication
-
-Acta has no passwords. There are three ways someone can prove who they are,
-and one of them is almost certainly the one you want.
+---
+layout: nubisco
+title: 'Authentication'
+intro: 'Acta has no passwords. There are three ways someone can prove who they are, and one of them is almost certainly the one you want.'
+---
 
 |                                               | Use it when                                                                                |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------ |

@@ -1,4 +1,7 @@
-# Connecting a client
+---
+layout: nubisco
+title: 'Connecting a client'
+---
 
 ## Get a token
 

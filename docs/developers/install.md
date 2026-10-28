@@ -1,8 +1,8 @@
-# Install
-
-Acta is one process. It serves the API, the MCP endpoint and the web app from
-a single port, and keeps everything in SQLite plus a directory of attachments.
-There is no separate database server, queue or cache to run.
+---
+layout: nubisco
+title: 'Install'
+intro: 'Acta is one process. It serves the API, the MCP endpoint and the web app from a single port, and keeps everything in SQLite plus a directory of attachments. There is no separate database server, queue or cache to run.'
+---
 
 ## With Docker
 

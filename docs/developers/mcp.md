@@ -1,7 +1,8 @@
-# The MCP endpoint
-
-Acta speaks the Model Context Protocol at `/mcp`, so an agent can read and
-change spaces, items and documents with the same fidelity the web app has.
+---
+layout: nubisco
+title: 'The MCP endpoint'
+intro: 'Acta speaks the Model Context Protocol at `/mcp`, so an agent can read and change spaces, items and documents with the same fidelity the web app has.'
+---
 
 ## What it is
 

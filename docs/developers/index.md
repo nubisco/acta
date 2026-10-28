@@ -1,8 +1,8 @@
-# For developers
-
-This half of the documentation is for running Acta, integrating with it, or
-working on it. If you are using an Acta someone else runs, you want
-[the users' half](/users/) instead.
+---
+layout: nubisco
+title: 'For developers'
+intro: "This half of the documentation is for running Acta, integrating with it, or working on it. If you are using an Acta someone else runs, you want [the users' half](/users/) instead."
+---
 
 ## Running it
 

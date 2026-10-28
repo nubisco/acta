@@ -1,8 +1,8 @@
-# Migrating from Trello
-
-The importer reads Trello board exports (or fetches boards live) and writes to
-a running Acta instance through the batch endpoints. It brings across lists,
-cards, labels, checklists, comments, attachments, due dates and members.
+---
+layout: nubisco
+title: 'Migrating from Trello'
+intro: 'The importer reads Trello board exports (or fetches boards live) and writes to a running Acta instance through the batch endpoints. It brings across lists, cards, labels, checklists, comments, attachments, due dates and members.'
+---
 
 It is **idempotent**: every op id derives from the Trello source id, so running
 it twice cannot duplicate anything. That is what makes the recommended

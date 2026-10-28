@@ -1,6 +1,8 @@
-# Concepts
-
-Seven ideas explain most of Acta.
+---
+layout: nubisco
+title: 'Concepts'
+intro: 'Seven ideas explain most of Acta.'
+---
 
 ## Workspace
 

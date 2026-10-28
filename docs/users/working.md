@@ -1,4 +1,7 @@
-# Working in Acta
+---
+layout: nubisco
+title: 'Working in Acta'
+---
 
 ## Home
 
