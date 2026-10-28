@@ -1,3 +1,10 @@
+## [1.65.1](https://github.com/nubisco/acta/compare/v1.65.0...v1.65.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **server:** a failed or hung startup no longer hangs every request ([8ad207e](https://github.com/nubisco/acta/commit/8ad207e746a5f92384ec2009cce940438faccbe8))
+
 # [1.65.0](https://github.com/nubisco/acta/compare/v1.64.0...v1.65.0) (2026-10-27)
 
 
