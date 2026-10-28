@@ -63,7 +63,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@nubisco/docs-sdk": "^0.1.5",
+    "@nubisco/docs-sdk": "^0.1.7",
     "@nubisco/ui": "^5.41.1",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/git": "^11.0.1",
