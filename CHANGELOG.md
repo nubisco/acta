@@ -1,3 +1,10 @@
+## [1.65.2](https://github.com/nubisco/acta/compare/v1.65.1...v1.65.2) (2026-10-28)
+
+
+### Bug Fixes
+
+* **auth:** talk to Accord's auth host for sign-in and the account switcher ([37c11e2](https://github.com/nubisco/acta/commit/37c11e230e5d5194d98f631b9459a47ac1eca13c))
+
 ## [1.65.1](https://github.com/nubisco/acta/compare/v1.65.0...v1.65.1) (2026-10-28)
 
 
