@@ -14,6 +14,13 @@
 
 export interface ISsoConfig {
   issuer: string
+  /**
+   * Where the browser talks to the provider: sign-in, and the account menu's
+   * list of signed-in accounts. The issuer unless the provider keeps browser
+   * sessions on another host, as Nubisco's Accord does on auth.nubisco.io
+   * while the issuer stays platform.nubisco.io. Unset means the issuer.
+   */
+  authOrigin?: string
   authorizeUrl: string
   appId: string
   /**
@@ -31,10 +38,12 @@ export function ssoConfigFromEnv(
   const issuer = env.ACTA_SSO_ISSUER?.replace(/\/$/, '')
   const appId = env.ACTA_SSO_APP_ID
   if (!issuer || !appId) return null
+  const authOrigin = env.ACTA_SSO_AUTH_ORIGIN?.replace(/\/$/, '') || issuer
   return {
     issuer,
+    authOrigin,
     appId,
-    authorizeUrl: env.ACTA_SSO_AUTHORIZE_URL ?? `${issuer}/api/auth/sso`,
+    authorizeUrl: env.ACTA_SSO_AUTHORIZE_URL ?? `${authOrigin}/api/auth/sso`,
     // Opt-in (LA-397). A valid token says who someone is, not which
     // workspace they belong to, and on an instance whose provider lets
     // anyone sign up, "on" puts every stranger inside this instance's own

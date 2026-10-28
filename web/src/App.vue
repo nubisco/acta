@@ -268,11 +268,11 @@ const accounts = useAccounts()
 // person signs an account in or out on another Nubisco app.
 function loadAccounts(): void {
   if (!ws.signsInThroughNubisco.value) return
-  void accounts.load(ws.platformUrl.value, ws.me.value)
+  void accounts.load(ws.platformAuthUrl.value, ws.me.value)
 }
 
 function removeAccount(account: IUserMenuAccount): void {
-  void accounts.remove(account, ws.platformUrl.value, ws.me.value)
+  void accounts.remove(account, ws.platformAuthUrl.value, ws.me.value)
 }
 
 // The profile lives on the provider, one page for every app that signs in

@@ -2,12 +2,14 @@
  * The browser's platform accounts, for the account menu.
  *
  * The platform keeps every account signed in on this browser in its own
- * session, and lists them at `/api/auth/identities`. That is a credentialed
- * cross-origin call, allowed because Acta's origin is in the platform's
- * ACCOUNT_MENU_ORIGINS, which covers only those two routes. Whenever the call
- * fails, `accountsUnknown` is set and NbUserMenu shows a single "Switch
- * account" that lets the platform ask instead. Locally it always fails, with
- * a CORS error, because only the deployed origins are allowed.
+ * session, and lists them at `/api/auth/identities` on its auth host (Accord's
+ * auth.nubisco.io, never the issuer, which only sees the old session cookie).
+ * That is a credentialed cross-origin call, allowed because Acta's origin is in
+ * the platform's ACCOUNT_MENU_ORIGINS, which covers only those two routes.
+ * Whenever the call fails, `accountsUnknown` is set and NbUserMenu shows a
+ * single "Switch account" that lets the platform ask instead. Locally it
+ * always fails, with a CORS error, because only the deployed origins are
+ * allowed.
  *
  * Switching is always a fresh sign-in through Acta's own /auth/sso/start,
  * with a login hint or a prompt. That is the only thing that re-issues Acta's
@@ -44,14 +46,14 @@ function returnPath(): string {
 }
 
 export function useAccounts() {
-  async function load(platformUrl: string | null, me: IMe | null) {
-    if (!platformUrl) {
+  async function load(authUrl: string | null, me: IMe | null) {
+    if (!authUrl) {
       accounts.value = []
       accountsUnknown.value = true
       return
     }
     try {
-      const res = await fetch(new URL('/api/auth/identities', platformUrl), {
+      const res = await fetch(new URL('/api/auth/identities', authUrl), {
         credentials: 'include',
       })
       if (!res.ok) throw new Error(`identities: ${res.status}`)
@@ -84,17 +86,17 @@ export function useAccounts() {
 
   async function remove(
     account: IUserMenuAccount,
-    platformUrl: string | null,
+    authUrl: string | null,
     me: IMe | null,
   ): Promise<void> {
-    if (!platformUrl) return
-    await fetch(new URL('/api/auth/identities/remove', platformUrl), {
+    if (!authUrl) return
+    await fetch(new URL('/api/auth/identities/remove', authUrl), {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: account.id }),
     }).catch(() => undefined)
-    await load(platformUrl, me)
+    await load(authUrl, me)
   }
 
   return {

@@ -53,6 +53,7 @@ interface IWorkerEnv {
   ACTA_SSO_ISSUER?: string
   ACTA_SSO_APP_ID?: string
   ACTA_SSO_AUTHORIZE_URL?: string
+  ACTA_SSO_AUTH_ORIGIN?: string
   ACTA_SSO_AUTO_PROVISION?: string
   /** Standard OpenID Connect. Preferred over the ACTA_SSO_* handover contract. */
   ACTA_OIDC_ISSUER?: string

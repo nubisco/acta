@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import type { Hono } from 'hono'
 import { createApp } from '../src/app'
 import { openDb, type BunSqliteDriver } from '../src/db'
-import { JwksVerifier } from '../src/core/sso'
+import { JwksVerifier, ssoConfigFromEnv } from '../src/core/sso'
 
 const ISSUER = 'https://idp.test'
 
@@ -480,5 +480,60 @@ describe('JwksVerifier fetch binding', () => {
     // visitor comes back signed in.
     const asset = await request('/assets/index.js')
     expect(asset.status).toBe(200)
+  })
+})
+
+/**
+ * Accord keeps the issuer as an identifier and holds browser sessions on its
+ * auth host, so where the browser goes and what tokens say can differ.
+ */
+describe('the provider auth origin', () => {
+  it('defaults to the issuer for sign-in', () => {
+    const config = ssoConfigFromEnv({
+      ACTA_SSO_ISSUER: 'https://platform.nubisco.io/',
+      ACTA_SSO_APP_ID: 'acta',
+    })
+    expect(config?.authOrigin).toBe('https://platform.nubisco.io')
+    expect(config?.authorizeUrl).toBe(
+      'https://platform.nubisco.io/api/auth/sso',
+    )
+  })
+
+  it('sends sign-in to the auth host and keeps the issuer for tokens', () => {
+    const config = ssoConfigFromEnv({
+      ACTA_SSO_ISSUER: 'https://platform.nubisco.io',
+      ACTA_SSO_APP_ID: 'acta',
+      ACTA_SSO_AUTH_ORIGIN: 'https://auth.nubisco.io/',
+    })
+    expect(config?.issuer).toBe('https://platform.nubisco.io')
+    expect(config?.authorizeUrl).toBe('https://auth.nubisco.io/api/auth/sso')
+  })
+
+  it('tells the account menu where the accounts are, falling back to the issuer', async () => {
+    const configOf = async (authOrigin?: string) => {
+      const instance = (await createApp(await openDb(':memory:'), {
+        bootstrap: { adminEmail: 'jose@nubisco.io', adminHandle: 'jose' },
+        dataDir: `/tmp/acta-origin-${Math.random().toString(36).slice(2)}`,
+        fetchImpl: idpFetch,
+        sso: {
+          issuer: 'https://platform.nubisco.io',
+          authOrigin,
+          appId: 'acta',
+          authorizeUrl: 'https://platform.nubisco.io/api/auth/sso',
+          autoProvision: false,
+          label: 'Nubisco Platform',
+        },
+      })) as unknown as Hono<never>
+      const res = await instance.request('/api/v1/auth/config')
+      return (await res.json()) as Record<string, unknown>
+    }
+
+    const unset = await configOf()
+    expect(unset.platform_url).toBe('https://platform.nubisco.io')
+    expect(unset.platform_auth_url).toBe('https://platform.nubisco.io')
+
+    const set = await configOf('https://auth.nubisco.io')
+    expect(set.platform_url).toBe('https://platform.nubisco.io')
+    expect(set.platform_auth_url).toBe('https://auth.nubisco.io')
   })
 })

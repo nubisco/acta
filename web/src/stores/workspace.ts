@@ -156,6 +156,7 @@ let inboxLoaded = false
 const authConfig = ref<{
   nubisco_platform?: boolean
   platform_url?: string
+  platform_auth_url?: string
   signup?: boolean
   analytics_url?: string
 } | null>(null)
@@ -458,6 +459,14 @@ export function useWorkspace() {
     ),
     /** Nubisco Platform's address, or null when sign-in goes elsewhere. */
     platformUrl: computed(() => authConfig.value?.platform_url ?? null),
+    /** Where the browser's signed-in accounts are read and removed: Accord's
+        auth host, or the issuer where there is no separate one. */
+    platformAuthUrl: computed(
+      () =>
+        authConfig.value?.platform_auth_url ??
+        authConfig.value?.platform_url ??
+        null,
+    ),
     /** Whether people can create workspaces here (the hosted service). */
     signupEnabled: computed(() => authConfig.value?.signup === true),
     loadAuthConfig,

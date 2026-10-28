@@ -201,6 +201,7 @@ export const auth = {
       sso_label?: string
       nubisco_platform?: boolean
       platform_url?: string
+      platform_auth_url?: string
       /** Whether a person with no workspace can create one here (EE). */
       signup?: boolean
       /** Where the Nubisco Analytics tracker is served from, if anywhere. */

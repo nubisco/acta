@@ -358,10 +358,16 @@ export function authRoutes(
       // lockup. An instance pointed at its own provider has neither page, and
       // must not be told about infrastructure it is not using.
       nubisco_platform: isNubiscoPlatform(sso?.config.issuer),
-      // Where the account menu reads the browser's other signed-in accounts
-      // from, and where Profile opens. Only for Nubisco Platform.
+      // Where Profile opens. Only for Nubisco Platform.
       platform_url: isNubiscoPlatform(sso?.config.issuer)
         ? sso!.config.issuer.replace(/\/$/, '')
+        : undefined,
+      // Where the account menu lists and removes the browser's signed-in
+      // accounts. Not the issuer: Accord keeps the issuer as an identifier
+      // and holds browser sessions on its auth host. The issuer when unset.
+      platform_auth_url: isNubiscoPlatform(sso?.config.issuer)
+        ? ((sso!.mode === 'handover' ? sso!.config.authOrigin : undefined) ??
+          sso!.config.issuer.replace(/\/$/, ''))
         : undefined,
       // Whether a person with no workspace can create one here. Only where
       // the edition offers it, so a self-hosted instance never shows a

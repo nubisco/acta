@@ -78,13 +78,14 @@ The contract Acta had before it spoke OIDC: the provider redirects back with a
 signed JWT rather than an authorization code. Keep using it if you already
 have; prefer OIDC for anything new, and note that OIDC wins if both are set.
 
-| Variable                  | Default                  | What it does                                       |
-| ------------------------- | ------------------------ | -------------------------------------------------- |
-| `ACTA_SSO_ISSUER`         | _unset_                  | Issuer, also where the JWKS is fetched from.       |
-| `ACTA_SSO_APP_ID`         | _unset_                  | The app identifier sent to the authorize endpoint. |
-| `ACTA_SSO_AUTHORIZE_URL`  | `${issuer}/api/auth/sso` | Where to send the browser.                         |
-| `ACTA_SSO_AUTO_PROVISION` | `false`                  | As above.                                          |
-| `ACTA_SSO_LABEL`          | `single sign-on`         | As above.                                          |
+| Variable                  | Default                      | What it does                                                          |
+| ------------------------- | ---------------------------- | --------------------------------------------------------------------- |
+| `ACTA_SSO_ISSUER`         | _unset_                      | Issuer, also where the JWKS is fetched from.                          |
+| `ACTA_SSO_APP_ID`         | _unset_                      | The app identifier sent to the authorize endpoint.                    |
+| `ACTA_SSO_AUTH_ORIGIN`    | the issuer                   | Where the browser signs in and lists its accounts, if not the issuer. |
+| `ACTA_SSO_AUTHORIZE_URL`  | `${authOrigin}/api/auth/sso` | Where to send the browser.                                            |
+| `ACTA_SSO_AUTO_PROVISION` | `false`                      | As above.                                                             |
+| `ACTA_SSO_LABEL`          | `single sign-on`             | As above.                                                             |
 
 ### Provider webhooks
 

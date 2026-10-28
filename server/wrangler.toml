@@ -32,6 +32,10 @@ ACTA_WORKSPACE = "Nubisco"
 # users have no account on; it now comes from here, so this instance has to say
 # so explicitly.
 ACTA_SSO_LABEL = "Nubisco Platform"
+# Accord's auth host: where the browser signs in and where the account menu
+# reads the signed-in accounts. ACTA_SSO_ISSUER stays platform.nubisco.io, it
+# is only an identifier in tokens. Unset, the issuer is used for both.
+ACTA_SSO_AUTH_ORIGIN = "https://auth.nubisco.io"
 # Who notification digests come from. Not a secret, and it belongs here
 # rather than in the code: this file is Nubisco's own deployment, and an
 # address baked into an open-source product is the wrong sender on every
