@@ -1,3 +1,10 @@
+# [1.66.0](https://github.com/nubisco/acta/compare/v1.65.2...v1.66.0) (2026-10-29)
+
+
+### Features
+
+* **mcp:** say where things open, mark read-only tools, declare Acta's identity ([3585326](https://github.com/nubisco/acta/commit/3585326174a37e7f5890c9a03407685d41820132))
+
 ## [1.65.2](https://github.com/nubisco/acta/compare/v1.65.1...v1.65.2) (2026-10-28)
 
 
