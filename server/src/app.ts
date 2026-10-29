@@ -475,7 +475,7 @@ export async function createApp(
     }),
   )
   app.use('/mcp', requireAuth({ resourceMetadata: true }))
-  app.route('/mcp', mcpRoutes(store))
+  app.route('/mcp', mcpRoutes(store, { baseUrl: opts.baseUrl }))
 
   // Static SPA: assets by path, index.html fallback so vue-router resolves
   // client-side (house pattern: run_worker_first + html_handling none).

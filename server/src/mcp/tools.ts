@@ -53,6 +53,8 @@ export interface IMcpTool {
   schema: z.ZodType
   /** Tools that mutate require the write scope. */
   write?: boolean
+  /** Changes nothing. Declared to clients as annotations.readOnlyHint. */
+  readOnly?: boolean
   handler: (ctx: ICtx, args: unknown) => unknown
 }
 
@@ -72,13 +74,15 @@ const zDocGet = z.object({
 export const MCP_TOOLS: IMcpTool[] = [
   {
     name: 'workspace_overview',
+    readOnly: true,
     description:
-      'One-call bootstrap: workspace name, all spaces with their lists and item counts, label groups, members (humans and agents), doc tree roots, and every goal (number, title, status, parent). Call this first; no other read is needed to orient.',
+      'One-call bootstrap: workspace name, all spaces with their lists and item counts, label groups, members (humans and agents), doc tree roots, and every goal (number, title, status, parent). When the instance has a public address, url_templates says where a card ({space} is the key before the dash), goal and document open in the web app: fill them to link, never guess the routes. Call this first; no other read is needed to orient.',
     schema: z.object({}),
     handler: (ctx) => workspaceOverview(ctx),
   },
   {
     name: 'space_get',
+    readOnly: true,
     description:
       'Items of one space, compact rows by default (key, title, list, labels, assignees, comment count, checklist progress, rev, updated). Filter by list, label, assignee, goal (number: the cards serving it, its sub-goals and parts included), state (open|done|archived|all), free text, or updated_since for delta reads. detail=board adds what a board card shows (summary: the first line of the description, size, blocked_by: open blockers, atts, goals: the goals each card serves, inherited through parents); detail=full adds that and whole descriptions. done=space leaves out done cards older than the board window set on the space, as the board shows it, and returns done_hidden, the number left out. The default returns every card. Never read a whole space to change one item; use item_write directly.',
     schema: zSpaceGet,
@@ -86,6 +90,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   },
   {
     name: 'item_get',
+    readOnly: true,
     description:
       'Full detail for up to 50 items by key in one call: description, comments, checklists, links (backlinks included), attachments, parent and parts, dependencies, and goals (the goals it serves, with via:KEY when the link is on a card it is part of); add "activity" to include the audit tail. Old keys from cross-space moves resolve automatically.',
     schema: zItemGet,
@@ -104,6 +109,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   },
   {
     name: 'goal_list',
+    readOnly: true,
     description:
       "Every goal in the workspace with its state, plus a summary (count by status, how many are overdue or have had no check-in for 30 days, and the work across all goals in flight). Goals are workspace-wide and numbered G-1, G-2. Each row carries two separate signals: status (the owner's judgement: pending, on_track, at_risk, off_track, done, paused, cancelled, set by check-ins) and progress (measured from the cards that serve it: total, done, active, waiting, overdue, and percent weighted by card size, unsized counting as 1). Progress counts cards linked to the goal, every card that is part of a linked card at any depth, and the work of its sub-goals (archived and cancelled sub-goals excluded), each card once. Also: owner, parent goal number, start and target dates, elapsed (percent of the date window gone), metric {name, unit, start, target, current, percent} when it has one, last_check_in. Filter by state (open|archived|all), status (comma separated), owner. To list the cards behind a goal, use goal_get or space_get with goal.",
     schema: zGoalList,
@@ -111,6 +117,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   },
   {
     name: 'goal_get',
+    readOnly: true,
     description:
       'Full detail for up to 20 goals by number (12 or "G-12"): everything goal_list returns plus description, followers, ancestors, children (its sub-goals, each with its own progress), items (every card counted toward this goal itself: linked:true for a direct link, via:KEY for a part reached through a linked card, with done, active, waiting, overdue, size and assignees as handles) and check_ins newest first (status, body, metric_value, can_edit, can_delete). include narrows to ["items"] or ["check_ins"]. Add "tree" to give each item parent (the card it is directly a part of) and blocked_by (its open blockers, [{key, title, space}], on any space).',
     schema: zGoalGet,
@@ -140,6 +147,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   },
   {
     name: 'doc_tree',
+    readOnly: true,
     description:
       'The document hierarchy as a flat depth-annotated list (slug, title, depth, rev, updated). Optionally scoped to a subtree root.',
     schema: zDocTree,
@@ -150,6 +158,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   },
   {
     name: 'doc_get',
+    readOnly: true,
     description:
       'One document: frontmatter fields, markdown body, rev. include=["sections"] returns the heading map with per-section content hashes for surgical edits via doc_write patch_section; "versions" lists history; "backlinks" lists referrers; "comments" lists comments, where an inline one carries its anchor (quoted text with prefix/suffix context), anchor_status (anchored, or detached when the quoted text is gone: the comment is kept either way) and resolved {by, ts} once resolved. at_version reads an old revision.',
     schema: zDocGet,
@@ -174,6 +183,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   },
   {
     name: 'search',
+    readOnly: true,
     description:
       'Unified full-text search across item titles/descriptions, comments, and documents. Returns type, key/slug, title, snippet. Filter by types or space.',
     schema: zSearch,
@@ -181,6 +191,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   },
   {
     name: 'activity_query',
+    readOnly: true,
     description:
       'The audit trail. Filter by entity (kind or id), actor, actor_kind (human|agent|system), verb pattern (item.* style), and since (event id cursor) for cheap "what changed since my last session" delta reads. Every event carries actor attribution and rule causation.',
     schema: zActivityQuery,
@@ -189,6 +200,7 @@ export const MCP_TOOLS: IMcpTool[] = [
   },
   {
     name: 'response_times',
+    readOnly: true,
     description:
       "How long people wait, per space and per label: time to first response and time to resolution, each as count, median_ms and p90_ms, plus received (cards created in the range) and unanswered (of those, still without a first response when the range ended). from/to are epoch ms, from inclusive and to exclusive, and default to the seven days up to now. space narrows to one space, and without it the report covers every unarchived space where something happened. First response: the first comment, move to another list, completion or reopening by a person who is not the card's creator. Agents and the system never count, whoever they act for. Resolution: reaching a done-role list or being completed, measured from creation to the last such time if the card was reopened. A card created already done has none. A card counts in the range its response or resolution happened in, judged on what had happened by the end of the range, so a past week always reads the same. Labels are the ones a card carries now, with their group (e.g. Need/Bug report). Calendar time, not working hours.",
     schema: zResponseTimes,

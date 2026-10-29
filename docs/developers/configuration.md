@@ -6,13 +6,13 @@ intro: 'Everything is an environment variable. Nothing is required to boot, but 
 
 ## Core
 
-| Variable         | Default     | What it does                                                                                                                         |
-| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `ACTA_WORKSPACE` | `Workspace` | The workspace name. Its slug becomes the URL segment.                                                                                |
-| `ACTA_DATA_DIR`  | `./data`    | Where `acta.sqlite` and `attachments/` live. Not used on Workers.                                                                    |
-| `ACTA_PORT`      | `4460`      | Listen port. Not used on Workers.                                                                                                    |
-| `ACTA_WEB_DIST`  | _unset_     | Directory of the built SPA. Without it the server serves the API only.                                                               |
-| `ACTA_BASE_URL`  | _unset_     | Acta's public address. Used to turn a card key into a link in outbound messages; everything works without it, just without the link. |
+| Variable         | Default     | What it does                                                                                                                                                      |
+| ---------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ACTA_WORKSPACE` | `Workspace` | The workspace name. Its slug becomes the URL segment.                                                                                                             |
+| `ACTA_DATA_DIR`  | `./data`    | Where `acta.sqlite` and `attachments/` live. Not used on Workers.                                                                                                 |
+| `ACTA_PORT`      | `4460`      | Listen port. Not used on Workers.                                                                                                                                 |
+| `ACTA_WEB_DIST`  | _unset_     | Directory of the built SPA. Without it the server serves the API only.                                                                                            |
+| `ACTA_BASE_URL`  | _unset_     | Acta's public address. Used to turn a card key into a link in outbound messages and in the MCP url templates; everything works without it, just without the link. |
 
 ## The first administrator
 

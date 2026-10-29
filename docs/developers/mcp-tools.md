@@ -1,7 +1,7 @@
 ---
 layout: nubisco
 title: 'Tools'
-intro: 'Seventeen tools, plus `attachment_add` when the instance has an attachment store configured (it does in every standard deployment). Those marked **write** require a token with the write scope.'
+intro: 'Seventeen tools, plus the three attachment tools when the instance has an attachment store configured (it does in every standard deployment). Those marked **write** require a token with the write scope. The rest only read, and say so to the client as `readOnlyHint`.'
 ---
 
 | Tool                 |           | Does                                                                                                                                                                                                                                                                                                               |
@@ -313,6 +313,29 @@ where nothing happened.
   with nothing to measure is `null`.
 - Cards are grouped by the space they are in and the labels they carry now.
   Durations are calendar time.
+
+## Links back to Acta
+
+When the instance has `ACTA_BASE_URL` set, `workspace_overview` returns
+`url_templates`, where a card, a goal and a document open in the web app for
+your workspace. The server's `instructions` on `initialize` carry the same
+templates, so a model sees them as soon as it connects.
+
+```json
+"url_templates": {
+  "item": "https://acta.example.com/nubisco/s/{space}?item={key}",
+  "goal": "https://acta.example.com/nubisco/goals/{number}",
+  "doc": "https://acta.example.com/nubisco/docs/{slug}"
+}
+```
+
+`{space}` is the part of a card key before the dash, so `CM-35` opens at
+`.../s/CM?item=CM-35`, and `G-14` at `.../goals/14`. Fill these rather than
+building addresses yourself: the routes are the web app's to change, and the
+templates follow them. They are given once rather than as a `url` on every row
+because every address follows from a key the result already carries, and a
+`url` per row made a compact read a third larger. Without `ACTA_BASE_URL` there
+are no templates, never relative ones.
 
 ## Errors
 

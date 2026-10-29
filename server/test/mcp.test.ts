@@ -35,11 +35,12 @@ async function call(name: string, args: unknown, token = agentToken) {
   return { data, isError: res.result.isError === true, raw: content }
 }
 
-beforeEach(async () => {
+async function boot(baseUrl?: string) {
   db = await openDb(':memory:')
   app = (await createApp(db, {
     bootstrap: { adminEmail: 'jose@nubisco.io', adminHandle: 'jose' },
     dataDir: `/tmp/acta-test-${Math.random().toString(36).slice(2)}`,
+    baseUrl,
   })) as never
   const ws = (await db.query<{ id: string }>('SELECT id FROM workspace'))[0].id
   const jose = (
@@ -52,7 +53,9 @@ beforeEach(async () => {
     [agentId, ws, jose, Date.now()],
   )
   agentToken = await createToken(db, ws, agentId, 'agent', ['read', 'write'])
-})
+}
+
+beforeEach(() => boot())
 
 describe('mcp endpoint', () => {
   it('rejects unauthenticated requests', async () => {
@@ -98,6 +101,39 @@ describe('mcp endpoint', () => {
     for (const tool of list.result.tools) {
       expect(tool.inputSchema.type).toBe('object')
     }
+  })
+
+  it('says it is Acta, with its own icon, and which tools only read', async () => {
+    const init = await rpc('initialize', {
+      protocolVersion: '2025-06-18',
+      capabilities: {},
+      clientInfo: { name: 'test', version: '0' },
+    })
+    const info = init.result.serverInfo
+    expect(info.title).toBe('Acta')
+    expect(info.websiteUrl).toBe('http://localhost')
+    expect(info.icons[0]).toEqual({
+      src: 'http://localhost/acta-icon.svg',
+      mimeType: 'image/svg+xml',
+      sizes: ['any'],
+    })
+
+    const list = await rpc('tools/list')
+    const readOnly = list.result.tools
+      .filter((t: any) => t.annotations?.readOnlyHint === true)
+      .map((t: any) => t.name)
+    expect(readOnly).toEqual([
+      'workspace_overview',
+      'space_get',
+      'item_get',
+      'goal_list',
+      'goal_get',
+      'doc_tree',
+      'doc_get',
+      'search',
+      'activity_query',
+      'response_times',
+    ])
   })
 
   it('runs the support-triage scenario in two calls with agent attribution', async () => {
@@ -437,5 +473,57 @@ describe('notifications from an agent', () => {
     // The frame says that something happened, never what anybody was told:
     // the inbox itself is only ever read per person, over GET.
     expect(seen).not.toContain('ivan')
+  })
+})
+
+describe('where things open in the web app', () => {
+  it('states the address templates once, in the bootstrap read and the instructions', async () => {
+    await boot('https://acta.example.com/')
+    const overview = await call('workspace_overview', {})
+    expect(overview.data.url_templates).toEqual({
+      item: 'https://acta.example.com/nubisco/s/{space}?item={key}',
+      goal: 'https://acta.example.com/nubisco/goals/{number}',
+      doc: 'https://acta.example.com/nubisco/docs/{slug}',
+    })
+    const init = await rpc('initialize', {
+      protocolVersion: '2025-06-18',
+      capabilities: {},
+      clientInfo: { name: 'test', version: '0' },
+    })
+    expect(init.result.instructions).toContain(
+      'https://acta.example.com/nubisco/s/{space}?item={key}',
+    )
+    // The instance's own address, not whichever host the request came in on.
+    expect(init.result.serverInfo.websiteUrl).toBe('https://acta.example.com')
+
+    // Rows stay as compact as they were.
+    await call('space_write', {
+      ops: [
+        {
+          op: 'create',
+          op_id: 'b1',
+          key: 'CM',
+          name: 'Core',
+          template: 'kanban6',
+        },
+      ],
+    })
+    await call('item_write', {
+      default_space: 'CM',
+      ops: [{ op: 'create', op_id: 'i1', list: 'Backlog', title: 'Card' }],
+    })
+    const space = await call('space_get', { space: 'CM' })
+    expect(space.raw).not.toContain('acta.example.com')
+  })
+
+  it('gives no templates when the instance has no address configured', async () => {
+    const overview = await call('workspace_overview', {})
+    expect(overview.data.url_templates).toBeUndefined()
+    const init = await rpc('initialize', {
+      protocolVersion: '2025-06-18',
+      capabilities: {},
+      clientInfo: { name: 'test', version: '0' },
+    })
+    expect(init.result.instructions).not.toContain('templates')
   })
 })

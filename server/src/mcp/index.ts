@@ -8,6 +8,7 @@ import { Hono } from 'hono'
 import { ApiError, type IActorCtx, type ICtx } from '../core/ctx'
 import type { ISqlDriver } from '../db'
 import type { AttachmentStore } from '../services/attachments'
+import { urlTemplates, type IUrlTemplates } from '../core/links'
 import { createMcpTools, toolInputSchema, type IMcpTool } from './tools'
 
 const PROTOCOL_VERSION = '2025-06-18'
@@ -40,10 +41,57 @@ function rpcError(
   return { jsonrpc: '2.0' as const, id, error: { code, message, data } }
 }
 
+const INSTRUCTIONS =
+  'Acta manages kanban spaces and markdown documents. Start with workspace_overview to orient. All writes are batch ops with client op_ids: they are idempotent and safe to retry. Prefer patch_section/append for document edits and updated_since/since cursors for delta reads.'
+
+interface IRequestEnv {
+  /** Where this server is, for its own icon and site. */
+  origin: string
+  /** Null when the instance has no public address configured. */
+  templates: () => Promise<IUrlTemplates | null>
+}
+
+/** The templates in words, for a model reading the instructions. */
+function linkInstructions(t: IUrlTemplates): string {
+  return ` To link to something in Acta, fill these templates: a card ${t.item} ({space} is the key before the dash, CM for CM-35), a goal ${t.goal} (12 for G-12), a document ${t.doc}. workspace_overview returns them as url_templates.`
+}
+
+/**
+ * The server's own identity, so a client can show Acta's name and icon
+ * rather than a generic one. Fields from MCP 2025-11-25, which a client on an
+ * older revision ignores.
+ */
+function serverInfo(origin: string) {
+  return {
+    name: 'acta',
+    title: 'Acta',
+    version: '0.1.0',
+    websiteUrl: origin,
+    icons: [
+      {
+        src: `${origin}/acta-icon.svg`,
+        mimeType: 'image/svg+xml',
+        sizes: ['any'],
+      },
+      {
+        src: `${origin}/icons/acta-192.png`,
+        mimeType: 'image/png',
+        sizes: ['192x192'],
+      },
+      {
+        src: `${origin}/icons/acta-512.png`,
+        mimeType: 'image/png',
+        sizes: ['512x512'],
+      },
+    ],
+  }
+}
+
 async function handleRequest(
   ctx: ICtx,
   tools: IMcpTool[],
   req: IJsonRpcRequest,
+  env: IRequestEnv,
 ): Promise<unknown> {
   const id = req.id ?? null
   switch (req.method) {
@@ -51,9 +99,10 @@ async function handleRequest(
       return rpcResult(id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: {} },
-        serverInfo: { name: 'acta', version: '0.1.0' },
-        instructions:
-          'Acta manages kanban spaces and markdown documents. Start with workspace_overview to orient. All writes are batch ops with client op_ids: they are idempotent and safe to retry. Prefer patch_section/append for document edits and updated_since/since cursors for delta reads.',
+        serverInfo: serverInfo(env.origin),
+        instructions: await env
+          .templates()
+          .then((t) => (t ? INSTRUCTIONS + linkInstructions(t) : INSTRUCTIONS)),
       })
     case 'ping':
       return rpcResult(id, {})
@@ -63,6 +112,7 @@ async function handleRequest(
           name: tool.name,
           description: tool.description,
           inputSchema: toolInputSchema(tool),
+          ...(tool.readOnly ? { annotations: { readOnlyHint: true } } : {}),
         })),
       })
     case 'tools/call': {
@@ -85,7 +135,14 @@ async function handleRequest(
         )
       }
       try {
-        const result = await tool.handler(ctx, parsed.data)
+        let result = await tool.handler(ctx, parsed.data)
+        // The bootstrap read says once where things open, rather than every
+        // read carrying a url per row (see core/links.ts).
+        if (tool.name === 'workspace_overview') {
+          const templates = await env.templates()
+          if (templates)
+            result = { ...(result as object), url_templates: templates }
+        }
         return rpcResult(id, {
           content: [{ type: 'text', text: JSON.stringify(result) }],
         })
@@ -114,7 +171,10 @@ function toolError(text: string) {
   return { content: [{ type: 'text', text }], isError: true }
 }
 
-export function mcpRoutes(store: AttachmentStore): Hono<IMcpEnv> {
+export function mcpRoutes(
+  store: AttachmentStore,
+  opts: { baseUrl?: string } = {},
+): Hono<IMcpEnv> {
   const app = new Hono<IMcpEnv>()
   const tools = createMcpTools(store)
 
@@ -130,10 +190,31 @@ export function mcpRoutes(store: AttachmentStore): Hono<IMcpEnv> {
     } catch {
       return c.json(rpcError(null, -32700, 'parse error'), 400)
     }
+    // Links only from a configured address (ACTA_BASE_URL, which the Worker
+    // defaults to its own origin), as outbound email does: the host a
+    // request arrived on can be an internal one behind a proxy.
+    const env: IRequestEnv = {
+      origin:
+        (opts.baseUrl ?? '').trim().replace(/\/+$/, '') ||
+        new URL(c.req.url).origin,
+      templates: async () => {
+        if (!opts.baseUrl) return null
+        const rows = await ctx.db.query<{ slug: string }>(
+          'SELECT slug FROM workspace WHERE id = ?',
+          [ctx.workspaceId],
+        )
+        return urlTemplates(opts.baseUrl, rows[0]?.slug)
+      },
+    }
     const requests = Array.isArray(body) ? body : [body]
     const responses: unknown[] = []
     for (const r of requests) {
-      const response = await handleRequest(ctx, tools, r as IJsonRpcRequest)
+      const response = await handleRequest(
+        ctx,
+        tools,
+        r as IJsonRpcRequest,
+        env,
+      )
       if (response !== undefined) responses.push(response)
     }
     if (responses.length === 0) return c.body(null, 202)
